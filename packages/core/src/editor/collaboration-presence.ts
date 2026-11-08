@@ -1,7 +1,7 @@
-// Presence between the editor and an attached collaboration session, after DOCX Editor's
-// surface wiring (`paginated-surface.ts`): the editor publishes its selection on every change,
-// follows its own caret when a peer's edit moves it, returns to the selection of an undone
-// change, and hands the surface the peers' selections to paint.
+// Presence between the editor and an attached collaboration session, after DOCX Editor's surface
+// wiring (`packages/core/src/editor/paginated-surface.ts`): the editor publishes its selection on
+// every change, follows its own caret when a peer's edit moves it, returns to the selection of an
+// undone change, and hands the surface the peers' selections to paint. DOCX Editor commit adf0e178.
 //
 // The editor addresses text as (shape, paragraph index, offset in the paragraph); a session
 // addresses it as (text node, offset in that node), because only a node has a shared key in

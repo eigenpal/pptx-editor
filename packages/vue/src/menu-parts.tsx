@@ -1,7 +1,8 @@
 /** @jsxImportSource vue */
 // `PptxEditorMenu`: the menu bar as library parts, the Vue twin of the React adapter's
 // `PptxEditor.Menu` (`menu-parts.tsx`), after DOCX Editor's `DocxEditorMenu`
-// (docx-editor/docs/site/content/customization/menus.mdx, packages/vue/src/editor/menu/).
+// (docx-editor/docs/site/content/customization/menus.mdx, packages/vue/src/editor/menu/). DOCX
+// Editor commit adf0e178.
 //
 // The preset bar renders core's `CHROME_MENUS` (File, Edit, View, Insert, Format, Arrange,
 // Slide Show). A named menu child (`PptxEditorMenu.File`) changes its menu in place: `hidden`

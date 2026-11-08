@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/check-max-lines-caps.mjs at 43c2012f3 (EigenPal).
+// Adapted from docx-editor/scripts/check-max-lines-caps.mjs at 43c2012f3 (EigenPal).
 // PPTX Editor changes: SLACK_EXEMPT and BLANKET_DISABLES are empty, because no file here holds
 // headroom or turns max-lines off for itself.
 /**

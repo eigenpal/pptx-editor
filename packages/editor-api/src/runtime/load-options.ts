@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from DOCX Editor's `packages/editor-api/src/runtime/load-options.ts` (commit 5993bd223945).
+// Adapted from DOCX Editor's `packages/editor-api/src/runtime/load-options.ts` (commit 5993bd223945).
 // What `load(...)` accepts, and what it refuses.
 //
 // Four call shapes, as Office.js takes them: `load('text')`, `load(['text', 'style'])`,

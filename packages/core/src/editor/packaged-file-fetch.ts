@@ -1,5 +1,6 @@
 // A `fetch` for packaged font files under Node, after DOCX Editor's
-// `packages/core/src/export/packaged-file-fetch.ts` (EigenPal, `createPackagedFileFetch`).
+// `packages/core/src/export/packaged-file-fetch.ts` (EigenPal, `createPackagedFileFetch`). DOCX
+// Editor commit adf0e178.
 //
 // `@docx-editor.dev/fonts` names each face as `new URL('../assets/X.ttf', import.meta.url)`.
 // A browser bundler rewrites that to an HTTP URL, and Bun's `fetch` reads a `file:` URL, but

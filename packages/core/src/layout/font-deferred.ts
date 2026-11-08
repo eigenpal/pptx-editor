@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/layout/font-deferred.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/layout/font-deferred.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // Faces an origin delivers after the first paint (`FontConfigurationFragment.deferred`).

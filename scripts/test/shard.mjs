@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/shard.mjs at 39a490db (EigenPal).
+// Copied from docx-editor/scripts/test/shard.mjs at adf0e178 (EigenPal).
 // Assign files before duration-based scheduling: runner-local caches must never
 // change shard membership, or CI could omit files or execute them twice.
 //

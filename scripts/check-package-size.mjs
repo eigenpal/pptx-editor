@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Copied from docx-editor/scripts/check-package-size.mjs (EigenPal), adapted for PPTX Editor.
+// Copied from docx-editor/scripts/check-package-size.mjs at adf0e178 (EigenPal), with comments
+// for PPTX Editor.
 //
 // Package size report + gate for the packages we publish.
 //

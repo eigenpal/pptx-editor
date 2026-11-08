@@ -1,6 +1,7 @@
-// Copied from DOCX Editor packages/editor-api/scripts/lib/manifest-integrity.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
-// Changes: the presentation namespace and paths. PPTX Editor has no declaration-only fixture
-// (DOCX Editor's `compat/docxeditor/declarations.ts`), so the authored-export check
+// Adapted from DOCX Editor packages/editor-api/scripts/lib/manifest-integrity.mjs at commit
+// 5993bd223945cabdaf3900557d9fb59bfd8c2d8c. Changes: the presentation namespace and paths. PPTX
+// Editor has no declaration-only fixture (DOCX Editor's
+// `packages/editor-api/compat/docxeditor/declarations.ts`), so the authored-export check
 // `validateAuthoredExportsAgainstManifest` and its support-type allowlist are not copied.
 /**
  * Internal-consistency checks for `compat/manifest.json`.

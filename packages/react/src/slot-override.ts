@@ -95,9 +95,10 @@ function composeHandlers(childHandler: unknown, slotHandler: unknown): unknown {
 
 /**
  * Render `child` with the control's props merged in, after DOCX Editor's toolbar `Slot`
- * (docx-editor/packages/react/src/editor/toolbar/Slot.tsx): class names join, styles merge
- * (child wins per property), handlers run child-first (the control's handler is skipped when
- * the child called `preventDefault()`), and other props keep the child's own value.
+ * (docx-editor/packages/react/src/editor/toolbar/Slot.tsx): class names join, styles merge (child
+ * wins per property), handlers run child-first (the control's handler is skipped when the child
+ * called `preventDefault()`), and other props keep the child's own value. DOCX Editor commit
+ * adf0e178.
  */
 export function renderAsChild(
   child: ReactElement<HostElementProps>,

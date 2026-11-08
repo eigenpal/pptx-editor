@@ -1,4 +1,4 @@
-// Ported from DOCX Editor packages/vue/src/editor/dialog-parts.ts at 27720ad5
+// Adapted from DOCX Editor packages/vue/src/editor/dialog-parts.ts at 27720ad5
 // (`createDialogComposition`, `NativeDialog`). PPTX changes:
 // the names follow the React twin (`createDialogParts`, `DialogFrame`), and the draft lives in
 // core.

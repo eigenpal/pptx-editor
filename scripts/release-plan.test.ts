@@ -1,4 +1,5 @@
-// The release plan never goes major by accident (DOCX Editor's scripts/release-plan.test.ts).
+// The release plan never goes major by accident (DOCX Editor's scripts/release-plan.test.ts). DOCX
+// Editor commit adf0e178.
 //
 // The packages are one fixed group, and the adapters have `core` as a peer. By
 // default changesets bumps a peer dependent to major whenever the peer changes, and the

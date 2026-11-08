@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/sha256.ts at aaebb18e (EigenPal).
+// Copied from docx-editor/packages/core/src/store/package/sha256.ts at adf0e178 (EigenPal).
 // Keep it equal to that file.
 // Synchronous platform-neutral SHA-256 over raw bytes.
 //

@@ -3,7 +3,7 @@
 // The same model as DOCX Editor's `packages/core/src/store/store/history-group.ts` and
 // `tree-store.ts`: history is scoped by intent, never by a timer. The caller states the scope.
 // A transaction is one entry; consecutive transactions that carry the same group token are one
-// entry; a projection or awareness commit is no entry.
+// entry; a projection or awareness commit is no entry. DOCX Editor commit adf0e178.
 
 /**
  * The identity of one continuous user gesture, for history grouping.

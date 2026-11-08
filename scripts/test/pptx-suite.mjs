@@ -1,6 +1,6 @@
-// PPTX Editor only: the facts about this repository that the runner copied from DOCX Editor
-// (`run-parallel.mjs`, `changed.mjs`) needs. Kept apart, so the copied files stay equal to
-// their source apart from the lines that read these values.
+// PPTX Editor only: the facts about this repository that the runner modules from DOCX Editor
+// (`scripts/test/run-parallel.mjs`, `scripts/test/changed.mjs` at adf0e178) need. Kept apart,
+// so those modules stay equal to their source apart from the lines that read these values.
 
 /**
  * The npm scopes of the workspace packages. Each maps `<scope><name>` to `packages/<name>`.

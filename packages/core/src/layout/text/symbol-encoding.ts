@@ -1,4 +1,4 @@
-// Copied from DOCX Editor: packages/core/src/store/package/symbol-encoding.ts at 0c907463 (format-neutral).
+// Copied from DOCX Editor: packages/core/src/store/package/symbol-encoding.ts at adf0e178 (format-neutral).
 // Legacy symbol-font encoding (U+F020–U+F0FF) → Unicode, for list markers.
 //
 // A WordprocessingML document stores a Symbol/Wingdings bullet as the font's own byte PLUS 0xF000: the default

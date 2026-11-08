@@ -5,7 +5,7 @@
 // stopped running. oxlint's JavaScript plugins are alpha and outside semver, so this test lints a
 // fixture of every banned shape with the real `.oxlintrc.json`, at the paths its overrides name,
 // and checks the exact reports. Same approach as DOCX Editor's
-// `scripts/__tests__/oxlint-rules.test.ts`.
+// `scripts/__tests__/oxlint-rules.test.ts`. DOCX Editor commit adf0e178.
 
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';

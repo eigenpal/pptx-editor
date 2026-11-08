@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The shared harness of the seeded collaboration fuzzers (`*-fuzz.test.ts`). Adapted from DOCX
+// The shared harness of the seeded collaboration fuzzers (`*-fuzz.test.ts`). After DOCX
 // Editor `packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts` (commit
 // 5993bd223): `seededRandom` is a copy, and the environment knobs, the trail, the shrink, and
 // `kindOf` keep its shape. The peer harness is PPTX-only: N editors on N Y.Docs

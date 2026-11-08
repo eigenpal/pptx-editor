@@ -4,7 +4,7 @@
 // picker takes the hook and ignores the `Toolbar.FontFamily` parts. PPTX Editor adds the groups
 // of core's `font-picker.ts` (the slide's theme fonts, the deck's fonts, all fonts), so a host
 // list can show the same groups as the packaged picker. The Vue twin is
-// `packages/vue/src/useFontFamily.ts`.
+// `packages/vue/src/useFontFamily.ts`. DOCX Editor commit adf0e178.
 
 import { useCallback, useMemo } from 'react';
 import {

@@ -1,5 +1,5 @@
 // Drawing renderers that a capability package installs, after DOCX Editor's
-// `packages/core/src/store/package/drawing-renderers.ts`.
+// `packages/core/src/store/package/drawing-renderers.ts`. DOCX Editor commit adf0e178.
 //
 // The engine paints shapes, pictures, fills, lines, text, and outer and preset shadows on its
 // own. A shape or picture paints without the effects that no renderer paints: glow, inner

@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/run-parallel.test.mjs at 39a490db (EigenPal).
+// Adapted from docx-editor/scripts/test/run-parallel.test.mjs at 39a490db (EigenPal).
 // PPTX Editor changes: the isolated repository has no `benchmarks/`, and it gets `pptx-suite.mjs`.
 import { expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';

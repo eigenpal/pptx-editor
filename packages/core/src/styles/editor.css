@@ -1,14 +1,14 @@
 /**
  * PPTX Editor styles — the single source of truth for chrome CSS and tokens.
  *
- * The token block (shadcn HSL set and `--doc-*` chrome palette, light and dark) is copied from
- * docx-editor/packages/core/src/styles/editor.css with the same NAMES, so one theme override
+ * The token block (shadcn HSL set and `--doc-*` chrome palette, light and dark) is adapted from
+ * docx-editor/packages/core/src/styles/editor.css at adf0e178, with the same NAMES, so one theme override
  * styles both products. Component rules below use tokens only — no raw hex or rgba. The slide
  * canvas is never themed: it keeps the deck's own colors in dark mode too.
  */
 
 /* ============================================================================
- * TOKENS (copied from DOCX Editor, scoped to .pptx-editor)
+ * TOKENS (the DOCX Editor token set, scoped to .pptx-editor)
  * ============================================================================ */
 .pptx-editor {
   /* ----------------------------------------------------------------------

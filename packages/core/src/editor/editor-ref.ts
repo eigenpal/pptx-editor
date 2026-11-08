@@ -2,7 +2,7 @@
 // `createDocxEditorRefApi` (docx-editor/packages/vue/src/components/DocxEditor/useDocxEditorRefApi.ts)
 // and `useDocxEditorRefApi` (docx-editor/packages/react/src/components/DocxEditor/hooks/).
 // React's `useImperativeHandle` and Vue's `expose` both build the handle here, so the two refs
-// cannot drift.
+// cannot drift. DOCX Editor commit adf0e178.
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 

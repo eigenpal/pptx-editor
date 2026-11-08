@@ -1,7 +1,8 @@
 // The editor's side of a progressive open (`progressive-open.ts`), after DOCX Editor's
-// `docx-editor-opening-layout.ts`: the open ends when the first slide shows, and the rest of
-// the deck parses in background tasks that belong to the session they started for. They stop
-// once the editor holds another session. A reader of the whole deck (save) finishes them first.
+// `packages/core/src/editor/docx-editor-opening-layout.ts`: the open ends when the first slide
+// shows, and the rest of the deck parses in background tasks that belong to the session they
+// started for. They stop once the editor holds another session. A reader of the whole deck (save)
+// finishes them first. DOCX Editor commit adf0e178.
 //
 // When the background parse settles, the fonts follow: a slide parsed in the background can
 // name a family the parts parsed at the open did not, so the packaged substitutes and the host

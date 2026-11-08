@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-// Ported from DOCX Editor packages/react/src/editor/dialog-parts.tsx at 27720ad5
+// Adapted from DOCX Editor packages/react/src/editor/dialog-parts.tsx at 27720ad5
 // (`createDialogParts`, `DialogFrame`, `UseDialogReturn`).
 // PPTX changes: part markers are `data-pptx-*`, the draft lives in core, `createDialogParts`
 // takes the dialog's name for warnings, and the frame rules in core differ where noted there.

@@ -1,0 +1,1976 @@
+[
+  {
+    "file": ".github/cla/cla.sh",
+    "kind": "copied",
+    "source": [".github/cla/cla.sh"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/cla/cla.test.sh",
+    "kind": "copied",
+    "source": [".github/cla/cla.test.sh"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/dependabot.yml",
+    "kind": "reference",
+    "source": [".github/dependabot.yml"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/workflows/ci.yml",
+    "kind": "reference",
+    "source": [".github/workflows/ci.yml"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/workflows/cla.yml",
+    "kind": "copied",
+    "source": [".github/workflows/cla.yml"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/workflows/dependabot-slack-reminders.yml",
+    "kind": "adapted",
+    "source": [".github/workflows/dependabot-slack-reminders.yml"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/workflows/post-release.yml",
+    "kind": "reference",
+    "source": [".github/workflows/post-release.yml"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".github/workflows/release.yml",
+    "kind": "reference",
+    "source": [".github/workflows/release.yml"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": ".husky/pre-commit",
+    "kind": "reference",
+    "source": [".husky/pre-commit"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "api/convert.node.test.mjs",
+    "kind": "reference",
+    "source": ["api/convert.node.test.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "api/convert.ts",
+    "kind": "reference",
+    "source": ["api/convert.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "docs/site/data/pptx-features.test.ts",
+    "kind": "reference",
+    "source": ["docs/site/data/word-features.ts"],
+    "commit": "29535a640510"
+  },
+  {
+    "file": "docs/site/data/pptx-features.ts",
+    "kind": "adapted",
+    "source": ["docs/site/data/word-features.ts"],
+    "commit": "29535a640510"
+  },
+  {
+    "file": "examples/chat/src/text.ts",
+    "kind": "reference",
+    "source": ["examples/shared/example-text.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "examples/shared/pdf-export-plugin.ts",
+    "kind": "reference",
+    "source": ["examples/shared/pdf-export-plugin.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "examples/vite/src/BrandLogo.tsx",
+    "kind": "reference",
+    "source": ["examples/shared/BrandLogo.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/__tests__/browser-bundle-graph.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/__tests__/browser-bundle-graph.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/__tests__/consumer.test-d.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/__tests__/consumer.test-d.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/__tests__/core-lane-graph.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/__tests__/core-lane-graph.ts"],
+    "commit": "26095c632"
+  },
+  {
+    "file": "packages/core/src/__tests__/core-lane-imports.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/__tests__/core-lane-imports.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/__tests__/history-group.test-d.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/__tests__/history-group.test-d.ts"],
+    "commit": "be94e1c51"
+  },
+  {
+    "file": "packages/core/src/automation/commands/actor-scoped-ids.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/actor-scoped-ids.ts"],
+    "commit": "a59ace33"
+  },
+  {
+    "file": "packages/core/src/automation/commands/actor-scoped-ids.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/para-id.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/commands/alternate-copies.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/textbox-fallback-export.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/commands/command-word.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/caret-word.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/automation/handles.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/automation/handles.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/host.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/automation/host.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/index.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/automation"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/operations.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/automation/operations.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/protocol.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/automation/protocol.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/automation/server-host.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/automation/server-host.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/cascade/chart-part.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/chart-parts.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/core/src/cascade/diagram.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/diagram-parts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/contracts/editor-fonts.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/contracts/editor-fonts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/contracts/history-group.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/contracts/editor-scope.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/actor-scoped-ids.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/__tests__/actor-scoped-ids.test.ts"],
+    "commit": "a59ace33"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/custom-fonts.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/editor/__tests__/custom-fonts.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/deferred-fonts.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/__tests__/deferred-fonts.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/font-composition.test.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/editor/__tests__/font-composition.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/font-resolver.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/editor/__tests__/font-resolver.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/load-fonts.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/editor/__tests__/load-fonts.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/__tests__/set-fonts.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/__tests__/set-fonts.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/adapter-support.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/editor/toolbar-fit.ts"],
+    "commit": "398963c7"
+  },
+  {
+    "file": "packages/core/src/editor/bind-history-group.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/editor/bind-history-group.ts"],
+    "commit": "2741998e3"
+  },
+  {
+    "file": "packages/core/src/editor/chrome-controls.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/chrome-controls.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/chrome-menus.ts",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/editor/chrome-controls.ts",
+      "packages/core/src/editor/chrome-menu-entries.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/chrome-review.ts",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/editor/review-chrome-controls.ts",
+      "packages/core/src/editor/toolbar-commands.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/chrome-tooltip.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/components/ui/Tooltip.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/collaboration-presence.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/paginated-surface.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/collaboration-status.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/collaboration/failure.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/comment-markers.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/review-icons.tsx", "packages/core/src/styles/editor.css"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/editor/custom-fonts.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/editor/custom-fonts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/deck-font-request.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/font-resolver.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/dev-warnings.ts",
+    "kind": "reference",
+    "source": [
+      "packages/react/src/editor/toolbar/toolbar-warnings.ts",
+      "packages/react/src/lib/is-development.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/dialog-draft.ts",
+    "kind": "reference",
+    "source": [
+      "packages/react/src/editor/dialog-parts.tsx",
+      "packages/core/src/editor/paragraph-dialog-fields.ts"
+    ],
+    "commit": "27720ad5"
+  },
+  {
+    "file": "packages/core/src/editor/editor-font-error.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/contracts/editor.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/editor-ref.ts",
+    "kind": "reference",
+    "source": ["packages/vue/src/components/DocxEditor/useDocxEditorRefApi.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/font-composition.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/editor/font-composition.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/font-picker.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/toolbar/FontFamily.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/font-resolution-lifetime.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/editor/font-resolution-lifetime.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/font-resolver.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/editor/font-resolver.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/format-painter.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/surface-format-painter.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/history-groups.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/contracts/editor-scope.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/icon-paths.ts",
+    "kind": "adapted",
+    "source": [
+      "packages/core/src/editor/generated-icon-paths.ts",
+      "packages/react/src/editor/DocxEditorHyperLink.tsx",
+      "packages/pro/src/react/review-icons.tsx"
+    ],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/editor/link-popup.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/useHyperlinkPopup.ts"],
+    "commit": "6907dc963"
+  },
+  {
+    "file": "packages/core/src/editor/load-fonts.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/editor/load-fonts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/menu-keyboard.ts",
+    "kind": "adapted",
+    "source": ["packages/react/src/editor/menu/menu-keyboard.ts"],
+    "commit": "26095c632"
+  },
+  {
+    "file": "packages/core/src/editor/modules.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/contracts/modules.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/packaged-file-fetch.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/export/packaged-file-fetch.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/paragraph-dialog-fields.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/paragraph-dialog-fields.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/pptx-editor-opening.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/docx-editor-opening-layout.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/pptx-source.ts",
+    "kind": "adapted",
+    "source": ["packages/react/src/editor/useDocxSource.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/core/src/editor/progressive-open.ts",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/editor/surface-progressive-open.ts",
+      "packages/core/src/editor/docx-editor-opening-layout.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/replica-ids.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/actor-scoped-ids.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/surface-input.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/surface-input.ts"],
+    "commit": "e568148f8"
+  },
+  {
+    "file": "packages/core/src/editor/surface-presence.ts",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/editor/surface-remote-selection.ts",
+      "packages/core/src/editor/surface-remote-caret.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/surface-resize.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/image-overlay-geometry.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/text-drag.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/surface-pointer.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/text-input.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/surface-input.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/toolbar-controls.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/toolbar-measure.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/toolbar-layout.ts",
+    "kind": "reference",
+    "source": [
+      "docs/site/content/customization/toolbar.mdx",
+      "packages/core/src/editor/toolbar-item-fit.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/toolbar-values.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/toolbar-values.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/__tests__/harfbuzz-wasm-binary.test.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/__tests__/harfbuzz-wasm-binary.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/defer-fonts.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/defer-fonts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/drawing-renderers.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/drawing-renderers.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/font-composition.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/font-composition.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/font-deferred.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/font-deferred.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/font-resolver.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/font-resolver.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/font-resource.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/font-resource.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/harfbuzz-wasm-binary.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/harfbuzz-wasm-binary.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/node-module-shim.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/node-module-shim.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/supported-font-families.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/supported-font-families.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/face-line-metrics.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/symbol-face-metrics.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/harfbuzz-measurer.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/harfbuzz-shaper.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/symbol-encoding.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/store/package/symbol-encoding.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/output/font-faces.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/embedded-font-faces.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/output/metafile-png.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/browser-image-decode-port.ts"],
+    "commit": "bac199e196492ecc3fb5fea249942ffd3657ea66"
+  },
+  {
+    "file": "packages/core/src/store/__tests__/sha256.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/__tests__/sha256.test.ts"],
+    "commit": "424a12168"
+  },
+  {
+    "file": "packages/core/src/store/__tests__/xml-reader.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/__tests__/xml-reader.test.ts"],
+    "commit": "d0bac831c"
+  },
+  {
+    "file": "packages/core/src/store/__tests__/zip.test.ts",
+    "kind": "adapted",
+    "source": [
+      "packages/core/src/store/__tests__/zip-proto.test.ts",
+      "packages/core/src/store/package/__tests__/zip-determinism.test.ts"
+    ],
+    "commit": "26095c632"
+  },
+  {
+    "file": "packages/core/src/store/package/tree.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/ooxml-tree.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/store/store/document-store.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/store/tree-store.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/store/store/history-group.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/store/history-group.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/store/store/node-index.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/ooxml-edit.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/store/store/part-checks.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/store/tree-store.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/store/store/replica-part.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/styles/editor.css",
+    "kind": "adapted",
+    "source": ["packages/core/src/styles/editor.css"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/tsup.config.ts",
+    "kind": "reference",
+    "source": ["packages/core/tsup.config.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/compat/type-assert.ts",
+    "kind": "copied",
+    "source": ["packages/editor-api/compat/docxeditor/type-assert.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/compat-report.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/compat-report.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/fetch-office-reference.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/fetch-office-reference.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/fetch-signature-inventory.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/fetch-signature-inventory.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/generate-conformance.mjs",
+    "kind": "reference",
+    "source": ["packages/editor-api/scripts/generate-conformance.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/definitely-typed-commit.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/lib/definitely-typed-commit.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/docs-reference.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/lib/docs-reference.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/extract-presentation-reference.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/lib/extract-word-reference.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/integrity.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/integrity.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/manifest-integrity.mjs",
+    "kind": "adapted",
+    "source": [
+      "packages/editor-api/scripts/lib/manifest-integrity.mjs",
+      "packages/editor-api/compat/docxeditor/declarations.ts"
+    ],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/provenance.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/provenance.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/reference-diff.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/reference-diff.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/reference-normalize.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/reference-normalize.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/shape-compare.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/shape-compare.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/signature-inventory.mjs",
+    "kind": "adapted",
+    "source": ["packages/editor-api/scripts/lib/signature-inventory.mjs"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/tar.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/tar.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/typecheck-compat.d.mts",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/typecheck-compat.d.mts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/typecheck-compat.mjs",
+    "kind": "copied",
+    "source": ["packages/editor-api/scripts/lib/typecheck-compat.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/src/model/collection.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/model/item-collection.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/model/model-object.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/model/model-object.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/batch.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/batch.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/browser.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/browser.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/client-object.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/client-object.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/client-result.ts",
+    "kind": "adapted",
+    "source": ["packages/editor-api/src/runtime/client-result.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/errors.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/errors.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/hydrate.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/hydrate.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/internals.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/internals.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/load-options.ts",
+    "kind": "adapted",
+    "source": ["packages/editor-api/src/runtime/load-options.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/object-path.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/object-path.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/queue.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/queue.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/request-context.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/request-context.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/runtime.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/runtime.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/server.ts",
+    "kind": "reference",
+    "source": ["packages/editor-api/src/runtime/server.ts"],
+    "commit": "5993bd223945"
+  },
+  {
+    "file": "packages/editor-api/src/runtime/tracked-objects.ts",
+    "kind": "copied",
+    "source": ["packages/editor-api/src/runtime/tracked-objects.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/i18n/src/index.ts",
+    "kind": "reference",
+    "source": ["packages/i18n"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/caret-word.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/caret-word.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/grapheme.test.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/__tests__/grapheme.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/limits.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/runtime/limits.ts"],
+    "commit": "26095c63"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/opc-names.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/__tests__/opc-names.test.ts"],
+    "commit": "26095c632"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/sha256.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/sha256.ts"],
+    "commit": "aaebb18e"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/sinks.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/__tests__/sinks.test.ts"],
+    "commit": "26095c632"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/word-segment.test.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/__tests__/word-segment.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/xml-reader.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/__tests__/xml-fast-read.test.ts"],
+    "commit": "fc28dba9"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/xml-reader.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/xml-fast-read.ts"],
+    "commit": "fc28dba9"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/zip-write.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/__tests__/zip-write.test.ts"],
+    "commit": "7cd3776a"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/zip.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/zip.ts"],
+    "commit": "7cd3776a"
+  },
+  {
+    "file": "packages/ooxml-core/src/__tests__/zip.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/__tests__/package-open-tolerance.test.ts"],
+    "commit": "8f541b37"
+  },
+  {
+    "file": "packages/ooxml-core/src/caret-word.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/caret-word.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/ooxml-core/src/drawingml-color.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/drawing-shape-color.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/ooxml-core/src/drawingml-geometry.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/drawing-geometry-engine.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/ooxml-core/src/grapheme.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/grapheme.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/limits.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/store/runtime/limits.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/opc-names.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/opc-names.ts"],
+    "commit": "d905af34"
+  },
+  {
+    "file": "packages/ooxml-core/src/sha256.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/store/package/sha256.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/sinks.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/sinks.ts"],
+    "commit": "bafbf5ac"
+  },
+  {
+    "file": "packages/ooxml-core/src/word-segment.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/word-segment.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/src/xml-fast-read.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/xml-fast-read.ts"],
+    "commit": "fc28dba9"
+  },
+  {
+    "file": "packages/ooxml-core/src/xml-reader.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/xml-reader.ts"],
+    "commit": "fc28dba9"
+  },
+  {
+    "file": "packages/ooxml-core/src/xml-text.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/xml-text.ts"],
+    "commit": "fc28dba9"
+  },
+  {
+    "file": "packages/ooxml-core/src/zip-write.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/zip-write.ts"],
+    "commit": "7cd3776a"
+  },
+  {
+    "file": "packages/ooxml-core/src/zip.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/store/package/zip.ts"],
+    "commit": "7cd3776a"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/export.test.ts",
+    "kind": "reference",
+    "source": [
+      "packages/docx-to-pdf/scripts/evaluation/export.test.ts",
+      "packages/docx-to-pdf/scripts/evaluation/layout-summary.test.ts"
+    ],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/export.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/export.ts"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/layout-summary.ts",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/layout-summary.ts"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/layout-text.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/layout-text.ts"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/settings.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/export.ts"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/test_visual_screen.py",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/test_visual_screen.py"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/test_worker.py",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/test_worker.py"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/word_movement.py",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/scripts/pdf-visual-diff.py"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/worker.py"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/cjk-font.ts",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/src/font-provisioning.ts"],
+    "commit": "12a57e37c"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/export-pdf.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/export-pdf.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/font-metrics.ts",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/src/font-metrics.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/fontkit.d.ts",
+    "kind": "copied",
+    "source": ["packages/docx-to-pdf/src/fontkit.d.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/fonts.ts",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/src/fonts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/open-session.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/open-session.ts"],
+    "commit": "398963c7"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/options.ts",
+    "kind": "reference",
+    "source": [
+      "packages/docx-to-pdf/src/options.ts",
+      "packages/docx-to-pdf/src/context.ts",
+      "packages/docx-to-pdf/src/pdf-work.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/page-ops.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/vector-gradient.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/paint.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/paint.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/pdf-font-embedding.ts",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/src/pdf-font-embedding.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/pdf-session.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/pdf-session.ts"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/pdf-streams.ts",
+    "kind": "adapted",
+    "source": ["packages/docx-to-pdf/src/context.ts"],
+    "commit": "ac84ccf30"
+  },
+  {
+    "file": "packages/pptx-to-pdf/src/types.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/types.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/__tests__/collaboration-coverage.test.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/__tests__/canonical-primitive-journal-coverage.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/__tests__/fuzz-support.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/pro/src/__tests__/singleton-children.test.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/__tests__/singleton-children.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/coverage-contract.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/store/collaboration-coverage-contract.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/errors.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/errors.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/move-rescue.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/materialize-orphans.ts"],
+    "commit": "5ffe9674"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/presence.ts",
+    "kind": "reference",
+    "source": [
+      "packages/pro/src/collaboration/document-awareness.ts",
+      "packages/pro/src/collaboration/document-remote-selections.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/schema.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/schema.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/session.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document-session.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/singleton-children.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/singleton-children.ts"],
+    "commit": "5ffe967"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/text-identity.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/split-text-sources.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/text-lineage.ts",
+    "kind": "reference",
+    "source": [
+      "packages/pro/src/collaboration/document/split-dedup.ts",
+      "packages/pro/src/collaboration/document/materialize-orphans.ts"
+    ],
+    "commit": "5ffe9674"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/undo-delete-filter.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/undo-delete-filter.ts"],
+    "commit": "5993bd22"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/undo-repair.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/paragraph-text-deletions.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/undo-restore.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/split-text-sources.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/undo-unlisted.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/undo-unlisted-text.ts"],
+    "commit": "5993bd22"
+  },
+  {
+    "file": "packages/pro/src/collaboration/yjs/yjs-items.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/collaboration/document/yjs-items.ts"],
+    "commit": "5993bd22"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-axes.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-axes.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-cartesian.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-cartesian.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-data-label.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-data-label.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-elements.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/drawing/chart-graphic.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-labels.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-labels.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-legend.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-legend.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-model.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-model.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-number-format.ts",
+    "kind": "copied",
+    "source": ["packages/pro/src/drawing/chart-number-format.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-pie.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-pie.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-projection.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/drawing/chart-projection.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-radar.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-radar.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-render.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-render.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-scale.ts",
+    "kind": "copied",
+    "source": ["packages/pro/src/drawing/chart-scale.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-scene.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-scene.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-series-paint.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-series-paint.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-series.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-series.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-style.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-style.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-text.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/drawing/chart-text.ts"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/drawing/chart-xml.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package"],
+    "commit": "ba742d7d1"
+  },
+  {
+    "file": "packages/pro/src/react/PptxEditorReview.tsx",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/DocxEditorReview.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/react/__tests__/context-menu-add-comment.test.tsx",
+    "kind": "reference",
+    "source": ["packages/react/test/context-menu-add-comment.test.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/pro/src/react/review-action-slot.tsx",
+    "kind": "adapted",
+    "source": ["packages/pro/src/react/review-action-slot.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/react/review-card-parts.tsx",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/review-card-parts.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/react/review-compose.tsx",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/review-compose-boxes.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/react/review-context.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/review-context.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/react/review-types.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/review-types.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/react/useReview.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/react/useReview.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/review/comment-view.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/review/review-date-format.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/vue/PptxEditorReview.tsx",
+    "kind": "reference",
+    "source": ["packages/pro/src/vue/DocxEditorReview.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/vue/review-action-slot.tsx",
+    "kind": "copied",
+    "source": ["packages/pro/src/vue/review-action-slot.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/vue/review-card-parts.tsx",
+    "kind": "reference",
+    "source": ["packages/pro/src/vue/review-card-parts.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/vue/review-compose.tsx",
+    "kind": "reference",
+    "source": ["packages/pro/src/vue/review-compose-boxes.tsx"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/vue/review-context.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/vue/review-context.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/pro/src/vue/useReview.ts",
+    "kind": "reference",
+    "source": ["packages/pro/src/vue/useReview.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/react/src/ChromeTooltip.tsx",
+    "kind": "reference",
+    "source": ["packages/react/src/components/ui/Tooltip.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/ContextMenu.tsx",
+    "kind": "reference",
+    "source": [
+      "packages/react/src/editor/contextmenu/DocxEditorContextMenu.tsx",
+      "packages/react/src/editor/contextmenu/parts.tsx",
+      "packages/core/src/styles/editor.css"
+    ],
+    "commit": "26095c632"
+  },
+  {
+    "file": "packages/react/src/FontFamilyControl.tsx",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/toolbar/FontFamily.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/HyperLink.tsx",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/DocxEditorHyperLink.tsx"],
+    "commit": "6907dc963"
+  },
+  {
+    "file": "packages/react/src/PptxEditorRoot.tsx",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/DocxEditorRoot.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/__tests__/customization.test.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/toolbar.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/__tests__/dialog-parts.test.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/dialogs.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/color-mode.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/color-mode-context.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/context-menu-parts.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/menus.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/dialog-parts.tsx",
+    "kind": "adapted",
+    "source": ["packages/react/src/editor/dialog-parts.tsx"],
+    "commit": "27720ad5"
+  },
+  {
+    "file": "packages/react/src/menu-parts.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/menus.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/menu-rows.tsx",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/menu/parts.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/popups.tsx",
+    "kind": "reference",
+    "source": [
+      "packages/react/src/editor/popup-config.tsx",
+      "packages/react/src/editor/popup-renderer.ts",
+      "packages/react/src/editor/dialog-host.tsx"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/slot-override.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/toolbar/Slot.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/toolbar-action.tsx",
+    "kind": "reference",
+    "source": [
+      "packages/react/src/editor/toolbar/ToolbarAction.tsx",
+      "packages/react/src/editor/toolbar/parts.tsx"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/toolbar-measure.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/toolbar-measure.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/toolbar-named-parts.tsx",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/toolbar/parts.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/toolbar-parts.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/toolbar.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/useFontFamily.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/toolbar/FontFamily.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/useFonts.ts",
+    "kind": "adapted",
+    "source": ["packages/react/src/editor/useFonts.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/react/src/useParagraphFormat.ts",
+    "kind": "reference",
+    "source": ["packages/react/src/editor/useParagraphFormat.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/react/src/usePptxSource.ts",
+    "kind": "adapted",
+    "source": [
+      "packages/react/src/editor/useDocxSource.ts",
+      "packages/react/src/editor/useEditorHostDocument.ts"
+    ],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/vue/src/FontFamilyControl.tsx",
+    "kind": "reference",
+    "source": ["packages/vue/src/editor/toolbar/FontFamily.tsx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/components.ts",
+    "kind": "reference",
+    "source": ["packages/vue/src/editor/DocxEditorRoot.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/composables.ts",
+    "kind": "reference",
+    "source": [
+      "packages/vue/src/editor/context.ts",
+      "packages/vue/src/editor/useDocxEditorRoot.ts",
+      "packages/vue/src/editor/useEditorState.ts",
+      "packages/vue/src/editor/useEditorCommand.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/context-menu-parts.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/menus.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/dialog-parts.ts",
+    "kind": "adapted",
+    "source": ["packages/vue/src/editor/dialog-parts.ts"],
+    "commit": "27720ad5"
+  },
+  {
+    "file": "packages/vue/src/menu-parts.tsx",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/menus.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/popups.ts",
+    "kind": "reference",
+    "source": ["packages/vue/src/editor/popup-config.ts", "packages/vue/src/editor/dialog-host.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/toolbar.ts",
+    "kind": "reference",
+    "source": ["docs/site/content/customization/toolbar.mdx"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/useFontFamily.ts",
+    "kind": "reference",
+    "source": ["packages/vue/src/editor/toolbar/useFontFamily.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/src/useFonts.ts",
+    "kind": "adapted",
+    "source": ["packages/vue/src/editor/useFonts.ts"],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/vue/src/usePptxSource.ts",
+    "kind": "adapted",
+    "source": [
+      "packages/vue/src/editor/useDocxSource.ts",
+      "packages/vue/src/editor/useEditorHostDocument.ts"
+    ],
+    "commit": "5993bd223"
+  },
+  {
+    "file": "packages/vue/test/cross-adapter.test.ts",
+    "kind": "reference",
+    "source": ["packages/vue/test/cross-adapter-differential.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/vue/test/overlays.test.ts",
+    "kind": "reference",
+    "source": ["packages/vue/test/cross-adapter-differential.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/api-extractor.mjs",
+    "kind": "reference",
+    "source": ["scripts/api-extractor.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/bench/edit-bench.ts",
+    "kind": "reference",
+    "source": ["scripts/bench/edit-bench.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-adapter-css-thin.mjs",
+    "kind": "adapted",
+    "source": ["scripts/check-adapter-css-thin.mjs"],
+    "commit": "39dddbb08"
+  },
+  {
+    "file": "scripts/check-adapter-mirror.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-adapter-mirror.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-api-changeset.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-api-changeset.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-composable-parity.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-composable-parity.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-consumer-install.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-consumer-install.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-lane-boundaries.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-lane-boundaries.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-max-lines-caps.mjs",
+    "kind": "adapted",
+    "source": ["scripts/check-max-lines-caps.mjs"],
+    "commit": "43c2012f3"
+  },
+  {
+    "file": "scripts/check-package-artifacts.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-package-artifacts.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-package-size.mjs",
+    "kind": "copied",
+    "source": ["scripts/check-package-size.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-parity-contract.mjs",
+    "kind": "reference",
+    "source": ["scripts/check-parity-contract.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/check-shipped-advisories.mjs",
+    "kind": "adapted",
+    "source": ["scripts/check-shipped-advisories.mjs"],
+    "commit": "788ace71d"
+  },
+  {
+    "file": "scripts/fidelity/thresholds.ts",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/scripts/evaluation/worker.py"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/generate-third-party-notices.mjs",
+    "kind": "reference",
+    "source": ["scripts/generate-third-party-notices.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/install-ci-chromium.sh",
+    "kind": "copied",
+    "source": ["scripts/install-ci-chromium.sh"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/lib-packages.mjs",
+    "kind": "reference",
+    "source": ["scripts/lib/packages.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/lib/max-lines-directives.mjs",
+    "kind": "copied",
+    "source": ["scripts/lib/max-lines-directives.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/oxlint/pptx-rules.mjs",
+    "kind": "reference",
+    "source": ["scripts/oxlint/docx-rules.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/oxlint/pptx-rules.test.ts",
+    "kind": "reference",
+    "source": ["scripts/__tests__/oxlint-rules.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/package-size-baseline.mjs",
+    "kind": "copied",
+    "source": ["scripts/package-size-baseline.mjs"],
+    "commit": "2d7935e80"
+  },
+  {
+    "file": "scripts/package-size-baseline.test.ts",
+    "kind": "adapted",
+    "source": ["scripts/package-size-baseline.test.ts"],
+    "commit": "2d7935e80"
+  },
+  {
+    "file": "scripts/parity/api-snapshot.mjs",
+    "kind": "reference",
+    "source": ["scripts/lib/api-snapshot-parse.mjs", "scripts/check-parity-contract.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/parity/parity.contract.json",
+    "kind": "reference",
+    "source": ["scripts/parity/parity.contract.json"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/release-mode.mjs",
+    "kind": "reference",
+    "source": ["scripts/release-mode.mjs"],
+    "commit": "b9a04a30f"
+  },
+  {
+    "file": "scripts/release-mode.test.ts",
+    "kind": "reference",
+    "source": ["scripts/release-mode.test.ts"],
+    "commit": "b9a04a30f"
+  },
+  {
+    "file": "scripts/release-plan.test.ts",
+    "kind": "reference",
+    "source": ["scripts/release-plan.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/release-workflow.test.ts",
+    "kind": "reference",
+    "source": ["scripts/release-workflow.test.ts"],
+    "commit": "b9a04a30f"
+  },
+  {
+    "file": "scripts/test/changed.mjs",
+    "kind": "adapted",
+    "source": ["scripts/test/changed.mjs"],
+    "commit": "39a490db"
+  },
+  {
+    "file": "scripts/test/changed.test.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/changed.test.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/merge-durations.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/merge-durations.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/merge-durations.test.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/merge-durations.test.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/output-capture.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/output-capture.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/output-capture.test.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/output-capture.test.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/pptx-suite.mjs",
+    "kind": "reference",
+    "source": ["scripts/test/run-parallel.mjs", "scripts/test/changed.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/preload-dom.ts",
+    "kind": "reference",
+    "source": ["scripts/test/preload-dom.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/run-parallel.mjs",
+    "kind": "adapted",
+    "source": ["scripts/test/run-parallel.mjs"],
+    "commit": "39a490db"
+  },
+  {
+    "file": "scripts/test/run-parallel.test.mjs",
+    "kind": "adapted",
+    "source": ["scripts/test/run-parallel.test.mjs"],
+    "commit": "39a490db"
+  },
+  {
+    "file": "scripts/test/shard.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/shard.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/test/shard.test.mjs",
+    "kind": "copied",
+    "source": ["scripts/test/shard.test.mjs"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "scripts/validate-i18n.mjs",
+    "kind": "reference",
+    "source": ["scripts/validate-i18n.mjs"],
+    "commit": "adf0e178"
+  }
+]

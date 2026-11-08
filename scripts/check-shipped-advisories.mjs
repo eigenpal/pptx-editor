@@ -1,4 +1,5 @@
-// Copied from docx-editor/scripts/check-shipped-advisories.mjs (EigenPal), adapted for PPTX Editor.
+// Adapted from docx-editor/scripts/check-shipped-advisories.mjs at 788ace71d (EigenPal), for PPTX
+// Editor.
 //
 // Advisory gate for the dependency closure we actually ship (audit Q7).
 //

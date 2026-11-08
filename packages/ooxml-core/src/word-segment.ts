@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/layout/word-segment.ts at 5993bd223 (EigenPal).
+// Copied from docx-editor/packages/core/src/layout/word-segment.ts at adf0e178 (EigenPal).
 // Keep it equal to that file.
 // Unicode word segmentation for semantic double-click selection (interactive-paginated-editing 5.3).
 // Uses Intl.Segmenter through an explicit replaceable boundary; fallback is bounded and grapheme-safe.

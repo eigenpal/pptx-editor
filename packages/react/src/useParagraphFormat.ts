@@ -1,7 +1,7 @@
 // Paragraph formatting as a hook: the read side off the snapshot, the write side through the
-// engine's `setParagraphFormat` command. The packaged Paragraph dialog and any host chrome read
-// the same `ParagraphFormatRead`, so they cannot disagree. After DOCX Editor's
-// `useParagraphFormat` (docx-editor/packages/react/src/editor/useParagraphFormat.ts).
+// engine's `setParagraphFormat` command. The packaged Paragraph dialog and any host chrome read the
+// same `ParagraphFormatRead`, so they cannot disagree. After DOCX Editor's `useParagraphFormat`
+// (docx-editor/packages/react/src/editor/useParagraphFormat.ts). DOCX Editor commit adf0e178.
 
 import { useCallback } from 'react';
 import {

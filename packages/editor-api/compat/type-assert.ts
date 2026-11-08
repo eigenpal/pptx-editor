@@ -1,4 +1,4 @@
-// Copied from DOCX Editor packages/editor-api/compat/docxeditor/type-assert.ts at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Copied from DOCX Editor packages/editor-api/compat/docxeditor/type-assert.ts at commit adf0e178.
 // Changes: the path (compat/type-assert.ts) and the comments. The types are equal.
 /**
  * A strict, bidirectional type-equality check — deliberately *not* a

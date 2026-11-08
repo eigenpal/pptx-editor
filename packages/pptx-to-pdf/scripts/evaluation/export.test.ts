@@ -4,8 +4,9 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // After DOCX Editor `packages/docx-to-pdf/scripts/evaluation/export.test.ts` and
-// `layout-summary.test.ts`, commit 398963c7f67207cebf3c38dcc41d5f0bd1339b5f: the evaluation
-// export and the layout summary agree with the public API on the synthetic fixtures.
+// `packages/docx-to-pdf/scripts/evaluation/layout-summary.test.ts`, commit
+// 398963c7f67207cebf3c38dcc41d5f0bd1339b5f: the evaluation export and the layout summary agree with
+// the public API on the synthetic fixtures.
 
 import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

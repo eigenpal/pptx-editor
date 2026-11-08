@@ -1,4 +1,5 @@
-// Tests for `sha256.ts` (copied from DOCX Editor at aaebb18e): the pure path pads in a fixed
+// Tests for `sha256.ts`, whose code is the same as DOCX Editor
+// `packages/core/src/store/package/sha256.ts` at aaebb18e. The pure path pads in a fixed
 // tail buffer instead of copying the input, so check every padding case against node:crypto.
 
 import { describe, expect, test } from 'bun:test';

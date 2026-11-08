@@ -3,10 +3,11 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The output step of a chart: its painted scene and its labels as resolved shapes in the
-// frame's box. The engine lays these out with the same geometry and text pipeline as every
-// other shape, so the editor and the PDF writer draw one layout. This module replaces DOCX
-// Editor's `chart-graphic.ts`, which emits that engine's vector components and text stories.
+// The output step of a chart: its painted scene and its labels as resolved shapes in the frame's
+// box. The engine lays these out with the same geometry and text pipeline as every other shape, so
+// the editor and the PDF writer draw one layout. This module replaces DOCX Editor's
+// `packages/pro/src/drawing/chart-graphic.ts`, which emits that engine's vector components and text
+// stories. DOCX Editor commit adf0e178.
 
 import type {
   BodyProps,

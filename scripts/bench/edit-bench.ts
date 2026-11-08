@@ -17,7 +17,8 @@
 // The `open-ready` row is the time until no slide is still opening (`pendingSlides` is 0): a
 // long deck shows its first slide first and parses the rest in the background.
 //
-// Model: DOCX Editor's `scripts/bench/edit-bench.ts` (EigenPal, same owner).
+// Model: DOCX Editor's `scripts/bench/edit-bench.ts` (EigenPal, same owner). DOCX Editor commit
+// adf0e178.
 //
 // Usage:
 //   bun scripts/bench/edit-bench.ts [--sizes 10,60,200,800,5000] [--runs 40] [--warmup 5] [--json]

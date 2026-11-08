@@ -1,7 +1,8 @@
 // Keyboard navigation for chrome menus, as DOM helpers rather than an item registry. Shared by
 // the React and Vue adapters (moved from packages/react/src/menu-keyboard.ts).
 //
-// Adapted from DOCX Editor (eigenpal/docx-editor, packages/react/src/editor/menu/menu-keyboard.ts):
+// Adapted from DOCX Editor (eigenpal/docx-editor, packages/react/src/editor/menu/menu-keyboard.ts
+// at 26095c632):
 // the same rule that a `menu` role is a promise. A screen reader hands the arrow keys to the
 // widget, so the keys must work. Items are found in the DOM, so a host's own rows join the
 // navigation without a registry. PPTX Editor adds one thing: swatch grids, where Up and Down

@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 // `PptxEditor.Menu`: the menu bar as library parts, after DOCX Editor's `DocxEditor.Menu`
-// (docx-editor/docs/site/content/customization/menus.mdx, packages/react/src/editor/menu/).
+// (docx-editor/docs/site/content/customization/menus.mdx, packages/react/src/editor/menu/). DOCX
+// Editor commit adf0e178.
 //
 // The preset bar renders core's `CHROME_MENUS` (File, Edit, View, Insert, Format, Arrange,
 // Slide Show). A named menu child (`Menu.File`) changes its menu in place: `hidden` removes

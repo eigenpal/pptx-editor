@@ -1,7 +1,8 @@
-// Serve `POST /api/convert` (the root `api/convert.ts` function) from the React and Vue
-// development servers, after DOCX Editor's `examples/shared/pdf-export-plugin.ts`. The demo then
-// exports PDF locally through the same handler as the deployment. The demos' aliases point
-// `@pptx-editor.dev/pptx-to-pdf` at its source, so no package build step is needed.
+// Serve `POST /api/convert` (the root `api/convert.ts` function) from the React and Vue development
+// servers, after DOCX Editor's `examples/shared/pdf-export-plugin.ts`. The demo then exports PDF
+// locally through the same handler as the deployment. The demos' aliases point
+// `@pptx-editor.dev/pptx-to-pdf` at its source, so no package build step is needed. DOCX Editor
+// commit adf0e178.
 
 import type { Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';

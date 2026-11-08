@@ -1,9 +1,10 @@
-// Chrome tooltips, after DOCX Editor's `Tooltip` (packages/react/src/components/ui/Tooltip.tsx):
-// a small bubble under a control after a 400 ms hover delay, in place of the native `title`.
-// A control names its tooltip with `data-pptx-tooltip` (and `data-pptx-tooltip-reason` when it is
+// Chrome tooltips, after DOCX Editor's `Tooltip` (packages/react/src/components/ui/Tooltip.tsx): a
+// small bubble under a control after a 400 ms hover delay, in place of the native `title`. A
+// control names its tooltip with `data-pptx-tooltip` (and `data-pptx-tooltip-reason` when it is
 // disabled for a reason); one listener per document finds the control under the pointer or the
 // keyboard focus. The React and Vue `ChromeTooltip` parts render the bubble with the same markup;
-// this module owns the timing and the position, so the two cannot drift.
+// this module owns the timing and the position, so the two cannot drift. DOCX Editor commit
+// adf0e178.
 //
 // The bubble is visual only (`aria-hidden`): the control's `aria-label` is its accessible name,
 // and a disabled control keeps its reason in an `aria-describedby` note, as before.

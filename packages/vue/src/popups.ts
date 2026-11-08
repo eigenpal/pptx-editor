@@ -1,9 +1,10 @@
-// The popups registry: the Vue twin of the React adapter's `popups.tsx`, after DOCX Editor's
-// Vue adapter (docx-editor/packages/vue/src/editor/popup-config.ts, dialog-host.ts).
-// `PptxEditorRoot` mounts the editor's dialogs; a host changes one through `popups`: a render
-// callback replaces the packaged dialog, and `false` turns off automatic rendering. Every
-// opener calls `useEditorDialog(key).open()`, focus returns to the opener on close, and a
-// dialog closes when the editor opens another document.
+// The popups registry: the Vue twin of the React adapter's `popups.tsx`, after DOCX Editor's Vue
+// adapter (docx-editor/packages/vue/src/editor/popup-config.ts,
+// packages/vue/src/editor/dialog-host.ts). `PptxEditorRoot` mounts the editor's dialogs; a host
+// changes one through `popups`: a render callback replaces the packaged dialog, and `false` turns
+// off automatic rendering. Every opener calls `useEditorDialog(key).open()`, focus returns to the
+// opener on close, and a dialog closes when the editor opens another document. DOCX Editor commit
+// adf0e178.
 
 import { markReadingPopup } from '@pptx-editor.dev/core/editor';
 import {

@@ -21,7 +21,9 @@ import { SAVE_VERIFIED_FEATURE_EDITS, SAVE_VERIFIED_FIXTURES } from './save-veri
 
 const FIXTURES = join(import.meta.dir, '../../../fixtures');
 
-/** The fields of a DOCX Editor matrix row (`docs/site/data/word-features.ts`). */
+/**
+ * The fields of a DOCX Editor matrix row (`docs/site/data/word-features.ts` at 29535a640510).
+ */
 const DOCX_ROW_FIELDS = new Set([
   'id',
   'name',

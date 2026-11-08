@@ -1,9 +1,10 @@
 // Tests for the bounded ZIP reader and the deterministic writer.
 //
-// The first two blocks are ported from docx-editor/packages/core/src/store/__tests__/zip-proto.test.ts
-// and docx-editor/packages/core/src/store/package/__tests__/zip-determinism.test.ts (EigenPal,
-// Apache-2.0), with WordprocessingML part names replaced by PresentationML ones. The rest are regression
-// tests for audit findings S1, S6, K1, K4, and P6.
+// The first two blocks are adapted from
+// docx-editor/packages/core/src/store/__tests__/zip-proto.test.ts and
+// docx-editor/packages/core/src/store/package/__tests__/zip-determinism.test.ts at 26095c632
+// (EigenPal, Apache-2.0), with WordprocessingML part names replaced by PresentationML ones. The
+// rest are regression tests for audit findings S1, S6, K1, K4, and P6.
 
 import { describe, expect, test } from 'bun:test';
 import { deflateSync, strToU8, unzipSync, zipSync } from 'fflate';

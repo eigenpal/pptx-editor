@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/zip.ts at 7cd3776a (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/zip.ts at 7cd3776a (EigenPal).
 // It also holds fixes that DOCX Editor does not have yet: S1, S6, K1, P6, W1.
 // Keep it equal to that file plus those fixes.
 // Bounded ZIP read/write over fflate (document-engine task 2.3 / design D14).

@@ -2,7 +2,7 @@
 
 These commands compare PPTX Editor's PDF with the reference PDF of each deck. They add no public API.
 
-The protocol is a copy of DOCX Editor's (`packages/docx-to-pdf/scripts/evaluation/`, commit `398963c7f67207cebf3c38dcc41d5f0bd1339b5f`), changed for slides. Each copied file names its DOCX Editor source. This repository keeps the candidate export and the measurement primitives. Comparison policy, scoring, caching, and reports belong to the evaluation caller.
+The protocol adapts DOCX Editor's protocol (`packages/docx-to-pdf/scripts/evaluation/`, commit `398963c7f67207cebf3c38dcc41d5f0bd1339b5f`) for slides. Each file names its DOCX Editor source in its header. This repository keeps the candidate export and the measurement primitives. Comparison policy, scoring, caching, and reports belong to the evaluation caller.
 
 Protocol version 1 separates candidate exports, measurements, comparisons, and detailed evidence.
 

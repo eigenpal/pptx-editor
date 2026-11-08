@@ -1,6 +1,7 @@
-// The typed values of value slots, after DOCX Editor's `packages/core/src/editor/toolbar-values.ts`.
-// `runToolbarCommand` and the adapters' `useEditorValueCommand` take these types, so a typo in a
-// value does not compile. A slot that is not listed takes `unknown`, as before.
+// The typed values of value slots, after DOCX Editor's
+// `packages/core/src/editor/toolbar-values.ts`. `runToolbarCommand` and the adapters'
+// `useEditorValueCommand` take these types, so a typo in a value does not compile. A slot that is
+// not listed takes `unknown`, as before. DOCX Editor commit adf0e178.
 
 import type {
   ColorChoice,

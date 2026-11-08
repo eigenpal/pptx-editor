@@ -3,9 +3,10 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The identity of text that a split moves (openspec change `collaboration-text-lineage`,
-// "Character identity"). After DOCX Editor's `split-text-sources.ts` and its paragraph text
-// design ("Moved text keeps an identity"), adapted to PPTX Editor's run records.
+// The identity of text that a split moves (openspec change `collaboration-text-lineage`, "Character
+// identity"). After DOCX Editor's `packages/pro/src/collaboration/document/split-text-sources.ts`
+// and its paragraph text design ("Moved text keeps an identity"), adapted to PPTX Editor's run
+// records. DOCX Editor commit adf0e178.
 //
 // A split (`splitRunAt` in `packages/core/src/automation/commands/text-model.ts`, alone for a format or
 // before an Enter moves the new run into a new paragraph) deletes the text after the cut from

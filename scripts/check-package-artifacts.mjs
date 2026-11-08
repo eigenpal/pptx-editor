@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Published exports and declarations must be self-contained
-// (docx-editor/scripts/check-package-artifacts.mjs).
+// (docx-editor/scripts/check-package-artifacts.mjs). DOCX Editor commit adf0e178.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';

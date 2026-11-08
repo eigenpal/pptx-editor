@@ -1,4 +1,5 @@
 // Handle minting and resolution, after DOCX Editor's `packages/core/src/automation/handles.ts`.
+// DOCX Editor commit adf0e178.
 //
 // INTERNAL. A handle is a name this table invented, mapped privately to the presentation
 // identity it stands for. Consumers get the name; nothing else leaves.

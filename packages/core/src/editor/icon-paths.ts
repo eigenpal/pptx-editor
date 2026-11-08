@@ -1,8 +1,8 @@
 // Material Symbols path data (Apache-2.0, Google): Outlined, weight 400, grade 0, 24 px,
-// viewBox "0 -960 960 960". Most paths are copied from DOCX Editor
+// viewBox "0 -960 960 960". Most paths are adapted from DOCX Editor
 // (docx-editor/packages/core/src/editor/generated-icon-paths.ts); `content_copy` from DOCX
 // Editor's context-menu icons; `edit`, `link_off`, and `open_in_new` from DOCX Editor's link
-// popover (`DocxEditorHyperLink.tsx`); `text_fields`, `folder_open`, `note_add`,
+// popover (`packages/react/src/editor/DocxEditorHyperLink.tsx`); `text_fields`, `folder_open`, `note_add`,
 // `align_horizontal_center`, `view_sidebar`, `slideshow`, `content_cut`, `content_paste`, `info`,
 // `bug_report`, `play_arrow`, `folder_zip`, `description`, `chevron_right`, `numbers`, `wallpaper`,
 // `photo_library`, `match_case`, `format_letter_spacing`, `text_rotate_vertical`, `text_format`,

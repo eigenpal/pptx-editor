@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * A PR that changes the public API surface must carry a changeset
- * (docx-editor/scripts/check-api-changeset.mjs).
+ * (docx-editor/scripts/check-api-changeset.mjs). DOCX Editor commit adf0e178.
  *
  * `docs/api/*.api.md` are the API Extractor snapshots: a diff there means a `@public`
  * symbol moved. The snapshots themselves gate nothing about VERSIONING — regenerating and

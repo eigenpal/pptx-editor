@@ -34,10 +34,11 @@ export const THRESHOLDS = {
 } as const;
 
 /**
- * Comparison B: the `pptx-to-pdf` PDF against the reference PDF. The pass limits match comparison A where the metric is the same. The screening
- * values only flag a page for review; they are DOCX Editor's
- * (`docx-to-pdf/scripts/evaluation/worker.py`). `worker.py` and `pptx-eval` read these values
- * from `packages/pptx-to-pdf/scripts/evaluation/thresholds.json`, generated from this file.
+ * Comparison B: the `pptx-to-pdf` PDF against the reference PDF. The pass limits match comparison A
+ * where the metric is the same. The screening values only flag a page for review; they are DOCX
+ * Editor's (`packages/docx-to-pdf/scripts/evaluation/worker.py`). `worker.py` and `pptx-eval` read
+ * these values from `packages/pptx-to-pdf/scripts/evaluation/thresholds.json`, generated from this
+ * file. DOCX Editor commit adf0e178.
  */
 export const COMPARISON_B = {
   /** Raster width for the pixel metric, as comparison A. */

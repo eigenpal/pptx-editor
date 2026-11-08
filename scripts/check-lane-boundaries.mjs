@@ -1,7 +1,8 @@
 // Compiles each DOM-free lane against its own tsconfig (lib without DOM, no ambient types), so a
-// `document`, `window`, or DOM type such as `HTMLElement` in store, cascade, layout, automation,
-// or ooxml-core fails, also when it arrives through an import. Same approach as
-// docx-editor/scripts/check-lane-boundaries.mjs, with `bun check` in place of `tsc`.
+// `document`, `window`, or DOM type such as `HTMLElement` in store, cascade, layout, automation, or
+// ooxml-core fails, also when it arrives through an import. Same approach as
+// docx-editor/scripts/check-lane-boundaries.mjs, with `bun check` in place of `tsc`. DOCX Editor
+// commit adf0e178.
 //
 // `bun check` reports the same errors as `tsc`. It also loads only what the lane imports: `tsc`
 // once pulled `@types/react` into the automation lane, whose empty global `HTMLElement`

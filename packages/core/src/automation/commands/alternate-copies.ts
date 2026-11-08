@@ -20,11 +20,12 @@
 //
 // Other edits remove, and do not copy, for two reasons. A copy of the `mc:Choice` shape can hold
 // markup in the namespaces that the Choice requires, which a reader of `mc:Fallback` does not
-// understand. And a removal converges in a collaboration room: when two peers edit the same
-// shape, both remove the same node, but two copies would both stay. DOCX Editor rewrites the
-// fallback of a text box from its DrawingML story on save (`textbox-fallback-export.ts`). A
-// PresentationML fallback is a whole shape that can differ from its Choice by design, so that
-// rule does not carry over.
+// understand. And a removal converges in a collaboration room: when two peers edit the same shape,
+// both remove the same node, but two copies would both stay. DOCX Editor rewrites the fallback of a
+// text box from its DrawingML story on save
+// (`packages/core/src/store/package/textbox-fallback-export.ts` at adf0e178). A PresentationML
+// fallback is a whole shape that can differ from its Choice by design, so that rule does not carry
+// over.
 //
 // The decision reads the package before the edit and the ops only, never editor state, so every
 // replica that applies the same ops gets the same result.

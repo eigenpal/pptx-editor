@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/package-size-baseline.mjs (EigenPal). Downloads the size report
+// Copied from docx-editor/scripts/package-size-baseline.mjs at 2d7935e80 (EigenPal). Downloads the size report
 // of the CI run on the PR base commit, for `check-package-size.mjs --compare`.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

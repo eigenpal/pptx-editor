@@ -7,7 +7,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // that a peer moved into a subtree another peer removed without having seen it goes back to its
 // old place, or to an earlier one when that place is gone too. When every old place is gone, it
 // follows the children that moved out of the removed node (a join of a paragraph whose own
-// join is in flight). Adapted from DOCX Editor
+// join is in flight). After DOCX Editor
 // `packages/pro/src/collaboration/document/materialize-orphans.ts` at 5ffe9674. The fields it
 // reads are written by `markLineage` in `text-lineage.ts`. Everything read here comes from the
 // room and is untrusted.

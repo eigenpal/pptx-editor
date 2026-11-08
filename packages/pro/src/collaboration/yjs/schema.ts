@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The shared Yjs schema of a PPTX room, after DOCX Editor's `collaboration/document/schema.ts`.
+// The shared Yjs schema of a PPTX room, after DOCX Editor's
+// `packages/pro/src/collaboration/document/schema.ts`. DOCX Editor commit adf0e178.
 //
 //   pptx-meta-v1      Y.Map   schema version
 //   pptx-parts-v1     Y.Map   part name → { kind: 'xml', root: key } | { kind: 'binary' }

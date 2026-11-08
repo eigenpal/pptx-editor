@@ -2,7 +2,7 @@
 # Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 # Production use requires a commercial agreement: licensing@eigenpal.com
 #
-# Copied from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/test_worker.py`, commit
+# Adapted from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/test_worker.py`, commit
 # 398963c7f67207cebf3c38dcc41d5f0bd1339b5f. PPTX changes: slide-sized pages (960 by 540 points), and
 # checks for large custom slide sizes and the reported resolution.
 """Synthetic protocol tests. Run with the evaluator's Python environment."""

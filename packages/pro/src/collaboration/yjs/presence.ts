@@ -3,8 +3,9 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Presence over Yjs awareness, after DOCX Editor's `document-awareness.ts` and
-// `document-remote-selections.ts`.
+// Presence over Yjs awareness, after DOCX Editor's
+// `packages/pro/src/collaboration/document-awareness.ts` and
+// `packages/pro/src/collaboration/document-remote-selections.ts`. DOCX Editor commit adf0e178.
 //
 // An awareness record comes from a PEER, so every field is checked, not believed. A selection
 // travels as shared keys (shapes) or Yjs relative positions (text), never as replica-local

@@ -1,9 +1,10 @@
 // The review controls: New comment (`review.addComment`), after DOCX Editor's
-// (docx-editor/packages/core/src/editor/review-chrome-controls.ts, toolbar-commands.ts). The
-// control runs no engine command: a comment needs its text first, and the text comes from the
-// draft of a comments pane (`PptxEditorReview` of the pro package), the way the link popup owns
-// `text.link`. So the control shows only while a comments pane can open a draft
-// (`registerCommentDraft`), and the review module reads comments.
+// (docx-editor/packages/core/src/editor/review-chrome-controls.ts,
+// packages/core/src/editor/toolbar-commands.ts). The control runs no engine command: a comment
+// needs its text first, and the text comes from the draft of a comments pane (`PptxEditorReview` of
+// the pro package), the way the link popup owns `text.link`. So the control shows only while a
+// comments pane can open a draft (`registerCommentDraft`), and the review module reads comments.
+// DOCX Editor commit adf0e178.
 
 import type { Editor } from '../contracts/index.ts';
 import type { ChromeGroup, ToolbarCommandState } from './chrome-controls.ts';

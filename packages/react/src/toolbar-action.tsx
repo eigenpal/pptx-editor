@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 // Host-owned toolbar controls, after DOCX Editor's `ToolbarAction` and `ToolbarSeparator`
-// (docx-editor/packages/react/src/editor/toolbar/ToolbarAction.tsx, parts.tsx).
+// (docx-editor/packages/react/src/editor/toolbar/ToolbarAction.tsx,
+// packages/react/src/editor/toolbar/parts.tsx). DOCX Editor commit adf0e178.
 //
 // `Toolbar.Slot` and the named parts are bound to a registered slot: the engine owns their
 // label, icon, and enabled state. A host's own action ("Send for review") has no slot and

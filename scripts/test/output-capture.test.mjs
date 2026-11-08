@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/output-capture.test.mjs at 39a490db (EigenPal).
+// Copied from docx-editor/scripts/test/output-capture.test.mjs at adf0e178 (EigenPal).
 import { expect, test } from 'bun:test';
 import { createOutputCapture } from './output-capture.mjs';
 

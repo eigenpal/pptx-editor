@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/merge-durations.mjs at 39a490db (EigenPal).
+// Copied from docx-editor/scripts/test/merge-durations.mjs at adf0e178 (EigenPal).
 // Merge per-shard test durations into the one cache file that CI shares between runs.
 //
 //   node scripts/test/merge-durations.mjs --out FILE [BASE] [SHARD_FILE]...

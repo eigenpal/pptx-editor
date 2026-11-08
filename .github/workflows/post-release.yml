@@ -4,7 +4,7 @@ name: Post-release updates
 # When a Release run publishes, comment "Released in vX.Y.Z" on every shipped PR and every
 # issue it closed. When PPTX_ROADMAP_PROJECT_NUMBER is set, stamp that project's "Shipped in" field. DOCX Editor also
 # verifies the published packages and updates its sites here; PPTX Editor has no such
-# steps yet.
+# steps yet. DOCX Editor commit adf0e178.
 
 on:
   workflow_run:

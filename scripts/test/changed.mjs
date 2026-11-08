@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/changed.mjs at 39a490db (EigenPal).
+// Adapted from docx-editor/scripts/test/changed.mjs at 39a490db (EigenPal).
 // PPTX Editor changes: the workspace scopes come from `pptx-suite.mjs` (`@pptx-editor.dev/`
 // and `@eigenpal/`), so a change in `packages/ooxml-core` selects the tests that import it.
 // Run only the test files that your change can affect.

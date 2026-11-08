@@ -1,8 +1,9 @@
-// The font request a deck makes of the host's font origins (PPTX only; the composition itself
-// is DOCX Editor's, `layout/font-resolver.ts`). The families are the theme fonts of every theme
-// a slide master uses, with the script fonts of the languages the deck names, then every
-// typeface the slides, layouts, masters, and the presentation's default text style name. The default
-// family is the minor Latin font of the first master's theme: body text measures with it.
+// The font request a deck makes of the host's font origins (PPTX only; the composition itself is
+// DOCX Editor's, `packages/core/src/layout/font-resolver.ts`). The families are the theme fonts of
+// every theme a slide master uses, with the script fonts of the languages the deck names, then
+// every typeface the slides, layouts, masters, and the presentation's default text style name. The
+// default family is the minor Latin font of the first master's theme: body text measures with it.
+// DOCX Editor commit adf0e178.
 
 import {
   attr,

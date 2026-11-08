@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Mirrors the Vue adapter's source tree against the React adapter's, after DOCX Editor's
 // scripts/check-adapter-mirror.mjs: every Vue source file has a React twin at the same relative
-// path (`.ts` and `.tsx` count as one), unless the list below names it with a reason. The list
-// only shrinks: an entry whose file is gone, or that now has a twin, fails as stale. Names
-// compare by exact case, so a check on a case-insensitive file system agrees with CI.
+// path (`.ts` and `.tsx` count as one), unless the list below names it with a reason. The list only
+// shrinks: an entry whose file is gone, or that now has a twin, fails as stale. Names compare by
+// exact case, so a check on a case-insensitive file system agrees with CI. DOCX Editor commit
+// adf0e178.
 //
 // React files with no Vue twin are listed the same way (`reactOnly`). DOCX Editor checks only
 // the Vue side; here both sides are small enough to hold to the same rule.

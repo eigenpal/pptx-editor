@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Ported from DOCX Editor `packages/pro/src/drawing/chart-style.ts` at commit ba742d7d1.
+// Adapted from DOCX Editor `packages/pro/src/drawing/chart-style.ts` at commit ba742d7d1.
 // Fills, outlines and default colours of chart elements.
 //
 // A chart element's `c:spPr` decides its fill and outline when it names them. Without one the

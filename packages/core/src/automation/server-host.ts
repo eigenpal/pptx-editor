@@ -1,4 +1,5 @@
 // The headless automation host, after DOCX Editor's `packages/core/src/automation/server-host.ts`.
+// DOCX Editor commit adf0e178.
 //
 // It owns what an editor session owns and nothing more: a package opened through the bounded
 // OPC/XML reader, one `PptxDocumentStore` over it, and the same `transact` write path the editor

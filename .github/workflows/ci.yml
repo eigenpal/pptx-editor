@@ -1,7 +1,7 @@
 name: CI
 
-# Source checks, browser checks, package verification, and unit test shards run
-# concurrently. Same shape as docx-editor/.github/workflows/ci.yml, sized for v0.
+# Source checks, browser checks, package verification, and unit test shards run concurrently. Same
+# shape as docx-editor/.github/workflows/ci.yml, sized for v0. DOCX Editor commit adf0e178.
 #
 # The test-durations cache is written only by pushes to main and pruned to the
 # newest entry by `cache-maintenance`; pull requests only read it.

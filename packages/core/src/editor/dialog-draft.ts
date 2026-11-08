@@ -1,4 +1,4 @@
-// Ported from DOCX Editor packages/react/src/editor/dialog-parts.tsx at 27720ad5 (the draft
+// After DOCX Editor packages/react/src/editor/dialog-parts.tsx at 27720ad5 (the draft
 // state of `UseDialogReturn`, the `data-docx-part` markers) and
 // packages/core/src/editor/paragraph-dialog-fields.ts at e608e2df (`trapTabWithin`).
 // The draft controller is new: DOCX Editor keeps a draft in

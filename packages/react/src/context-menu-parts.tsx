@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 // `PptxEditor.ContextMenu`: the slide canvas's context menu as library parts, after DOCX
 // Editor's `DocxEditor.ContextMenu` (docx-editor/docs/site/content/customization/menus.mdx,
-// packages/react/src/editor/contextmenu/).
+// packages/react/src/editor/contextmenu/). DOCX Editor commit adf0e178.
 //
 // The canvas opens a menu request (right-click, Shift+F10, the Menu key) for what is under the
 // pointer: shapes, text being edited, or empty slide area. The menu renders core's

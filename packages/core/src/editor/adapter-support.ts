@@ -398,7 +398,7 @@ export type ToolbarArrangedGroup<G extends ToolbarGroupOverride> =
   | { readonly kind: 'host'; readonly override: G };
 
 /**
- * The bar order with the host's groups placed: copied from DOCX Editor's `arrangeToolbarGroups`
+ * The bar order with the host's groups placed: adapted from DOCX Editor's `arrangeToolbarGroups`
  * (packages/core/src/editor/toolbar-fit.ts at 398963c7),
  * renamed because `arrangeToolbarGroups` here returns the arranged groups themselves. A host group without `after` follows
  * every built-in group, in order of appearance. A group with `after` follows the group it

@@ -1,5 +1,5 @@
 // What `module` resolves to inside the shipped bundle (docx-editor/packages/core/src/layout/
-// node-module-shim.ts).
+// packages/core/src/layout/node-module-shim.ts). DOCX Editor commit adf0e178.
 //
 // The HarfBuzz runtime's Emscripten glue opens with, in one file serving both runtimes:
 //

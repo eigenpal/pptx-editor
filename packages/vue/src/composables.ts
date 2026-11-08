@@ -1,12 +1,13 @@
 // Injection keys and composables: the Vue twin of the React adapter's context and hooks
-// (packages/react/src/context.ts). The state each composable derives comes from the shared
-// adapter support in core (`editorCommandFor`, `EMPTY_EDITOR_SNAPSHOT`,
-// `platformShortcuts`), so React and Vue report the same thing. After DOCX Editor's Vue
-// adapter (docx-editor/packages/vue/src/editor/context.ts, useDocxEditorRoot.ts,
-// useEditorState.ts, useEditorCommand.ts): the root holds ONE editor subscription and
-// publishes a change tick, and every composable reads the tick, so a toolbar of fifty controls
-// costs one subscription, not fifty. Every composable annotates a named `Use<Name>Return`
-// type, so core's internal types do not leak into the API snapshot.
+// (packages/react/src/context.ts). The state each composable derives comes from the shared adapter
+// support in core (`editorCommandFor`, `EMPTY_EDITOR_SNAPSHOT`, `platformShortcuts`), so React and
+// Vue report the same thing. After DOCX Editor's Vue adapter
+// (docx-editor/packages/vue/src/editor/context.ts, packages/vue/src/editor/useDocxEditorRoot.ts,
+// packages/vue/src/editor/useEditorState.ts, packages/vue/src/editor/useEditorCommand.ts): the root
+// holds ONE editor subscription and publishes a change tick, and every composable reads the tick,
+// so a toolbar of fifty controls costs one subscription, not fifty. Every composable annotates a
+// named `Use<Name>Return` type, so core's internal types do not leak into the API snapshot. DOCX
+// Editor commit adf0e178.
 
 import {
   computed,

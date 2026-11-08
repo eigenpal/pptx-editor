@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Vue composables declare a named `Use<Name>Return` type (AGENTS.md "Public API"), so core's
-// internal types do not leak into the Vue API snapshot. Every Vue composable must also have a
-// React hook of the same name, or be listed in the parity contract's `vueExclusive`. After
-// DOCX Editor's scripts/check-composable-parity.mjs. Reads the committed snapshots.
+// internal types do not leak into the Vue API snapshot. Every Vue composable must also have a React
+// hook of the same name, or be listed in the parity contract's `vueExclusive`. After DOCX Editor's
+// scripts/check-composable-parity.mjs. Reads the committed snapshots. DOCX Editor commit adf0e178.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

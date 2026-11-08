@@ -1,8 +1,8 @@
 // The host's fonts for one editor, DOCX Editor's way (PPTX only; the composition, the resolver
-// mark, and the resolver lifetime are copies of DOCX Editor's modules). It composes the `fonts`
-// origins for each deck, admits the faces (byte limits, content hash, sfnt check), and installs
-// them in the session, after the embedded faces. `setFonts` replaces them in place; each `load`
-// and each `setFonts` aborts the resolution before it.
+// mark, and the resolver lifetime come from DOCX Editor, and each module header names its source).
+// It composes the `fonts` origins for each deck, admits the faces (byte limits, content hash, sfnt
+// check), and installs them in the session, after the embedded faces. `setFonts` replaces them in
+// place; each `load` and each `setFonts` aborts the resolution before it.
 
 import type {
   EditorFontErrorCode,

@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/vue/src/editor/useFonts.ts` at commit 5993bd223.
+// Adapted from DOCX Editor `packages/vue/src/editor/useFonts.ts` at commit 5993bd223.
 // Keep the exported API equal to the source.
 
 import { toValue } from 'vue';

@@ -1,7 +1,7 @@
 /**
  * PPTX feature support matrix: single source of truth.
  *
- * Copied from DOCX Editor `docs/site/data/word-features.ts` at commit 29535a640510 (the type
+ * Adapted from DOCX Editor `docs/site/data/word-features.ts` at commit 29535a640510 (the type
  * block, `FEATURE_TIERS`, and the by-id lookup). The row type has the same fields as
  * `WordFeature`; only the categories differ. Add PPTX categories, never new fields or status
  * values.

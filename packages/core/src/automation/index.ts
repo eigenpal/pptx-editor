@@ -1,6 +1,7 @@
 // The automation lane: DOM-free edits that lower to store ops (`commands/`), and the automation
-// host that runs Office.js-shaped batches over them, after DOCX Editor's `core/src/automation`.
-// `@pptx-editor.dev/editor-api` is the object model over this protocol.
+// host that runs Office.js-shaped batches over them, after DOCX Editor's
+// `packages/core/src/automation`. `@pptx-editor.dev/editor-api` is the object model over this
+// protocol. DOCX Editor commit adf0e178.
 
 export type {
   AutomationAdjustmentsRead,

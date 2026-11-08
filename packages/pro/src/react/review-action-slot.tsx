@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from DOCX Editor: packages/pro/src/react/review-action-slot.tsx at adf0e178c.
+// Adapted from DOCX Editor: packages/pro/src/react/review-action-slot.tsx at adf0e178c. The one
+// change is the `@jsxImportSource react` pragma, because this package builds React and Vue JSX.
 // The Vue twin is `../vue/review-action-slot.tsx`.
 /** @jsxImportSource react */
 

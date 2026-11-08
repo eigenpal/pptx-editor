@@ -1,11 +1,11 @@
 /** @jsxImportSource react */
-// Menu rows over chrome slots, shared by `PptxEditor.Menu` and `PptxEditor.ContextMenu`, after
-// DOCX Editor's `Menu.Item` and `ContextMenu.Slot` (docx-editor/packages/react/src/editor/menu/
-// parts.tsx). A row takes its label, icon, shortcut, enabled state, and action from the slot's
-// registry entry and core's row rules (`resolveChromeMenuRow`, `chromeRowState`,
-// `runChromeRow`), so a menu row and its toolbar twin cannot drift. A slot that collects a
-// value (Insert > Shape, Insert > Line, Insert > Table, New Slide, Layout) opens a submenu of its
-// choices.
+// Menu rows over chrome slots, shared by `PptxEditor.Menu` and `PptxEditor.ContextMenu`, after DOCX
+// Editor's `Menu.Item` and `ContextMenu.Slot` (docx-editor/packages/react/src/editor/menu/
+// packages/react/src/editor/menu/parts.tsx). A row takes its label, icon, shortcut, enabled state,
+// and action from the slot's registry entry and core's row rules (`resolveChromeMenuRow`,
+// `chromeRowState`, `runChromeRow`), so a menu row and its toolbar twin cannot drift. A slot that
+// collects a value (Insert > Shape, Insert > Line, Insert > Table, New Slide, Layout) opens a
+// submenu of its choices. DOCX Editor commit adf0e178.
 
 import { createContext, useContext, type ReactNode } from 'react';
 import {

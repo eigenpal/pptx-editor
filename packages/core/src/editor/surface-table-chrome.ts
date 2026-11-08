@@ -1,5 +1,5 @@
-// The editing chrome around a table on the slide, after DOCX Editor's table chrome: the select
-// handle at the table's top-left corner (a click selects the table, a drag moves it), a line on
+// The editing chrome around a table on the slide, after DOCX Editor's table chrome. It has the
+// select handle at the table's top-left corner (a click selects the table, a drag moves it), a line on
 // the grid line under the pointer (a drag there resizes, `surface-table.ts`), and the "+"
 // buttons on the table's left and top edges that insert a row below or a column right of a
 // grid line. The chrome shows for the table the selection is in or on, and for a hovered table.

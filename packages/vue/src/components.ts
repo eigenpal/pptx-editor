@@ -1,6 +1,6 @@
-// Provider-first host for the editor facade: the Vue twin of the React adapter's
-// `PptxEditor.Root` / `.Viewport` / `.Content` (packages/react/src/PptxEditorRoot.tsx), after
-// DOCX Editor's Vue adapter (docx-editor/packages/vue/src/editor/DocxEditorRoot.ts).
+// Provider-first host for the editor facade: the Vue twin of the React adapter's `PptxEditor.Root`
+// / `.Viewport` / `.Content` (packages/react/src/PptxEditorRoot.tsx), after DOCX Editor's Vue
+// adapter (docx-editor/packages/vue/src/editor/DocxEditorRoot.ts). DOCX Editor commit adf0e178.
 //
 // `PptxEditorRoot` renders no DOM of its own: it creates the instance on mount, provides it,
 // and lets `PptxEditorContent` attach the surface wherever the host's template puts it. Props

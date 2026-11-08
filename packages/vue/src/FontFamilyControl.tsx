@@ -1,12 +1,13 @@
 /** @jsxImportSource vue */
 // The font family picker: the Vue twin of the React adapter's `FontFamilyControl.tsx`, after DOCX
 // Editor's `FontFamily` toolbar compound (docx-editor/packages/vue/src/editor/toolbar/
-// FontFamily.tsx): a root that holds the picker state in a part-level context (provide/inject),
-// and the `Trigger`, `Content`, and `Item` parts that read it. With no slot content the root
-// renders a trigger and a search field over a list box of groups (the slide's theme fonts,
-// labeled Headings and Body; the fonts in this presentation; all fonts), each name drawn in its
-// own face, the current family marked and scrolled into view when the list opens. With slot
-// content, a host composes the parts itself. Core's `font-picker.ts` builds the groups and rows.
+// packages/vue/src/editor/toolbar/FontFamily.tsx): a root that holds the picker state in a
+// part-level context (provide/inject), and the `Trigger`, `Content`, and `Item` parts that read it.
+// With no slot content the root renders a trigger and a search field over a list box of groups (the
+// slide's theme fonts, labeled Headings and Body; the fonts in this presentation; all fonts), each
+// name drawn in its own face, the current family marked and scrolled into view when the list opens.
+// With slot content, a host composes the parts itself. Core's `font-picker.ts` builds the groups
+// and rows. DOCX Editor commit adf0e178.
 
 import {
   defineComponent,

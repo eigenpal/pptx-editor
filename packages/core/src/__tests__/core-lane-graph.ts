@@ -1,5 +1,5 @@
 // The internal lane DAG of the core package, adapted from
-// docx-editor/packages/core/src/__tests__/core-lane-graph.ts.
+// docx-editor/packages/core/src/__tests__/core-lane-graph.ts at 26095c632.
 //
 // The machine-readable source of truth for which lane may import which. A lane that acquires a
 // new dependency declares it here, in a diff a reviewer sees. `core-lane-graph.test.ts` proves

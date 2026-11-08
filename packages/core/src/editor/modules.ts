@@ -1,6 +1,6 @@
 // The `EditorModule` seam, after DOCX Editor's `packages/core/src/contracts/modules.ts`: how an
 // optional capability (the review module and the collaboration module in `@pptx-editor.dev/pro`)
-// contributes to the engine without the free tier importing it.
+// contributes to the engine without the free tier importing it. DOCX Editor commit adf0e178.
 //
 // NOT a plugin system. The shape is closed: every contribution point is named here, the editor
 // reads the registry at its own dispatch points, and core never imports a capability package.

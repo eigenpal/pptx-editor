@@ -2,8 +2,9 @@
 // after DOCX Editor's cross-adapter differential test
 // (docx-editor/packages/vue/test/cross-adapter-differential.test.ts). Both bars draw every
 // registered control of their groups; the test pins the icon command set to the registry, so a
-// control missing from either bar fails. `toolbar-controls.test.ts` compares the full markup.
-// The tooltip bubble and the grouped font list must also give the same canonical markup.
+// control missing from either bar fails. `toolbar-controls.test.ts` compares the full markup. The
+// tooltip bubble and the grouped font list must also give the same canonical markup. DOCX Editor
+// commit adf0e178.
 
 import { afterEach, expect, test } from 'bun:test';
 import { createElement } from 'react';

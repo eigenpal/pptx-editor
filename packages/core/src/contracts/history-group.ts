@@ -1,5 +1,6 @@
 // The public history group handle, as DOCX Editor's `packages/core/src/contracts/editor-scope.ts`
-// defines it: an engine-owned identity of one gesture that a host passes to `exec`.
+// defines it: an engine-owned identity of one gesture that a host passes to `exec`. DOCX Editor
+// commit adf0e178.
 
 declare const historyGroupBrand: unique symbol;
 

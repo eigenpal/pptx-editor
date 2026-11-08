@@ -1,7 +1,8 @@
 /** @jsxImportSource vue */
-// `PptxEditorContextMenu`: the slide canvas's context menu as library parts, the Vue twin of
-// the React adapter's `PptxEditor.ContextMenu` (`context-menu-parts.tsx`), after DOCX Editor's
-// `DocxEditorContextMenu` (docx-editor/docs/site/content/customization/menus.mdx).
+// `PptxEditorContextMenu`: the slide canvas's context menu as library parts, the Vue twin of the
+// React adapter's `PptxEditor.ContextMenu` (`context-menu-parts.tsx`), after DOCX Editor's
+// `DocxEditorContextMenu` (docx-editor/docs/site/content/customization/menus.mdx). DOCX Editor
+// commit adf0e178.
 //
 // The canvas opens a menu request (right-click, Shift+F10, the Menu key) for what is under the
 // pointer: shapes, pictures, text being edited, or empty slide area. The menu renders core's

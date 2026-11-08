@@ -12,7 +12,7 @@ import {
 
 // Dialog named parts over a draft controller, as in DOCX Editor
 // (docs/site/content/customization/dialogs.mdx): parts replace defaults in place, keep their
-// wiring, and Apply commits the draft once while Cancel discards it.
+// wiring, and Apply commits the draft once while Cancel discards it. DOCX Editor commit adf0e178.
 
 const IN = 914_400;
 

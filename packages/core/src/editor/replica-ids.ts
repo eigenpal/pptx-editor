@@ -1,5 +1,6 @@
 // Ids that two replicas of one collaboration room can mint at the same time: the PPTX-only part,
-// beside DOCX Editor's `actor-scoped-ids.ts` (copied with the omissions its header lists).
+// beside DOCX Editor's `packages/core/src/store/package/actor-scoped-ids.ts` (copied with the
+// omissions its header lists). DOCX Editor commit adf0e178.
 //
 // Each replica picks "one past the highest" from its own state, and the state-based merge
 // then joins both parts, so two peers that add a slide, a picture, a link, or a shape at once

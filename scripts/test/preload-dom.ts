@@ -1,5 +1,5 @@
 // Registers happy-dom once, before any adapter test module is evaluated (DOCX Editor's
-// scripts/test/preload-dom.ts).
+// scripts/test/preload-dom.ts). DOCX Editor commit adf0e178.
 //
 // Only the adapter tests preload it: `bun run test` passes `--preload` for the files under
 // `packages/react/` and `packages/vue/` (`pptx-suite.mjs`), and `bun run test:dom` runs them

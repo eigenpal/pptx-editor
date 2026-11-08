@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
-// Provider-first host for the editor facade (docx-editor/packages/react/src/editor/DocxEditorRoot.tsx).
+// Provider-first host for the editor facade
+// (docx-editor/packages/react/src/editor/DocxEditorRoot.tsx). DOCX Editor commit adf0e178.
 //
 // `Root` renders no DOM of its own: it creates the instance in an effect (StrictMode-safe: a
 // fresh instance per effect run, destroyed on cleanup), publishes it through context, and lets

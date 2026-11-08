@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/package-size-baseline.test.ts (EigenPal).
+// Adapted from docx-editor/scripts/package-size-baseline.test.ts at 2d7935e80 (EigenPal).
 import { afterEach, expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -1,9 +1,10 @@
 // The menu registry: the menu bar and the canvas context menus as rows over chrome slots, after
 // DOCX Editor's `CHROME_MENUS` (docx-editor/packages/core/src/editor/chrome-controls.ts,
-// chrome-menu-entries.ts). A row names a slot, so its label, icon, enabled state, and action
-// come from the same registry entry as the toolbar control: a menu row and its toolbar twin
-// cannot describe one capability two ways. The adapters render these rows; a host replaces
-// one with `Menu.Item` or `ContextMenu.Slot`, adds its own, or turns the preset off.
+// packages/core/src/editor/chrome-menu-entries.ts). A row names a slot, so its label, icon, enabled
+// state, and action come from the same registry entry as the toolbar control: a menu row and its
+// toolbar twin cannot describe one capability two ways. The adapters render these rows; a host
+// replaces one with `Menu.Item` or `ContextMenu.Slot`, adds its own, or turns the preset off. DOCX
+// Editor commit adf0e178.
 //
 // The menu bar includes rows whose commands the engine provides.
 

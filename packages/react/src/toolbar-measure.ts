@@ -1,6 +1,7 @@
 // The toolbar's measuring and focus helpers, kept apart from `Toolbar.tsx` (its 1,000-line cap):
 // roving focus here, and the room and separator measures from core. After DOCX Editor's
-// `toolbar-measure.ts` and `useToolbarOverflow`.
+// `packages/core/src/editor/toolbar-measure.ts` and `useToolbarOverflow`. DOCX Editor commit
+// adf0e178.
 
 import { useLayoutEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {

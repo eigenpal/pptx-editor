@@ -1,7 +1,7 @@
 // The collaboration status tracker and failure-code guard, after DOCX Editor's
 // `packages/core/src/collaboration/failure.ts`. One cached snapshot, a new reference only when a
 // value changes, so a React host can read it with `useSyncExternalStore`. Session
-// implementations (the pro Yjs session, or a host's own) share it.
+// implementations (the pro Yjs session, or a host's own) share it. DOCX Editor commit adf0e178.
 
 import type {
   CollaborationFailure,

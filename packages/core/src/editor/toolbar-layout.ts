@@ -1,7 +1,8 @@
 // Toolbar layout rules both adapters share: the named parts (`Toolbar.Bold` …), each group's
-// collapse priority, and which groups leave the bar for the More menu when it runs out of
-// width. After DOCX Editor's toolbar (docs/site/content/customization/toolbar.mdx: named parts,
-// `priority`, `pinned`, `overflow`) and core's `toolbar-item-fit.ts`.
+// collapse priority, and which groups leave the bar for the More menu when it runs out of width.
+// After DOCX Editor's toolbar (docs/site/content/customization/toolbar.mdx: named parts,
+// `priority`, `pinned`, `overflow`) and core's `packages/core/src/editor/toolbar-item-fit.ts`. DOCX
+// Editor commit adf0e178.
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 

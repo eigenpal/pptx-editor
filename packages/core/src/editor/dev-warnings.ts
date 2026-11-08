@@ -1,6 +1,7 @@
-// Development warnings for customizations that cannot do what they say. Shared by the React
-// and Vue adapters (moved from packages/react/src/dev-warnings.ts). After DOCX Editor's
-// `packages/react/src/editor/toolbar/toolbar-warnings.ts` and `lib/is-development.ts`.
+// Development warnings for customizations that cannot do what they say. Shared by the React and Vue
+// adapters (moved from packages/react/src/dev-warnings.ts). After DOCX Editor's
+// `packages/react/src/editor/toolbar/toolbar-warnings.ts` and
+// `packages/react/src/lib/is-development.ts`. DOCX Editor commit adf0e178.
 //
 // A misplaced part still renders, because breaking the host's page is worse than a misplaced
 // control. But it must not fail silently: each warning names the part, the value, and what the

@@ -3,10 +3,10 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The evaluation protocol's fixed settings and its font plan. `export.ts` and
-// `layout-summary.ts` share them, as DOCX Editor's `export.ts`, `trace.ts`, and
-// `layout-summary.ts` share one font profile (`packages/docx-to-pdf/scripts/evaluation/`,
-// commit 398963c7f67207cebf3c38dcc41d5f0bd1339b5f).
+// The evaluation protocol's fixed settings and its font plan.
+// `packages/docx-to-pdf/scripts/evaluation/export.ts` and `layout-summary.ts` share them, as DOCX
+// Editor's `export.ts`, `trace.ts`, and `layout-summary.ts` share one font profile
+// (`packages/docx-to-pdf/scripts/evaluation/`, commit 398963c7f67207cebf3c38dcc41d5f0bd1339b5f).
 
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';

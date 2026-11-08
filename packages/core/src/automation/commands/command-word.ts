@@ -1,9 +1,9 @@
 // The word a command acts on at a collapsed caret: Change Case and Insert link. PPTX Editor
-// behavior beside the shared caret word rule (`caretWordRange` in `@eigenpal/ooxml-core`,
-// copied from DOCX Editor and kept equal to it). That rule takes a word only with the caret
-// strictly inside it, because a format at a word edge arms the text typed next. A command that
-// changes existing text has nothing to arm: at the end of a word it takes the word before the
-// caret, and at the start of a word the word after it.
+// behavior beside the shared caret word rule (`caretWordRange` in `@eigenpal/ooxml-core`, which
+// keeps the rule of DOCX Editor `packages/core/src/layout/caret-word.ts` at 5993bd223). That rule
+// takes a word only with the caret strictly inside it, because a format at a word edge arms the
+// text typed next. A command that changes existing text has nothing to arm: at the end of a word it
+// takes the word before the caret, and at the start of a word the word after it.
 
 import { caretWordRange, type CaretWordRange } from '@eigenpal/ooxml-core';
 import type { TextPoint } from '../../contracts/neutral.ts';

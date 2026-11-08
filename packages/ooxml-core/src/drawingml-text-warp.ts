@@ -4,7 +4,7 @@
 // evaluator draws them as it draws a preset shape; the text layout of each editor maps glyphs
 // between the paths.
 //
-// This is PPTX Editor's module, not a copy of a DOCX Editor file.
+// This is PPTX Editor's own module: DOCX Editor has no such file.
 
 import {
   definitionAdjustments,

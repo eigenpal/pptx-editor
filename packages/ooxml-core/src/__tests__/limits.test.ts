@@ -1,5 +1,6 @@
-// Tests for the resource limits (`limits.ts`, copied from DOCX Editor `store/runtime/limits.ts`
-// at 26095c63): a host may lower a limit but never raise or disable one.
+// Tests for the resource limits in `limits.ts`, whose code is the same as DOCX Editor
+// `packages/core/src/store/runtime/limits.ts` at 26095c63. A host may lower a limit but never
+// raise or disable one.
 
 import { describe, expect, test } from 'bun:test';
 import {

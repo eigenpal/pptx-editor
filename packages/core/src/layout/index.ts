@@ -24,7 +24,7 @@ export {
   symbolBulletText,
 } from './text/autonumber.ts';
 export { breakOpportunities, isIdeographic, type KinsokuLists } from './text/line-break.ts';
-// Font configuration, copied from DOCX Editor's layout lane (each file header names its source).
+// Font configuration from DOCX Editor's layout lane (each file header names its source).
 // Named exports: `font-resource.ts` also names a `FontRequest` and a `FontSubstitution` that
 // differ from the measurer's.
 export {

@@ -4,7 +4,8 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Option checks, the work budget, and the cancellation scope, after DOCX Editor's `docx-to-pdf`
-// (`src/options.ts`, `src/context.ts` budgets, `src/pdf-work.ts` `withPdfWork`).
+// (`packages/docx-to-pdf/src/options.ts`, `packages/docx-to-pdf/src/context.ts` budgets,
+// `packages/docx-to-pdf/src/pdf-work.ts` `withPdfWork`). DOCX Editor commit adf0e178.
 
 import {
   ExportResourceError,

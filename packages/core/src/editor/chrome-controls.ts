@@ -1,5 +1,6 @@
-// The chrome registry: the toolbar taxonomy both the React adapter and any future adapter
-// derive their default arrangement FROM (docx-editor/packages/core/src/editor/chrome-controls.ts).
+// The chrome registry: the toolbar taxonomy both the React adapter and any future adapter derive
+// their default arrangement FROM (docx-editor/packages/core/src/editor/chrome-controls.ts). DOCX
+// Editor commit adf0e178.
 //
 // `ChromeSlotId` values are public API: renames are breaking. A control's descriptor says HOW
 // it renders and dispatches, never whether it is enabled. Enabled state has exactly one source,

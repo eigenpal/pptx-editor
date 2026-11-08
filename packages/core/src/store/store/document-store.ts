@@ -1,9 +1,10 @@
 // The document store: the single source of truth and the only write path.
 //
 // One transaction = one atomic publication = at most one history entry (DOCX Editor's
-// TreeDocumentStore contract, store/store/tree-store.ts). `transact` stages every op against a
-// working package; nothing is visible until all ops apply, so a refused op mid-batch leaves the
-// revision, the package, and every subscriber exactly as they were.
+// TreeDocumentStore contract, `packages/core/src/store/store/tree-store.ts` at adf0e178).
+// `transact` stages every op against a working package; nothing is visible until all ops apply, so
+// a refused op mid-batch leaves the revision, the package, and every subscriber exactly as they
+// were.
 //
 // History is scoped by intent, never by a timer: consecutive transactions with the same
 // `historyGroup` token are one entry, and a `projection` or `awareness` commit is none

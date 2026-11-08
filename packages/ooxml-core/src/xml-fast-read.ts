@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/xml-fast-read.ts at fc28dba9 (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/xml-fast-read.ts at fc28dba9 (EigenPal).
 // It also holds fixes that DOCX Editor does not have yet: S4 (a comment), K6.
 // Keep it equal to that file plus those fixes.
 // One-pass reader for the plain XML subset that OOXML parts are written in.

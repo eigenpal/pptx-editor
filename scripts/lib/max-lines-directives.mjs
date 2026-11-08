@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/lib/max-lines-directives.mjs at 43c2012f3 (EigenPal).
+// Copied from docx-editor/scripts/lib/max-lines-directives.mjs at adf0e178 (EigenPal).
 // File-level lint directives that switch max-lines off, read by scripts/check-max-lines-caps.mjs.
 
 /**

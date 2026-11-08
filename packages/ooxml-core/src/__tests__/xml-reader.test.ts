@@ -1,7 +1,7 @@
 // Tests for the two XML readers at the trust boundary: DTD and entity rejection, the depth and
 // element caps, attribute normalization, and that the one-pass reader from DOCX Editor
-// (`xml-fast-read.ts` at fc28dba9) builds exactly the tree the bounded reader builds, or gives
-// the part to it.
+// (`packages/core/src/store/package/xml-fast-read.ts` at fc28dba9) builds exactly the tree the
+// bounded reader builds, or gives the part to it.
 
 import { describe, expect, test } from 'bun:test';
 import { fastReadXml } from '../xml-fast-read.ts';
@@ -176,7 +176,7 @@ describe('xml-text helpers', () => {
   });
 });
 
-// Ported from docx-editor/packages/core/src/store/__tests__/xml-fast-read.test.ts at fc28dba9
+// Adapted from docx-editor/packages/core/src/store/__tests__/xml-fast-read.test.ts at fc28dba9
 // (EigenPal), with a PresentationML part as the base.
 describe('mutations of a part', () => {
   /** The tree with attribute order spelled out, so an order change is a difference. */

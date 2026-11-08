@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/layout/__tests__/grapheme.test.ts at 5993bd223.
+// Copied from docx-editor/packages/core/src/layout/__tests__/grapheme.test.ts at adf0e178.
 // Grapheme boundary tests (interactive-paginated-editing 3.3).
 
 import { describe, expect, test, afterEach } from 'bun:test';

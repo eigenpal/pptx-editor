@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copied from DOCX Editor packages/editor-api/scripts/fetch-office-reference.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Adapted from DOCX Editor packages/editor-api/scripts/fetch-office-reference.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
 // Changes: the presentation namespace, PPTX Editor names, and paths only.
 /**
  * Fetches the current stable `@types/office-js` release, verifies its

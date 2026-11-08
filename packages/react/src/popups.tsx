@@ -1,8 +1,9 @@
 /** @jsxImportSource react */
 // The popups registry, after DOCX Editor's (docx-editor/packages/react/src/editor/popup-config.tsx,
-// popup-renderer.ts, dialog-host.tsx). `PptxEditor.Root` mounts the editor's dialogs. A host
-// changes one through `popups`: a render callback replaces the packaged dialog, and `false`
-// turns off automatic rendering. The operation behind a dialog never depends on it.
+// packages/react/src/editor/popup-renderer.ts, packages/react/src/editor/dialog-host.tsx).
+// `PptxEditor.Root` mounts the editor's dialogs. A host changes one through `popups`: a render
+// callback replaces the packaged dialog, and `false` turns off automatic rendering. The operation
+// behind a dialog never depends on it. DOCX Editor commit adf0e178.
 //
 // Every packaged opener (the Format panel, the rail and canvas menus) and any host chrome open
 // a dialog with `useEditorDialog(key).open()`, so a host renderer receives the request from all

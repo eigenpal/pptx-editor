@@ -192,18 +192,19 @@ export interface CaretModifiers {
 }
 
 /**
- * The caret after a navigation key, with the key map of DOCX Editor's `surface-input.ts`.
- * Left and Right step one character (a whole emoji, a whole field). With Alt (macOS) or Ctrl
- * (other platforms) they step to the start of the word before or the end of the word after
- * (UAX #29 words, the same units as a word deletion; forward, past the spaces after the word,
- * to the start of the next one), and at a paragraph edge into the next paragraph; both keys
- * are accepted on every platform. With Cmd alone they go to the line edges, for keyboards
- * without Home and End: the start and the end of a left-to-right line, and the visual edge on
- * the arrow's side of a line in visual order. Up and Down keep the x position on the next line; with
- * Alt (macOS) or Ctrl alone they go to the start of the paragraph (Up, or of the one before
- * when the caret is there already) or of the next paragraph (Down, or the end of the last).
- * Home and End go to the edges of the laid-out line (`lineEdge`). Home and End with Ctrl or
- * Cmd, and Up and Down with Cmd, go to the start or the end of the text body.
+ * The caret after a navigation key, with the key map of DOCX Editor's
+ * `packages/core/src/editor/surface-input.ts`. Left and Right step one character (a whole emoji, a
+ * whole field). With Alt (macOS) or Ctrl (other platforms) they step to the start of the word
+ * before or the end of the word after (UAX #29 words, the same units as a word deletion; forward,
+ * past the spaces after the word, to the start of the next one), and at a paragraph edge into the
+ * next paragraph; both keys are accepted on every platform. With Cmd alone they go to the line
+ * edges, for keyboards without Home and End: the start and the end of a left-to-right line, and
+ * the visual edge on the arrow's side of a line in visual order. Up and Down keep the x position
+ * on the next line; with Alt (macOS) or Ctrl alone they go to the start of the paragraph (Up, or
+ * of the one before when the caret is there already) or of the next paragraph (Down, or the end of
+ * the last). Home and End go to the edges of the laid-out line (`lineEdge`). Home and End with
+ * Ctrl or Cmd, and Up and Down with Cmd, go to the start or the end of the text body. DOCX Editor
+ * commit adf0e178.
  */
 export function moveCaret(
   item: ShapeItem,

@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// A collaboration session over a Y.Doc, after DOCX Editor's `collaboration/document-session.ts`.
+// A collaboration session over a Y.Doc, after DOCX Editor's
+// `packages/pro/src/collaboration/document-session.ts`. DOCX Editor commit adf0e178.
 //
 // The host owns the Y.Doc and its provider (Hocuspocus, y-webrtc, or a test link) and passes
 // the document in, with an optional Yjs awareness for presence. On attach, an empty room is

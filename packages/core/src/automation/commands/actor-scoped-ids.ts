@@ -1,9 +1,11 @@
-// Copied from DOCX Editor: packages/core/src/store/package/actor-scoped-ids.ts at a59ace33 (format-neutral). Left out: `freePackageRelationshipId`, which reads DOCX Editor's package type; `fnv1a32` is inlined from its `para-id.ts`.
-// In PPTX Editor the actor comes from `OpBatch.allocationActor` (the session id), passed to each mint;
+// Adapted from DOCX Editor: packages/core/src/store/package/actor-scoped-ids.ts at a59ace33
+// (format-neutral). Left out: `freePackageRelationshipId`, which reads DOCX Editor's package type;
+// `fnv1a32` is inlined from its `packages/core/src/store/package/para-id.ts`. In PPTX Editor the
+// actor comes from `OpBatch.allocationActor` (the session id), passed to each mint;
 // `runWithTransactionActor` is not bound, so the functions that resolve the actor from the
 // transaction (`transactionActorId`, `resolveAllocationActor`) see none: pass the actor explicitly.
-// Actor-scoped decimal id allocation for revision, comment, relationship, bookmark,
-// `_Toc` bookmark-name, content-control, and numbering id namespaces.
+// Actor-scoped decimal id allocation for revision, comment, relationship, bookmark, `_Toc`
+// bookmark-name, content-control, and numbering id namespaces. DOCX Editor commit adf0e178.
 //
 // WHY STRIPES: two replicas that mint by "one past the highest local id" compute the SAME
 // value from the same snapshot. The CRDT then keeps both nodes and the shared `@w:id` /

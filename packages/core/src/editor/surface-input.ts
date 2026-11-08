@@ -1,8 +1,8 @@
 // DOM input wiring for the slide surface: the `beforeinput` dispatch, IME composition, keys,
 // and clipboard events. Browser input becomes editor text input or commands; the DOM is never
 // edited. Every `beforeinput` is prevented, and an input type the editor does not apply is
-// refused with a typed reason, never dropped silently. Adapted from docx-editor's
-// `surface-input.ts`.
+// refused with a typed reason, never dropped silently. After DOCX Editor
+// `packages/core/src/editor/surface-input.ts` at e568148f8.
 
 import type { EditorCommand, EditorExecOptions, HistoryGroup } from '../contracts/index.ts';
 import type { TextInputKind } from './text-input.ts';

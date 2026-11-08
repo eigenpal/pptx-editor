@@ -2,8 +2,9 @@
 // The named toolbar parts (`Toolbar.Bold`, `Toolbar.FontFamily`, …), after DOCX Editor's
 // `definePart` (docx-editor/packages/react/src/editor/toolbar/parts.tsx). Each part is a
 // `Toolbar.Slot` with its slot pinned, and carries the slot as a static (`pptxSlot`), so the
-// toolbar recognizes it among its children and puts it in the slot's place. The table of
-// names lives in core (`TOOLBAR_NAMED_PARTS`), so the Vue twin uses the same names.
+// toolbar recognizes it among its children and puts it in the slot's place. The table of names
+// lives in core (`TOOLBAR_NAMED_PARTS`), so the Vue twin uses the same names. DOCX Editor commit
+// adf0e178.
 
 import type { ReactNode } from 'react';
 import { TOOLBAR_NAMED_PARTS, type ChromeSlotId } from '@pptx-editor.dev/core/editor';

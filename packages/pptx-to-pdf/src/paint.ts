@@ -4,7 +4,7 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Paint one laid-out slide into a PDF page. Like DOCX Editor's `docx-to-pdf`
-// (`packages/docx-to-pdf/src/paint.ts`), this reads the engine's layout, the same
+// (`packages/docx-to-pdf/src/paint.ts` at adf0e178), this reads the engine's layout, the same
 // `layoutSlide` output the editor's SVG paint reads; it is not a second layout.
 //
 // The page content works in slide EMU with y down: one page matrix maps EMU to PDF points and

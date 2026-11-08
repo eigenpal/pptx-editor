@@ -5,7 +5,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The New comment row of the canvas context menus (`review.addComment`), after DOCX Editor's
 // `packages/react/test/context-menu-add-comment.test.tsx`. The Vue twin is
-// `../../vue/__tests__/context-menu-add-comment.test.ts`.
+// `../../vue/__tests__/context-menu-add-comment.test.ts`. DOCX Editor commit adf0e178.
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';

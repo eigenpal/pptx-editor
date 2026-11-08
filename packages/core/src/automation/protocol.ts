@@ -1,4 +1,5 @@
 // The automation host protocol, after DOCX Editor's `packages/core/src/automation/protocol.ts`.
+// DOCX Editor commit adf0e178.
 //
 // One interface, two implementations: a headless host that owns a package it opened from bytes,
 // and a browser host that borrows a live editor's store. Both answer the same operations with

@@ -1,5 +1,6 @@
 // The chat example's own English text, in one place, as DOCX Editor's examples keep theirs in
-// `shared/example-text.ts`. The editor's controls use the published locale catalog.
+// `examples/shared/example-text.ts` at adf0e178. The editor's controls use the published
+// locale catalog.
 
 export const TEXT = {
   appName: 'Studio',

@@ -1,4 +1,4 @@
-// Copied from DOCX Editor packages/editor-api/scripts/lib/typecheck-compat.d.mts at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Copied from DOCX Editor packages/editor-api/scripts/lib/typecheck-compat.d.mts at commit adf0e178.
 // Changes: this comment names the PPTX Editor test that imports the helper. The declarations
 // are equal.
 // Declarations for the `.mjs` helper that `scripts/__tests__/conformance.test.ts` imports.

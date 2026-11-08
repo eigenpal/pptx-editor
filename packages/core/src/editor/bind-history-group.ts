@@ -1,5 +1,5 @@
 // One undo step for one continuous gesture on a host control (a slider drag, a held arrow key,
-// a native color picker). Copied from DOCX Editor's
+// a native color picker). Adapted from DOCX Editor's
 // packages/core/src/editor/bind-history-group.ts (commit 2741998e3), over this editor's
 // `beginHistoryGroup()`. The framework's own change handlers apply the values; this binding
 // only opens and ends the group.

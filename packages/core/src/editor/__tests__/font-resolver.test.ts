@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/editor/__tests__/font-resolver.test.ts` at commit 5993bd223.
+// Adapted from DOCX Editor `packages/core/src/editor/__tests__/font-resolver.test.ts` at commit 5993bd223.
 // Keep the exported API equal to the source.
 
 // The mark that separates an on-demand resolver from a zero-argument loader, and the

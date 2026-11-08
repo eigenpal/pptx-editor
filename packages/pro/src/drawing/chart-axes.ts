@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Ported from DOCX Editor `packages/pro/src/drawing/chart-axes.ts` at commit ba742d7d1.
+// Adapted from DOCX Editor `packages/pro/src/drawing/chart-axes.ts` at commit ba742d7d1.
 // Axes of a chart with categories or values along both directions: which axis each plot
 // uses, the category positions, the value scales, and the tick labels with the room they take.
 

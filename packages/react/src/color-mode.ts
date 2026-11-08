@@ -1,8 +1,9 @@
 // The chrome color mode a `PptxEditor.Root` declares (`colorMode`), after DOCX Editor's
 // `packages/react/src/editor/color-mode-context.ts`. The dark palette is scoped to
 // `.pptx-editor.dark`. `Root` renders no element, so the viewport adds `dark` beside
-// `.pptx-editor`, and a part rendered outside the viewport (a dialog) puts the scope classes
-// on its own root element. Only the chrome is themed: the slide keeps the deck's own colors.
+// `.pptx-editor`, and a part rendered outside the viewport (a dialog) puts the scope classes on its
+// own root element. Only the chrome is themed: the slide keeps the deck's own colors. DOCX Editor
+// commit adf0e178.
 
 import { createContext, useContext, useSyncExternalStore } from 'react';
 import {

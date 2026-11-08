@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/layout/font-resource.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/layout/font-resource.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // The implementation lives in the store lane (`store/package/sha256.ts`), where both
