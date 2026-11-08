@@ -427,14 +427,18 @@ function evaluatePath(
   // The current point and the subpath start, in path units.
   let cur = { x: 0, y: 0 };
   let start = cur;
+  const fill = path.fill ?? 'norm';
+  const stroke = path.stroke !== false;
   /**
-   * True once a `moveTo` has set the current point. `lnTo`, `arcTo`, `quadBezTo`, and
-   * `cubicBezTo` draw from the current point (ECMA-376 Part 1, 20.1.9, `CT_Path2D`). The schema
-   * makes the commands an unordered choice, so a path can start with one of them, but then it
-   * has no current point. Such a command draws nothing, and neither the fill nor the
-   * outline shows it: the reference PDF of fixture `custom-geometry` slide 2 shows no part of a
-   * path that starts with `lnTo`.
+   * `lnTo`, `arcTo`, `quadBezTo`, and `cubicBezTo` draw from the current point (ECMA-376 Part 1,
+   * 20.1.9, `CT_Path2D`). The schema makes the commands an unordered choice, so a path can start
+   * with one of them, but then it has no current point. Such a path draws nothing at all, also
+   * after a later `moveTo`: neither the fill nor the outline shows any part of it. The reference
+   * PDFs of fixtures `custom-geometry` slide 2 and `follow-ups` slide 1 show this.
    */
+  const first = path.cmds.find((c) => c[0] !== 'Z');
+  if (first && first[0] !== 'M') return { commands: [], fill, stroke };
+  // True once a `moveTo` has set the current point: a close before it has nothing to close.
   let open = false;
   const cmds = path.cmds;
   const n = Math.min(cmds.length, MAX_COMMANDS);
@@ -448,12 +452,10 @@ function evaluatePath(
         emit(sink, { op: 'M', x: cur.x * sx, y: cur.y * sy });
         break;
       case 'L':
-        if (!open) break;
         cur = { x: v(cmd[1]), y: v(cmd[2]) };
         emit(sink, { op: 'L', x: cur.x * sx, y: cur.y * sy });
         break;
       case 'A':
-        if (!open) break;
         cur = arcToBeziers(
           cur.x,
           cur.y,
@@ -465,7 +467,6 @@ function evaluatePath(
         );
         break;
       case 'Q': {
-        if (!open) break;
         const x = v(cmd[3]);
         const y = v(cmd[4]);
         emit(sink, { op: 'Q', x1: v(cmd[1]) * sx, y1: v(cmd[2]) * sy, x: x * sx, y: y * sy });
@@ -473,7 +474,6 @@ function evaluatePath(
         break;
       }
       case 'C': {
-        if (!open) break;
         const x = v(cmd[5]);
         const y = v(cmd[6]);
         emit(sink, {
@@ -495,7 +495,7 @@ function evaluatePath(
         break;
     }
   }
-  return { commands: sink.out, fill: path.fill ?? 'norm', stroke: path.stroke !== false };
+  return { commands: sink.out, fill, stroke };
 }
 
 /**

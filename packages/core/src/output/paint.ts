@@ -758,21 +758,25 @@ export function paintItem(
       if (second) outer.appendChild(second);
       const shadow = shadowCopy(ctx.defs, effects, source);
       if (shadow) outer.appendChild(shadow);
-      // The glow lies under the extrusion: a copy that paints the glow alone, then the sides.
-      const under = extrusion.length > 0;
+      // The glow is a copy that paints the glow alone, under the extrusion and the content. The
+      // content itself paints with no filter, so its text stays text in a printed PDF.
       const glow =
-        pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids, under) : null;
-      if (glow) effectDefs(ctx.defs, glow.defs);
-      if (glow && under)
+        pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids, true) : null;
+      if (glow) {
+        effectDefs(ctx.defs, glow.defs);
+        let glowSource = contentId;
+        if (shown !== content) {
+          glowSource = ctx.defs.id('shown');
+          shown.setAttribute('id', glowSource);
+        }
         outer.appendChild(
           svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
-            svg(doc, 'use', { href: `#${contentId}` }),
+            svg(doc, 'use', { href: `#${glowSource}` }),
           ])
         );
+      }
       for (const node of extrusion) outer.appendChild(node);
-      outer.appendChild(
-        glow && !under ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [shown]) : shown
-      );
+      outer.appendChild(shown);
       return outer;
     }
   }

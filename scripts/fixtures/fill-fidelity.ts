@@ -50,11 +50,17 @@ const pic = (id: number, x: number, y: number, cx: number, cy: number, blip: str
   `<p:blipFill>${blip}</p:blipFill><p:spPr><a:xfrm><a:off x="${Math.round(x * IN)}" y="${Math.round(y * IN)}"/>` +
   `<a:ext cx="${Math.round(cx * IN)}" cy="${Math.round(cy * IN)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 
+/**
+ * The resolution of a tiled picture in the fixtures. A PNG without `pHYs` has no stated
+ * resolution, and presentation apps tile it at different resolutions, so every tiled PNG states one.
+ */
+export const TILE_FIXTURE_DPI = 144;
+
 /** The deck: linear gradients, path gradients, tiles and overlays, stretched pictures, backgrounds. */
 export function fillFidelityDeck(image: Uint8Array): FixtureOptions {
   return {
     media: [
-      { name: 'image1.png', bytes: image, contentType: 'image/png' },
+      { name: 'image1.png', bytes: withResolution(image, TILE_FIXTURE_DPI), contentType: 'image/png' },
       { name: 'image2.png', bytes: withResolution(image, 150), contentType: 'image/png' },
     ],
     slides: [

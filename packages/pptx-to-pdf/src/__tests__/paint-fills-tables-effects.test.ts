@@ -791,6 +791,23 @@ describe('round 3 cases', () => {
     }
   });
 
+  test('every picture asks for smooth sampling', async () => {
+    const result = await exportPdf(deck('pictures'), BEST);
+    const doc = await PDFDocument.load(result.bytes, { updateMetadata: false });
+    const images = doc.context
+      .enumerateIndirectObjects()
+      .map(([, obj]) => obj)
+      .filter((obj): obj is PDFRawStream => obj instanceof PDFRawStream)
+      .filter((obj) => obj.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'));
+    const masks = new Set(images.map((obj) => obj.dict.get(PDFName.of('SMask'))).filter(Boolean));
+    const pictures = images.filter(
+      (obj) => ![...masks].some((ref) => doc.context.lookup(ref as never) === obj)
+    );
+    expect(pictures.length).toBeGreaterThan(0);
+    for (const obj of pictures)
+      expect(obj.dict.get(PDFName.of('Interpolate'))?.toString()).toBe('true');
+  });
+
   test('an EMF that does not convert reports picture.metafile', async () => {
     const result = await exportPdf(pictureWith(emfRectangle(0, 0), 'img.emf', 'image/x-emf'), BEST);
     expect(codes(result)).toContain('picture.metafile');

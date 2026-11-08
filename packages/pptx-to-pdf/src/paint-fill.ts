@@ -27,8 +27,10 @@ import {
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
+  PDFBool,
   type PDFImage,
-  type PDFName,
+  PDFName,
+  PDFRawStream,
   type PDFRef,
 } from 'pdf-lib';
 import type { GradientStop, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
@@ -460,6 +462,7 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
       p.res.work.reserveContent(bytes.length);
       try {
         image = png ? await p.res.doc.embedPng(bytes) : await p.res.doc.embedJpg(bytes);
+        await smoothImage(image, p);
       } catch {
         p.diag.add('picture.unreadable', 'unsupported', 'A picture cannot be decoded.');
       }
@@ -467,6 +470,17 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
   }
   p.res.images.set(target, image);
   return image;
+}
+
+/**
+ * Mark an embedded picture for smooth sampling (`/Interpolate`, ISO 32000-1, 8.9.5.3), as the
+ * editor's paint samples it. Without the flag, a PDF viewer can draw an enlarged picture with
+ * hard pixel edges. The picture is embedded now, so its image dictionary exists.
+ */
+async function smoothImage(image: PDFImage, p: PageOps): Promise<void> {
+  await image.embed();
+  const dict = p.res.doc.context.lookup(image.ref);
+  if (dict instanceof PDFRawStream) dict.dict.set(PDFName.of('Interpolate'), PDFBool.True);
 }
 
 /** Whether a picture fill has an image this writer draws (the image is embedded once). */
