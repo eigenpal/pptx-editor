@@ -31,10 +31,10 @@ export interface CopyEntry {
 /**
  * A mention of DOCX Editor: "DOCX Editor", `docx-editor`, `docx_editor`, `docx-js-editor`,
  * `DocxEditor`, or `docxeditor`, in any case, also across a line break inside a comment
- * ("DOCX\n// Editor"). The package scope `@docx-editor.dev/` and the site are not one.
+ * ("DOCX\n// Editor"), with one flat run of space and comment marks so the match stays linear.
+ * The package scope `@docx-editor.dev/` and the site are not one.
  */
-export const MENTION =
-  /\bdocx(?:[-_]?(?:js[-_])?|\s+(?:(?:\/\/+|\*|#|--|<!--)\s*)*)editor(?!\.dev)/i;
+export const MENTION = /\bdocx(?:[-_]?(?:js[-_])?|\s[\s/*#<!-]*)editor(?!\.dev)/i;
 
 /**
  * Tracked files that may hold copy signals without a manifest entry, as [pattern, reason]. A
