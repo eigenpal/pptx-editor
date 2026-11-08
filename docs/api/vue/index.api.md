@@ -15,6 +15,7 @@ import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
 import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
+import { ClipboardDrawingReader } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CommandResult } from '@pptx-editor.dev/core/editor';
@@ -380,6 +381,8 @@ export { ChromeMenuId }
 export { ChromeSlotId }
 
 export { ChromeTranslate }
+
+export { ClipboardDrawingReader }
 
 export { ColorMode }
 
@@ -2444,6 +2447,10 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
+        };
         readonly author: {
             readonly type: StringConstructor;
             readonly default: undefined;
@@ -2510,6 +2517,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
+        readonly readClipboardDrawing: ClipboardDrawingReader;
         readonly author: string;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
@@ -2550,6 +2558,10 @@ export const PptxEditor: {
         readonly autoCorrect: {
             readonly type: BooleanConstructor;
             readonly default: true;
+        };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
         };
         readonly author: {
             readonly type: StringConstructor;
@@ -2613,6 +2625,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
+        readonly readClipboardDrawing: ClipboardDrawingReader;
         readonly author: string;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
@@ -2647,6 +2660,10 @@ export const PptxEditor: {
     readonly autoCorrect: {
         readonly type: BooleanConstructor;
         readonly default: true;
+    };
+    readonly readClipboardDrawing: {
+        readonly type: PropType<ClipboardDrawingReader>;
+        readonly default: undefined;
     };
     readonly author: {
         readonly type: StringConstructor;
@@ -2714,6 +2731,7 @@ export const PptxEditor: {
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly autoCorrect: boolean;
+    readonly readClipboardDrawing: ClipboardDrawingReader;
     readonly author: string;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
@@ -2752,6 +2770,10 @@ export const PptxEditor: {
         readonly autoCorrect: {
             readonly type: BooleanConstructor;
             readonly default: true;
+        };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
         };
         readonly author: {
             readonly type: StringConstructor;
@@ -2802,6 +2824,10 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
+        };
         readonly author: {
             readonly type: StringConstructor;
             readonly default: undefined;
@@ -2826,6 +2852,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
+        readonly readClipboardDrawing: ClipboardDrawingReader;
         readonly author: string;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
@@ -6285,6 +6312,10 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
+    readonly readClipboardDrawing: {
+        readonly type: PropType<ClipboardDrawingReader>;
+        readonly default: undefined;
+    };
     readonly author: {
         readonly type: StringConstructor;
         readonly default: undefined;
@@ -6334,6 +6365,10 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
+    readonly readClipboardDrawing: {
+        readonly type: PropType<ClipboardDrawingReader>;
+        readonly default: undefined;
+    };
     readonly author: {
         readonly type: StringConstructor;
         readonly default: undefined;
@@ -6358,6 +6393,7 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly autoCorrect: boolean;
+    readonly readClipboardDrawing: ClipboardDrawingReader;
     readonly author: string;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;

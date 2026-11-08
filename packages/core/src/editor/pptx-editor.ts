@@ -664,10 +664,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     ...(options.readClipboardDrawing ? { readDrawing: options.readClipboardDrawing } : {}),
   });
 
-  /**
-   * Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
-   * kept, so the next deck opens in it.
-   */
+  // Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
+  // kept, so the next deck opens in it.
   const applyMode = (): void => {
     mode = readOnly || session?.damage ? 'view' : hostMode;
     if (mode !== 'view') return;
