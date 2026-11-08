@@ -98,8 +98,10 @@ function withArabicSlashes(text: string, runs: readonly BidiRunText[], rtl: bool
 
 /**
  * The partner of each paired bracket of `text` (UAX #9 BD16), or -1. Each paragraph (up to a
- * paragraph separator) pairs on its own, with a stack of 63 openings; a paragraph that
- * overflows the stack pairs none of its brackets, as BD16 stops there.
+ * paragraph separator) pairs on its own, with a stack of 63 openings. At the 64th opening
+ * pairing stops for the rest of the paragraph, and the pairs found before it stay: bidi-js
+ * resolves the levels that way (`embeddingLevels.js`, the BD16 loop breaks and keeps its
+ * pairs), and these partners must name the same pairs as the levels.
  */
 function bracketPartners(text: string): Int32Array {
   const partner = new Int32Array(text.length).fill(-1);
@@ -107,8 +109,7 @@ function bracketPartners(text: string): Int32Array {
   let pairs: [number, number][] = [];
   let overflow = false;
   const endParagraph = (): void => {
-    if (!overflow)
-      for (const [open, close] of pairs) [partner[open], partner[close]] = [close, open];
+    for (const [open, close] of pairs) [partner[open], partner[close]] = [close, open];
     stack = [];
     pairs = [];
     overflow = false;
@@ -149,8 +150,9 @@ function bracketPartners(text: string): Int32Array {
  * character keep their paragraph-wide level: the whitespace at the run's edges, so it still
  * separates the run from the text beside it; a bracket whose pair lies outside the run, so the
  * pair resolves as one (UAX #9 N0), with the whitespace between it and the run's text; and
- * everything when the paragraph has authored embedding, override, or isolate controls. Text outside the run sees the run's characters, so right-to-left words in two
- * runs of a left-to-right paragraph still read as one stretch.
+ * everything when the paragraph has authored embedding, override, or isolate controls. Text
+ * outside the run sees the run's characters, so right-to-left words in two runs of a
+ * left-to-right paragraph still read as one stretch.
  */
 function isolateRunLevels(
   levels: Uint8Array,

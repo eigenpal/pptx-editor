@@ -328,3 +328,41 @@ describe('glyph positions for readers that place each glyph', () => {
     ]);
   });
 });
+
+describe('bracket pairs across runs (UAX #9 BD16)', () => {
+  // `(` ends the first run and `)` ends the second, a left-to-right run of a right-to-left
+  // paragraph. A paired `)` keeps the paragraph level with its `(`; an unpaired one reads
+  // inside its run, one level above the paragraph.
+  const levelsOf = (between: string, after = ''): number[] => {
+    const runs = [{ text: `${SHALOM} (` }, { text: `${between}abc)` }, { text: after }];
+    return [...paragraphBidi(runs, true)!.levels];
+  };
+  const open = SHALOM.length + 1;
+  const close = (between: string): number => open + 1 + between.length + 3;
+  const LINE_FEED = String.fromCharCode(0x0a);
+  const PARAGRAPH_SEPARATOR = String.fromCharCode(0x2029);
+
+  test('a pair found before 63 more openings stays a pair', () => {
+    const levels = levelsOf('', ` ${'('.repeat(63)}`);
+    expect(levels[close('')]).toBe(levels[open]);
+    expect(levels[close('')]).toBe(1);
+  });
+
+  test('a pair found before the 64th opening stays a pair, as bidi-js keeps it', () => {
+    const levels = levelsOf('', ` ${'('.repeat(64)}`);
+    expect(levels[close('')]).toBe(levels[open]);
+    expect(levels[close('')]).toBe(1);
+  });
+
+  test('a line feed between the brackets ends the paragraph, so they do not pair', () => {
+    const levels = levelsOf(LINE_FEED);
+    expect(levels[open]).toBe(1);
+    expect(levels[close(LINE_FEED)]).toBe(2);
+  });
+
+  test('a paragraph separator between the brackets ends the paragraph too', () => {
+    const levels = levelsOf(PARAGRAPH_SEPARATOR);
+    expect(levels[open]).toBe(1);
+    expect(levels[close(PARAGRAPH_SEPARATOR)]).toBe(2);
+  });
+});
