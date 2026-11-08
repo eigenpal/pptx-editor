@@ -49,7 +49,8 @@ function cellSelection(
  * A caret in a cell that Left or Right moves into, at the visual edge that faces the cell it
  * came from: the right edge (`side` 1) for Left, the left edge (-1) for Right. On the cell's
  * first line when the move goes forward in the cell order, else on its last line. Undefined
- * when the cell has no laid-out line.
+ * when the cell has no laid-out line, and for rotated or stacked text, whose line edges do not
+ * face the neighboring cell: the caller then takes the cell's logical start or end.
  */
 function cellEdgeCaret(
   layout: SlideLayout | undefined,
@@ -63,7 +64,8 @@ function cellEdgeCaret(
   const m = item ? textFrameMatrix(item) : undefined;
   const lines = item?.text?.lines ?? [];
   const line = forward ? lines[0] : lines[lines.length - 1];
-  if (!item || !m || !line) return undefined;
+  if (!item?.text || !m || !line) return undefined;
+  if (item.text.rotation !== 0 || item.text.upright !== 'none') return undefined;
   const xs = [...line.caretX, ...(line.bidi?.trailingX ?? [])];
   const x = side === 1 ? Math.max(...xs) : Math.min(...xs);
   const s = apply(m, x, line.top + line.height / 2);

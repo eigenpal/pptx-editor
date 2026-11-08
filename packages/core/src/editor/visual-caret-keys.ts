@@ -58,7 +58,7 @@ function visualStep(item: ShapeItem, point: TextPoint, direction: -1 | 1): TextP
   return { paragraph: next.paragraph, offset: logical === 1 ? next.start : next.end };
 }
 
-/** Whether `a` and `b` are neighbouring caret stops of the paragraph (no jump between them). */
+/** Whether `a` and `b` are neighboring caret stops of the paragraph (no jump between them). */
 function adjacent(u: ParagraphUnits, a: number, b: number): boolean {
   return Math.abs(u.stops.indexOf(a) - u.stops.indexOf(b)) === 1;
 }

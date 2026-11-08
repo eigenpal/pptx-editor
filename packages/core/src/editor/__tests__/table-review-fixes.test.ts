@@ -353,4 +353,19 @@ describe('arrow keys in a table that runs right to left', () => {
     expect(caretSlideX(e)).toBeCloseTo(textEdges(e, 1)[0], 0);
     expect(press(e, 'ArrowRight')).toBe(false);
   });
+
+  test('a cell of vertical text is entered at its logical end', async () => {
+    const vertical =
+      '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr rtl="1"/>' +
+      '<a:r><a:rPr lang="he-IL"/><a:t>אבג</a:t></a:r></a:p></a:txBody>' +
+      '<a:tcPr vert="vert"/></a:tc>';
+    const row = `<a:tr h="370840">${cell('a')}${vertical}${cell('x')}</a:tr>`;
+    const e = await open(deck(row));
+    caretIn(e, 0, 2, 0);
+    expect(press(e, 'ArrowLeft')).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({
+      cell: { row: 0, column: 1 },
+      focus: { paragraph: 0, offset: 3 },
+    });
+  });
 });
