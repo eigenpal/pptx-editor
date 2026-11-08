@@ -4702,6 +4702,45 @@ legend.pptx-dialog__label {
   align-self: flex-start;
 }
 
+/* Diagram tab: one row per diagram node, indented by its level, with its text field and the
+   add and delete buttons of the node. It shares the notes and errors of the Chart Data tab. */
+.pptx-diagram-pane__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.pptx-diagram-pane__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px;
+  padding-inline-start: calc(var(--pptx-diagram-level, 0) * 16px);
+}
+.pptx-diagram-pane__actions {
+  display: flex;
+  gap: 0;
+}
+.pptx-diagram-pane__field textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-control, 8px);
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  resize: none;
+}
+.pptx-diagram-pane__field textarea:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: -1px;
+}
+
 /* The Equation dialog: a gallery of common equations in a grid of two columns (one on a phone),
    each button with its name and its linear form, above the linear form field. */
 .pptx-dialog[data-pptx-dialog='equation'] {

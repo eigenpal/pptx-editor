@@ -851,7 +851,8 @@
     "noAnimationChange": "效果或切换已经是这些设置",
     "instantAnimation": "此效果是瞬时的，因此没有持续时间",
     "noChart": "请选择一个图表",
-    "noCommentPane": "此编辑器没有批注窗格"
+    "noCommentPane": "此编辑器没有批注窗格",
+    "noDiagram": "请选择图示"
   },
   "rail": {
     "ariaLabel": "幻灯片",
@@ -899,6 +900,7 @@
     "tabs": {
       "format": "格式",
       "chart": "图表",
+      "diagram": "图示",
       "selection": "选择",
       "animations": "动画",
       "comments": "批注"
@@ -1212,7 +1214,8 @@
       "lastShape": "图示至少要保留一个顶层形状。",
       "layoutUnsupported": "编辑器无法重新排列此图示，因此无法添加或删除其形状。",
       "noChildren": "此图示不显示顶层以下的形状。",
-      "tooLarge": "图示的形状数量超出编辑器可编辑的范围。"
+      "tooLarge": "图示的形状数量超出编辑器可编辑的范围。",
+      "textTooLong": "文本太长。请使用不超过 10,000 个字符和 1,000 个段落。"
     },
     "equationEmpty": "请输入公式。",
     "equationSyntax": "无法读取此公式。请检查括号和反斜杠后的名称。"
@@ -1704,10 +1707,24 @@
     "removeSeries": "删除系列"
   },
   "diagram": {
+    "editText": "编辑文本…",
     "addAfter": "在后面添加形状",
     "addBefore": "在前面添加形状",
     "addBelow": "在下方添加形状",
-    "delete": "删除形状"
+    "delete": "删除形状",
+    "pane": {
+      "help": "按 Enter 键或离开字段即可应用。每个字段是一个形状的文本。",
+      "emptyTitle": "未选择图示",
+      "emptyBody": "在幻灯片上选择图示以编辑其形状的文本。",
+      "nodeLabel": "形状 {number} 的文本",
+      "readOnly": "无法在此处编辑此形状的文本。",
+      "addAfterNamed": "在 {name} 后添加形状",
+      "addBelowNamed": "在 {name} 下方添加形状",
+      "deleteNamed": "删除形状 {name}",
+      "addShape": "添加形状",
+      "emptyShape": "空形状",
+      "noNodes": "此图示没有可编辑的节点。"
+    }
   },
   "equation": {
     "close": "关闭",

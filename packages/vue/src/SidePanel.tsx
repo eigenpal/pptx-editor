@@ -1,5 +1,5 @@
 /** @jsxImportSource vue */
-// The side panel (Format, Chart Data, Selection, Animations, and Comments): the Vue twin of `SidePanel` in the React adapter's
+// The side panel (Format, Chart Data, Diagram, Selection, Animations, and Comments): the Vue twin of `SidePanel` in the React adapter's
 // `panes.tsx`, with the same markup, classes, and ARIA. The Format tab writes the selected
 // element's position, size, rotation, and text fitting through engine commands.
 
@@ -38,6 +38,7 @@ import { useEditorState, usePptxEditor, useTranslation } from './composables.ts'
 import { PptxEditorSelectionPane } from './SelectionPane.tsx';
 import { AnimationsPane } from './AnimationsPane.tsx';
 import { ChartDataPane } from './ChartDataPane.tsx';
+import { DiagramTextPane } from './DiagramTextPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -291,6 +292,7 @@ const sidePanelProps = {
 function packagedPane(tab: SidePanelTab, t: (key: TranslationKey) => string): VNodeChild {
   if (tab === 'format') return <FormatTab />;
   if (tab === 'chart') return <ChartDataPane />;
+  if (tab === 'diagram') return <DiagramTextPane />;
   if (tab === 'selection') return <PptxEditorSelectionPane />;
   if (tab === 'animations') return <AnimationsPane />;
   return (
@@ -309,7 +311,7 @@ function packagedPane(tab: SidePanelTab, t: (key: TranslationKey) => string): VN
 export type SidePanelProps = ExtractPublicPropTypes<typeof sidePanelProps>;
 
 /**
- * The side panel: Format · Chart Data · Selection · Animations · Comments, the twin of React's `PptxEditor.SidePanel`. The host
+ * The side panel: Format · Chart Data · Diagram · Selection · Animations · Comments, the twin of React's `PptxEditor.SidePanel`. The host
  * shows or hides the panel by rendering it. @public
  */
 export const PptxEditorSidePanel = defineComponent({
@@ -329,9 +331,12 @@ export const PptxEditorSidePanel = defineComponent({
     const editor = usePptxEditor();
     const own = ref<SidePanelTab>(props.tab ?? 'format');
     const tab = computed<SidePanelTab>(() => props.tab ?? own.value);
-    // The Chart Data tab shows while a chart is selected, or while it is open.
+    // The Chart Data and Diagram tabs show while their object is selected, or while open.
     const chartSelected = useEditorState((s) => !!s.chart);
-    const tabs = computed(() => visibleSidePanelTabs(chartSelected.value, tab.value));
+    const diagramSelected = useEditorState((s) => !!s.diagram);
+    const tabs = computed(() =>
+      visibleSidePanelTabs(chartSelected.value, tab.value, diagramSelected.value)
+    );
     const setTab = (next: SidePanelTab): void => {
       own.value = next;
       emit('tabChange', next);

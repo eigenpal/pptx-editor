@@ -1697,6 +1697,7 @@ export interface ToolbarNamedParts {
     readonly DiagramAddBefore: ToolbarPartComponent;
     readonly DiagramAddBelow: ToolbarPartComponent;
     readonly DiagramDelete: ToolbarPartComponent;
+    readonly DiagramEditText: ToolbarPartComponent;
     readonly Duplicate: ToolbarPartComponent;
     readonly Equation: ToolbarPartComponent;
     readonly ExpandAllSections: ToolbarPartComponent;

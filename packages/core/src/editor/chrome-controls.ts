@@ -20,7 +20,7 @@ import { IMAGE_CHROME_GROUP, imageSlotState, type ImageSlotId } from './chrome-p
 import { adapterActionState } from './chrome-adapter-state.ts';
 import { EQUATION_PROBES, INSERT_GROUP, type EquationSlotId } from './chrome-insert.ts';
 import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
-import { DIAGRAM_CHROME_GROUP, type DiagramSlotId } from './chrome-diagram.ts';
+import { DIAGRAM_CHROME_GROUP, diagramSlotState, type DiagramSlotId } from './chrome-diagram.ts';
 import {
   REVIEW_CHROME_GROUP,
   addCommentState,
@@ -109,7 +109,7 @@ export type ChromeControlState =
    * Shows a tab of the side panel: Format, Selection, or Chart Data. The slot sends
    * `requestPane`, which a mounted side panel and the host answer.
    */
-  | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' | 'chart' }
+  | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' | 'chart' | 'diagram' }
   /**
    * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
    * the engine takes it; the dialog runs the command.
@@ -832,7 +832,8 @@ export interface ToolbarCommandState {
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState {
   if (!editor) return { id, enabled: false, disabledReason: 'disabled.noEditor', active: false };
   if (id === 'review.addComment') return addCommentState(editor);
-  const image = imageSlotState(editor, id) ?? chartSlotState(editor, id);
+  const image =
+    imageSlotState(editor, id) ?? chartSlotState(editor, id) ?? diagramSlotState(editor, id);
   if (image) return image;
   const snap = editor.snapshot();
   const f = snap.format;

@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-// The side panel: Format, Chart Data, Selection (the selection pane), Animations, and Comments. The Format
+// The side panel: Format, Chart Data, Diagram, Selection (the selection pane), Animations, and Comments. The Format
 // tab writes the selected element's position, size, rotation, and text fitting through engine
 // commands.
 // The Vue twin is `packages/vue/src/SidePanel.tsx`.
@@ -27,6 +27,7 @@ import { paneStyle } from './pane-state.ts';
 import { SelectionPane } from './SelectionPane.tsx';
 import { AnimationsPane } from './AnimationsPane.tsx';
 import { ChartDataPane } from './ChartDataPane.tsx';
+import { DiagramTextPane } from './DiagramTextPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -248,6 +249,7 @@ function PackagedPane({ tab }: { readonly tab: SidePanelTab }) {
   const { t } = useTranslation();
   if (tab === 'format') return <FormatTab />;
   if (tab === 'chart') return <ChartDataPane />;
+  if (tab === 'diagram') return <DiagramTextPane />;
   if (tab === 'selection') return <SelectionPane />;
   if (tab === 'animations') return <AnimationsPane />;
   return (
@@ -280,7 +282,7 @@ export interface SidePanelProps {
   readonly panes?: Partial<Record<SidePanelTab, ReactNode>>;
 }
 
-/** The side panel: Format · Chart Data · Selection · Animations · Comments. `panes` fills a tab. @public */
+/** The side panel: Format · Chart Data · Diagram · Selection · Animations · Comments. `panes` fills a tab. @public */
 export function SidePanel({
   onClose,
   className,
@@ -294,9 +296,10 @@ export function SidePanel({
   const editor = usePptxEditor();
   const [own, setOwn] = useState<SidePanelTab>(shown ?? 'format');
   const tab = shown ?? own;
-  // The Chart Data tab shows while a chart is selected, or while it is open.
+  // The Chart Data and Diagram tabs show while their object is selected, or while open.
   const chartSelected = useEditorState((s) => !!s.chart);
-  const tabs = visibleSidePanelTabs(chartSelected, tab);
+  const diagramSelected = useEditorState((s) => !!s.diagram);
+  const tabs = visibleSidePanelTabs(chartSelected, tab, diagramSelected);
   const setTab = (next: SidePanelTab): void => {
     setOwn(next);
     onTabChange?.(next);

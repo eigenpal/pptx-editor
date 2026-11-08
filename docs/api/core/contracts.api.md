@@ -414,7 +414,20 @@ export type DiagramCommand = {
     readonly type: 'deleteDiagramShape';
     readonly nodeId?: string;
     readonly node?: string;
+} | {
+    readonly type: 'setDiagramText';
+    readonly node: string;
+    readonly text: string;
+    readonly nodeId?: string;
 };
+
+// @public
+export interface DiagramNodeState {
+    readonly editable: boolean;
+    readonly level: number;
+    readonly node: string;
+    readonly text: string;
+}
 
 // @public
 export type DiagramShapePosition = 'after' | 'before' | 'below';
@@ -1517,6 +1530,7 @@ export interface SelectedChartState {
 export interface SelectedDiagramState {
     readonly node: string | null;
     readonly nodeId: string;
+    readonly nodes: readonly DiagramNodeState[];
     readonly reason?: string;
     readonly structure: boolean;
 }

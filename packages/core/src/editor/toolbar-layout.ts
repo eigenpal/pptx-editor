@@ -103,6 +103,7 @@ export const TOOLBAR_NAMED_PARTS = {
   ImageCropFit: 'image.cropFit',
   ImageProperties: 'image.properties',
   ChartEditData: 'chart.editData',
+  DiagramEditText: 'diagram.editText',
   DiagramAddAfter: 'diagram.addAfter',
   DiagramAddBefore: 'diagram.addBefore',
   DiagramAddBelow: 'diagram.addBelow',

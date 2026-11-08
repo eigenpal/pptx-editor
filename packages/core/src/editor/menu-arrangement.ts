@@ -144,6 +144,7 @@ export const CONTEXT_MENU_NAMED_PARTS = {
   ImageChange: row('image.change'),
   ImageProperties: row('image.properties'),
   ChartEditData: row('chart.editData'),
+  DiagramEditText: row('diagram.editText'),
   DiagramAddAfter: row('diagram.addAfter'),
   DiagramAddBefore: row('diagram.addBefore'),
   DiagramAddBelow: row('diagram.addBelow'),

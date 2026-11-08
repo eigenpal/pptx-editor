@@ -417,7 +417,12 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   [
     'errors.diagram.noText',
     'edit.diagram-text',
-    'The diagram shape shows the text of more than one node. Edit the text of each node instead.',
+    'No single diagram shape with a paragraph shows this node. Edit the text of each node instead.',
+  ],
+  [
+    'errors.diagram.textTooLong',
+    'edit.diagram-range',
+    'Pass up to 10,000 characters and 1,000 paragraphs as `text` of `setDiagramText`.',
   ],
   [
     'errors.diagram.lastShape',

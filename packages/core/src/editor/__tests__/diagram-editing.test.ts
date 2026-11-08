@@ -9,8 +9,10 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { readPptx, serializeXmlPart } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { editorCaretOf, toolbarContextOf } from '../adapter-support.ts';
-import { canvasMenuKind } from '../chrome-menus.ts';
-import { toolbarCommandState } from '../chrome-controls.ts';
+import { CANVAS_CONTEXT_MENUS, canvasMenuKind } from '../chrome-menus.ts';
+import { runToolbarCommand, toolbarCommandState } from '../chrome-controls.ts';
+import { listenPaneRequests, visibleSidePanelTabs } from '../pane-requests.ts';
+import { runChromeRow } from '../chrome-actions.ts';
 import { ribbonContextActive } from '../ribbon.ts';
 import { firstCellCaret } from '../table-keys.ts';
 import { diagramPress, diagramTab, diagramTextItems } from '../surface-diagram.ts';
@@ -235,6 +237,145 @@ describe('diagram caret', () => {
     const next = editorCaretOf(e.snapshot(), first);
     expect(next).not.toBe(first);
     expect(next?.diagramNode).toBe(nodeWithText(e, 'Build'));
+    e.destroy();
+  });
+});
+
+describe('diagram text pane', () => {
+  test('the snapshot lists the nodes in outline order with their text and level', async () => {
+    const e = await open();
+    e.setSelection({ kind: 'shapes', nodeIds: [frameOf(e)] });
+    const nodes = e.snapshot().diagram!.nodes;
+    const top = nodes.filter((n) => n.level === 0).map((n) => n.text);
+    expect(top).toContain('Plan');
+    expect(top).toContain('Write');
+    // A child follows its parent, one level down.
+    const write = nodes.findIndex((n) => n.text === 'Write');
+    expect(nodes[write + 1]).toMatchObject({ text: 'Draft', level: 1 });
+    expect(nodes.every((n) => n.editable)).toBe(true);
+    e.destroy();
+  });
+
+  test('setDiagramText replaces the text of both parts as one undo step', async () => {
+    const e = await open();
+    const frame = frameOf(e);
+    const plan = nodeWithText(e, 'Plan');
+    e.setSelection({ kind: 'shapes', nodeIds: [frame] });
+    const r = e.exec({ type: 'setDiagramText', nodeId: frame, node: plan, text: 'Kickoff\nGoals' });
+    expect(r.ok).toBe(true);
+    const data = partText(e, '/ppt/diagrams/data1.xml');
+    const drawing = partText(e, '/ppt/diagrams/drawing1.xml');
+    expect(data).toContain('<a:t>Kickoff</a:t>');
+    expect(data).toContain('<a:t>Goals</a:t>');
+    expect(data).not.toContain('<a:t>Plan</a:t>');
+    // The first run's formatting stays on the new text.
+    expect(drawing).toContain('<a:rPr lang="en-US" sz="2000" kern="1200"/><a:t>Kickoff</a:t>');
+    expect(e.snapshot().diagram!.nodes.find((n) => n.node === plan)?.text).toBe('Kickoff\nGoals');
+    // The frame stays selected.
+    expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: [frame] });
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(partText(e, '/ppt/diagrams/data1.xml')).toContain('<a:t>Plan</a:t>');
+    // Empty text leaves the shape empty.
+    expect(e.exec({ type: 'setDiagramText', nodeId: frame, node: plan, text: '' }).ok).toBe(true);
+    expect(partText(e, '/ppt/diagrams/drawing1.xml')).not.toContain('<a:t>Plan</a:t>');
+    e.destroy();
+  });
+
+  test('setDiagramText replaces only the changed text', async () => {
+    const e = await open();
+    const frame = frameOf(e);
+    const plan = nodeWithText(e, 'Plan');
+    const set = (text: string) =>
+      e.exec({ type: 'setDiagramText', nodeId: frame, node: plan, text });
+    expect(set('Plan\nGoals').ok).toBe(true);
+    // The first paragraph keeps its run when only a second paragraph is new.
+    const body = (): string =>
+      /<dsp:sp modelId="[^"]+">[\s\S]*?<\/dsp:sp>/.exec(
+        partText(e, '/ppt/diagrams/drawing1.xml')
+      )![0];
+    expect(body()).toContain('<a:t>Plan</a:t>');
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(set('Plan B').ok).toBe(true);
+    // The kept text and the new text share the original run and its size.
+    expect(body()).toContain('<a:rPr lang="en-US" sz="2000" kern="1200"/><a:t>Plan B</a:t>');
+    const long = set('x'.repeat(10_001));
+    expect(long.ok).toBe(false);
+    if (!long.ok) expect(long.reason).toBe('errors.diagram.textTooLong');
+    e.destroy();
+  });
+
+  test('a shape with no paragraph is not editable, and setDiagramText refuses it', async () => {
+    const files = unzipSync(fixture('diagram-editing'));
+    const drawing = strFromU8(files['ppt/diagrams/drawing1.xml']!);
+    // The first shape loses its paragraphs: a text body with none is invalid input.
+    const first = /<dsp:txBody>([\s\S]*?)<\/dsp:txBody>/.exec(drawing)!;
+    const bare = first[0].replace(/<a:p>[\s\S]*<\/a:p>/, '');
+    files['ppt/diagrams/drawing1.xml'] = strToU8(drawing.replace(first[0], bare));
+    const e = await open('diagram-editing', 0, zipSync(files));
+    const frame = frameOf(e);
+    e.setSelection({ kind: 'shapes', nodeIds: [frame] });
+    const node = e.snapshot().diagram!.nodes[0]!;
+    expect(node.editable).toBe(false);
+    const command = { type: 'setDiagramText', nodeId: frame, node: node.node, text: '' } as const;
+    expect(e.can(command).ok).toBe(false);
+    const r = e.exec(command);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('errors.diagram.noText');
+    e.destroy();
+  });
+
+  test('setDiagramText refuses an unknown node, unknown keys, and a frame that is no diagram', async () => {
+    const e = await open();
+    const frame = frameOf(e);
+    const bad = e.exec({ type: 'setDiagramText', nodeId: frame, node: 'nope', text: 'x' });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.reason).toBe('errors.diagram.noText');
+    const extra = e.exec({
+      type: 'setDiagramText',
+      nodeId: frame,
+      node: nodeWithText(e, 'Plan'),
+      text: 'x',
+      color: 'red',
+    } as never);
+    expect(extra.ok).toBe(false);
+    const other = e.snapshot().shapes!.find((s) => !s.name.startsWith('Diagram'))!.nodeId;
+    const noDiagram = e.exec({ type: 'setDiagramText', nodeId: other, node: 'x', text: 'x' });
+    expect(noDiagram.ok).toBe(false);
+    if (!noDiagram.ok) expect(noDiagram.reason).toBe('errors.diagram.noDiagram');
+    e.destroy();
+  });
+
+  test('Edit text leads the diagram menu and asks for the Diagram tab', async () => {
+    const e = await open('diagram-editing');
+    e.setSelection({ kind: 'shapes', nodeIds: [frameOf(e)] });
+    expect(CANVAS_CONTEXT_MENUS.diagram[0]).toMatchObject({
+      kind: 'item',
+      slot: 'diagram.editText',
+    });
+    // Without a side panel, the row says why it is off.
+    expect(toolbarCommandState(e, 'diagram.editText').disabledReason).toBe('disabled.noSidePanel');
+    const asked: string[] = [];
+    const stop = listenPaneRequests(e, (pane) => asked.push(pane));
+    expect(toolbarCommandState(e, 'diagram.editText').enabled).toBe(true);
+    expect(runToolbarCommand(e, 'diagram.editText').ok).toBe(true);
+    expect(asked).toEqual(['diagram']);
+    expect(visibleSidePanelTabs(false, 'format', true)).toContain('diagram');
+    expect(visibleSidePanelTabs(false, 'format', false)).not.toContain('diagram');
+    expect(visibleSidePanelTabs(false, 'diagram', false)).toContain('diagram');
+    // The context menu row asks for the tab too.
+    const noop = (): void => undefined;
+    const rowHost = {
+      openDialog: noop,
+      startSlideshow: noop,
+      openFind: noop,
+      openLink: noop,
+      pickImage: noop,
+    };
+    runChromeRow(e, rowHost, 'diagram.editText');
+    expect(asked).toEqual(['diagram', 'diagram']);
+    e.setSelection({ kind: 'none' });
+    expect(toolbarCommandState(e, 'diagram.editText').disabledReason).toBe('disabled.noDiagram');
+    stop();
     e.destroy();
   });
 });

@@ -1,6 +1,6 @@
 ---
 title: 'Diagrams'
-description: 'Type in the shapes of a diagram, and add and delete diagram shapes.'
+description: 'Type in the shapes of a diagram, edit their text in the Diagram tab, and add and delete diagram shapes.'
 category: 'Guides'
 ---
 
@@ -32,9 +32,37 @@ editor.input('text', 'Next step: ');
 
 `editor.snapshot().diagram` reports the selected diagram: its frame, the node that holds the caret, and whether its shapes can be added and deleted.
 
+## Edit text in the Diagram tab
+
+The **Diagram** tab of the side panel lists the nodes of the selected diagram in outline order. Each child is indented under its parent.
+
+1. Select the diagram.
+2. Right-click the diagram and select **Edit text…**, or select **Edit text…** in the **Diagram** toolbar group.
+3. Change the text in a field. Press Enter or leave the field to apply it. Shift+Enter starts a new paragraph, and Escape restores the text.
+
+Each row also has **Add shape after**, **Add shape below**, and **Delete shape** buttons for its node. One applied field, add, or delete is one undo step. In view mode, the tab shows the text read-only.
+
+From code, `setDiagramText` replaces the text of one node. Only the changed part of the text is replaced, so the rest keeps its formatting, line breaks, and paragraph settings. New text takes the formatting of the run where it goes in. A newline starts a paragraph. The text can have up to 10,000 characters and 1,000 paragraphs:
+
+```ts
+const diagram = editor.snapshot().diagram;
+const first = diagram?.nodes[0];
+if (diagram && first?.editable) {
+  const result = editor.exec({
+    type: 'setDiagramText',
+    nodeId: diagram.nodeId, // the diagram's graphic frame
+    node: first.node, // the data model id of the node
+    text: 'Scope',
+  });
+  if (!result.ok) console.warn(result.reason); // a translation key
+}
+```
+
+`editor.snapshot().diagram.nodes` lists each node with its `text`, its `level` (0 for a top-level node), and `editable`. A node is not editable when no single shape shows its text.
+
 ## Add and delete shapes
 
-Select the diagram, or put the caret in one of its shapes. Then use the **Diagram** toolbar group, the **Diagram Design** ribbon tab, or the diagram's context menu:
+Select the diagram, or put the caret in one of its shapes. Then use the **Diagram** toolbar group, the **Diagram Design** ribbon tab, the diagram's context menu, or the buttons of the **Diagram** tab:
 
 - **Add shape after** and **Add shape before** add a node at the same level as the node that holds the caret. With only the diagram selected, they add after the last node or before the first one.
 - **Add shape below** adds a child as the last child of the node that holds the caret.

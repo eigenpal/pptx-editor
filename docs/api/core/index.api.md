@@ -627,7 +627,7 @@ export type ChromeControlState =
 */
 | {
     readonly kind: 'pane';
-    readonly pane: 'format' | 'selection' | 'chart';
+    readonly pane: 'format' | 'selection' | 'chart' | 'diagram';
 }
 /**
 * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
@@ -1285,6 +1285,7 @@ export const CONTEXT_MENU_NAMED_PARTS: {
     readonly ImageChange: MenuNamedRow;
     readonly ImageProperties: MenuNamedRow;
     readonly ChartEditData: MenuNamedRow;
+    readonly DiagramEditText: MenuNamedRow;
     readonly DiagramAddAfter: MenuNamedRow;
     readonly DiagramAddBefore: MenuNamedRow;
     readonly DiagramAddBelow: MenuNamedRow;
@@ -1509,13 +1510,26 @@ export type DiagramCommand = {
     readonly type: 'deleteDiagramShape';
     readonly nodeId?: string;
     readonly node?: string;
+} | {
+    readonly type: 'setDiagramText';
+    readonly node: string;
+    readonly text: string;
+    readonly nodeId?: string;
 };
+
+// @public
+export interface DiagramNodeState {
+    readonly editable: boolean;
+    readonly level: number;
+    readonly node: string;
+    readonly text: string;
+}
 
 // @public
 export type DiagramShapePosition = 'after' | 'before' | 'below';
 
 // @public
-export type DiagramSlotId = 'diagram.addAfter' | 'diagram.addBefore' | 'diagram.addBelow' | 'diagram.delete';
+export type DiagramSlotId = 'diagram.editText' | 'diagram.addAfter' | 'diagram.addBefore' | 'diagram.addBelow' | 'diagram.delete';
 
 // @internal
 export const DIALOG_FIELD_ATTRIBUTE = "data-pptx-field";
@@ -5143,6 +5157,7 @@ export interface SelectedChartState {
 export interface SelectedDiagramState {
     readonly node: string | null;
     readonly nodeId: string;
+    readonly nodes: readonly DiagramNodeState[];
     readonly reason?: string;
     readonly structure: boolean;
 }
@@ -5464,7 +5479,7 @@ export function showsLoading(snapshot: EditorSnapshot): boolean;
 export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>>;
 
 // @internal
-export const SIDE_PANEL_TABS: readonly ["format", "chart", "selection", "animations", "comments"];
+export const SIDE_PANEL_TABS: readonly ["format", "chart", "diagram", "selection", "animations", "comments"];
 
 // @public
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
@@ -6464,6 +6479,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly ImageCropFit: "image.cropFit";
     readonly ImageProperties: "image.properties";
     readonly ChartEditData: "chart.editData";
+    readonly DiagramEditText: "diagram.editText";
     readonly DiagramAddAfter: "diagram.addAfter";
     readonly DiagramAddBefore: "diagram.addBefore";
     readonly DiagramAddBelow: "diagram.addBelow";
@@ -6821,7 +6837,7 @@ export function valueSlotShown<K extends keyof ToolbarValueMap>(slot: K, raw: un
 export type VerticalAlign = 't' | 'ctr' | 'b';
 
 // @internal
-export function visibleSidePanelTabs(chartSelected: boolean, open: SidePanelTab): readonly SidePanelTab[];
+export function visibleSidePanelTabs(chartSelected: boolean, open: SidePanelTab, diagramSelected?: boolean): readonly SidePanelTab[];
 
 // @internal
 export function warnAsChildChild(slot: string, parts?: ToolbarPartNames): void;
