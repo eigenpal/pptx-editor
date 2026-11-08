@@ -91,7 +91,7 @@ describe('visual order of a line', () => {
   test('neutrals at a run edge stay in their run', () => {
     // A left-to-right run keeps its colon and quotation marks inside it.
     const a = lay(para(r('phrase: ', 'en-US') + r(SALAM))).lines[0];
-    expect(visual(a)).toBe(`${reversed(SALAM)}phrase: `);
+    expect(visual(a)).toBe(`${reversed(SALAM)} phrase:`);
     const b = lay(para(r(`${SHALOM}: `, 'he-IL') + r('"Hi, all!"', 'en-US'))).lines[0];
     expect(visual(b)).toBe(`"Hi, all!" :${reversed(SHALOM)}`);
     // A run with no strong letter reads in the paragraph's direction.
@@ -102,12 +102,63 @@ describe('visual order of a line', () => {
   test('a slash between digits separates numbers in an Arabic run, not in a Hebrew run', () => {
     const arabic = lay(para(r(`${SALAM} 17/08/96`))).lines[0];
     expect(visual(arabic)).toStartWith('96/08/17');
+    const split = lay(para(r(`${SALAM} 17/`) + r('08/96'))).lines[0];
+    expect(visual(split)).toContain('96/08/17');
+    // The language of the run that holds the slash decides.
+    const mixed = lay(para(r(`${SHALOM} 17/08`, 'he-IL') + r('/96'))).lines[0];
+    expect(visual(mixed)).toContain('96/17/08');
     const hebrew = lay(para(r(`${SHALOM} 852/20`, 'he-IL'))).lines[0];
     expect(visual(hebrew)).toContain('852/20');
   });
 });
 
+describe('runs with more than one script', () => {
+  test('a run that mixes scripts reads in the paragraph direction (UAX #9)', () => {
+    const words = '\u05d4\u05d5\u05d0 \u05db\u05dc\u05d9';
+    const line = lay(para(r(`Excel ${words}`, 'he-IL'))).lines[0];
+    expect(visual(line)).toBe(`${reversed(words)} Excel`);
+  });
+
+  test('right-to-left words in two runs of a left-to-right paragraph keep their order', () => {
+    const line = lay(para(r(`Hello ${SHALOM} `, 'he-IL') + r(DATE, 'he-IL'), '<a:pPr/>')).lines[0];
+    expect(visual(line)).toBe(`Hello ${reversed(`${SHALOM} ${DATE}`)}`);
+  });
+
+  test('bidi controls reorder a left-to-right paragraph without right-to-left letters', () => {
+    const line = lay(para(r('abc\u202edef\u202c', 'en-US'), '<a:pPr/>')).lines[0];
+    expect(visual(line).replace(/[\u202c\u202e]/gu, '')).toBe('abcfed');
+  });
+
+  test('a right-to-left script outside the Basic Multilingual Plane reads right to left', () => {
+    const adlam = '\u{1e900}\u{1e901}';
+    expect(paragraphBidi([{ text: `a ${adlam}` }], false)).toBeDefined();
+  });
+});
+
 describe('physical alignment', () => {
+  for (const [algn, side] of [
+    ['ctr', 'center'],
+    ['dist', 'fill'],
+    ['justLow', 'fill'],
+    ['thaiDist', 'fill'],
+  ] as const)
+    test(`algn="${algn}" in a right-to-left paragraph`, () => {
+      const words = Array.from({ length: 12 }, () => SALAM.repeat(4)).join(' ');
+      const t = lay(para(r(words), `<a:pPr rtl="1" algn="${algn}"/>`));
+      const first = t.lines[0];
+      const SPACE = 0.25 * 18 * 12_700;
+      if (side === 'center') {
+        const last = t.lines[t.lines.length - 1];
+        expect((left(last) + right(last)) / 2).toBeCloseTo((BOX_LEFT + BOX_RIGHT) / 2, 3);
+      } else {
+        expect(right(first)).toBeCloseTo(BOX_RIGHT, 3);
+        expect(left(first) + SPACE).toBeCloseTo(BOX_LEFT, 3);
+      }
+      const last = t.lines[t.lines.length - 1];
+      // A justified last line starts at the leading (right) edge; a distributed one fills.
+      if (algn === 'justLow') expect(right(last)).toBeCloseTo(BOX_RIGHT, 3);
+    });
+
   test('DrawingML algn names physical edges, also in a right-to-left paragraph', () => {
     expect(paragraphAlignment('l')).toBe('left');
     expect(paragraphAlignment('r')).toBe('right');
@@ -164,7 +215,7 @@ describe('trailing spaces', () => {
     expect(run.text.endsWith(' ')).toBe(true);
   });
 
-  test('the space after a left-to-right run hangs past the right inset', () => {
+  test('a left-to-right run that ends a wrapped line ends at the right inset', () => {
     const t = lay(
       para(r('phrase phrase phrase phrase phrase phrase phrase phrase ', 'en-US') + r(words))
     );

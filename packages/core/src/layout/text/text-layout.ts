@@ -875,9 +875,11 @@ export function layoutTextOn(
       let extra: Float64Array | undefined;
       // `shift` is measured from the paragraph's leading edge: the right edge when it is `rtl`.
       const alignment = paragraphAlignment(p.align);
+      const justifies = p.align === 'just' || p.align === 'justLow';
+      const distributes = p.align === 'dist' || p.align === 'thaiDist';
       if (alignment !== 'both') shift = leadingOffset(alignment, p.rtl, room);
       // A justified line that ends with hanging punctuation fills the line, also the last line.
-      else if (((p.align === 'just' && (!lastOfPara || hanging)) || p.align === 'dist') && room > 0)
+      else if (((justifies && (!lastOfPara || hanging)) || distributes) && room > 0)
         // The hanging character keeps its gap: the line ends where the character starts.
         extra = justifyExtra(units, segments, range.start, contentEnd, room);
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;

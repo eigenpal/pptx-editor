@@ -2,9 +2,10 @@
 // draws, and the caret position of each source offset. DOM-free; lengths are EMU.
 //
 // Trailing spaces follow DOCX Editor `packages/core/src/layout/bidi-trailing-spaces.ts` at
-// commit adf0e178: they keep the level that reordering gives them, so they stand beside the
-// text they follow. Spaces that reordering puts past the line's visible text hang outside it,
+// commit adf0e178: spaces that reordering puts past the line's visible text hang outside it,
 // and alignment ignores them; spaces between two pieces of visible text take room like text.
+// UAX #9 L1 gives the spaces that end a line the paragraph level, so they hang at the line's
+// trailing edge.
 
 import { bidiAlgorithm } from './bidi.ts';
 import { lineVisualOrder, type ParagraphBidi } from './rtl-paragraph.ts';

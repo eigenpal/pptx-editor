@@ -17,8 +17,11 @@ export function paragraphAlignment(algn: ResolvedParagraph['align']): Alignment 
       return 'center';
     case 'r':
       return 'right';
+    // `justLow` justifies as `just` does, and `thaiDist` distributes as `dist` does.
     case 'just':
+    case 'justLow':
     case 'dist':
+    case 'thaiDist':
       return 'both';
     default:
       return 'left';
