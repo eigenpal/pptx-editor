@@ -28,7 +28,7 @@ import { animationMarkElements, type AnimationMark } from './surface-animation-m
 import type { PaintedPresence } from './collaboration-presence.ts';
 import {
   cornersOf,
-  findItem,
+  itemById,
   selectionScope,
   isLineItem,
   lineEnds,
@@ -111,10 +111,7 @@ export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost {
   readonly commentMarkers?: CommentMarkerHost;
 }
 
-/** Find a slide item by node id, inside groups too. */
-export function itemById(layout: SlideLayout | undefined, id: string): LayoutItem | undefined {
-  return layout ? findItem(layout.items, id) : undefined;
-}
+export { itemById } from '../automation/commands/placement.ts';
 
 /** The editable slide surface bound to one host element. */
 export class SlideSurface {
@@ -878,10 +875,12 @@ export class SlideSurface {
   #view = (layout: SlideLayout) => this.#reach.view(layout.slide, this.editor.zoom());
 
   /**
-   * End a drag (an undo or a redo). A shape drag ends with no edit, and says so when it moved. A
-   * crop or adjust handle drag keeps the steps it wrote, which the undo then reverts.
+   * End a drag and an IME composition, before an undo, a redo, or a slide change. A shape drag
+   * ends with no edit, and says so when it moved. A crop or adjust handle drag keeps the steps it
+   * wrote, which the undo then reverts. A composition puts its text in at its place.
    */
-  cancelDrag(): void {
+  interrupt(): void {
+    this.#inputBinding.endComposition();
     this.#drag.cancel();
     this.#adjustDrag = this.#cropDrag = null;
   }

@@ -399,7 +399,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (command.type === 'undo' || command.type === 'redo') {
       if (mode === 'view') return refuse('disabled.viewing');
-      surface?.cancelDrag();
+      surface?.interrupt(); // A drag, and an IME composition, end first.
       const undo = command.type === 'undo';
       // An armed format is the last step, as in DOCX Editor: the first undo ends it alone.
       if (undo && arm.current()) return (arm.clear(), emit(), { ok: true });
@@ -875,11 +875,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       applyMode();
       emit();
     },
-    goToSlide(index) {
-      instance.selectSlide(index);
-    },
+    goToSlide: (index) => instance.selectSlide(index),
     selectSlide(index, mode = 'replace') {
       if (!session) return;
+      surface?.interrupt(); // An IME composition ends on its own slide.
       const before = slide;
       const next = Math.max(0, Math.min(index, session.info.slides.length - 1));
       if (views.presentationView === 'slideMaster')

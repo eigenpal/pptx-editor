@@ -211,32 +211,41 @@ export function createSystemText(host: SystemTextHost) {
     const part = host.part();
     return session && part && !host.viewing() ? caretParagraph(session, part, sel) : null;
   };
+  /** Run one text input; whether it applied (an applied input sets a new selection). */
+  const input = (replacement: string, before: EditorSelection): boolean => {
+    const was = host.selection();
+    if (replacement) host.textInput('text', replacement, before);
+    else host.textInput('deleteBackward', undefined, before);
+    return host.selection() !== was;
+  };
+  /** Refuse a system change with its reason: it did not apply. */
+  const refuse = (detail: string): false => {
+    host.refuse('errors.inputUnsupported', detail);
+    return false;
+  };
   /**
    * Replace `target` before the caret `at`, the caret of a composition that the selection
-   * moved away from. A target that the text before `at` does not hold is refused, and the
-   * composition goes nowhere else. The selection stays where it moved to; the edit moves it
-   * when it comes after the edit in the same paragraph.
+   * moved away from; whether it applied. A target that the text before `at` does not hold is
+   * refused, and the composition goes nowhere else. The selection stays where it moved to;
+   * the edit moves it when it comes after the edit in the same paragraph.
    */
   const replaceAt = (
     at: EditorSelection,
     target: ReplacementTarget | null,
     replacement: string
-  ): void => {
+  ): boolean => {
     const user = host.selection();
     const there = caretAt(at);
     const range = target && there && replacementRange(there.text, there.offset, there.key, target);
-    if (at.kind !== 'text' || !there || !range)
-      return host.refuse('errors.inputUnsupported', 'insertCompositionText');
-    if (there.text.slice(range.from, range.to) === replacement) return;
+    if (at.kind !== 'text' || !there || !range) return refuse('insertCompositionText');
+    if (there.text.slice(range.from, range.to) === replacement) return true;
     const paragraph = at.focus.paragraph;
     const point = (offset: number) => ({ paragraph, offset });
     host.select({ ...at, anchor: point(range.from), focus: point(range.to) });
-    const over = host.selection();
-    if (replacement) host.textInput('text', replacement, at);
-    else host.textInput('deleteBackward', undefined, at);
-    const by = host.selection() === over ? 0 : replacement.length - (range.to - range.from);
-    host.select(shifted(user, at, range.to, by));
+    const done = input(replacement, at);
+    host.select(shifted(user, at, range.to, done ? replacement.length - range.to + range.from : 0));
     host.emit();
+    return done;
   };
   return {
     /** The text the surface's input holds for the system. */
@@ -254,13 +263,14 @@ export function createSystemText(host: SystemTextHost) {
      * caret's paragraph; else the input is refused, so no word goes in twice. An empty
      * replacement deletes the target. A caret format that waits at the caret stays for the
      * next typed text. The edit is one text input over the target: one store transaction,
-     * one undo step, and an undo puts the caret back where it was.
+     * one undo step, and an undo puts the caret back where it was. Whether it applied: a
+     * change that changes nothing applies; a refusal publishes its reason.
      */
     replaceText(
       target: ReplacementTarget | null,
       replacement: string,
       place: ReplacementPlace = {}
-    ): void {
+    ): boolean {
       if (place.at) return replaceAt(place.at, target, replacement);
       const sel = host.selection();
       const at = caretAt(sel);
@@ -269,9 +279,8 @@ export function createSystemText(host: SystemTextHost) {
         // the editor no longer has (its selection went a task before it): it is refused, so
         // no word goes in twice. Other text with no target goes in at the caret.
         if (at && correctsWord(contextBefore(at.text, at.offset), replacement))
-          return host.refuse('errors.inputUnsupported', 'insertReplacementText');
-        if (replacement) host.textInput('text', replacement, sel);
-        return;
+          return refuse('insertReplacementText');
+        return !replacement || input(replacement, sel);
       }
       const range = at && replacementRange(at.text, at.offset, at.key, target);
       if (sel.kind !== 'text' || !at || !range) {
@@ -280,21 +289,19 @@ export function createSystemText(host: SystemTextHost) {
         // would, so none is lost and none repeats. A composition that changes characters
         // which moved is refused: it goes in nowhere else. The surface passes `typed` only
         // when the caret is the composition's own place; a caret that moved away gets `at`.
-        if (place.typed && replacement && target.text === '')
-          return host.textInput('text', replacement, sel);
-        return host.refuse('errors.inputUnsupported', 'insertReplacementText');
+        if (place.typed && replacement && target.text === '') return input(replacement, sel);
+        return refuse('insertReplacementText');
       }
       // A change that changes nothing writes nothing: no undo step, no collaboration op.
-      if (at.text.slice(range.from, range.to) === replacement) return;
+      if (at.text.slice(range.from, range.to) === replacement) return true;
       const point = (offset: number) => ({ paragraph: sel.focus.paragraph, offset });
+      let done = false;
       host.follow(() => {
         host.select({ ...sel, anchor: point(range.from), focus: point(range.to) });
-        const over = host.selection();
-        if (replacement) host.textInput('text', replacement, sel);
-        else host.textInput('deleteBackward', undefined, sel);
+        done = input(replacement, sel);
         const now = host.selection();
         // A refused input leaves the target selected: the caret goes back.
-        if (now === over) return host.select(sel);
+        if (!done) return host.select(sel);
         // The text between the target and the caret stays: the caret goes back after it.
         if (target.after > 0 && now.kind === 'text') {
           const caret = point(now.focus.offset + target.after);
@@ -302,6 +309,7 @@ export function createSystemText(host: SystemTextHost) {
         }
       });
       host.emit();
+      return done;
     },
   };
 }

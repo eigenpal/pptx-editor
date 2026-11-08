@@ -3,7 +3,13 @@
 // items have the identity for both steps; group children go through their group's transform
 // and its `chOff`/`chExt` scale (design D2 of `group-and-multi-edit`).
 
-import { apply, invert, type LayoutItem, type Matrix } from '../../layout/index.ts';
+import {
+  apply,
+  invert,
+  type LayoutItem,
+  type Matrix,
+  type SlideLayout,
+} from '../../layout/index.ts';
 import type { EditorSelection, TransformItem } from '../../contracts/neutral.ts';
 
 /** A box in an item's parent space, EMU and degrees. */
@@ -99,6 +105,11 @@ export function findItem(items: readonly LayoutItem[], id: string): LayoutItem |
     itemsById.set(items, byId);
   }
   return byId.get(id);
+}
+
+/** Find a slide item by node id, inside groups too (`findItem`). */
+export function itemById(layout: SlideLayout | undefined, id: string): LayoutItem | undefined {
+  return layout ? findItem(layout.items, id) : undefined;
 }
 
 /** The items of each laid-out item list by node id (`findItem`). Lists never change. */

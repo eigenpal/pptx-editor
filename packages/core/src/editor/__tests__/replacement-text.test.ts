@@ -29,13 +29,14 @@ const win = new GlobalWindow();
 const doc = win.document as unknown as Document;
 afterAll(() => win.happyDOM.close());
 
-async function open(text: string, options: { autoCorrect?: boolean } = {}) {
+async function open(text: string, options: { autoCorrect?: boolean; blankSlides?: number } = {}) {
   const g = globalThis as { ResizeObserver?: unknown };
   g.ResizeObserver ??= (win as unknown as { ResizeObserver: unknown }).ResizeObserver;
-  const e = createPptxEditor({ fixedMeasurer: true, substitutes: false, ...options });
-  const bytes = buildPptx({
-    slides: [{ shapes: shape({ id: 2, name: 'T', x: IN, y: IN, cx: 6 * IN, cy: 2 * IN, text }) }],
-  });
+  const { blankSlides = 0, ...editorOptions } = options;
+  const e = createPptxEditor({ fixedMeasurer: true, substitutes: false, ...editorOptions });
+  const first = { shapes: shape({ id: 2, name: 'T', x: IN, y: IN, cx: 6 * IN, cy: 2 * IN, text }) };
+  const blank = Array.from({ length: blankSlides }, () => ({ shapes: '' }));
+  const bytes = buildPptx({ slides: [first, ...blank] });
   expect((await e.load(bytes)).ok).toBe(true);
   const host = doc.createElement('div') as unknown as HTMLElement;
   doc.body.append(host as unknown as Node);
@@ -822,54 +823,89 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('what the keyboard sends late for an ended composition goes to its place', async () => {
-    const { e, input, beforeInput } = await composeWord('hello wrold', 6, 11);
-    caret(e, 0, 3);
-    // The correction arrives with no key, before the keyboard learns of the move.
-    beforeInput('insertText', 'world');
-    expect(texts(e)).toEqual(['hello world']);
-    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 3 });
-    expect(input.value).toBe('hel');
+  test('the final text the browser sends when the input blurs goes in once, at the place', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('abc ');
+    input.focus();
+    fire(composition('compositionstart'));
+    input.value = 'abc にほ';
+    input.setSelectionRange(6, 6);
+    // A browser ends its composition at a blur, with the final text, in the same task.
+    const end = () => {
+      input.value = 'abc にほん。';
+      input.setSelectionRange(8, 8);
+      fire(composition('compositionend', 'にほん。'));
+    };
+    input.addEventListener('blur', end, { once: true });
+    caret(e, 0, 1);
+    expect(texts(e)).toEqual(['abc にほん。']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 1 });
+    expect(doc.activeElement).toBe(input as unknown as Element);
+    expect(input.value).toBe('a');
     e.destroy();
   });
 
-  test('a composition that continues an ended one goes to its place', async () => {
-    const { e, input, fire } = await composeWord('hello world', 6, 11);
-    caret(e, 0, 3);
+  test('a composition after a tap is new, also over characters the input holds', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('abc ');
     fire(composition('compositionstart'));
-    input.value = 'helworldx';
-    input.setSelectionRange(9, 9);
-    fire(composition('compositionend', 'worldx'));
-    expect(texts(e)).toEqual(['hello worldx']);
-    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 3 });
+    input.value = 'abc wor';
+    input.setSelectionRange(7, 7);
+    // A tap after "abc": the composed "wor" stays at its place.
+    caret(e, 0, 3);
+    expect(texts(e)).toEqual(['abc wor']);
+    // The keyboard composes "abc" again from a collapsed caret and adds "d".
+    fire(composition('compositionstart'));
+    input.value = 'abcd';
+    input.setSelectionRange(4, 4);
+    fire(composition('compositionend', 'abcd'));
+    expect(texts(e)).toEqual(['abcd wor']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 4 });
     e.destroy();
   });
 
-  test('a composition over the word at the new caret is a new composition', async () => {
-    const { e, input, fire } = await composeWord('hello world', 6, 11);
-    caret(e, 0, 5);
-    // The keyboard learned of the move: it composes the word at the new caret again.
-    input.setSelectionRange(0, 5);
+  test('input after a composition ended is new input at the caret', async () => {
+    const { e, beforeInput } = await composeWord('hello wrold', 6, 11);
+    caret(e, 0, 3);
+    // No late window: input with no key goes in at the caret, as in a plain text field.
+    beforeInput('insertText', 'x');
+    expect(texts(e)).toEqual(['helxlo wrold']);
+    e.destroy();
+  });
+
+  test('a slide change during a composition puts its text on its own slide', async () => {
+    const { e, input, type, fire } = await open(para(''), { blankSlides: 1 });
+    caret(e, 0, 0);
+    type('abc ');
     fire(composition('compositionstart'));
-    input.value = 'Hello';
+    input.value = 'abc にほ';
+    input.setSelectionRange(6, 6);
+    e.goToSlide(1);
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
+    // The end that the browser sends later adds nothing.
+    fire(composition('compositionend', 'にほん'));
+    e.goToSlide(0);
+    expect(texts(e)).toEqual(['abc にほ']);
+    e.destroy();
+  });
+
+  test('an undo during a composition ends the composition first', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('abc');
+    e.exec({ type: 'undo' }); // A boundary: the next text is a step of its own.
+    e.exec({ type: 'redo' });
+    fire(composition('compositionstart'));
+    input.value = 'abcにほ';
     input.setSelectionRange(5, 5);
-    fire(composition('compositionend', 'Hello'));
-    expect(texts(e)).toEqual(['Hello world']);
-    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 5 });
-    e.destroy();
-  });
-
-  test('input that comes after the wait goes in at the new caret', async () => {
-    const { e, beforeInput } = await composeWord('hello world', 6, 11);
-    caret(e, 0, 5);
-    const now = performance.now.bind(performance);
-    performance.now = () => now() + 1000;
-    try {
-      beforeInput('insertText', 'x');
-    } finally {
-      performance.now = now;
-    }
-    expect(texts(e)).toEqual(['hellox world']);
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
+    // The composed text went in as its own step, and the undo took it back.
+    expect(texts(e)).toEqual(['abc']);
+    expect(e.exec({ type: 'redo' }).ok).toBe(true);
+    expect(texts(e)).toEqual(['abcにほ']);
     e.destroy();
   });
 

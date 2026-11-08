@@ -20,7 +20,19 @@ import type {
 import type { TextInputKind } from './text-input.ts';
 import { bindEditorClipboard } from './editor-clipboard.ts';
 import {
-  compositionEdit,
+  applyComposition,
+  contextChange,
+  ending,
+  finalEdit,
+  followEdit,
+  IDLE,
+  partialEdit,
+  placement,
+  startComposition,
+  type CompositionState,
+} from './composition.ts';
+import { createCompositionOverlay } from './composition-overlay.ts';
+import {
   fieldEdit,
   type ContextEdit,
   type ReplacementPlace,
@@ -45,7 +57,7 @@ export interface SurfaceInputHost {
     target: ReplacementTarget | null,
     replacement: string,
     place?: ReplacementPlace
-  ): boolean | void;
+  ): boolean;
   /** The text the input holds for the system, or null for none. */
   typingContext?(): TypingContext | null;
   /** The text for a translation key: the input's description. */
@@ -240,46 +252,19 @@ export function isCompositionKey(e: KeyboardEvent): boolean {
   return e.isComposing || e.keyCode === 229;
 }
 
-/**
- * The width of a text in the input's font, in CSS pixels, or 0 where no canvas measures it
- * (then the composing overlay keeps its plain placement).
- */
-function measurer(input: HTMLTextAreaElement): (text: string) => number {
-  let context: CanvasRenderingContext2D | null | undefined;
-  return (text) => {
-    try {
-      context ??= input.ownerDocument.createElement('canvas').getContext('2d');
-      const view = input.ownerDocument.defaultView;
-      if (!context || !view) return 0;
-      context.font = view.getComputedStyle(input).font;
-      return context.measureText(text).width;
-    } catch {
-      return 0;
-    }
-  };
-}
-
-/** A strong right-to-left letter: Hebrew, Arabic, Syriac, Thaana, N'Ko, and their forms. */
-const RTL = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/u;
-
 /** Edits that the field shows as the model does, at the end of the caret's context. */
 const FIELD_WRITES = new Set(['insertText', 'insertReplacementText']);
 const FIELD_DELETES = new Set(['deleteContentBackward', 'deleteWordBackward']);
-/** A composition that the editor ended: its caret, and the text it covers there. */
-interface Orphan {
-  readonly at: EditorSelection;
-  readonly target: ReplacementTarget;
-}
-
-/** Input that can carry what an IME composed after the editor ended its composition. */
-const LATE_WRITES = new Set(['insertText', 'insertReplacementText']);
-/** How long after the editor ends a composition its late input still goes to its place. */
-const LATE_MS = 300;
 
 /** The surface's input binding. */
 export interface SurfaceInputBinding {
   /** Put the caret's context in the input (`TypingContext`); none while an IME composes. */
   sync(): void;
+  /**
+   * End an IME composition before the editor changes what it applies to (an undo, a redo, a
+   * slide change): the browser ends it, and its text goes in at its place.
+   */
+  endComposition(): void;
   /** Stop listening. */
   destroy(): void;
 }
@@ -290,32 +275,23 @@ export function bindSurfaceInput(
   root: HTMLElement,
   host: SurfaceInputHost
 ): SurfaceInputBinding {
-  let composing = false;
-  /**
-   * The context the input holds (during a composition: the context when it started), and
-   * the value, width, and selection when a composition started.
-   */
+  /** The context the input holds (during a composition: the context when it started). */
   let context: TypingContext | null = null;
-  let composeFrom = { value: '', width: 0, start: 0, end: 0 };
-  /** During a composition: the context at its place, moved by edits since it started. */
-  let seen: TypingContext | null = null;
+  /** The IME composition, and its place (`composition.ts`). */
+  let composition: CompositionState = IDLE;
   /**
-   * The text and caret of a composition that the editor ended because the caret moved away
-   * from it (`abandon`). An IME can send what it composed after that and before it learns
-   * of the move: such input comes at once (`LATE_MS`) with no key first, and goes only to
-   * the composition's place. Any key, a blur, or another input ends the wait, and so does a
-   * composition over a selected word (a keyboard that learned of the move composes the word
-   * at the new caret). `continued`: a composition at the caret that started in the wait.
+   * The type of a non-cancelable edit that went to the model at its `beforeinput`: the
+   * `input` event of that type after it is the field's own change, not a second edit. The
+   * next key, `beforeinput`, composition, or blur ends the wait. No timer: a browser can run
+   * input tasks first.
    */
-  let orphan: Orphan | null = null;
-  let orphanAt = 0;
-  let continued: Orphan | null = null;
-  /** The orphan, while it waits; ends the wait. */
-  const takeOrphan = (): Orphan | null => {
-    const late = orphan;
-    orphan = null;
-    return late && performance.now() - orphanAt <= LATE_MS ? late : null;
-  };
+  let echo: string | null = null;
+  const overlay = createCompositionOverlay(input);
+  const composing = (): boolean => composition.phase !== 'idle';
+  const fit = (): void =>
+    composition.phase === 'idle'
+      ? overlay(null, 0)
+      : overlay(composition.place.value, composition.width);
   // A screen reader reads the input's value: it says that the value is the text up to the
   // caret, not the whole text of the shape.
   const description = host.label?.('canvas.inputDescription');
@@ -324,15 +300,14 @@ export function bindSurfaceInput(
   // reads the text before the caret when the caret moves, for its capitals and suggestions,
   // and an empty input reads to it as the start of a sentence.
   const sync = (): void => {
-    if (composing) {
-      // The composition changes the model only when it ends, so a new context during it
-      // comes from elsewhere. An edit (a peer's, or the API's) that keeps the caret in the
-      // paragraph moves the composition's place with the caret. Any other move (a click or a
-      // tap, an arrow key, the API, another paragraph or slide) ends the composition.
+    if (composition.phase === 'ending') return;
+    if (composition.phase === 'composing') {
+      // A composition changes the model only when it ends, so a new context during it comes
+      // from elsewhere (`contextChange`).
       const now = host.typingContext?.() ?? null;
-      if (now?.key === seen?.key && now?.text === seen?.text) return;
-      if (now && now.key === seen?.key && now.revision !== seen.revision) seen = now;
-      else abandon();
+      const change = contextChange(composition, now);
+      if (change === 'follow' && now) composition = followEdit(composition, now);
+      else if (change === 'left') interrupt();
       return;
     }
     context = host.typingContext?.() ?? null;
@@ -353,7 +328,7 @@ export function bindSurfaceInput(
    * selection for the same event.
    */
   const collapse = (): void => {
-    if (composing) return;
+    if (composing()) return;
     const end = input.value.length;
     if (input.selectionStart !== end || input.selectionEnd !== end)
       input.setSelectionRange(end, end);
@@ -372,131 +347,44 @@ export function bindSurfaceInput(
   const fieldShows = (e: InputEvent): boolean =>
     context !== null &&
     (FIELD_WRITES.has(e.inputType) ? !!e.data : FIELD_DELETES.has(e.inputType) && !!input.value);
-  /**
-   * The type of a non-cancelable edit that went to the model at its `beforeinput`: the
-   * `input` event of that type after it is the field's own change, not a second edit. The
-   * next key or `beforeinput` ends the wait. No timer: a browser can run input tasks first.
-   */
-  let echo: string | null = null;
-  const width = measurer(input);
-  // The input grows with the text being composed, so the text shows at the caret while the
-  // IME composes it (the slide shows the text only once the composition ends). The context
-  // before it scrolls out of view. A keyboard that composes the word before the caret again
-  // (`compositionEdit`) moves the input left over that word, so the composed text covers it.
-  const fit = (): void => {
-    input.style.width = '';
-    input.style.marginLeft = '';
-    input.style.direction = '';
-    if (!composing || input.value === composeFrom.value) return;
-    const from = composeFrom.value;
-    const value = input.value;
-    let shared = 0;
-    while (shared < from.length && shared < value.length && from[shared] === value[shared])
-      shared += 1;
-    const back = shared < from.length ? width(from.slice(shared)) : 0;
-    const shown = back > 0 ? width(value.slice(shared)) : 0;
-    if (back > 0 && shown > 0) {
-      input.style.width = `${Math.ceil(shown) + 1}px`;
-      // In right-to-left text the word before the caret is on its right: the input stays at
-      // the caret and grows right, and shows the end of its text, which is on its left.
-      if (RTL.test(from.slice(shared))) {
-        input.style.direction = 'rtl';
-        input.scrollLeft = -input.scrollWidth;
-        return;
-      }
-      input.style.marginLeft = `${-back}px`;
-      input.scrollLeft = input.scrollWidth;
-      return;
-    }
-    input.style.width = `${Math.max(1, input.scrollWidth - composeFrom.width) + 1}px`;
-    input.scrollLeft = input.scrollWidth;
-  };
-  const endComposition = (): void => {
-    composing = false;
+  /** End the composition `state`: its change goes in at its place, then the input syncs. */
+  const finish = (state: CompositionState, edit: ContextEdit | null, data: string): void => {
+    composition = IDLE;
     input.classList.remove(COMPOSING_CLASS);
     fit();
+    if (state.phase !== 'idle') {
+      // With no text caret when it started (a selected range), the text replaces the range.
+      if (!state.place.context) {
+        if (data) host.textInput('text', data);
+      } else if (edit)
+        applyComposition(host, placement(state, host.typingContext?.() ?? null), edit);
+    }
     sync();
   };
   /**
-   * Where the composition goes in. At the caret, while the caret is its place (`seen`); when
-   * an edit moved that place, a change that no longer matches goes in at the caret
-   * (`typed`). When the caret moved for another reason, at the composition's own caret
-   * (`at`), and the caret stays where it moved to. Null: no text caret to go to.
+   * Make the browser end the composition: the caret left its place, or the editor is about
+   * to change what it applies to. A blur of the focused input ends the browser's
+   * composition, which sends `compositionend` with the final text in this task; it goes in at
+   * the place (`onCompositionEnd`), and the focus comes back at once. When no
+   * `compositionend` comes (the browser had no composition), the text the input shows goes
+   * in at the place, as the end would have put it. Input after this is new input.
    */
-  const placeOf = (): ReplacementPlace | null => {
-    if (!seen) return null;
-    const now = host.typingContext?.() ?? null;
-    const edited = now?.revision !== seen.revision;
-    if (now?.key === seen.key && (now.text === seen.text || edited)) return { typed: true };
-    return seen.selection ? { at: seen.selection } : null;
-  };
-  /** Apply one composition change at its place; whether it went in (or changed nothing). */
-  const commit = (place: ReplacementPlace | null, edit: ContextEdit): boolean => {
-    if (!place || !host.replaceText) return false;
-    if (edit.target.text === '' && edit.text === '') return true; // Nothing changed.
-    if (!place.at && edit.target.text === '' && edit.target.after === 0) {
-      host.textInput('text', edit.text);
-      return true;
+  const interrupt = (): void => {
+    if (composition.phase !== 'composing') return;
+    composition = ending(composition);
+    if (input.ownerDocument.activeElement === input) {
+      input.blur();
+      input.focus({ preventScroll: true });
     }
-    return host.replaceText(edit.target, edit.text, place) !== false;
-  };
-  /**
-   * End a composition whose caret moved away from it: what it composed so far goes in at its
-   * own place (`placeOf`), and a new value in the input ends the browser's composition, so
-   * the next key edits at the new caret. Its later input goes to its place (`orphan`).
-   */
-  const abandon = (): void => {
-    const start = context;
-    const from = composeFrom;
-    const value = input.value;
-    const place = placeOf();
-    const late = continued;
-    composing = false;
-    continued = null;
-    orphan = null;
-    input.classList.remove(COMPOSING_CLASS);
-    fit();
-    const changed = value !== from.value;
-    const edit = start && changed ? fieldEdit(from.value, value, start.key) : null;
-    // A composition that continued an ended one goes to that one's place, and no further.
-    if (late) {
-      if (edit) host.replaceText?.(late.target, edit.text, { at: late.at });
-      return sync();
-    }
-    const done = edit ? commit(place, edit) : true;
-    const tail = from.value.length - from.end;
-    const kept =
-      value.slice(0, from.start) === from.value.slice(0, from.start) &&
-      value.slice(value.length - tail) === from.value.slice(from.end);
-    const sel = place?.at;
-    if (start && done && kept && sel?.kind === 'text') {
-      const point = { ...sel.focus, offset: sel.focus.offset + value.length - from.value.length };
-      orphan = {
-        at: { ...sel, anchor: point, focus: point },
-        target: {
-          text: value.slice(from.start, value.length - tail),
-          after: tail,
-          between: value.slice(value.length - tail),
-          paragraph: start.key,
-        },
-      };
-      orphanAt = performance.now();
-    }
+    const state = composition;
+    if (state.phase === 'ending') finish(state, partialEdit(state.place, input.value), '');
     sync();
   };
   const onBeforeInput = (e: InputEvent): void => {
     // The IME owns the field until it finishes; the result arrives at composition end.
-    if (composing) return;
+    if (composing()) return;
     echo = null;
-    // What an IME composed for a composition that the editor ended goes to its place.
-    const late = takeOrphan();
-    if (late && LATE_WRITES.has(e.inputType) && e.data && /^[\p{L}\p{N}\p{M}'’-]+$/u.test(e.data)) {
-      if (e.cancelable) e.preventDefault();
-      else echo = e.inputType;
-      host.replaceText?.(late.target, e.data, { at: late.at });
-      return sync();
-    }
-    // Input of a composition that the browser kept after the editor ended it changes nothing.
+    // Input of a composition that the browser kept after it ended changes nothing.
     if (COMPOSITION_INPUT.has(e.inputType)) return void (e.cancelable && e.preventDefault());
     if (!e.cancelable) {
       // An edit the browser does not let the editor cancel changes the field itself, where
@@ -516,12 +404,11 @@ export function bindSurfaceInput(
     sync();
   };
   const onInput = (e: Event): void => {
-    if (composing) return fit();
+    if (composing()) return fit();
     const type = (e as InputEvent).inputType;
     // An input that no `beforeinput` announced, or one that could not be prevented, changed
     // the field itself (an extension that writes the field, for example): its change goes
-    // to the model, so the field and the model agree again. Not the input of a composition
-    // that the editor ended.
+    // to the model, so the field and the model agree again. Not the input of a composition.
     const before = context?.text ?? '';
     const own = echo !== type && !COMPOSITION_INPUT.has(type) && !(e as InputEvent).isComposing;
     const edit =
@@ -534,39 +421,22 @@ export function bindSurfaceInput(
   const onCompositionStart = (): void => {
     // No reset here: a reconversion selects the word it composes again and starts in the
     // same task. A caret or a selection from a native key in an earlier task is already
-    // reset, by its `selectionchange` or by the composition's first key.
-    composing = true;
+    // reset, by its `selectionchange` or by the composition's first key. The place is the
+    // caret now, and the input selection that the system made for the composition.
     echo = null;
-    const { value, selectionStart: start, selectionEnd: end } = input;
-    const late = takeOrphan();
-    continued = late && start === end ? late : null;
+    const { value, selectionStart, selectionEnd } = input;
+    const width = value ? input.scrollWidth : 0;
+    composition = startComposition(context, value, selectionStart, selectionEnd, width);
     input.classList.add(COMPOSING_CLASS);
-    composeFrom = { value, width: value ? input.scrollWidth : 0, start, end };
-    seen = context;
     // The candidate window opens at the caret: the end of a long context.
     input.scrollLeft = input.scrollWidth;
   };
   const onCompositionEnd = (e: CompositionEvent): void => {
-    // A composition that the editor ended already (`abandon`) adds nothing more.
-    if (!composing) return sync();
-    const before = composeFrom.value;
-    const { value, selectionEnd } = input;
-    const start = context;
-    const late = continued;
-    continued = null;
-    // The place is read before the end of the composition updates the context.
-    const place = placeOf();
-    endComposition();
+    const state = composition;
+    // A composition that ended already adds nothing more.
+    if (state.phase === 'idle') return sync();
     const data = e.data ?? '';
-    if (late) return void host.replaceText?.(late.target, data, { at: late.at });
-    if (!start) return void (data && host.textInput('text', data));
-    // A keyboard can recompose a word the input already holds: only the change goes in. A
-    // composition that ends empty deletes what it covered, when the field lost it. When the
-    // field does not hold the committed text, the text goes in at the composition's caret.
-    const edit = (before && (data || value !== before)
-      ? compositionEdit(before, value, selectionEnd, data, start.key)
-      : null) ?? { target: { text: '', after: 0, between: '', paragraph: start.key }, text: data };
-    commit(place, edit);
+    finish(state, finalEdit(state.place, input.value, input.selectionEnd, data), data);
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     // Before the key acts, also the first key of a composition (key code 229): a caret or a
@@ -574,7 +444,6 @@ export function bindSurfaceInput(
     // its own selection after this, for its own input.
     if (e.target === input) collapse();
     echo = null;
-    orphan = null;
     if (isCompositionKey(e)) return;
     if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {
@@ -582,6 +451,7 @@ export function bindSurfaceInput(
       e.stopPropagation();
     }
   };
+  const onBlur = (): void => void (echo = null);
   const onCopy = (e: ClipboardEvent): void => {
     if (e.clipboardData && host.copy(e.clipboardData, false)) e.preventDefault();
   };
@@ -594,48 +464,36 @@ export function bindSurfaceInput(
       e.stopPropagation();
     }
   };
-  input.addEventListener('beforeinput', onBeforeInput);
-  input.addEventListener('input', onInput);
+  const onContextMenu = (): void => host.warmCopy?.();
+  const doc = input.ownerDocument;
   // A browser fires `selectionchange` at the document, at the input, or both; `select` covers
   // a selection with no `selectionchange`. The reset is the same for each.
-  const doc = input.ownerDocument;
-  doc.addEventListener('selectionchange', onSelectionChange);
-  input.addEventListener('selectionchange', onSelectionChange);
-  input.addEventListener('select', onSelectionChange);
-  input.addEventListener('compositionstart', onCompositionStart);
-  input.addEventListener('compositionend', onCompositionEnd);
-  input.addEventListener('keydown', onKeyDown);
-  // Focus elsewhere ends any wait for input that belongs to an earlier edit.
-  const onBlur = (): void => {
-    echo = null;
-    orphan = null;
-  };
-  input.addEventListener('blur', onBlur);
-  root.addEventListener('keydown', onKeyDown);
-  root.addEventListener('copy', onCopy);
-  root.addEventListener('cut', onCut);
-  root.addEventListener('paste', onPaste);
-  const onContextMenu = (): void => host.warmCopy?.();
-  root.addEventListener('contextmenu', onContextMenu);
+  const listeners: [EventTarget, string, EventListener][] = [
+    [input, 'beforeinput', onBeforeInput as EventListener],
+    [input, 'input', onInput],
+    [doc, 'selectionchange', onSelectionChange],
+    [input, 'selectionchange', onSelectionChange],
+    [input, 'select', onSelectionChange],
+    [input, 'compositionstart', onCompositionStart],
+    [input, 'compositionend', onCompositionEnd as EventListener],
+    [input, 'keydown', onKeyDown as EventListener],
+    [input, 'blur', onBlur],
+    [root, 'keydown', onKeyDown as EventListener],
+    [root, 'copy', onCopy as EventListener],
+    [root, 'cut', onCut as EventListener],
+    [root, 'paste', onPaste as EventListener],
+    [root, 'contextmenu', onContextMenu],
+  ];
+  for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
   // Copy and paste with the focus elsewhere in the editor (the slide list, the toolbar).
   const unbindOutside = bindEditorClipboard(root, host);
   sync();
-  const destroy = (): void => {
-    unbindOutside();
-    root.removeEventListener('contextmenu', onContextMenu);
-    input.removeEventListener('beforeinput', onBeforeInput);
-    input.removeEventListener('input', onInput);
-    doc.removeEventListener('selectionchange', onSelectionChange);
-    input.removeEventListener('selectionchange', onSelectionChange);
-    input.removeEventListener('select', onSelectionChange);
-    input.removeEventListener('compositionstart', onCompositionStart);
-    input.removeEventListener('compositionend', onCompositionEnd);
-    input.removeEventListener('keydown', onKeyDown);
-    input.removeEventListener('blur', onBlur);
-    root.removeEventListener('keydown', onKeyDown);
-    root.removeEventListener('copy', onCopy);
-    root.removeEventListener('cut', onCut);
-    root.removeEventListener('paste', onPaste);
+  return {
+    sync,
+    endComposition: interrupt,
+    destroy: () => {
+      unbindOutside();
+      for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
+    },
   };
-  return { sync, destroy };
 }
