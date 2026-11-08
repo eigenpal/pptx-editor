@@ -111,23 +111,40 @@ function decorationRects(
   return out;
 }
 
-/** A right-to-left word: its letters in source order, anchored at its right edge. */
-const RTL_STYLE = 'direction:rtl;unicode-bidi:bidi-override';
+/**
+ * The style of a right-to-left word: its letters in source order, anchored at its right edge,
+ * with the features the measurer shapes with (`harfbuzz-measurer.ts`): no standard,
+ * contextual, discretionary, or historical ligatures, contextual alternates kept, and kerning
+ * only when the run asks for it.
+ */
+function rtlStyle(kerning: boolean): string {
+  return (
+    'white-space:pre;direction:rtl;unicode-bidi:bidi-override;' +
+    `font-kerning:${kerning ? 'normal' : 'none'};` +
+    'font-variant-ligatures:no-common-ligatures no-discretionary-ligatures no-historical-ligatures;' +
+    'font-feature-settings:"liga" 0,"clig" 0,"dlig" 0,"hlig" 0'
+  );
+}
 
 /**
  * The words of a right-to-left run, each painted as one `<text>` that starts at the word's
  * right edge and reads right to left, so the browser shapes and joins its letters. Spaces
- * between the words take the room that layout gave them, justification included. Every
+ * between the words take the room that layout gave them, justification included, and each
+ * word fills the width layout measured for it (`textLength`), so character spacing, kerning
+ * that the browser applies differently, and a fallback face for a missing glyph never move
+ * the next word. Every
  * character of the run has an odd bidi level, so the override keeps the browser from
  * reordering the word again.
  */
-function rtlWords(run: GlyphRun): { text: string; right: number }[] {
-  const out: { text: string; right: number }[] = [];
+function rtlWords(run: GlyphRun): { text: string; right: number; width: number }[] {
+  const out: { text: string; right: number; width: number }[] = [];
   const n = run.text.length;
   const re = /[^ \u3000]+/gu;
   // Unit `i` draws in cell `n - 1 - i`, so a word that starts at unit `i` ends at `x[n - i]`.
-  for (let m = re.exec(run.text); m; m = re.exec(run.text))
-    out.push({ text: m[0], right: run.x[n - m.index] });
+  for (let m = re.exec(run.text); m; m = re.exec(run.text)) {
+    const right = run.x[n - m.index];
+    out.push({ text: m[0], right, width: right - run.x[n - m.index - m[0].length] });
+  }
   return out;
 }
 
@@ -372,9 +389,15 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
         text.textContent = content;
         return text;
       };
+      const kerning = run.props.kern !== undefined && run.props.size >= run.props.kern;
       for (const word of run.rtl ? rtlWords(run) : []) {
-        const text = makeText(word.text, { x: pt(word.right), y: pt(baseline) });
-        text.setAttribute('style', `${text.getAttribute('style')};${RTL_STYLE}`);
+        const text = makeText(word.text, {
+          x: pt(word.right),
+          y: pt(baseline),
+          textLength: word.width > 0 ? pt(word.width) : undefined,
+          lengthAdjust: word.width > 0 ? 'spacing' : undefined,
+        });
+        text.setAttribute('style', rtlStyle(kerning));
         group.appendChild(text);
       }
       for (const piece of run.rtl ? [] : uprightPieces(run.text, layout.upright)) {

@@ -38,6 +38,39 @@ describe('right-to-left paint', () => {
     expect(first).toBeGreaterThan(second);
   });
 
+  test('a right-to-left word fills the width layout measured, character spacing included', () => {
+    // 24 pt text in the fixed measurer: 12 pt letters, 3 pt closer with spc="-300".
+    const word = '\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea';
+    const root = paint(
+      para(
+        `<a:r><a:rPr lang="he-IL" sz="2400" spc="-300"/><a:t>${word}</a:t></a:r>`,
+        '<a:pPr rtl="1"/>'
+      )
+    );
+    const text = root.querySelector('text')!;
+    expect(Number(text.getAttribute('textLength'))).toBeCloseTo(6 * (12 - 3), 6);
+    expect(text.getAttribute('lengthAdjust')).toBe('spacing');
+  });
+
+  test('a right-to-left word kerns only when its run asks, as the measurer does', () => {
+    const word = '\u05e9\u05dc\u05d5\u05dd';
+    const style = (attrs: string): string =>
+      paint(
+        para(
+          `<a:r><a:rPr lang="he-IL" sz="2400"${attrs}/><a:t>${word}</a:t></a:r>`,
+          '<a:pPr rtl="1"/>'
+        )
+      )
+        .querySelector('text')!
+        .getAttribute('style')!;
+    expect(style(' kern="1200"')).toContain('font-kerning:normal');
+    // Text smaller than `kern` is not kerned.
+    expect(style(' kern="4800"')).toContain('font-kerning:none');
+    // Contextual alternates stay on, as in the measurer; ligatures stay off.
+    expect(style('')).not.toContain('"calt" 0');
+    expect(style('')).toContain('"liga" 0');
+  });
+
   test('left-to-right text keeps one position for each character', () => {
     const root = paint(para('<a:r><a:rPr lang="en-US" sz="1800"/><a:t>abc</a:t></a:r>'));
     const text = root.querySelector('text')!;
