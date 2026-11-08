@@ -25,6 +25,16 @@ The harness SHALL print every slide to PDF with the editor's own pipeline and co
 - **WHEN** our page holds a text line that the reference page does not hold
 - **THEN** the slide fails on extra text
 
+#### Scenario: Numbers and values
+
+- **WHEN** a text line holds two or more letters or digits, such as a number, a date, or a chart or table value
+- **THEN** the line check pairs it with the line of the same text in the other PDF, by the same rules for both PDFs, and a line of one letter or digit is checked by pixels only
+
+#### Scenario: Spaces in a text item
+
+- **WHEN** one PDF writes a space between two glyphs of a line and the other PDF does not
+- **THEN** both lines get the same line check, because the rule reads the text without whitespace
+
 #### Scenario: A font that the harness did not load
 
 - **WHEN** our PDF draws with a font that is not a fixture font, an engine font, or a harness fallback face

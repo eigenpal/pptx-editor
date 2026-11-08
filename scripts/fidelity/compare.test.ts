@@ -39,7 +39,17 @@ describe('lineKey', () => {
     expect(lineKey('45 %')).toBe('45%');
     expect(lineKey('2026-11-08')).toBe('2026-11-08');
     expect(lineKey('2𝑎')).toBe('2𝑎');
-    expect(lineKey('$1,200')).toBe('1,200');
+    expect(lineKey('$1,200')).toBe('$1,200');
+  });
+
+  test('keeps a sign that is part of a number, and drops a bullet', () => {
+    expect(lineKey('€1,200')).not.toBe(lineKey('$1,200'));
+    expect(lineKey('−5 pt')).toBe('−5pt');
+    expect(lineKey('-12')).toBe('-12');
+    expect(lineKey('• Item text')).toBe('Itemtext');
+    expect(lineKey('– Item text')).toBe('Itemtext');
+    expect(lineKey('→ Next step')).toBe('Nextstep');
+    expect(lineKey('\uf0a7Item')).toBe('Item');
   });
 });
 
