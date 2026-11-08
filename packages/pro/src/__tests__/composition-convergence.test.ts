@@ -86,7 +86,9 @@ async function peers(text: string) {
     a.destroy();
     b.destroy();
   };
-  return { a, b, input, compose, commit, composing, done };
+  /** A composition starts over the input selection, as a keyboard that composes a word again. */
+  const start = () => fire('compositionstart');
+  return { a, b, input, start, compose, commit, composing, done };
 }
 
 const nodeId = (e: PptxEditorInstance, name: string) =>
@@ -148,6 +150,77 @@ describe('a composition while a peer edits', () => {
     expect(composing()).toBe(true);
     commit('日本');
     expect(paragraphs(a)[0]).toBe('world日本');
+    done();
+  });
+
+  test('a peer Enter before the caret takes the place to the new paragraph', async () => {
+    const { a, b, compose, commit, composing, done } = await peers(para(run('Hello world')));
+    caret(a, nodeId(a, 'T'), 0, 11);
+    compose('日本');
+    // Peer B splits the paragraph before "world": the place goes with "world".
+    caret(b, nodeId(b, 'T'), 0, 5);
+    expect(b.input('paragraph').ok).toBe(true);
+    expect(composing()).toBe(true);
+    commit('日本');
+    expect(paragraphs(a).slice(0, 2)).toEqual(['Hello', ' world日本']);
+    expect(a.snapshot().lastRejection).toBeNull();
+    done();
+  });
+
+  test('a peer Enter after the caret keeps the place', async () => {
+    const { a, b, compose, commit, done } = await peers(para(run('Hello world, bye')));
+    caret(a, nodeId(a, 'T'), 0, 11);
+    compose('日本');
+    caret(b, nodeId(b, 'T'), 0, 11);
+    expect(b.input('paragraph').ok).toBe(true);
+    commit('日本');
+    expect(paragraphs(a).slice(0, 2)).toEqual(['Hello world日本', ', bye']);
+    done();
+  });
+
+  test('a peer Backspace that merges the paragraph keeps the place in the merged text', async () => {
+    const { a, b, compose, commit, composing, done } = await peers(
+      para(run('one')) + para(run('two'))
+    );
+    caret(a, nodeId(a, 'T'), 1, 3);
+    compose('日本');
+    // Peer B joins the paragraph to the one above: its element id is gone.
+    caret(b, nodeId(b, 'T'), 1, 0);
+    expect(b.input('deleteBackward').ok).toBe(true);
+    expect(composing()).toBe(true);
+    commit('日本');
+    expect(paragraphs(a)[0]).toBe('onetwo日本');
+    expect(a.snapshot().lastRejection).toBeNull();
+    done();
+  });
+
+  test('a peer typing before the caret in the paragraph moves the place with it', async () => {
+    const { a, b, compose, commit, done } = await peers(para(run('Hello world')));
+    caret(a, nodeId(a, 'T'), 0, 11);
+    compose('日本');
+    caret(b, nodeId(b, 'T'), 0, 0);
+    expect(b.input('text', 'X').ok).toBe(true);
+    commit('日本');
+    expect(paragraphs(a)[0]).toBe('XHello world日本');
+    done();
+  });
+
+  test('a peer change inside a recomposed word refuses the word change', async () => {
+    const { a, b, input, start, commit, composing, done } = await peers(para(run('hello wrold')));
+    caret(a, nodeId(a, 'T'), 0, 11);
+    // A keyboard composes "wrold" again.
+    input.setSelectionRange(6, 11);
+    start();
+    const at = (offset: number) => ({ paragraph: 0, offset });
+    b.setSelection({ kind: 'text', nodeId: nodeId(b, 'T'), anchor: at(8), focus: at(9) });
+    expect(b.input('text', 'X').ok).toBe(true);
+    expect(composing()).toBe(true);
+    input.value = 'hello world';
+    input.setSelectionRange(11, 11);
+    commit('world');
+    // The text before the place is no longer the word: the change goes in nowhere.
+    expect(paragraphs(a)[0]).toBe('hello wrXld');
+    expect(a.snapshot().lastRejection?.reason).toBe('errors.inputUnsupported');
     done();
   });
 

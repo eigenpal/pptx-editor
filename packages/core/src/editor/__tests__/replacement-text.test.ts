@@ -673,17 +673,17 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('a recomposed word whose target a peer changed keeps the typed text', async () => {
+  test('text that an edit puts at the place of a composition goes after it', async () => {
     const { e, input, fire } = await open(para(run('a helo')));
     caret(e, 0, 6);
     fire(composition('compositionstart'));
-    // A peer's edit lands while the keyboard composes: the model is no longer the field.
+    // An edit lands while the keyboard composes: the model is no longer the field.
     e.input('text', '!');
     input.value = 'a hello';
     input.setSelectionRange(7, 7);
     fire(composition('compositionend', 'hello'));
-    // Nothing is lost and no letter goes in twice: the new letter follows the caret.
-    expect(texts(e)).toEqual(['a helo!l']);
+    // The composition was there first: nothing is lost, and no letter goes in twice.
+    expect(texts(e)).toEqual(['a hello!']);
     e.destroy();
   });
 
@@ -796,36 +796,43 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('the rest of an ended composition, with no key first, goes to its place', async () => {
-    // The keyboard does not know of the tap yet: it composes the word on, at the new caret.
-    const backspace = await composeWord('hello world', 6, 11);
-    caret(backspace.e, 0, 3);
-    backspace.fire(composition('compositionstart'));
-    backspace.input.value = 'helworl';
-    backspace.input.setSelectionRange(7, 7);
-    backspace.fire(composition('compositionend', 'worl'));
-    expect(texts(backspace.e)).toEqual(['hello worl']);
-    expect(focusOf(backspace.e)).toEqual({ paragraph: 0, offset: 3 });
-    backspace.e.destroy();
-    // A correction that the keyboard commits after the tap.
-    const corrected = await composeWord('hello wrold', 6, 11);
-    caret(corrected.e, 0, 3);
-    corrected.beforeInput('insertText', 'world');
-    expect(texts(corrected.e)).toEqual(['hello world']);
-    corrected.e.destroy();
+  /** A composition of `composed` at the end of `first`, which a tap into `second` ends. */
+  async function tapAway(first: string, second: string, composed: string, offset: number) {
+    const opened = await open(para(run(first)) + para(run(second)));
+    caret(opened.e, 0, first.length);
+    opened.fire(key('Process', 229));
+    opened.fire(composition('compositionstart'));
+    opened.input.value = first + composed;
+    opened.input.setSelectionRange(opened.input.value.length, opened.input.value.length);
+    caret(opened.e, 1, offset);
+    return opened;
+  }
+
+  test('after a tap ends a composition, all new input goes in at the new caret', async () => {
+    // A second tap, then dictation with no key first.
+    const dictated = await tapAway('A ', 'B x', 'th', 3);
+    caret(dictated.e, 1, 1);
+    dictated.beforeInput('insertText', 'to');
+    expect(texts(dictated.e)).toEqual(['A th', 'Bto x']);
+    dictated.e.destroy();
+    // A new composition with no key first, whose text continues the ended one.
+    const next = await tapAway('A ', 'B ', 'th', 2);
+    next.fire(composition('compositionstart'));
+    next.input.value = 'B the';
+    next.input.setSelectionRange(5, 5);
+    next.fire(composition('compositionend', 'the'));
+    expect(texts(next.e)).toEqual(['A th', 'B the']);
+    next.e.destroy();
   });
 
-  test('a late commit that extends the ended text replaces it once', async () => {
-    const { e, input, type, fire, beforeInput } = await open(para(''));
-    caret(e, 0, 0);
-    type('abc ');
+  test('a reconversion at the new caret changes the word there', async () => {
+    const { e, input, fire } = await tapAway('A ', 'B it', 'is', 4);
+    input.setSelectionRange(2, 4);
     fire(composition('compositionstart'));
-    input.value = 'abc にほ';
-    input.setSelectionRange(6, 6);
-    caret(e, 0, 1);
-    beforeInput('insertText', 'にほん。');
-    expect(texts(e)).toEqual(['abc にほん。']);
-    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 1 });
+    input.value = 'B its';
+    input.setSelectionRange(5, 5);
+    fire(composition('compositionend', 'its'));
+    expect(texts(e)).toEqual(['A is', 'B its']);
     e.destroy();
   });
 
@@ -896,17 +903,16 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('an edit between a recomposed word and the caret refuses the word change', async () => {
+  test('an edit at the caret keeps a recomposed word at its place', async () => {
     const { e, input, fire } = await composeWord('hello wrold', 6, 11);
-    // An edit at the caret (as a peer's) keeps the composition: its place moves.
+    // An edit at the caret (as a peer's) keeps the composition, before the new text.
     e.input('text', '!');
     expect(input.classList.contains(COMPOSING_CLASS)).toBe(true);
     input.value = 'hello world';
     input.setSelectionRange(11, 11);
     fire(composition('compositionend', 'world'));
-    // The word moved away from the caret: the change goes in nowhere else.
-    expect(texts(e)).toEqual(['hello wrold!']);
-    expect(e.snapshot().lastRejection?.reason).toBe('errors.inputUnsupported');
+    expect(texts(e)).toEqual(['hello world!']);
+    expect(e.snapshot().lastRejection).toBeNull();
     e.destroy();
   });
 

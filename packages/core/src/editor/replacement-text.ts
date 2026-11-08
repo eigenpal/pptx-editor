@@ -19,7 +19,7 @@ import type { EditorSelection } from '../contracts/index.ts';
 import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectionBody } from './table-cells.ts';
-import { caretInParagraph } from './paragraph-place.ts';
+import { caretInParagraph, placeAfterEdits } from './paragraph-place.ts';
 
 /** The text the hidden input holds for the system: the caret paragraph before the caret. */
 export interface TypingContext {
@@ -32,6 +32,8 @@ export interface TypingContext {
   readonly revision?: number;
   /** The element id of the caret's paragraph, which edits do not change (`paragraph-place.ts`). */
   readonly paragraphId?: string;
+  /** The whole text of the caret's paragraph, for the place of a composition through edits. */
+  readonly paragraphText?: string;
 }
 
 /**
@@ -189,6 +191,15 @@ function shifted(
   return { ...sel, anchor: move(sel.anchor), focus: move(sel.focus) };
 }
 
+/** Whether `a` is the collapsed caret `b`: the same text body, paragraph, and offset. */
+function sameCaret(a: EditorSelection, b: EditorSelection & { kind: 'text' }): boolean {
+  if (a.kind !== 'text' || a.nodeId !== b.nodeId || a.diagramNode !== b.diagramNode) return false;
+  if (a.cell?.row !== b.cell?.row || a.cell?.column !== b.cell?.column) return false;
+  const same = (p: { paragraph: number; offset: number }) =>
+    p.paragraph === b.focus.paragraph && p.offset === b.focus.offset;
+  return same(a.anchor) && same(a.focus);
+}
+
 /** What `createSystemText` asks of the editor. */
 export interface SystemTextHost {
   session(): DocumentSession | null;
@@ -230,7 +241,7 @@ export function createSystemText(host: SystemTextHost) {
     if (!at) return null;
     const revision = host.session()?.store.revision;
     const text = contextBefore(at.text, at.offset);
-    return { key: at.key, text, selection, revision, paragraphId: at.id };
+    return { key: at.key, text, selection, revision, paragraphId: at.id, paragraphText: at.text };
   };
   /** Run one text input; whether it applied (an applied input sets a new selection). */
   const input = (replacement: string, before: EditorSelection): boolean => {
@@ -293,15 +304,19 @@ export function createSystemText(host: SystemTextHost) {
     /** The text the surface's input holds for the system. */
     typingContext,
     /**
-     * Put the caret back at a composition's place `seen` after an edit took the caret out of
-     * its paragraph: the paragraph by its element id, at the same offset, when the text before
-     * that offset is the composition's. The context there, or null when the place is gone.
+     * The place of a composition, last seen at `seen`, after an edit (`placeAfterEdits`), with
+     * the caret put there: the caret that the edit left is not the place. The context there,
+     * or null when no place holds.
      */
-    followPlace(seen: TypingContext): TypingContext | null {
-      if (!seen.selection || seen.paragraphId === undefined) return null;
-      const at = placeAt(seen.selection, { paragraph: seen.paragraphId, text: seen.text });
-      if (!at) return null;
-      host.select(at);
+    mapPlace(seen: TypingContext): TypingContext | null {
+      const session = host.session();
+      const part = host.part();
+      const { selection: caret, paragraphId: id, paragraphText: text } = seen;
+      if (!session || !part || caret?.kind !== 'text' || id === undefined || text === undefined)
+        return null;
+      const place = placeAfterEdits(session.probeBatch(), part, { caret, id, text });
+      if (!place) return null;
+      if (!sameCaret(host.selection(), place.caret)) host.select(place.caret);
       return typingContext();
     },
     /**

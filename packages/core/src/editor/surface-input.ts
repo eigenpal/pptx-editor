@@ -22,18 +22,14 @@ import { bindEditorClipboard } from './editor-clipboard.ts';
 import {
   applyComposition,
   contextChange,
-  continues,
-  endedComposition,
   ending,
   finalEdit,
   followEdit,
   IDLE,
   partialEdit,
   placement,
-  resumed,
   startComposition,
   type CompositionState,
-  type EndedComposition,
 } from './composition.ts';
 import { createCompositionOverlay } from './composition-overlay.ts';
 import {
@@ -65,10 +61,10 @@ export interface SurfaceInputHost {
   /** The text the input holds for the system, or null for none. */
   typingContext?(): TypingContext | null;
   /**
-   * Put the caret back at a composition's place after an edit took it out of the place's
-   * paragraph; the context there, or null when the place is gone (`replacement-text.ts`).
+   * The place of a composition after an edit, with the caret put there; the context there,
+   * or null when no place holds (`replacement-text.ts`).
    */
-  followPlace?(seen: TypingContext): TypingContext | null;
+  mapPlace?(seen: TypingContext): TypingContext | null;
   /** The text for a translation key: the input's description. */
   label?(key: string): string;
   shortcut(key: string, event: KeyboardEvent): boolean;
@@ -295,12 +291,6 @@ export function bindSurfaceInput(
    * input tasks first.
    */
   let echo: string | null = null;
-  /**
-   * The last composition that the editor ended (`interrupt`), until the next key, input, or
-   * composition. An input method can send the rest of it before it learns of the end, with
-   * no key first: such input that continues its text (`continues`) goes to its place.
-   */
-  let ended: EndedComposition | null = null;
   const overlay = createCompositionOverlay(input);
   const composing = (): boolean => composition.phase !== 'idle';
   const fit = (): void =>
@@ -321,11 +311,10 @@ export function bindSurfaceInput(
       // from elsewhere (`contextChange`).
       const now = host.typingContext?.() ?? null;
       const change = contextChange(composition, now);
-      if (change === 'follow' && now) composition = followEdit(composition, now);
-      else if (change === 'moved') {
-        // An edit took the caret out of the place's paragraph: the composition stays at its
-        // place, found again by its paragraph, and the caret goes back to it.
-        const at = composition.seen && host.followPlace?.(composition.seen);
+      if (change === 'follow') {
+        // An edit: the place maps through it, and the caret goes back to the place.
+        const { seen } = composition;
+        const at = seen && host.mapPlace ? host.mapPlace(seen) : now;
         if (at && composition.phase === 'composing') composition = followEdit(composition, at);
         else interrupt();
       } else if (change === 'left') interrupt();
@@ -368,41 +357,18 @@ export function bindSurfaceInput(
   const fieldShows = (e: InputEvent): boolean =>
     context !== null &&
     (FIELD_WRITES.has(e.inputType) ? !!e.data : FIELD_DELETES.has(e.inputType) && !!input.value);
-  /** Put `text` at an ended composition's place, as the rest of it; whether it went in. */
-  const resume = (late: EndedComposition, text: string): EndedComposition | null =>
-    host.replaceText?.(late.target, text, { at: late.at, expect: late.expect })
-      ? resumed(late, text)
-      : null;
-  /**
-   * End the composition `state`: its change goes in at its place, or, when it continues a
-   * composition that the editor ended, at that one's place. Then the input syncs. The ended
-   * composition, when the change went in.
-   */
-  const finish = (
-    state: CompositionState,
-    edit: ContextEdit | null,
-    data: string
-  ): EndedComposition | null => {
-    const value = input.value;
+  /** End the composition `state`: its change goes in at its place. Then the input syncs. */
+  const finish = (state: CompositionState, edit: ContextEdit | null, data: string): void => {
     composition = IDLE;
     input.classList.remove(COMPOSING_CLASS);
     fit();
-    let done: EndedComposition | null = null;
-    if (state.phase !== 'idle') {
-      const late = state.resumes;
-      const text = data || edit?.text || '';
-      if (late && continues(late.target.text, text)) done = resume(late, text);
-      // With no text caret when it started (a selected range), the text replaces the range.
-      else if (!state.place.context) {
-        if (data) host.textInput('text', data);
-      } else {
-        // A composition that changed nothing keeps its place too.
-        const where = placement(state, host.typingContext?.() ?? null);
-        if (!edit || applyComposition(host, where, edit)) done = endedComposition(state, value);
-      }
+    // With no text caret when it started (a selected range), the text replaces the range.
+    if (state.phase !== 'idle' && !state.place.context) {
+      if (data) host.textInput('text', data);
+    } else if (state.phase !== 'idle' && edit) {
+      applyComposition(host, placement(state, host.typingContext?.() ?? null), edit);
     }
     sync();
-    return done;
   };
   /**
    * Make the browser end the composition: the caret left its place with no edit (a click or
@@ -411,12 +377,16 @@ export function bindSurfaceInput(
    * `compositionend` with the final text in this task; it goes in at the place
    * (`onCompositionEnd`), and the focus comes back at once. When no `compositionend` comes
    * (the browser had no composition), the text the input shows goes in at the place, as the
-   * end would have put it. A peer's edit never gets here: it moves the place (`follow`).
+   * end would have put it. A peer's edit gets here only when the place is gone.
    *
    * The blur and the focus run in the task of the tap that moved the caret, so the focus
    * stays in the user's gesture and a mobile browser keeps its on-screen keyboard. A device
    * check is still open: that the keyboard does not flicker, and that it starts its next
    * composition from the new caret.
+   *
+   * A known limit: an input method that has not yet learned of the end can send the rest of
+   * the ended composition, with no key first. That input goes in at the new caret, as all
+   * input after the end does: content cannot tell it from the user's next input.
    */
   const interrupt = (): void => {
     if (composition.phase !== 'composing') return;
@@ -426,22 +396,13 @@ export function bindSurfaceInput(
       input.focus({ preventScroll: true });
     }
     const state = composition;
-    if (state.phase === 'ending') ended = finish(state, partialEdit(state.place, input.value), '');
+    if (state.phase === 'ending') finish(state, partialEdit(state.place, input.value), '');
     sync();
   };
   const onBeforeInput = (e: InputEvent): void => {
     // The IME owns the field until it finishes; the result arrives at composition end.
     if (composing()) return;
     echo = null;
-    const late = ended;
-    ended = null;
-    // The rest of a composition that the editor ended goes to its place, by its content.
-    if (late && FIELD_WRITES.has(e.inputType) && e.data && continues(late.target.text, e.data)) {
-      if (e.cancelable) e.preventDefault();
-      else echo = e.inputType;
-      ended = resume(late, e.data);
-      return sync();
-    }
     // Input of a composition that the browser kept after it ended changes nothing.
     if (COMPOSITION_INPUT.has(e.inputType)) return void (e.cancelable && e.preventDefault());
     if (!e.cancelable) {
@@ -484,9 +445,7 @@ export function bindSurfaceInput(
     echo = null;
     const { value, selectionStart, selectionEnd } = input;
     const width = value ? input.scrollWidth : 0;
-    const resumes = ended;
-    ended = null;
-    composition = startComposition(context, value, selectionStart, selectionEnd, width, resumes);
+    composition = startComposition(context, value, selectionStart, selectionEnd, width);
     input.classList.add(COMPOSING_CLASS);
     // The candidate window opens at the caret: the end of a long context.
     input.scrollLeft = input.scrollWidth;
@@ -496,9 +455,7 @@ export function bindSurfaceInput(
     // A composition that ended already adds nothing more.
     if (state.phase === 'idle') return sync();
     const data = e.data ?? '';
-    const done = finish(state, finalEdit(state.place, input.value, input.selectionEnd, data), data);
-    // The end of a composition that the editor ended (`interrupt`): its rest may follow.
-    if (state.phase === 'ending') ended = done;
+    finish(state, finalEdit(state.place, input.value, input.selectionEnd, data), data);
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     // Before the key acts, also the first key of a composition (key code 229): a caret or a
@@ -506,7 +463,6 @@ export function bindSurfaceInput(
     // its own selection after this, for its own input.
     if (e.target === input) collapse();
     echo = null;
-    ended = null; // A key is the user's own input: nothing more of an ended composition.
     if (isCompositionKey(e)) return;
     if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {
