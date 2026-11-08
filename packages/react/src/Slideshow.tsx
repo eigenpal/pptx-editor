@@ -134,7 +134,7 @@ function SlideshowScreen({
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
-    return enterSlideshowScreen(el);
+    return enterSlideshowScreen(el, () => controller.exit());
   }, [controller]);
 
   // Every key goes to the show. A layout effect, so the listener leaves in the same commit as

@@ -62,12 +62,15 @@ const SLIDE_LIST = '.pptx-rail__list, .pptx-sorter__list';
 /**
  * Show `el` full screen when the browser allows it, and focus it; the fixed overlay covers the
  * window otherwise. Returns the function that leaves full screen and gives focus back to the
- * element that had it. Leaving full screen does not end the show: it keeps running in the
- * window. Escape ends it through the show keys (`listenSlideshowKeys`). A browser can deliver
- * its own Escape exit late, sometimes after the next show entered full screen, so ending the
- * show on that exit would close a show the user just started. @internal
+ * element that had it.
+ *
+ * `onLeave` runs once when the document leaves full screen after `el` held it: the browser
+ * takes the first Escape to leave full screen and does not give that key to the page, so the
+ * show ends there too and one Escape is enough. Only an exit after this show itself held full
+ * screen counts, so the late exit of an earlier show cannot end a show that just started.
+ * @internal
  */
-export function enterSlideshowScreen(el: HTMLElement): () => void {
+export function enterSlideshowScreen(el: HTMLElement, onLeave?: () => void): () => void {
   const doc = el.ownerDocument;
   const active = doc.activeElement;
   const before = active instanceof HTMLElement && active !== doc.body ? active : null;
@@ -96,6 +99,15 @@ export function enterSlideshowScreen(el: HTMLElement): () => void {
   };
   el.focus({ preventScroll: true });
   let ended = false;
+  let held = false;
+  const onFullscreenChange = (): void => {
+    if (doc.fullscreenElement === el) held = true;
+    else if (held && !ended) {
+      held = false;
+      onLeave?.();
+    }
+  };
+  doc.addEventListener('fullscreenchange', onFullscreenChange);
   // Refused or failed requests leave the overlay in place; `afterFullscreenSettles` swallows
   // the rejection.
   if (typeof el.requestFullscreen === 'function')
@@ -104,6 +116,7 @@ export function enterSlideshowScreen(el: HTMLElement): () => void {
     );
   return () => {
     ended = true;
+    doc.removeEventListener('fullscreenchange', onFullscreenChange);
     // Focus goes back now, and again once full screen is left and the show is out of the page:
     // while the show holds full screen or focus, the page under it can refuse focus.
     afterFullscreenSettles(doc, () => leaveFullscreen(doc, el).then(giveBack));

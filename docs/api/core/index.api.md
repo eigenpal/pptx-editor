@@ -2516,7 +2516,7 @@ export function embeddedFontSources(pkg: PptxPackage): {
 export const EMPTY_EDITOR_SNAPSHOT: EditorSnapshot;
 
 // @internal
-export function enterSlideshowScreen(el: HTMLElement): () => void;
+export function enterSlideshowScreen(el: HTMLElement, onLeave?: () => void): () => void;
 
 // @internal
 export const EQUATION_GALLERY: readonly EquationGalleryItem[];
