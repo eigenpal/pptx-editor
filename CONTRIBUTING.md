@@ -20,6 +20,12 @@ bun run dev
 
 The demo builds against workspace source, so it needs no package build.
 
+## TypeScript tooling
+
+`bun run typecheck` uses TypeScript 6 through the `tsc` command. The Next.js example uses the standard compiler API integration. Declaration generation, source analysis, and API compatibility checks use the same TypeScript dependency.
+
+The separate DOM-free lane guard retains `bun check` to detect ambient DOM type leakage.
+
 ## Make changes
 
 1. Create a branch from `main`.

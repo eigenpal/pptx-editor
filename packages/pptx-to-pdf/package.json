@@ -23,7 +23,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "bun check",
+    "typecheck": "tsc --noEmit",
     "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pptx-to-pdf --local",
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pptx-to-pdf"
   },

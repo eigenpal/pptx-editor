@@ -56,7 +56,7 @@
   ],
   "scripts": {
     "build": "tsup",
-    "typecheck": "bun check && bun check -p tsconfig.consumer.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.consumer.json",
     "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/core --local",
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/core"
   },

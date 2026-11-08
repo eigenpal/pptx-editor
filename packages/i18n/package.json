@@ -33,7 +33,7 @@
   ],
   "scripts": {
     "build": "tsup",
-    "typecheck": "bun check",
+    "typecheck": "tsc --noEmit",
     "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/i18n --local",
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/i18n"
   },
