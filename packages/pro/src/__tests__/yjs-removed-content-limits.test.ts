@@ -65,16 +65,17 @@ describe('removed paragraphs past the count limits', () => {
     const { editors, relay } = await openFuzzPeers(three(), [1_001, 2_002, 3_003]);
     const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
     // Peer a removes 1000 paragraphs before peer b sees any, and peer b removes 100, so the
-    // body's fields arrive in another order at each peer.
+    // body's fields arrive in another order at each peer. Each peer gets the other's edits in
+    // one sync, as when it comes back online: one read of the room, not one per edit.
     enterAndJoin(a, 1_000);
     selectAcross(a, 0, 1, 2, 1);
     ok(a.input('deleteBackward'));
     enterAndJoin(b, 100);
     selectIn(b, 1, 2);
     ok(b.input('text', 'x'));
-    relay.flush();
+    relay.sync();
     expect(converged(...editors)).toEqual(['AH', 'x']);
-  }, 60_000);
+  });
 });
 
 /** A record in `room` with a shell, an optional child list, and optional text. */
