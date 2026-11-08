@@ -121,6 +121,16 @@ describe('math line extent', () => {
       descent: 0,
     });
     expect(mathLineExtent([], [rule], 18, measurer)).toEqual({ ascent: 3 * EM, descent: 2 * EM });
+    // A mark that claims room above its outline: the rule of a radical.
+    expect(mathLineExtent([], [{ ...rule, claimAbove: EM }], 18, measurer).ascent).toBe(4 * EM);
+  });
+
+  test('a radical claims room above its rule', () => {
+    const measurer = createFixedMeasurer();
+    const b = layout('\\sqrt(x)', measurer);
+    let top = -Infinity;
+    for (const m of b.marks) for (const c of m.commands) if (c.op !== 'Z') top = Math.max(top, c.y);
+    expect(b.lineAscent - top).toBeCloseTo(0.078 * EM, 0);
   });
 });
 
