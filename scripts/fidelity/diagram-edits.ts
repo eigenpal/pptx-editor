@@ -100,7 +100,7 @@ export function topTexts(d: SavedDeck, n: number): string[] {
   const doc = /<dgm:pt modelId="([^"]+)" type="doc"/.exec(data)?.[1];
   const textOf = (id: string): string => {
     const pt = new RegExp(
-      `<dgm:pt modelId="${id.replace(/[{}]/g, '\\$&')}"[^>]*>(.*?)</dgm:pt>`
+      `<dgm:pt modelId="${id.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}"[^>]*>(.*?)</dgm:pt>`
     ).exec(data)?.[1];
     return [...(pt ?? '').matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((t) => t[1]).join('');
   };
