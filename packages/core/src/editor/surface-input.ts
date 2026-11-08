@@ -11,22 +11,33 @@
 // system settings apply. The input is transparent (`opacity: 0`), so a spelling mark on it
 // never shows; while an IME composes, it shows only the composed text, scrolled to the caret.
 
-import type { EditorCommand, EditorExecOptions, HistoryGroup } from '../contracts/index.ts';
+import type {
+  EditorCommand,
+  EditorExecOptions,
+  EditorSelection,
+  HistoryGroup,
+} from '../contracts/index.ts';
 import type { TextInputKind } from './text-input.ts';
 import { bindEditorClipboard } from './editor-clipboard.ts';
 import { compositionEdit, type ReplacementTarget, type TypingContext } from './replacement-text.ts';
 
 /** What the input wiring asks of the editor. */
 export interface SurfaceInputHost {
-  /** Apply a text input; `exact`: a system replacement, typed with no AutoCorrect. */
-  textInput(kind: TextInputKind, data?: string, exact?: boolean): void;
+  /**
+   * Apply a text input. `before`: a system replacement, typed with no AutoCorrect, whose undo
+   * gives `before` back as the selection.
+   */
+  textInput(kind: TextInputKind, data?: string, before?: EditorSelection): void;
   /**
    * Apply a system text change: `replacement` replaces `target` when the model text before
-   * the caret holds it, else goes in at the caret (`replacement-text.ts`).
+   * the caret holds it, and goes in at the caret when there is no target
+   * (`replacement-text.ts`).
    */
   replaceText?(target: ReplacementTarget | null, replacement: string): void;
   /** The text the input holds for the system, or null for none. */
   typingContext?(): TypingContext | null;
+  /** The text for a translation key: the input's description. */
+  label?(key: string): string;
   shortcut(key: string, event: KeyboardEvent): boolean;
   /**
    * Fill a copy or cut; false leaves the event to the browser. `slideList`: the event comes
@@ -113,23 +124,56 @@ function staticRangeText(range: StaticRange): string | null {
   }
 }
 
+/** The input's value and selection, as `replacementTarget` reads them. */
+interface InputField {
+  readonly value: string;
+  readonly selectionStart: number;
+  readonly selectionEnd: number;
+}
+
+/** The range `[start, end)` of the input's context as a target, or null for none. */
+function contextTarget(
+  context: TypingContext | null,
+  value: string,
+  start: number,
+  end: number
+): ReplacementTarget | null {
+  if (!context || value !== context.text || end <= start || end > value.length) return null;
+  return { text: value.slice(start, end), after: value.length - end, paragraph: context.key };
+}
+
 /**
- * The target of a replacement event, or null when it names none the model could act on. In
- * the input, the system selects the text it replaces over the mirrored `context`; a browser
- * that reports a target range instead gives its text, with no paragraph. One range only: a
- * real substitution targets one run of text, and several joined could match by chance.
+ * The text the system selected in the input over the mirrored `context`, or null when the
+ * input selection is collapsed. Some systems select the text they correct, then send
+ * `insertText`: that text is a target too.
+ */
+export function inputTarget(input: InputField, context: TypingContext | null) {
+  return contextTarget(context, input.value, input.selectionStart, input.selectionEnd);
+}
+
+/**
+ * The target of a replacement event, or null when it names none the model could act on: the
+ * text the system selected in the input, else one target range. A range in the input's text
+ * (its offsets address the input's value) gives its distance to the caret; a range elsewhere
+ * gives its text, with no paragraph. One range only: a real substitution targets one run of
+ * text, and several joined could match by chance.
  */
 export function replacementTarget(
   e: InputEvent,
-  input: { readonly value: string; readonly selectionStart: number; readonly selectionEnd: number },
+  input: InputField,
   context: TypingContext | null
 ): ReplacementTarget | null {
-  const { value, selectionStart: start, selectionEnd: end } = input;
-  if (context && value === context.text && end > start && end <= value.length)
-    return { text: value.slice(start, end), after: value.length - end, paragraph: context.key };
+  const selected = inputTarget(input, context);
+  if (selected) return selected;
   const ranges = typeof e.getTargetRanges === 'function' ? e.getTargetRanges() : [];
   if (ranges.length !== 1) return null;
-  const text = staticRangeText(ranges[0]!);
+  const range = ranges[0]!;
+  const node = range.startContainer;
+  if (node === range.endContainer && node.nodeType === 3 && node.textContent === input.value) {
+    const inContext = contextTarget(context, input.value, range.startOffset, range.endOffset);
+    if (inContext) return inContext;
+  }
+  const text = staticRangeText(range);
   return text ? { text, after: 0, paragraph: null } : null;
 }
 
@@ -143,8 +187,9 @@ export function dispatchBeforeInput(
   if (COMPOSITION_INPUT.has(type)) return;
   const kind = Object.prototype.hasOwnProperty.call(TEXT_INPUT, type) ? TEXT_INPUT[type] : null;
   if (kind) return host.textInput(kind);
-  if (type === 'insertReplacementText') {
-    // Autocorrect, dictation, and smart substitutions arrive this way, not from a paste.
+  // Autocorrect, dictation, and smart substitutions arrive as `insertReplacementText`, or as
+  // `insertText` over the text the system selected in the input. Not from a paste.
+  if (type === 'insertReplacementText' || (type === 'insertText' && target)) {
     const text = e.data ?? e.dataTransfer?.getData('text/plain') ?? '';
     if (!text) return;
     if (host.replaceText) host.replaceText(target, text);
@@ -190,6 +235,10 @@ export function bindSurfaceInput(
   /** The context the input holds, and the value and width when a composition started. */
   let context: TypingContext | null = null;
   let composeFrom = { value: '', width: 0 };
+  // A screen reader reads the input's value: it says that the value is the text up to the
+  // caret, not the whole text of the shape.
+  const description = host.label?.('canvas.inputDescription');
+  if (description) input.setAttribute('aria-description', description);
   const sync = (): void => {
     if (composing) return;
     context = host.typingContext?.() ?? null;
@@ -222,7 +271,11 @@ export function bindSurfaceInput(
     if (composing) return;
     e.preventDefault();
     const target =
-      e.inputType === 'insertReplacementText' ? replacementTarget(e, input, context) : null;
+      e.inputType === 'insertReplacementText'
+        ? replacementTarget(e, input, context)
+        : e.inputType === 'insertText'
+          ? inputTarget(input, context)
+          : null;
     dispatchBeforeInput(host, e, target);
     sync();
   };
@@ -239,10 +292,15 @@ export function bindSurfaceInput(
     const { value, selectionEnd } = input;
     const key = context?.key ?? null;
     endComposition();
-    if (!e.data) return;
-    // A keyboard can recompose a word the input already holds: only the change goes in.
-    const edit = before ? compositionEdit(before, value, selectionEnd, e.data, key) : null;
-    if (!edit || !host.replaceText) return host.textInput('text', e.data);
+    const data = e.data ?? '';
+    // A keyboard can recompose a word the input already holds: only the change goes in. A
+    // composition that ends empty deletes what it covered, when the field lost it.
+    const edit =
+      before && (data || value !== before)
+        ? compositionEdit(before, value, selectionEnd, data, key)
+        : null;
+    if (!edit || !host.replaceText) return void (data && host.textInput('text', data));
+    if (edit.target.text === '' && edit.text === '') return; // Nothing changed.
     if (edit.target.text === '' && edit.target.after === 0)
       return host.textInput('text', edit.text);
     host.replaceText(edit.target, edit.text);

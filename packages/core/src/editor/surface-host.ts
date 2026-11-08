@@ -76,8 +76,10 @@ export interface SurfaceHostState {
   readonly painter: FormatPainter;
   readonly views: ViewSettings;
   readonly groups: EditorHistoryGroups;
-  /** The caret format that waits for the next typed text. */
-  readonly arm: { current(): unknown };
+  /** The caret format that waits for the next typed text (`CaretArm`). */
+  readonly arm: { follow(update: () => void): void };
+  /** Publish the editor state. */
+  emit(): void;
   /** One drag step: the steps of one gesture are one undo step. */
   gestureEdit(command: EditorCommand, gesture: string, base?: PptxPackage): void;
   /** The comment threads that show markers on the slide. */
@@ -92,8 +94,9 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
     ...createSystemText({
       ...s,
       select: base.select,
-      armed: () => s.arm.current() !== null,
-      textInput: (kind, data, exact) => base.textInput(kind, data, exact),
+      follow: (update) => s.arm.follow(update),
+      refuse: base.refuse,
+      textInput: (kind, data, before) => base.textInput(kind, data, before),
     }),
     ...(s.commentMarkers ? { commentMarkers: s.commentMarkers } : {}),
     paintLayout: (l) => s.prompts.paint(s.session(), l, s.selection(), s.viewing()) ?? l,

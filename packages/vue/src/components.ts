@@ -88,7 +88,8 @@ const pptxEditorRootProps = {
   /**
    * AutoCorrect while typing (default `true`): symbols, ellipses, fractions, and lists started
    * by typing `1.`, `1)`, `*`, or `-` and a space. Capitals, curly quotes, dashes, and
-   * spelling follow the user's system settings. Read once, when the editor is created.
+   * spelling come from the user's system or browser when it offers them. Read once, when the
+   * editor is created.
    */
   autoCorrect: { type: Boolean, default: true },
   /**

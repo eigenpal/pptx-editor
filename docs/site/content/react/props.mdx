@@ -50,7 +50,7 @@ For generated signatures, see `docs/api/react/index.api.md` in the repository.
 | Prop | Type | Description |
 | --- | --- | --- |
 | `document` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without it, the editor shows its loading sheet. |
-| `autoCorrect` | `boolean` | Enables AutoCorrect for symbols, ellipses, fractions, and typed list starts. Capitals, quotes, dashes, and spelling follow the user's system settings. Defaults to `true`. Read when the editor is created; remount to change it. |
+| `autoCorrect` | `boolean` | Enables AutoCorrect for symbols, ellipses, fractions, and typed list starts. Capitals, quotes, dashes, and spelling come from the user's system or browser when it offers them. Defaults to `true`. Read when the editor is created; remount to change it. |
 | `mode` | `'edit' \| 'view'` | Edit the deck, or only show it. Defaults to `'edit'`. Changes apply without a reload. |
 | `readClipboardDrawing` | `ClipboardDrawingReader` | Reads copied shapes from the system clipboard in a desktop host, so they paste as editable shapes. Read when the editor is created. See [Copy and paste](/docs/guides/copy-and-paste#paste-shapes-in-a-desktop-app). |
 

@@ -2,9 +2,10 @@
 // The model side of `applyReplacementText`: a system text change (autocorrect, a capital,
 // a curly quote, dictation, the double-space period of macOS) arrives as
 // `insertReplacementText`, and the text it targets is matched against the model text before
-// the caret. On agreement the replacement replaces those characters; on anything else it
-// goes in at the caret, which never edits text the system did not target. A target that
-// names another paragraph is never matched.
+// the caret. On agreement the replacement replaces those characters. A target that the model
+// text does not hold, or that names another paragraph, is never matched: the input is
+// refused, so no text the system did not target changes and no word goes in twice. A
+// replacement with no target goes in at the caret.
 //
 // PPTX Editor types into a hidden textarea, not into painted pages, so the target comes from
 // the textarea's selection over the text that the surface mirrors into it (`TypingContext`):
@@ -12,6 +13,7 @@
 // the system corrects a word after the space that ends it. The paragraph check compares the
 // mirror's paragraph key with the caret's. DOM-free: `surface-input.ts` reads the event.
 
+import { segmentGraphemes } from '@eigenpal/ooxml-core';
 import type { EditorSelection } from '../contracts/index.ts';
 import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
@@ -35,7 +37,9 @@ export interface ReplacementTarget {
 }
 
 /** The most characters of context the hidden input holds. */
-export const CONTEXT_LIMIT = 200;
+export const CONTEXT_LIMIT = 216;
+/** How far past the cut the context looks for a word start: it keeps at least 200. */
+const WORD_SLACK = 16;
 
 /** The key of the paragraph a caret is in: shape, table cell, and paragraph index. */
 export function paragraphKey(
@@ -49,19 +53,28 @@ export function paragraphKey(
 
 /**
  * The context for the system: the paragraph text before the caret, from its last line break,
- * at most `CONTEXT_LIMIT` characters, cut at a space where it is long.
+ * at most `CONTEXT_LIMIT` characters. A long text is cut at a word start near the limit, else
+ * at a grapheme boundary, so the context keeps at least `CONTEXT_LIMIT - WORD_SLACK`.
  */
 export function contextBefore(paragraphText: string, offset: number): string {
   const before = paragraphText.slice(0, offset);
-  let from = Math.max(0, before.length - CONTEXT_LIMIT);
   // A line break reads as `\n` in the model text (`paragraphText`).
   const lineStart = before.lastIndexOf('\n') + 1;
-  if (lineStart > from) from = lineStart;
-  else if (from > 0) {
-    const space = before.indexOf(' ', from);
-    if (space >= 0) from = space + 1;
+  let from = Math.max(lineStart, before.length - CONTEXT_LIMIT);
+  if (from > lineStart) {
+    const space = before.slice(from, from + WORD_SLACK).search(/\s/u);
+    from = space >= 0 ? from + space + 1 : graphemeStart(before, from);
   }
   return before.slice(from);
+}
+
+/** The first grapheme boundary at or after `at` in `text`. */
+function graphemeStart(text: string, at: number): number {
+  const base = Math.max(0, at - 32);
+  const boundary = segmentGraphemes(text.slice(base, at + 32))
+    .map((g) => base + g.utf16From)
+    .find((offset) => offset >= at);
+  return boundary ?? at;
 }
 
 /**
@@ -116,10 +129,21 @@ export interface SystemTextHost {
   selection(): EditorSelection;
   /** Set the selection and publish it. */
   select(next: EditorSelection): void;
-  /** Whether a caret format waits for the next typed text. */
-  armed(): boolean;
-  /** The editor's text input; `exact`: no AutoCorrect. */
-  textInput(kind: 'text', data: string, exact: boolean): void;
+  /** Run `update`; a caret format that waits at the caret moves with the caret. */
+  follow(update: () => void): void;
+  /** Publish the editor state. */
+  emit(): void;
+  /** Publish why an input was not applied. */
+  refuse(reason: string, detail?: string): void;
+  /**
+   * The editor's text input, as a system replacement: no AutoCorrect, and an undo gives
+   * `before` back as the selection.
+   */
+  textInput(
+    kind: 'text' | 'deleteBackward',
+    data: string | undefined,
+    before: EditorSelection
+  ): void;
 }
 
 /** The editor's side of system text changes: the input's context and the replacement. */
@@ -136,31 +160,41 @@ export function createSystemText(host: SystemTextHost) {
       return at ? { key: at.key, text: contextBefore(at.text, at.offset) } : null;
     },
     /**
-     * Apply a system text change. The replacement replaces its target when the model text
-     * before the caret holds it, in the caret's paragraph; else it goes in at the caret. An
-     * armed caret format keeps the caret path, so the format rides the text as it rides a
-     * keystroke. The edit is a text input over the target: one store transaction, and the
-     * undo step of text typed over a range.
+     * Apply a system text change. With no target, the replacement goes in at the caret. With
+     * one, it replaces the target when the model text before the caret holds it, in the
+     * caret's paragraph; else the input is refused, so no word goes in twice. An empty
+     * replacement deletes the target. A caret format that waits at the caret stays for the
+     * next typed text. The edit is one text input over the target: one store transaction,
+     * one undo step, and an undo puts the caret back where it was.
      */
     replaceText(target: ReplacementTarget | null, replacement: string): void {
-      if (!replacement) return;
       const sel = host.selection();
-      const at = target && !host.armed() ? caretAt(sel) : null;
-      const range = at && target && replacementRange(at.text, at.offset, at.key, target);
-      if (sel.kind !== 'text' || !target || !range)
-        return host.textInput('text', replacement, true);
-      const point = (offset: number) => ({ paragraph: sel.focus.paragraph, offset });
-      host.select({ ...sel, anchor: point(range.from), focus: point(range.to) });
-      const before = host.selection();
-      host.textInput('text', replacement, true);
-      const now = host.selection();
-      // A refused input leaves the target selected: the caret goes back.
-      if (now === before) return host.select(sel);
-      // The text between the target and the caret stays: the caret goes back after it.
-      if (target.after > 0 && now.kind === 'text') {
-        const caret = point(now.focus.offset + target.after);
-        host.select({ ...now, anchor: caret, focus: caret });
+      if (!target) {
+        if (replacement) host.textInput('text', replacement, sel);
+        return;
       }
+      const at = caretAt(sel);
+      const range = at && replacementRange(at.text, at.offset, at.key, target);
+      if (sel.kind !== 'text' || !at || !range)
+        return host.refuse('errors.inputUnsupported', 'insertReplacementText');
+      // A change that changes nothing writes nothing: no undo step, no collaboration op.
+      if (at.text.slice(range.from, range.to) === replacement) return;
+      const point = (offset: number) => ({ paragraph: sel.focus.paragraph, offset });
+      host.follow(() => {
+        host.select({ ...sel, anchor: point(range.from), focus: point(range.to) });
+        const over = host.selection();
+        if (replacement) host.textInput('text', replacement, sel);
+        else host.textInput('deleteBackward', undefined, sel);
+        const now = host.selection();
+        // A refused input leaves the target selected: the caret goes back.
+        if (now === over) return host.select(sel);
+        // The text between the target and the caret stays: the caret goes back after it.
+        if (target.after > 0 && now.kind === 'text') {
+          const caret = point(now.focus.offset + target.after);
+          host.select({ ...now, anchor: caret, focus: caret });
+        }
+      });
+      host.emit();
     },
   };
 }
@@ -175,9 +209,9 @@ export interface ContextEdit {
  * What an IME composition changed in the mirrored context, from the field's value before the
  * composition (`before`), after it (`after`), the caret after it, and the committed text
  * (`data`). A keyboard can recompose a word that is already in the field, so the committed
- * text can cover characters of `before`. The change keeps the characters that both values
- * share, and at least one committed character. Null when the field does not hold `data` at
- * the caret: then `data` goes in at the caret.
+ * text can cover characters of `before`, and an empty commit deletes them. The change keeps
+ * the characters that both values share; it can be empty when nothing changed. Null when the
+ * field does not hold `data` at the caret: then `data` goes in at the caret.
  */
 export function compositionEdit(
   before: string,
@@ -194,16 +228,14 @@ export function compositionEdit(
   if (before.slice(before.length - tail) !== after.slice(caret)) return null;
   let replaced = before.slice(at, before.length - tail);
   let text = data;
-  // At least one committed character stays, so the change is never an empty replacement.
   let lead = 0;
-  while (lead < replaced.length && lead < text.length - 1 && replaced[lead] === text[lead])
-    lead += 1;
+  while (lead < replaced.length && lead < text.length && replaced[lead] === text[lead]) lead += 1;
   replaced = replaced.slice(lead);
   text = text.slice(lead);
   let trail = 0;
   while (
     trail < replaced.length &&
-    trail < text.length - 1 &&
+    trail < text.length &&
     replaced[replaced.length - 1 - trail] === text[text.length - 1 - trail]
   )
     trail += 1;

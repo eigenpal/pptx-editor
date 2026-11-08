@@ -1145,6 +1145,7 @@
     "ariaLabel": "第 {index} 张幻灯片，共 {total} 张",
     "emptyAriaLabel": "未打开演示文稿",
     "inputAriaLabel": "所选形状的文本",
+    "inputDescription": "显示当前段落中光标之前的文本",
     "adjustHandle": "拖动以更改形状",
     "placeholderTable": "在此处插入表格",
     "placeholderChart": "在此处插入图表",

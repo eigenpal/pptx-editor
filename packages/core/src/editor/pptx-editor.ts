@@ -493,10 +493,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   };
 
   /**
-   * Apply a text edit at the text selection as one transaction (`exact`: no AutoCorrect);
-   * typing at a caret is one undo step. A refusal is returned and published, never dropped.
+   * Apply a text edit at the text selection as one transaction (`was`: a system edit, with
+   * no AutoCorrect, whose undo selects `was`); typing at a caret is one undo step.
    */
-  const textInput = (kind: TextInputKind, data?: string, exact = false): CommandResult => {
+  const textInput = (kind: TextInputKind, data?: string, was?: EditorSelection): CommandResult => {
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (mode === 'view') return refuse('disabled.viewing');
     if (selection.kind !== 'text')
@@ -519,7 +519,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (sel.diagramNode !== undefined) at = typeDiagram(batch, part, sel, item, kind, data);
       else if (!txBody) throw new CommandRefusal('disabled.noText');
       else {
-        ({ at, list } = typeText(batch, part, slide, txBody.id, item, sel, kind, data, exact));
+        ({ at, list } = typeText(batch, part, slide, txBody.id, item, sel, kind, data, !!was));
         const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
         if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
         refit(batch, slide, part, sel.nodeId, session.measurer);
@@ -534,7 +534,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!burst || comparePoints(sel.anchor, sel.focus) !== 0) groups.boundary();
     const caret: EditorSelection = { ...sel, anchor: at, focus: at };
     // The entry's `selectionBefore`: an undo returns this object, so the arm finds its commands.
-    const mark = { part, selection: sel };
+    const mark = { part, selection: was ?? sel };
     const r = commit(
       armed ? [...armed.ops, ...batch.ops] : batch.ops,
       { label: 'typing', ...(burst ? { historyGroup: groups.typing(sel.nodeId) } : {}) },
@@ -932,7 +932,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           viewing: () => mode === 'view',
           part: () => partAt(slide),
           surface: () => surface,
-          ...{ prompts, presence, painter, views, groups, gestureEdit, arm },
+          ...{ prompts, presence, painter, views, groups, gestureEdit, arm, emit },
           commentMarkers: comments.markers(snapshot, instance, () => session?.store.package),
         })
       );

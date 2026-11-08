@@ -1145,6 +1145,7 @@
     "ariaLabel": "スライド {index}/{total}",
     "emptyAriaLabel": "開いているプレゼンテーションはありません",
     "inputAriaLabel": "選択した図形のテキスト",
+    "inputDescription": "現在の段落のカーソルまでのテキストを表示します",
     "adjustHandle": "ドラッグして図形の形を変更",
     "placeholderTable": "ここに表を挿入",
     "placeholderChart": "ここにグラフを挿入",

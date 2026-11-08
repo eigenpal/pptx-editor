@@ -2,4 +2,4 @@
 '@pptx-editor.dev/core': minor
 ---
 
-Typing follows each user's system settings for capitals, quotes, dashes, and spelling, and AutoCorrect keeps only symbols, the ellipsis, fractions, and typed list starts.
+Typing takes capitals, quotes, dashes, and spelling corrections from the user's system or browser when it offers them, and AutoCorrect keeps only symbols, the ellipsis, fractions, and typed list starts.

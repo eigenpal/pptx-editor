@@ -88,8 +88,17 @@ describe('the text the input holds for the system', () => {
     const long = `${'word '.repeat(100)}end`;
     const kept = contextBefore(long, long.length);
     expect(kept.length).toBeLessThanOrEqual(CONTEXT_LIMIT);
+    expect(kept.length).toBeGreaterThanOrEqual(200);
     expect(kept.startsWith('word ')).toBe(true);
     expect(long.endsWith(kept)).toBe(true);
+    // A long word keeps at least 200 characters; the cut never splits an emoji.
+    const word = `${'x'.repeat(300)} word`;
+    expect(contextBefore(word, word.length).length).toBeGreaterThanOrEqual(200);
+    const emoji = '😀'.repeat(200);
+    const cut = contextBefore(emoji, emoji.length);
+    expect(cut.length).toBeGreaterThanOrEqual(200);
+    expect(cut.length % 2).toBe(0);
+    expect(cut.codePointAt(0)).toBe(0x1f600);
   });
 
   test('the input holds the text before the caret and follows the caret', async () => {
@@ -98,6 +107,8 @@ describe('the text the input holds for the system', () => {
     expect(input.hasAttribute('autocorrect')).toBe(false);
     expect(input.hasAttribute('autocapitalize')).toBe(false);
     expect(input.hasAttribute('spellcheck')).toBe(false);
+    // A screen reader hears that the value is the text up to the caret.
+    expect(input.getAttribute('aria-description')).toBe('canvas.inputDescription');
     caret(e, 0, 5);
     expect(input.value).toBe('Hello');
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5]);
@@ -194,19 +205,73 @@ describe('a system replacement (insertReplacementText)', () => {
     e.destroy();
   });
 
-  test('undo gives the replaced word back, selected', async () => {
+  test('undo gives the replaced word back, with the caret where it was', async () => {
     const { e, input, replace } = await open(para(run('Hello wrold')));
     caret(e, 0, 11);
     replace(6, 11, 'world');
     expect(texts(e)).toEqual(['Hello world']);
     e.exec({ type: 'undo' });
     expect(texts(e)).toEqual(['Hello wrold']);
-    // Undo selects the word the replacement replaced; the input holds no text for a range.
     expect(e.snapshot().selection).toMatchObject({
-      anchor: { paragraph: 0, offset: 6 },
+      anchor: { paragraph: 0, offset: 11 },
       focus: { paragraph: 0, offset: 11 },
     });
-    expect(input.value).toBe('');
+    expect(input.value).toBe('Hello wrold');
+    e.destroy();
+  });
+
+  test('a target the model text does not hold is refused, so no word goes in twice', async () => {
+    const { e, fire } = await open(para(run('say teh ')));
+    caret(e, 0, 8);
+    const revision = e.session!.store.revision;
+    // A browser names a target range whose text is not before the caret in the model.
+    const node = doc.createTextNode('teh');
+    const range = { startContainer: node, startOffset: 0, endContainer: node, endOffset: 3 };
+    const event = new win.InputEvent('beforeinput', {
+      inputType: 'insertReplacementText',
+      data: 'the',
+      bubbles: true,
+      cancelable: true,
+    }) as unknown as Event;
+    Object.defineProperty(event, 'getTargetRanges', { value: () => [range] });
+    fire(event);
+    expect(texts(e)).toEqual(['say teh ']);
+    expect(e.snapshot().lastRejection?.reason).toBe('errors.inputUnsupported');
+    expect(e.session!.store.revision).toBe(revision);
+    e.destroy();
+  });
+
+  test('a replacement with a caret format armed replaces the word and keeps the format', async () => {
+    const { e, type, replace } = await open(para(''));
+    caret(e, 0, 0);
+    type('say teh ');
+    e.exec({ type: 'toggleBold' });
+    replace(4, 7, 'the');
+    expect(texts(e)).toEqual(['say the ']);
+    type('x');
+    expect(texts(e)).toEqual(['say the x']);
+    const runs = e.session!.layout(0)!.items.find((x) => x.kind === 'shape' && x.element.text);
+    const last = runs?.kind === 'shape' ? runs.element.text!.paragraphs[0].runs.at(-1) : null;
+    expect(last && 'props' in last && last.text).toBe('x');
+    expect((last as { props: { bold: boolean } }).props.bold).toBe(true);
+    e.destroy();
+  });
+
+  test('insertText over the text the system selected in the input replaces it', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('cats adn ');
+    input.setSelectionRange(5, 8);
+    fire(
+      new win.InputEvent('beforeinput', {
+        inputType: 'insertText',
+        data: 'and',
+        bubbles: true,
+        cancelable: true,
+      }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['cats and ']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 9 });
     e.destroy();
   });
 
@@ -229,6 +294,15 @@ describe('a system replacement (insertReplacementText)', () => {
       text: 'teh',
       after: 0,
       paragraph: null,
+    });
+    // A range in the input's own text: its offsets give the distance to the caret.
+    const own = doc.createTextNode('a teh');
+    const inInput = { startContainer: own, startOffset: 2, endContainer: own, endOffset: 4 };
+    const early = { ...event, getTargetRanges: () => [inInput] } as unknown as InputEvent;
+    expect(replacementTarget(early, collapsed, context)).toEqual({
+      text: 'te',
+      after: 1,
+      paragraph: 'k',
     });
     const two = { ...event, getTargetRanges: () => [range, range] } as unknown as InputEvent;
     expect(replacementTarget(two, collapsed, context)).toBeNull();
@@ -255,25 +329,56 @@ describe('a composition over the text the input holds', () => {
       target: { text: 'eh', after: 0, paragraph: 'k' },
       text: 'he',
     });
+    // An empty commit deletes what the composition covered; an unchanged one changes nothing.
+    expect(compositionEdit('a hello', 'a ', 2, '', 'k')).toEqual({
+      target: { text: 'hello', after: 0, paragraph: 'k' },
+      text: '',
+    });
+    expect(compositionEdit('a hello', 'a hello', 7, 'hello', 'k')).toEqual({
+      target: { text: '', after: 0, paragraph: 'k' },
+      text: '',
+    });
     // The field does not hold the committed text at the caret.
     expect(compositionEdit('abc', 'abcに', 4, '日本', 'k')).toBeNull();
   });
 
+  const composition = (type: string, data = ''): Event => {
+    const event = new win.CompositionEvent(type, { bubbles: true }) as unknown as Event;
+    Object.defineProperty(event, 'data', { value: data });
+    return event;
+  };
+  /** A keyboard composes the input's text again: the field becomes `value`, then commits. */
+  async function recompose(text: string, value: string, data: string) {
+    const opened = await open(para(run(text)));
+    caret(opened.e, 0, text.length);
+    const revision = opened.e.session!.store.revision;
+    opened.fire(composition('compositionstart'));
+    opened.input.value = value;
+    opened.input.setSelectionRange(value.length, value.length);
+    opened.fire(composition('compositionend', data));
+    return { ...opened, revision };
+  }
+
   test('a recomposed word changes once in the model', async () => {
-    const { e, input, fire } = await open(para(run('a helo')));
-    caret(e, 0, 6);
-    const composition = (type: string, data = ''): Event => {
-      const event = new win.CompositionEvent(type, { bubbles: true }) as unknown as Event;
-      Object.defineProperty(event, 'data', { value: data });
-      return event;
-    };
-    fire(composition('compositionstart'));
-    input.value = 'a hello';
-    input.setSelectionRange(7, 7);
-    fire(composition('compositionend', 'hello'));
+    const { e, input } = await recompose('a helo', 'a hello', 'hello');
     expect(texts(e)).toEqual(['a hello']);
     expect(focusOf(e)).toEqual({ paragraph: 0, offset: 7 });
     expect(input.value).toBe('a hello');
+    e.destroy();
+  });
+
+  test('a recomposed word that the user deletes goes from the model', async () => {
+    const { e, input } = await recompose('a hello', 'a ', '');
+    expect(texts(e)).toEqual(['a ']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 2 });
+    expect(input.value).toBe('a ');
+    e.destroy();
+  });
+
+  test('a recomposition that ends unchanged writes nothing', async () => {
+    const { e, revision } = await recompose('a hello', 'a hello', 'hello');
+    expect(texts(e)).toEqual(['a hello']);
+    expect(e.session!.store.revision).toBe(revision);
     e.destroy();
   });
 });
