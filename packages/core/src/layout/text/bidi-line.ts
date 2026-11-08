@@ -9,6 +9,7 @@
 
 import { bidiAlgorithm } from './bidi.ts';
 import { lineVisualOrder, type ParagraphBidi } from './rtl-paragraph.ts';
+import type { GlyphRun } from './text-layout.ts';
 
 /** A run of text at its place: its source text and its cell edges (`GlyphRun`). */
 interface BidiRun {
@@ -170,7 +171,7 @@ export function wholeMarker<T extends BidiRun>(placed: T, rtl: boolean): T {
 export interface RunGlyph {
   /** UTF-16 offset of the character in the run's text. */
   readonly index: number;
-  /** The character to draw: in a right-to-left run, the mirror of a paired bracket. */
+  /** The character to draw: in a right-to-left run, the mirror of a mirrored character (L4). */
   readonly char: string;
   /** The left edge of its cell, EMU from the text box left. */
   readonly x: number;
@@ -182,7 +183,7 @@ export interface RunGlyph {
  * character with a mirror image (UAX #9 L4, such as a bracket) draws as that mirror. A
  * surrogate pair is one character. For readers that place each glyph at its own position.
  */
-export function runGlyphs(run: BidiRun): RunGlyph[] {
+export function runGlyphs(run: Pick<GlyphRun, 'text' | 'x' | 'rtl'>): RunGlyph[] {
   const n = run.text.length;
   const out: RunGlyph[] = [];
   for (let i = 0; i < n;) {

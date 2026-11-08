@@ -156,7 +156,9 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       let shown = 0;
       // Each character in its cell; a right-to-left run reads right to left (`runGlyphs`).
       for (const { char: ch, x } of runGlyphs(run)) {
-        // The glyph the face's cmap gives, as the editor's SVG text draws it (no ligatures).
+        // The glyph the face's cmap gives, with no shaping: no ligatures, and the isolated form
+        // of an Arabic letter, in a cell measured from the joined form, so letters can overlap.
+        // The editor's SVG text shapes each right-to-left word as a whole.
         const glyph = font.font.glyphForCodePoint(ch.codePointAt(0) ?? 0)?.id ?? 0;
         if (glyph <= 0) {
           if (ch.trim() !== '')
@@ -338,8 +340,8 @@ function drawDecorations(
     );
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
-  const x0 = run.x[0];
-  const x1 = run.x[end] ?? run.x[run.x.length - 1];
+  const x0 = run.rtl ? run.x[run.text.length - end] : run.x[0];
+  const x1 = run.rtl ? run.x[run.x.length - 1] : (run.x[end] ?? run.x[run.x.length - 1]);
   if (!(x1 > x0)) return;
   const size = run.sizePt * EMU_PER_PT;
   const m = run.face.metrics;

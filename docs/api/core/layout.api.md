@@ -780,7 +780,7 @@ export interface RunGlyph {
 }
 
 // @public
-export function runGlyphs(run: BidiRun): RunGlyph[];
+export function runGlyphs(run: Pick<GlyphRun, 'text' | 'x' | 'rtl'>): RunGlyph[];
 
 // @public
 export const SCRIPT_SIZE_SCALE: number;

@@ -39,6 +39,9 @@ export function ghostBullet(
   if (fill.type === 'solid')
     text.setAttribute('fill', `rgb(${fill.color.r} ${fill.color.g} ${fill.color.b})`);
   text.setAttribute('xml:space', 'preserve');
+  // The characters stand in their cells and are already mirrored: the browser must not reorder
+  // or mirror them again.
+  text.setAttribute('style', 'unicode-bidi:bidi-override;direction:ltr');
   text.textContent = glyphs.map((g) => g.char).join('');
   g.appendChild(text);
   return g;
