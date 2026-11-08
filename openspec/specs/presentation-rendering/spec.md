@@ -125,7 +125,7 @@ The renderer SHALL draw rectangular path gradients as concentric rectangles, pre
 #### Scenario: Tiled picture
 
 - **WHEN** a 128×96-pixel image without a resolution is tiled with `sx="50000" sy="50000"`
-- **THEN** each tile is 64×48 pixels at 96 DPI
+- **THEN** each tile is 64×48 pt, because an image without a resolution reads at 72 DPI
 
 ### Requirement: Compound lines
 

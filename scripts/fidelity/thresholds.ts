@@ -205,7 +205,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'fill-fidelity/3': ['pixels'],
     'fill-fidelity/4': ['pixels'],
     'fill-fidelity/6': ['pixels'],
-    'fills-lines/1': ['pixels', 'extra-text'],
+    'fills-lines/1': ['extra-text'],
     'fills-lines/2': ['pixels'],
     'follow-ups/2': ['pixels'],
     'follow-ups/3': ['pixels'],

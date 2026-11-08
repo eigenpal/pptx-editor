@@ -74,7 +74,10 @@ import {
 /** The longest the late fit waits for substitutes that slides parsed late name. */
 const LATE_SUBSTITUTE_WAIT_MS = 10_000;
 
-/** The resolution of a tiled image whose header states none (measured on `fixtures/fills-lines.pdf`). */
+/**
+ * The resolution of a tiled image whose header states none. Reference PDFs disagree on this
+ * value, so every tiled PNG in `fixtures/` states its resolution (`TILE_FIXTURE_DPI`).
+ */
 const TILE_DPI = 72;
 
 /** Options for opening a presentation. */
