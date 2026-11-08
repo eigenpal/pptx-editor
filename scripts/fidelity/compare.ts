@@ -70,12 +70,15 @@ const UNMAPPED = /[\u0000-\u0008\u000E-\u001F�]/u;
 /**
  * The text that line matching compares: normalized, without a leading bullet or whitespace.
  * Empty for a line that is not checked: right-to-left text, unmapped glyphs, and lines without
- * two letters in a row (numbers, and the one glyph per line of vertical or stacked text).
+ * two letters in a row (numbers, and the one glyph per line of vertical or stacked text). The
+ * rule reads the key, after whitespace goes: a PDF can write a space between any two items, so
+ * the same text must give the same answer with and without the spaces.
  */
 export function lineKey(text: string): string {
   const n = normalize(text);
   if (RTL.test(n) || UNMAPPED.test(n)) return '';
-  return /\p{L}{2}/u.test(n) ? n.replace(LEADING_BULLET, '').replace(/\s+/g, '') : '';
+  const key = n.replace(LEADING_BULLET, '').replace(/\s+/g, '');
+  return /\p{L}{2}/u.test(key) ? key : '';
 }
 
 /**
