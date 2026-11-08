@@ -6,6 +6,7 @@
 import { defineComponent, ref, useId, type PropType } from 'vue';
 import {
   chartPaneCommand,
+  chartPaneDraftKey,
   chartValueText,
   nextChartCategoryLabel,
   type ChartData,
@@ -82,6 +83,7 @@ const SeriesCard = defineComponent({
   name: 'PptxChartSeriesCard',
   props: {
     data: { type: Object as PropType<ChartData>, required: true },
+    draftKey: { type: String, required: true },
     index: { type: Number, required: true },
     open: { type: Boolean, required: true },
     disabled: { type: Boolean, required: true },
@@ -107,6 +109,7 @@ const SeriesCard = defineComponent({
           <summary class="pptx-chart-pane__summary">{name}</summary>
           <div class="pptx-chart-pane__card-body">
             <ChartField
+              key={props.draftKey}
               label={t('chartData.seriesName', { number: index + 1 })}
               visibleLabel={t('chartData.name')}
               value={series.name}
@@ -116,7 +119,7 @@ const SeriesCard = defineComponent({
             <div class="pptx-panel__grid">
               {data.categories.map((c, i) => (
                 <ChartField
-                  key={i}
+                  key={`${props.draftKey}:${i}`}
                   label={t('chartData.cellLabel', { series: name, category: c.label })}
                   visibleLabel={c.label}
                   value={chartValueText(series.values[i])}
@@ -183,6 +186,7 @@ export const ChartDataPane = defineComponent({
           </div>
         );
       const data = read.data;
+      const draftKey = chartPaneDraftKey(e!.snapshot(), data);
       const disabled = readOnly.value || !selected.editable;
       /** Applies one change: null when it applied, else the reason. */
       const apply = (change: ChartPaneChange): string | null => {
@@ -220,6 +224,7 @@ export const ChartDataPane = defineComponent({
               {data.categories.map((c, i) => (
                 <li key={i} class="pptx-chart-pane__row">
                   <ChartField
+                    key={draftKey}
                     label={t(xy ? 'chartData.xValueLabel' : 'chartData.categoryLabel', {
                       number: i + 1,
                     })}
@@ -260,6 +265,7 @@ export const ChartDataPane = defineComponent({
               <SeriesCard
                 key={j}
                 data={data}
+                draftKey={draftKey}
                 index={j}
                 open={open.value.has(j)}
                 disabled={disabled}

@@ -503,6 +503,9 @@ export type ChartPaneChange = {
 // @public
 export function chartPaneCommand(data: ChartData, change: ChartPaneChange): ChartPaneResult;
 
+// @internal
+export function chartPaneDraftKey(snapshot: EditorSnapshot, data: ChartData): string;
+
 // @public
 export function chartPaneNumericX(data: Pick<ChartData, 'kind' | 'categories'>): boolean;
 
@@ -768,6 +771,7 @@ export type ChromeTooltipListener = (state: ChromeTooltipState | null) => void;
 
 // @internal
 export interface ChromeTooltipState {
+    readonly instant: boolean;
     // (undocumented)
     readonly label: string;
     // (undocumented)

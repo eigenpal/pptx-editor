@@ -3,7 +3,7 @@
 // remove, sends. The React and Vue panes (`ChartDataPane.tsx`) render from these, so both check
 // the same input with the same keys.
 
-import type { ChartData, EditorCommand } from '../contracts/index.ts';
+import type { ChartData, EditorCommand, EditorSnapshot } from '../contracts/index.ts';
 import {
   MAX_CHART_LABEL,
   MAX_CHART_POINTS,
@@ -11,6 +11,20 @@ import {
 } from '../automation/commands/chart-data-model.ts';
 
 export { MAX_CHART_POINTS, MAX_CHART_SERIES };
+
+/**
+ * Drafts belong to one chart and one grid size. Structure edits renumber source indexes,
+ * so discard pending fields when a row or series is added or removed. @internal
+ */
+export function chartPaneDraftKey(snapshot: EditorSnapshot, data: ChartData): string {
+  return JSON.stringify([
+    snapshot.currentSlide,
+    snapshot.chart?.nodeId,
+    data.kind,
+    data.categories.length,
+    data.series.length,
+  ]);
+}
 
 /** One change of the Chart Data tab: a committed field, or an add or a remove. @public */
 export type ChartPaneChange =

@@ -124,6 +124,41 @@ describe('Chart Data tab (React)', () => {
     expect(values(editor).series.map((s) => s.name)).toEqual(['Plan', 'Forecast', 'Stretch']);
   });
 
+  test('removing a category clears rejected drafts before indexes change', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    type(screen.getByRole('textbox', { name: 'Plan, South' }), 'many');
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Remove category North' })));
+    const east = screen.getByRole('textbox', { name: 'Plan, East' }) as HTMLInputElement;
+    expect(east.value).toBe('51');
+    expect(east.getAttribute('aria-invalid')).toBe('false');
+    expect(values(editor).series[0]!.values).toEqual([35, 51, 28]);
+    act(() => void fireEvent.blur(east));
+    expect(values(editor).series[0]!.values).toEqual([35, 51, 28]);
+  });
+
+  test('selecting a chart on another slide clears rejected drafts', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    type(screen.getByRole('textbox', { name: 'Plan, South' }), 'many');
+    act(() => editor.goToSlide(1));
+    selectChart(editor);
+    expect(document.querySelector('input[aria-invalid="true"]')).toBe(null);
+    expect(
+      screen.getAllByRole('textbox').some((field) => (field as HTMLInputElement).value === 'many')
+    ).toBe(false);
+  });
+
+  test('removing a series clears a rejected name from the next series', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    type(screen.getByRole('textbox', { name: 'Name of series 2' }), 'Plan');
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Remove series Plan' })));
+    const name = screen.getByRole('textbox', { name: 'Name of series 2' }) as HTMLInputElement;
+    expect(name.value).toBe('Forecast');
+    expect(name.getAttribute('aria-invalid')).toBe('false');
+  });
+
   test('a name that the workbook refuses stays in its field with the reason', async () => {
     const editor = await mount(<SidePanel tab="chart" />);
     selectChart(editor);

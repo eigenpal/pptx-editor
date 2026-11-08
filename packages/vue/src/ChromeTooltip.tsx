@@ -1,7 +1,7 @@
 /** @jsxImportSource vue */
 // The chrome tooltip bubble: the Vue twin of the React adapter's `ChromeTooltip.tsx`, after DOCX
 // Editor's `Tooltip`. The editor root mounts one; it shows the `data-pptx-tooltip` label of the
-// control under the pointer, or of the control a keyboard user moved to, after core's delay, with
+// control under the pointer, or immediately on keyboard focus, with
 // a disabled control's reason on its own line. Core's `chrome-tooltip.ts` owns the timing and the
 // position.
 
@@ -37,7 +37,13 @@ export const ChromeTooltip = defineComponent({
       return (
         <Teleport to={s.scope}>
           {/* Visual only: the control's `aria-label` and `aria-describedby` carry the same text. */}
-          <div ref={bubble} class="pptx-tooltip" role="tooltip" aria-hidden="true">
+          <div
+            ref={bubble}
+            class="pptx-tooltip"
+            role="tooltip"
+            aria-hidden="true"
+            data-instant={s.instant || undefined}
+          >
             <span class="pptx-tooltip__label">{s.label}</span>
             {s.reason ? <span class="pptx-tooltip__reason">{s.reason}</span> : null}
           </div>

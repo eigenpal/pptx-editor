@@ -111,6 +111,46 @@ describe('Chart Data tab', () => {
     expect(v).toContain('Enter a number, or leave the cell empty.');
   });
 
+  test('Vue clears rejected drafts after categories and series are removed', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const field = (name: string) =>
+      el.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!;
+    const click = (name: string) =>
+      fireEvent.click(el.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!);
+    fireEvent.input(field('Plan, South'), { target: { value: 'many' } });
+    fireEvent.keyDown(field('Plan, South'), { key: 'Enter' });
+    await flush();
+    click('Remove category North');
+    await flush();
+    expect(field('Plan, East').value).toBe('51');
+    expect(field('Plan, East').getAttribute('aria-invalid')).toBe('false');
+    expect(data(editor).series[0]!.values).toEqual([35, 51, 28]);
+    fireEvent.input(field('Name of series 2'), { target: { value: 'Plan' } });
+    fireEvent.keyDown(field('Name of series 2'), { key: 'Enter' });
+    await flush();
+    click('Remove series Plan');
+    await flush();
+    expect(field('Name of series 2').value).toBe('Forecast');
+    expect(field('Name of series 2').getAttribute('aria-invalid')).toBe('false');
+  });
+
+  test('Vue clears rejected drafts when another chart is selected', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const field = el.querySelector<HTMLInputElement>('input[aria-label="Plan, South"]')!;
+    fireEvent.input(field, { target: { value: 'many' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await flush();
+    expect(field.getAttribute('aria-invalid')).toBe('true');
+    editor.goToSlide(1);
+    const chart = editor.snapshot().shapes!.find((s) => s.name.startsWith('Chart'))!;
+    editor.setSelection({ kind: 'shapes', nodeIds: [chart.nodeId] });
+    await flush();
+    expect(el.querySelector('input[aria-invalid="true"]')).toBe(null);
+    expect([...el.querySelectorAll('input')].some((input) => input.value === 'many')).toBe(false);
+  });
+
   test('Vue applies a field on Enter as one undo step, and adds and removes', async () => {
     const editor = await deck();
     const el = await mountVue(editor);

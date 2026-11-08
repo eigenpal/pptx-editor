@@ -8,6 +8,7 @@
 import { useId, useState } from 'react';
 import {
   chartPaneCommand,
+  chartPaneDraftKey,
   chartValueText,
   nextChartCategoryLabel,
   type ChartData,
@@ -83,6 +84,7 @@ function ChartField({
 /** One series: its name, its values by category, and its removal. */
 function SeriesCard({
   data,
+  draftKey,
   index,
   open,
   disabled,
@@ -91,6 +93,7 @@ function SeriesCard({
   run,
 }: {
   data: ChartData;
+  draftKey: string;
   index: number;
   open: boolean;
   disabled: boolean;
@@ -110,6 +113,7 @@ function SeriesCard({
       <summary className="pptx-chart-pane__summary">{name}</summary>
       <div className="pptx-chart-pane__card-body">
         <ChartField
+          key={draftKey}
           label={t('chartData.seriesName', { number: index + 1 })}
           visibleLabel={t('chartData.name')}
           value={series.name}
@@ -119,7 +123,7 @@ function SeriesCard({
         <div className="pptx-panel__grid">
           {data.categories.map((c, i) => (
             <ChartField
-              key={i}
+              key={`${draftKey}:${i}`}
               label={t('chartData.cellLabel', { series: name, category: c.label })}
               visibleLabel={c.label}
               value={chartValueText(series.values[i])}
@@ -169,6 +173,7 @@ export function ChartDataPane() {
       </div>
     );
   const data = read.data;
+  const draftKey = chartPaneDraftKey(editor!.snapshot(), data);
   const disabled = readOnly || !chart.editable;
   /** Applies one change: null when it applied, else the reason. */
   const apply = (change: ChartPaneChange): string | null => {
@@ -214,6 +219,7 @@ export function ChartDataPane() {
           {data.categories.map((c, i) => (
             <li key={i} className="pptx-chart-pane__row">
               <ChartField
+                key={draftKey}
                 label={t(xy ? 'chartData.xValueLabel' : 'chartData.categoryLabel', {
                   number: i + 1,
                 })}
@@ -254,6 +260,7 @@ export function ChartDataPane() {
           <SeriesCard
             key={j}
             data={data}
+            draftKey={draftKey}
             index={j}
             open={open.has(j)}
             disabled={disabled}
