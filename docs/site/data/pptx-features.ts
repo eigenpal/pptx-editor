@@ -120,7 +120,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Underline styles other than single are approximate. The Font dialog sets the underline color (a:uFill). ${SAVE_CHECKED}`,
+    notes: `Strikethrough uses the strikeout position and thickness of the font, and a double strikethrough draws two bars one thickness apart. Underline styles other than single are approximate. The Font dialog sets the underline color (a:uFill). ${SAVE_CHECKED}`,
   },
   {
     id: 'text.font-family-size',
@@ -210,7 +210,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      "East Asian characters measure and draw with the run's ea font, complex-script characters with its cs font, and symbol characters with its sym font. A theme with an empty ea or cs font uses its script font (a:font) for the run's language (lang, altLang). Chinese and Japanese text breaks between characters and Korean text at spaces. eaLnBrk, latinLnBrk, hangingPunct, the presentation kinsoku lists (p:kinsoku), and justified and distributed East Asian lines follow the reference rules. A missing East Asian font falls back to a host CJK face, such as Noto Sans CJK JP from @docx-editor.dev/fonts-cjk, and a character that the run's face lacks uses another loaded face. Right-to-left text is approximate. Bidi line layout is not built, so the caret moves in logical order in right-to-left text. Caret steps keep combining marks and clusters whole, and word steps use dictionary words in Thai, Lao, Khmer, Myanmar, and CJK text.",
+      "East Asian characters measure and draw with the run's ea font, complex-script characters with its cs font, and symbol characters with its sym font. A theme with an empty ea or cs font uses its script font (a:font) for the run's language (lang, altLang). Chinese and Japanese text breaks between characters and Korean text at spaces. eaLnBrk, latinLnBrk, hangingPunct, the presentation kinsoku lists (p:kinsoku), and justified and distributed East Asian lines follow the reference rules. A missing East Asian font falls back to a host CJK face, such as Noto Sans CJK JP from @docx-editor.dev/fonts-cjk, and a character that the run's face lacks uses another loaded face. Right-to-left and mixed-direction text lays out with the Unicode Bidirectional Algorithm in the editor, in warped text, and in the PDF export (approximate). Arabic letters join in the editor's paint but not in the PDF export. In right-to-left and mixed-direction text, the caret, the arrow keys, Cmd with an arrow, and clicks work on screen, Home and End go to the line's start and end in reading order, and a selection shows one highlight for each part of the line it covers. Line breaks never split a grapheme cluster. Caret steps keep combining marks and clusters whole, and word steps use dictionary words in Thai, Lao, Khmer, Myanmar, and CJK text.",
     docsLink: '/docs/guides/east-asian-text',
   },
   {
@@ -320,7 +320,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). The dialog sets a picture bullet from a PNG, JPEG, or GIF file. A picture bullet draws 0.7 times the bullet size high, on the baseline. A missing or unreadable bullet picture draws no bullet.',
+      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Every a:buAutoNum scheme draws its own counter and punctuation, and a number in Arabic, Hebrew, or East Asian characters draws in the font of the run for that script (approximate past the measured items). The dialog sets a picture bullet from a PNG, JPEG, or GIF file. A picture bullet draws 0.7 times the bullet size high, on the baseline. A missing or unreadable bullet picture draws no bullet.',
   },
 
   // --- Shapes, groups & connectors -------------------------------------

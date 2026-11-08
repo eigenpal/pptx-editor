@@ -13,7 +13,7 @@ import type {
   ResolvedTextBody,
 } from '../cascade/index.ts';
 import type { LayoutItem, Matrix } from './slide-layout.ts';
-import { isExactScheme, isSymbolFont } from './text/autonumber.ts';
+import { AutonumberCounters, isExactScheme, isSymbolFont } from './text/autonumber.ts';
 import { hasCharacters } from './text/text-layout.ts';
 import { isIdeographic } from './text/line-break.ts';
 
@@ -186,8 +186,10 @@ class Collector {
     if (bp.anchorCtr || bp.anchor === 'just' || bp.anchor === 'dist') this.add('anchoring');
     if (bp.warp) this.add('text-warp');
 
+    const counters = new AutonumberCounters();
     for (const p of body.paragraphs) {
       if (p.runs.length === 0) continue;
+      const item = counters.next(p);
       // The line rules are measured on Latin text in the reference fonts; other scripts,
       // vertical text, substituted faces, and overflowing anchored text are not (the
       // fidelity page, "Line model").
@@ -195,7 +197,7 @@ class Collector {
       if (p.rtl) this.add('rtl');
       if (p.align === 'justLow' || p.align === 'thaiDist') this.add('anchoring');
       if (p.bullet && (p.align === 'ctr' || p.align === 'r')) this.add('aligned-bullets');
-      if (p.bullet?.type === 'autonum' && !isExactScheme(p.bullet.scheme))
+      if (p.bullet?.type === 'autonum' && !isExactScheme(p.bullet.scheme, item))
         this.add('numbering-schemes');
       if (p.bullet?.type === 'char' && isSymbolFont(p.bullet.font ?? ''))
         this.add('symbol-bullets');
