@@ -75,6 +75,15 @@ describe('math ink', () => {
     expect(mathInkOf(measurer, face, 0x4e2d)).toEqual({ lo: -0.4, hi: 1.2, fromFontBox: true });
     expect(mathTextInk(measurer, face, 'x中').fromFontBox).toBe(true);
   });
+
+  test('faces that share an id keep their own boxes for a glyph with no outline', () => {
+    const fixed = createFixedMeasurer();
+    const measurer: TextMeasurer = { ...fixed, glyphOutline: () => undefined };
+    const face = fixed.resolve({ family: 'Shared', bold: false, italic: false });
+    const tall: ResolvedFace = { ...face, metrics: { ...face.metrics, ascent: 1.5 } };
+    expect(mathInkOf(measurer, face, 0x78).hi).toBe(face.metrics.ascent);
+    expect(mathInkOf(measurer, tall, 0x78).hi).toBe(1.5);
+  });
 });
 
 describe('math line extent', () => {
@@ -129,6 +138,9 @@ describe('script shifts', () => {
     expect(scriptShifts(part(0.5), undefined, part(0.7), EM, false).v / EM).toBeCloseTo(
       0.7 - 760 / 2048
     );
+    // A font box that stands in for missing ink does not lower the subscript.
+    const tofu = { ...part(1.2), fromFontBox: true as const };
+    expect(scriptShifts(part(0.5), undefined, tofu, EM, false).v / EM).toBeCloseTo(0.2);
   });
 
   test('scripts on one base keep an ink gap: the superscript rises first, then the subscript drops', () => {

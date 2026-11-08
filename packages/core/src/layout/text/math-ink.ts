@@ -67,7 +67,10 @@ function outlineExtent(
 export function mathInkOf(measurer: TextMeasurer, face: ResolvedFace, cp: number): MathInk {
   let cache = inkCache.get(measurer);
   if (!cache) inkCache.set(measurer, (cache = new Map()));
-  const key = `${face.id}\u0000${cp}`;
+  // A substituted face shares the id of its substitute but keeps its own metrics, which a
+  // glyph with no outline takes: the metrics are part of the key.
+  const { ascent, descent } = face.metrics;
+  const key = `${face.id}\u0000${ascent}\u0000${descent}\u0000${cp}`;
   const hit = cache.get(key);
   if (hit) return hit;
   let out: MathInk;

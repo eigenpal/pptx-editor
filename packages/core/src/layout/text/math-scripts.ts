@@ -38,6 +38,8 @@ const SUBSCRIPT_SHIFT_DOWN = 0.2;
 interface ScriptPart {
   readonly asc: number;
   readonly desc: number;
+  /** Some glyph has no outline, so the box of its face stands in for its ink. */
+  readonly fromFontBox?: true;
 }
 
 /**
@@ -60,8 +62,10 @@ export function scriptShifts(
       )
     : 0;
   // The subscript baseline drops a fifth of an em, and lower when the top of its ink would
-  // rise past a fixed height, as a tall subscript does.
-  let v = sub ? Math.max(SUBSCRIPT_SHIFT_DOWN * em, sub.asc - SUBSCRIPT_TOP_MAX * em) : 0;
+  // rise past a fixed height, as a tall subscript does. A font box that stands in for missing
+  // glyph ink reaches far above the glyphs, so it says nothing about the limit.
+  const inkTop = sub && !sub.fromFontBox ? sub.asc : 0;
+  let v = sub ? Math.max(SUBSCRIPT_SHIFT_DOWN * em, inkTop - SUBSCRIPT_TOP_MAX * em) : 0;
   if (sup && sub) {
     // Keep an ink gap between the scripts. The superscript rises first, up to a limit, and the
     // subscript drops for the rest.

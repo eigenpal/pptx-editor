@@ -139,6 +139,8 @@ interface Box {
   desc: number;
   glyphs: MathGlyphs[];
   marks: MathMark[];
+  /** Some glyph has no outline, so the box of its face stands in for its ink. */
+  fromFontBox?: true;
 }
 
 interface Item {
@@ -173,6 +175,7 @@ function place(into: Box, box: Box, dx: number, dy: number): void {
   for (const m of box.marks) into.marks.push({ ...m, commands: moveCommands(m.commands, dx, dy) });
   into.asc = Math.max(into.asc, box.asc + dy);
   into.desc = Math.max(into.desc, box.desc - dy);
+  if (box.fromFontBox) into.fromFontBox = true;
 }
 
 const nextLevel = (level: 0 | 1 | 2): 0 | 1 | 2 => (level === 0 ? 1 : 2);
@@ -238,10 +241,12 @@ function textBox(text: string, face: ResolvedFace, size: number, props: RunProps
   for (let i = 0; i < adv.length; i += 1) x.push(x[i]! + adv[i]! * em);
   let lo = 0;
   let hi = 0;
+  let fromFontBox = false;
   for (const ch of text) {
     const ink = mathInkOf(env.measurer, face, ch.codePointAt(0) ?? 32);
     lo = Math.min(lo, ink.lo);
     hi = Math.max(hi, ink.hi);
+    fromFontBox ||= ink.fromFontBox === true;
   }
   // A character outside the BMP (a math alphanumeric) is a piece of its own: an SVG `x` list
   // positions each character, not each UTF-16 unit.
@@ -261,7 +266,9 @@ function textBox(text: string, face: ResolvedFace, size: number, props: RunProps
     });
     i = j;
   }
-  return { w: x[x.length - 1]!, asc: hi * em, desc: -lo * em, glyphs, marks: [] };
+  const out: Box = { w: x[x.length - 1]!, asc: hi * em, desc: -lo * em, glyphs, marks: [] };
+  if (fromFontBox) out.fromFontBox = true;
+  return out;
 }
 
 /** Run properties for glyphs and marks: no text decoration, which math does not draw. */
