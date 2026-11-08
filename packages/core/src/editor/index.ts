@@ -489,6 +489,8 @@ export {
 } from './picture-fields.ts';
 export {
   chartPaneCommand,
+  chartPaneDraftKey,
+  chartPaneDraftContinues,
   chartPaneNumericX,
   chartValueText,
   nextChartCategoryLabel,

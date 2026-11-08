@@ -3,7 +3,7 @@
 // remove, sends. The React and Vue panes (`ChartDataPane.tsx`) render from these, so both check
 // the same input with the same keys.
 
-import type { ChartData, EditorCommand } from '../contracts/index.ts';
+import type { ChartData, EditorCommand, EditorSnapshot } from '../contracts/index.ts';
 import {
   MAX_CHART_LABEL,
   MAX_CHART_POINTS,
@@ -11,6 +11,37 @@ import {
 } from '../automation/commands/chart-data-model.ts';
 
 export { MAX_CHART_POINTS, MAX_CHART_SERIES };
+
+/** The chart identity and grid labels used to guard local field drafts. @internal */
+export function chartPaneDraftKey(snapshot: EditorSnapshot, data: ChartData): string {
+  return JSON.stringify([
+    snapshot.currentSlide,
+    snapshot.chart?.nodeId,
+    data.kind,
+    data.categories.map((category) => category.label),
+    data.series.map((series) => series.name),
+  ]);
+}
+
+/**
+ * Keep drafts when the chart and existing grid labels stay in place, including appends.
+ * Source indexes are renumbered on read, so other topology changes clear drafts. @internal
+ */
+export function chartPaneDraftContinues(previous: string, next: string): boolean {
+  if (previous === next) return true;
+  type Scope = [number, string | null, string, string[], string[]];
+  const before = JSON.parse(previous) as Scope;
+  const after = JSON.parse(next) as Scope;
+  return (
+    before[0] === after[0] &&
+    before[1] === after[1] &&
+    before[2] === after[2] &&
+    before[3].length <= after[3].length &&
+    before[4].length <= after[4].length &&
+    before[3].every((label, index) => label === after[3][index]) &&
+    before[4].every((name, index) => name === after[4][index])
+  );
+}
 
 /** One change of the Chart Data tab: a committed field, or an add or a remove. @public */
 export type ChartPaneChange =

@@ -8,7 +8,11 @@ import { join } from 'node:path';
 import { createElement } from 'react';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
-import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import {
+  createPptxEditor,
+  panelHistoryKey,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import { PptxEditorContext } from '../../react/src/context.ts';
 import { ChartDataPane as RChartDataPane } from '../../react/src/ChartDataPane.tsx';
 import { ChartDataPane } from '../src/ChartDataPane.tsx';
@@ -109,6 +113,123 @@ describe('Chart Data tab', () => {
     const v = await refuse(await mountVue(await deck()));
     expect(v).toEqual(r);
     expect(v).toContain('Enter a number, or leave the cell empty.');
+  });
+
+  test('Vue clears rejected drafts after categories and series are removed', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const field = (name: string) =>
+      el.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!;
+    const click = (name: string) =>
+      fireEvent.click(el.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!);
+    fireEvent.input(field('Plan, South'), { target: { value: 'many' } });
+    fireEvent.keyDown(field('Plan, South'), { key: 'Enter' });
+    await flush();
+    click('Remove category North');
+    await flush();
+    expect(field('Plan, East').value).toBe('51');
+    expect(field('Plan, East').getAttribute('aria-invalid')).toBe('false');
+    expect(data(editor).series[0]!.values).toEqual([35, 51, 28]);
+    fireEvent.input(field('Name of series 2'), { target: { value: 'Plan' } });
+    fireEvent.keyDown(field('Name of series 2'), { key: 'Enter' });
+    await flush();
+    click('Remove series Plan');
+    await flush();
+    expect(field('Name of series 2').value).toBe('Forecast');
+    expect(field('Name of series 2').getAttribute('aria-invalid')).toBe('false');
+  });
+
+  test('Vue clears rejected drafts when another chart is selected', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const field = el.querySelector<HTMLInputElement>('input[aria-label="Plan, South"]')!;
+    fireEvent.input(field, { target: { value: 'many' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await flush();
+    expect(field.getAttribute('aria-invalid')).toBe('true');
+    editor.goToSlide(1);
+    const chart = editor.snapshot().shapes!.find((s) => s.name.startsWith('Chart'))!;
+    editor.setSelection({ kind: 'shapes', nodeIds: [chart.nodeId] });
+    await flush();
+    expect(el.querySelector('input[aria-invalid="true"]')).toBe(null);
+    expect([...el.querySelectorAll('input')].some((input) => input.value === 'many')).toBe(false);
+  });
+
+  test('Vue keeps input focus through undo and redo of a category append', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const before = data(editor);
+    editor.exec({
+      type: 'setChartData',
+      data: {
+        ...before,
+        categories: [...before.categories, { label: 'Added' }],
+        series: before.series.map((series) => ({ ...series, values: [...series.values, null] })),
+      },
+    });
+    await flush();
+    const field = el.querySelector<HTMLInputElement>('input[aria-label="Category 1"]')!;
+    field.focus();
+    for (const [key, count] of [
+      ['z', 4],
+      ['y', 5],
+    ] as const) {
+      panelHistoryKey(
+        {
+          key,
+          ctrlKey: true,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+          target: field,
+          preventDefault() {},
+        },
+        editor
+      );
+      await flush();
+      expect(data(editor).categories.length).toBe(count);
+      expect(document.activeElement).toBe(field);
+    }
+  });
+
+  test('Vue preserves drafts on appends and clears them on an equal-size chart switch', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const original = editor.snapshot().chart!.nodeId;
+    editor.exec({ type: 'duplicate' });
+    await flush();
+    expect(editor.snapshot().chart!.nodeId).not.toBe(original);
+    const field = el.querySelector<HTMLInputElement>('input[aria-label="Plan, East"]')!;
+    field.focus();
+    fireEvent.input(field, { target: { value: '77' } });
+    await flush();
+    const before = data(editor);
+    editor.exec({
+      type: 'setChartData',
+      data: {
+        ...before,
+        categories: [...before.categories, { label: 'Added' }],
+        series: [
+          ...before.series.map((series) => ({ ...series, values: [...series.values, null] })),
+          { name: 'Added series', values: [1, 2, 3, 4, 5] },
+        ],
+      },
+    });
+    await flush();
+    expect(field.value).toBe('77');
+    expect(document.activeElement).toBe(field);
+    // Restore the same grid before checking chart identity independently of its size.
+    editor.exec({ type: 'undo' });
+    await flush();
+    fireEvent.input(field, { target: { value: 'many' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await flush();
+    editor.setSelection({ kind: 'shapes', nodeIds: [original] });
+    await flush();
+    expect(el.querySelector('input[aria-label="Plan, East"]')).toBe(field);
+    expect(field.value).toBe('51');
+    expect(field.getAttribute('aria-invalid')).toBe('false');
+    expect(document.activeElement).toBe(field);
   });
 
   test('Vue applies a field on Enter as one undo step, and adds and removes', async () => {

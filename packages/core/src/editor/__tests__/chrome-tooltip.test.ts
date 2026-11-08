@@ -104,6 +104,7 @@ describe('listenChromeTooltips', () => {
     expect(last()).toBe(null);
     await wait(TOOLTIP_DELAY_MS / 2 + 30);
     expect(last()?.label).toBe('Bold (Ctrl+B)');
+    expect(last()?.instant).toBe(false);
     expect(last()?.reason).toBe(null);
     expect(last()?.target).toBe(bold);
     expect(last()?.scope).toBe(scope);
@@ -120,6 +121,7 @@ describe('listenChromeTooltips', () => {
     over(plain);
     over(bold);
     expect(last()?.label).toBe('Bold (Ctrl+B)');
+    expect(last()?.instant).toBe(true);
     over(plain);
     await wait(TOOLTIP_SKIP_DELAY_MS + 30);
     over(undo);
@@ -146,12 +148,12 @@ describe('listenChromeTooltips', () => {
     const { bold, undo, last } = setup();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     bold.focus();
-    await wait(TOOLTIP_DELAY_MS + 30);
+    expect(last()?.instant).toBe(true);
     expect(last()?.target).toBe(bold);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(last()).toBe(null);
     undo.focus();
-    await wait(TOOLTIP_DELAY_MS + 30);
+    expect(last()?.instant).toBe(true);
     expect(last()?.target).toBe(undo);
     undo.blur();
     expect(last()).toBe(null);
@@ -162,11 +164,55 @@ describe('listenChromeTooltips', () => {
     expect(last()).toBe(null);
   });
 
+  test('Escape dismissal resets after keyboard focus leaves and returns', () => {
+    const { bold, undo, last } = setup();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    bold.focus();
+    expect(last()?.target).toBe(bold);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(last()).toBe(null);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    undo.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })
+    );
+    bold.focus();
+    expect(last()?.target).toBe(bold);
+    expect(last()?.instant).toBe(true);
+  });
+
   test('a control with its menu open shows no tooltip', async () => {
     const { bold, last } = setup();
     bold.setAttribute('aria-expanded', 'true');
     over(bold);
     await wait(TOOLTIP_DELAY_MS + 30);
+    expect(last()).toBe(null);
+  });
+
+  test('keyboard focus takes over a pending hover without waiting or later reopening', async () => {
+    const { bold, last } = setup();
+    over(bold);
+    expect(last()).toBe(null);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    bold.focus();
+    expect(last()?.target).toBe(bold);
+    expect(last()?.instant).toBe(true);
+    bold.blur();
+    expect(last()).toBe(null);
+    await wait(TOOLTIP_DELAY_MS + 30);
+    expect(last()).toBe(null);
+  });
+
+  test('keyboard focus takes over a visible hover and closes it on blur', async () => {
+    const { bold, last } = setup();
+    over(bold);
+    await wait(TOOLTIP_DELAY_MS + 30);
+    expect(last()?.instant).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    bold.focus();
+    expect(last()?.target).toBe(bold);
+    expect(last()?.instant).toBe(true);
+    bold.blur();
     expect(last()).toBe(null);
   });
 

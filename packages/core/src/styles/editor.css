@@ -3942,6 +3942,9 @@ legend.pptx-dialog__label {
   pointer-events: none;
   animation: pptx-tooltip-in 0.12s ease-out both;
 }
+.pptx-tooltip[data-instant] {
+  animation: none;
+}
 .pptx-tooltip:not([data-side]) {
   visibility: hidden;
 }

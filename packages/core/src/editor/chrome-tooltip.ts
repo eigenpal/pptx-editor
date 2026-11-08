@@ -1,5 +1,6 @@
 // Chrome tooltips, after DOCX Editor's `Tooltip` (packages/react/src/components/ui/Tooltip.tsx): a
-// small bubble under a control after a 400 ms hover delay, in place of the native `title`. A
+// small bubble under a control after a 400 ms hover delay, in place of the native `title`.
+// Keyboard focus shows the bubble immediately without entry motion. A
 // control names its tooltip with `data-pptx-tooltip` (and `data-pptx-tooltip-reason` when it is
 // disabled for a reason); one listener per document finds the control under the pointer or the
 // keyboard focus. The React and Vue `ChromeTooltip` parts render the bubble with the same markup;
@@ -50,6 +51,8 @@ export function tooltipAttributes(
 /** The tooltip on screen: the control, its text, and the editor scope it renders in. @internal */
 export interface ChromeTooltipState {
   readonly target: HTMLElement;
+  /** Skip entry motion for keyboard focus and movement between nearby controls. */
+  readonly instant: boolean;
   readonly label: string;
   readonly reason: string | null;
   /** The nearest `.pptx-editor`, so the bubble inherits the theme tokens and dark mode. */
@@ -115,7 +118,7 @@ function createController(doc: Document): Controller {
   let timer: number | null = null;
   let pending: HTMLElement | null = null;
   let shown: HTMLElement | null = null;
-  // The control a click or Escape closed: it opens again only after the pointer leaves it.
+  // The control a click or Escape closed: it opens again after the pointer or keyboard focus leaves it.
   let suppressed: HTMLElement | null = null;
   let source: 'pointer' | 'focus' = 'pointer';
   let closedAt = -Infinity;
@@ -125,12 +128,13 @@ function createController(doc: Document): Controller {
   const controller: Controller = { listeners: [], state: null, dispose: () => {} };
   const notify = (): void => controller.listeners[0]?.(controller.state);
 
-  const read = (el: HTMLElement): ChromeTooltipState | null => {
+  const read = (el: HTMLElement, instant: boolean): ChromeTooltipState | null => {
     const label = el.getAttribute(TOOLTIP_LABEL_ATTRIBUTE);
     // A control whose menu is open shows the menu, not its tooltip, as DOCX Editor's pickers.
     if (!label || !el.isConnected || el.getAttribute('aria-expanded') === 'true') return null;
     return {
       target: el,
+      instant,
       label,
       reason: el.getAttribute(TOOLTIP_REASON_ATTRIBUTE) || null,
       scope: popoverScope(el),
@@ -149,19 +153,26 @@ function createController(doc: Document): Controller {
     closedAt = Date.now();
     notify();
   };
-  const show = (el: HTMLElement): void => {
+  const show = (el: HTMLElement, instant = false): void => {
     cancel();
-    const state = read(el);
+    const state = read(el, instant);
     shown = state ? el : null;
     controller.state = state;
     notify();
   };
   const request = (el: HTMLElement, from: 'pointer' | 'focus'): void => {
-    if (el === suppressed || el === shown || el === pending) return;
+    if (el === suppressed) return;
+    // Keyboard focus takes over a pending or visible pointer tooltip immediately.
+    // Its blur must also dismiss the bubble after this input-mode change.
+    if (from === 'focus' && (el === shown || el === pending)) {
+      source = from;
+      return show(el, true);
+    }
+    if (el === shown || el === pending) return;
     const warm = shown !== null || Date.now() - closedAt < TOOLTIP_SKIP_DELAY_MS;
     hide();
     source = from;
-    if (warm) return show(el);
+    if (warm || from === 'focus') return show(el, true);
     pending = el;
     timer = win.setTimeout(() => show(el), TOOLTIP_DELAY_MS);
   };
@@ -184,6 +195,7 @@ function createController(doc: Document): Controller {
   };
   const onFocusIn = (e: FocusEvent): void => {
     const el = tooltipTarget(e.target);
+    if (keyboard && el !== suppressed) suppressed = null;
     if (el && keyboard) request(el, 'focus');
     else if (source === 'focus') hide();
   };

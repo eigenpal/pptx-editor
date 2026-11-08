@@ -165,6 +165,34 @@ describe('the placeholder chrome', () => {
     expect(chrome(e).c.elements(doc, layoutOf(e), PX)).toEqual([]);
   });
 
+  test('insert buttons stay out of the way while another object is selected or edited', async () => {
+    const e = await open(title() + content);
+    const titleId = tree(e)[0]!.id;
+    const contentId = tree(e)[1]!.id;
+    const { c } = chrome(e);
+    for (const selection of [
+      { kind: 'shapes', nodeIds: [titleId] },
+      { kind: 'shapes', nodeIds: [titleId, contentId] },
+      {
+        kind: 'text',
+        nodeId: titleId,
+        anchor: { paragraph: 0, offset: 0 },
+        focus: { paragraph: 0, offset: 0 },
+      },
+    ] as const) {
+      e.setSelection(selection);
+      const parts = c.elements(doc, layoutOf(e), PX);
+      expect(buttons(parts)).toEqual([]);
+      expect(
+        parts.some((p) => p.getAttribute('class') === 'pptx-surface__placeholder-outline')
+      ).toBe(true);
+    }
+    e.setSelection({ kind: 'none' });
+    expect(buttons(c.elements(doc, layoutOf(e), PX))).toEqual(['table', 'picture']);
+    e.setSelection({ kind: 'shapes', nodeIds: [contentId] });
+    expect(buttons(c.elements(doc, layoutOf(e), PX))).toEqual(['table', 'picture']);
+  });
+
   test('the table button fills the placeholder; the picture button asks for a file', async () => {
     const e = await open(title() + content);
     const id = tree(e)[1]!.id;

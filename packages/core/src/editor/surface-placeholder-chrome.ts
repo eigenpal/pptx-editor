@@ -94,6 +94,16 @@ export class PlaceholderChrome {
       box.setAttribute('stroke-width', String(px));
       box.setAttribute('stroke-dasharray', `${px} ${2 * px}`);
       parts.push(box);
+      // Insert controls must not cover another selected object or its text caret.
+      // Keep the outline so the empty placeholder remains discoverable.
+      if (
+        sel.kind !== 'none' &&
+        !(
+          sel.kind === 'shapes' &&
+          (sel.nodeIds.length === 0 || (sel.nodeIds.length === 1 && sel.nodeIds[0] === id))
+        )
+      )
+        continue;
       // The buttons show where the command fills this very placeholder: the same test.
       const fillable = this.host.fillableType?.(id);
       const inserts: Insert[] = [];
