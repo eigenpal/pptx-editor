@@ -181,7 +181,7 @@ Each deck prints one line. The gate summary says what to do next. The report is 
 bun run fidelity --update-gaps
 ```
 
-A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, or in a pull request that changes no engine or harness source. A limit can go away only with its reason in `RETIRED_LIMITS`.
+A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, in a pull request that changes no engine or harness source, or in a pull request whose source changes are only the comparison files (`COMPARISON_FILES` in `scripts/fidelity/thresholds.ts`), harness tests, and documentation. Such a change prints the same pages and checks them in another way, so the failures it finds were there before. It may not check fewer lines, and it changes no engine code. The check reads `COMPARISON_FILES` from the base branch. A limit can go away only with its reason in `RETIRED_LIMITS`.
 
 ### Add a fixture
 

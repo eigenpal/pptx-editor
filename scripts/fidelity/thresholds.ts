@@ -85,6 +85,17 @@ export const COMPARISON_B = {
 export const PAGE_SIZE_TOLERANCE_PT = 0.625;
 
 /**
+ * The harness files that only read and compare the two PDFs. A pull request whose source changes
+ * are only these files, harness tests, and documentation paints and prints the same pages, so it
+ * may record the failures that its checks find (`check-known-gaps.ts`). It may not check fewer
+ * lines. The ratchet reads this list from the base branch, so a change cannot widen it for itself.
+ */
+export const COMPARISON_FILES: readonly string[] = [
+  'scripts/fidelity/compare.ts',
+  'scripts/fidelity/pdf.ts',
+];
+
+/**
  * Limits that the harness no longer has, each with the reason. `check-known-gaps.ts` refuses a
  * limit that goes away unless it is listed here, so no limit goes away unseen.
  */

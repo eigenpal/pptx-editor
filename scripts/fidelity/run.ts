@@ -180,7 +180,7 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     ? 'The list was measured with other tools (TOOLS above): record it in a pull request that changes only the tools, with bun run fidelity --update-gaps --accept-worse.'
     : '';
   const step = refused
-    ? 'Nothing was written: the run has new entries or kinds (LOOSER, NEW above). Fix the regression. Only a new fixture or a pull request that changes no engine or harness source may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
+    ? 'Nothing was written: the run has new entries or kinds (LOOSER, NEW above). Fix the regression. Only a new fixture, a pull request that changes no engine or harness source, or a pull request that changes only the comparison (COMPARISON_FILES in thresholds.ts) may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
     : args.updateGaps
       ? 'FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a new kind is a regression to fix, not to record.'
       : fixes.length
