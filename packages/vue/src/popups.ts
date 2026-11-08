@@ -6,7 +6,7 @@
 // opener on close, and a dialog closes when the editor opens another document. DOCX Editor commit
 // adf0e178.
 
-import { markReadingPopup } from '@pptx-editor.dev/core/editor';
+import { findViewRefusal, markReadingPopup } from '@pptx-editor.dev/core/editor';
 import {
   computed,
   defineComponent,
@@ -270,8 +270,9 @@ function overlayReason(
     return popups?.hyperlink === false && !overlays.linkViews?.value ? 'link.unavailable' : null;
   if (key !== 'find') return null;
   if (popups?.find === false) return 'find.unavailable';
-  // Find shows its matches on the slide canvas, which the slide sorter does not show.
-  if (editor?.snapshot().presentationView === 'slideSorter') return 'disabled.findSorter';
+  // Find shows its matches on the slide canvas: not in the slide sorter or master view.
+  const refused = findViewRefusal(editor?.snapshot().presentationView);
+  if (refused) return refused;
   // Find needs a find bar to open: nothing answers the request without one.
   return overlays.findBars.value === 0 ? 'find.noBar' : null;
 }

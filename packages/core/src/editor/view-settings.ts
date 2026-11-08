@@ -59,7 +59,7 @@ export type ViewCommand = Extract<
   }
 >;
 
-const VIEWS: ReadonlySet<PresentationView> = new Set(['normal', 'slideSorter']);
+const VIEWS: ReadonlySet<PresentationView> = new Set(['normal', 'slideSorter', 'slideMaster']);
 const NONE: readonly string[] = [];
 
 export function isViewCommand(command: EditorCommand): command is ViewCommand {

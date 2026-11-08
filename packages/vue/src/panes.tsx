@@ -6,6 +6,7 @@
 
 import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 import { createRailItemMemo } from './rail-memo.ts';
+import { MasterRail } from './MasterRail.tsx';
 import {
   computed,
   defineComponent,
@@ -542,7 +543,21 @@ const SlideRailRoot = defineComponent({
         />
       ));
     };
+    // The slide master view lists masters and layouts instead of slides.
+    const masterView = useEditorState((s) => s.presentationView === 'slideMaster');
     return () => {
+      // A host that closes the rail (`open` false) keeps it closed in this view too.
+      if (masterView.value && props.open === false) return null;
+      if (masterView.value)
+        return (
+          <MasterRail
+            {...restAttrs(attrs)}
+            className={[attrs.class, props.className].filter(Boolean).join(' ')}
+            paneWidth={props.paneWidth}
+            orientation={props.orientation}
+            railStyle={[attrs.style as StyleValue, props.style]}
+          />
+        );
       const toggle = props.toggle !== false;
       const open = pane.open.value;
       const className = ['pptx-rail', attrs.class, props.className];

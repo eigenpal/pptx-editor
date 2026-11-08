@@ -1034,7 +1034,6 @@ export interface EditorSnapshot extends CommentSnapshot {
     readonly canUndo: boolean;
     readonly chart?: SelectedChartState | null;
     readonly collapsedSections?: readonly string[];
-    // (undocumented)
     readonly currentSlide: number;
     readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
@@ -1507,7 +1506,7 @@ export type PictureCommand =
 };
 
 // @public
-export type PresentationView = 'normal' | 'slideSorter';
+export type PresentationView = 'normal' | 'slideSorter' | 'slideMaster';
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
@@ -1815,7 +1814,11 @@ export interface SlideSummary {
     readonly index: number;
     readonly key: string;
     readonly layoutId?: string;
+    readonly masterId?: string;
+    readonly name?: string;
     readonly pending?: true;
+    readonly template?: 'master' | 'layout';
+    readonly usedBy?: number;
 }
 
 // @public

@@ -26,7 +26,7 @@ import {
   type VNode,
   type VNodeChild,
 } from 'vue';
-import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
+import { currentSlideSummary, registerCommentDraft } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useReviewAuthors } from '@pptx-editor.dev/vue';
 import {
   commentTarget,
@@ -193,7 +193,7 @@ const ReviewRoot = defineComponent({
     const t = useReviewLabel();
     const label = (key: Parameters<typeof t>[0]): string => props.t?.(key) ?? t(key);
     const noModule = useEditorState((s) => s.status === 'ready' && s.comments == null);
-    const slide = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+    const slide = useEditorState((s) => currentSlideSummary(s)?.id ?? '');
     const drafting = ref(false);
     // The element a draft from a menu points at: the one the right-click selected. A deleted
     // element no longer counts: the draft then points at the selection or the slide.

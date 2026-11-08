@@ -184,6 +184,7 @@ export const MENU_NAMED_PARTS = {
   Replace: row('find.replace'),
   NormalView: row('view.presentationView', 'normal'),
   SlideSorterView: row('view.presentationView', 'slideSorter'),
+  SlideMasterView: row('view.presentationView', 'slideMaster'),
   SmartGuides: row('view.smartGuides'),
   NewSlide: row('slide.add'),
   TextBox: row('insert.textBox'),

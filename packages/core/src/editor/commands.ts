@@ -71,6 +71,7 @@ import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
 import { isViewCommand } from './view-settings.ts';
 import { compileObjectCommand, isObjectCommand } from './object-commands.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
+import { slideOnlyCommand } from './master-view.ts';
 import { compileShapeCommand, isShapeCommand } from './shape-command-table.ts';
 import { compileTextFormatCommand, isTextFormatCommand } from './text-format-commands.ts';
 import {
@@ -105,7 +106,6 @@ import {
   deleteSlide,
   duplicateSlide,
   moveSlide,
-  setSlideBackground,
 } from '../automation/commands/slide-commands.ts';
 import {
   aSpec,
@@ -138,6 +138,8 @@ export interface CommandContext {
   readonly readOnly: boolean;
   /** The Slide Sorter view is on: it shows no slide to put a new shape on. */
   readonly slideSorter?: boolean;
+  /** The slide master view is on: commands that act on slides are off (`master-view.ts`). */
+  readonly slideMaster?: boolean;
   /**
    * Only find out whether the command can run (`Editor.can`): skip the autofit re-measurement,
    * which adds ops but never refuses. The ops of a probe are never committed.
@@ -387,6 +389,9 @@ export function compile(
   // In the Slide Sorter, the Insert commands are off: a new shape waits for the Normal view.
   if (ctx.slideSorter && CANVAS_INSERTS.has(command.type))
     throw new CommandRefusal('disabled.slideSorter');
+  const slideEdit = PRESENTATION_EDITS.has(command.type) || isSlideCommand(command);
+  if (ctx.slideMaster && slideOnlyCommand(command, slideEdit))
+    throw new CommandRefusal('disabled.slideMaster');
   const batch = ctx.probe ? ctx.session.probeBatch(ctx.base) : ctx.session.batch(ctx.base);
   if (PRESENTATION_EDITS.has(command.type)) normalizePresentation(batch);
   if (isSlideCommand(command)) return { batch, effect: compileSlideCommand(ctx, batch, command) };
@@ -779,11 +784,6 @@ export function compile(
     case 'setLineEnds': {
       setLineEnds(batch, slidePart(ctx), selectedIds(ctx.selection), command.head, command.tail);
       return { batch, effect: { label: 'lineEnds' } };
-    }
-    case 'setSlideBackground': {
-      const slides = command.allSlides ? info.slides.map((_, i) => i) : [ctx.slide];
-      for (const i of slides) setSlideBackground(batch, i, command.background);
-      return { batch, effect: { label: 'slideBackground' } };
     }
     case 'insertLine': {
       const id = insertLine(batch, slidePart(ctx), command.kind, slideW, slideH);

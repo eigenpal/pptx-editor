@@ -51,6 +51,7 @@ import {
   translateKeyOrText,
   type HyperlinkPopupController,
   type HyperlinkPopupState,
+  deckSlideCount,
 } from '@pptx-editor.dev/core/editor';
 import type { CustomShowSummary } from '@pptx-editor.dev/core/contracts';
 import { Icon, Popover } from './chrome.tsx';
@@ -406,7 +407,9 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
   const ctx = useContext(HyperlinkPopupContext);
   const { state, setUrl, commitEdit } = useHyperlinkPopup();
   const { t } = useTranslation();
-  const slides = useEditorState((s) => s.slides.length);
+  // The deck's slides, also in the slide master view, whose rail lists layouts.
+  const editor = usePptxEditor();
+  const slides = useEditorState(() => deckSlideCount(editor));
   const shows = useEditorState((s) => s.customShows ?? NO_SHOWS);
   const [kind, setKind] = useState<LinkKind>(() => linkKindOf(state.draft));
   // The kinds stay as they opened: Custom show only for a deck with one, or a link to one.

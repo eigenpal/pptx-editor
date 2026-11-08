@@ -1269,6 +1269,163 @@
 .pptx-rail__thumb[data-pending] {
   background: var(--doc-bg-hover);
 }
+/* The slide master view's rail: the master first, its layouts under it on a guide line, each
+   with its name under the thumbnail. */
+.pptx-master-rail__list {
+  padding: 10px 10px 4px;
+}
+.pptx-master-rail__item {
+  position: relative;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+.pptx-master-rail__item[data-template='layout'] {
+  margin-inline-start: 14px;
+}
+/* The guide line that ties the layouts to their master. */
+.pptx-master-rail__item[data-template='layout']::before {
+  content: '';
+  position: absolute;
+  inset-block: -10px 0;
+  inset-inline-start: -9px;
+  border-inline-start: 1px solid var(--doc-border);
+}
+.pptx-master-rail__item[data-template='master']
+  + .pptx-master-rail__item[data-template='layout']::before {
+  inset-block-start: -6px;
+}
+.pptx-master-rail__name {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--doc-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pptx-master-rail__item[data-template='master'] .pptx-master-rail__name {
+  font-weight: 600;
+}
+.pptx-master-rail__item[aria-current='true'] .pptx-master-rail__name {
+  color: var(--doc-text);
+}
+/* How many slides use the template, under its name. */
+.pptx-master-rail__usage {
+  margin-top: -4px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--doc-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A layout that no slide uses fades a little, so the used ones stand out. */
+.pptx-master-rail__item[data-unused] .pptx-rail__thumb {
+  opacity: 0.6;
+}
+/* A horizontal rail is one row: no indent and no guide line. */
+.pptx-rail[data-orientation='horizontal'] .pptx-master-rail__item {
+  flex-direction: column;
+  margin-inline-start: 0;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-master-rail__item::before {
+  content: none;
+}
+/* The bar over the canvas in the slide master view: what is being edited, and Close. It is the
+   canvas's first child (`.pptx-master-slot`), in the 52px that the canvas pads its top by, so
+   the fitted zoom keeps the slide clear of it in any host layout. Its negative margin gives
+   that room back to the surface, and `sticky` keeps it in view while a zoomed slide scrolls. */
+.pptx-master-slot {
+  display: contents;
+}
+.pptx-canvas:has(> .pptx-master-slot > .pptx-master-bar) {
+  padding-top: 52px;
+}
+.pptx-master-bar {
+  position: sticky;
+  /* A sticky offset counts from inside the canvas's 52px top padding: -44px is 8px from its
+     top edge. */
+  top: -44px;
+  left: 12px;
+  z-index: 20;
+  box-sizing: border-box;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 44px;
+  margin: -44px 12px 0;
+  padding: 6px 8px 6px 12px;
+  border-radius: var(--doc-radius-surface, 14px);
+  background: var(--doc-surface);
+  box-shadow: var(--doc-card-shadow);
+  color: var(--doc-text);
+  font-size: 13px;
+}
+.pptx-master-bar__icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--doc-primary);
+}
+.pptx-master-bar__text {
+  display: flex;
+  flex: 1 1 auto;
+  /* One line, so the bar keeps the height that the canvas pads for. */
+  flex-wrap: nowrap;
+  column-gap: 12px;
+  align-items: baseline;
+  min-width: 0;
+}
+/* A long layout name from the file shrinks with an ellipsis; the hint gives way first. */
+.pptx-master-bar__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pptx-master-bar__hint {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-master-bar__close {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--doc-radius-control, 7px);
+  background: var(--doc-primary);
+  color: var(--doc-on-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .pptx-master-bar__close:hover {
+    background: var(--doc-primary-hover);
+  }
+}
+.pptx-master-bar__close:active {
+  transform: scale(0.97);
+}
+.pptx-master-bar__close:focus-visible {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-master-bar__close:active {
+    transform: none;
+  }
+}
 /* Sections: a header per section that collapses its slides. */
 .pptx-rail__section,
 .pptx-rail__section-list {

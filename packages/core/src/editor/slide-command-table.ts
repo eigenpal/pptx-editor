@@ -1,5 +1,5 @@
 // Slide commands of the Home and Slide Show tabs (change layout, reset, hide), speaker notes
-// formatting, sections, and the slide size. `commands.ts` sends them here; each compiles to one
+// formatting, sections, the slide size, and the background. `commands.ts` sends them here; each compiles to one
 // transaction, so one undo step.
 
 import { createTranslator } from '@pptx-editor.dev/i18n';
@@ -15,6 +15,7 @@ import { formatNotes } from '../automation/commands/notes-commands.ts';
 import { applyLayout, deckLayout } from '../automation/commands/slide-layouts.ts';
 import { slideIndices } from '../automation/commands/slide-multi.ts';
 import { setSlideSize } from '../automation/commands/slide-size.ts';
+import { setSlideBackground } from '../automation/commands/slide-commands.ts';
 import {
   addSection,
   moveSection,
@@ -39,6 +40,7 @@ export type SlideCommand = Extract<
       | 'removeAllSections'
       | 'moveSection'
       | 'setSlideSize'
+      | 'setSlideBackground'
       | 'pasteSlides';
   }
 >;
@@ -54,6 +56,7 @@ const TYPES: ReadonlySet<string> = new Set([
   'removeAllSections',
   'moveSection',
   'setSlideSize',
+  'setSlideBackground',
   'pasteSlides',
 ]);
 
@@ -124,6 +127,14 @@ export function compileSlideCommand(
   switch (command.type) {
     case 'pasteSlides':
       return pasteSlides(ctx, batch, command);
+    case 'setSlideBackground': {
+      // In the slide master view, the background goes on the template on the canvas only.
+      const all = command.allSlides && !ctx.slideMaster;
+      const count = presentationInfo(batch.pkg).slides.length;
+      const slides = all ? Array.from({ length: count }, (_, i) => i) : [ctx.slide];
+      for (const i of slides) setSlideBackground(batch, i, command.background);
+      return { label: 'slideBackground' };
+    }
     case 'setSlideSize': {
       const content = command.content ?? 'scale';
       if (content !== 'scale' && content !== 'keep')

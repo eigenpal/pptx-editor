@@ -92,6 +92,8 @@ function BackgroundDialogOpen({
   const editor = usePptxEditor();
   const file = useRef<HTMLInputElement>(null);
   const current = useEditorState((s) => s.slideBackground);
+  // The slide master view sets the background of the layout or master on the canvas only.
+  const template = useEditorState((s) => s.presentationView === 'slideMaster');
   // Why OK cannot apply now, or null when it can.
   const refusal = useEditorState((s) =>
     s.status !== 'ready' ? 'disabled.noEditor' : s.mode !== 'edit' ? 'disabled.viewing' : null
@@ -310,7 +312,12 @@ function BackgroundDialogOpen({
               <p role="status" className="pptx-dialog__muted pptx-dialog__status">
                 {status}
               </p>
-              <label data-pptx-part="field" data-pptx-field="allSlides" className="pptx-radio">
+              <label
+                data-pptx-part="field"
+                data-pptx-field="allSlides"
+                className="pptx-radio"
+                hidden={template}
+              >
                 <input
                   type="checkbox"
                   aria-invalid={state.errors.allSlides ? true : undefined}

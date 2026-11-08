@@ -8,6 +8,7 @@
 import type { Translate } from '@pptx-editor.dev/i18n';
 import type { EditorRejection, EditorRemoval, FindMatch, FindOptions } from '../contracts/index.ts';
 import { translateKeyOrText } from './adapter-support.ts';
+import { findViewRefusal } from './master-rail.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import type { PptxEditorInstance } from './pptx-editor.ts';
 import { surfaceRootOf } from './surface-registry.ts';
@@ -53,7 +54,7 @@ const lastWorkedIn = new WeakMap<object, boolean>();
  * on nothing (a closed menu or a removed control drops it to `<body>`), the key opens the bar
  * only when the last press or focus on the page was in this editor. Elsewhere on the host page,
  * the browser's own find keeps the key. `scope` finds the bar's `.pptx-editor`. In the slide
- * sorter, which shows no slide to find on, the request shows why through the edit notice
+ * sorter and the slide master view, which show no slide to find on, the request shows why through the edit notice
  * instead. Returns the function that stops. @internal
  */
 export function listenFindRequests(
@@ -62,7 +63,8 @@ export function listenFindRequests(
   open: (replace: boolean) => void
 ): () => void {
   const answer = (replace: boolean): void => {
-    if (editor.snapshot().presentationView === 'slideSorter') editor.reject('disabled.findSorter');
+    const refused = findViewRefusal(editor.snapshot().presentationView);
+    if (refused) editor.reject(refused);
     else open(replace);
   };
   const onRequest = (e: Event): void => {

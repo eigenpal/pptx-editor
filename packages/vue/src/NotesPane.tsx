@@ -410,7 +410,10 @@ export const PptxEditorNotesPane = defineComponent({
       leaveSlide();
     };
 
+    // Layouts and masters have no speaker notes: the slide master view hides the pane.
+    const masterView = useEditorState((s) => s.presentationView === 'slideMaster');
     return () => {
+      if (masterView.value) return null;
       const open = pane.open.value;
       const d = draft.value;
       return (

@@ -59,6 +59,7 @@ import { provideHyperlinkPopup } from './useHyperlinkPopup.ts';
 import { useCanvasContextMenu } from './CanvasContextMenu.tsx';
 import { SlideSorterWatch } from './SlideSorter.tsx';
 import { ChromeTooltip } from './ChromeTooltip.tsx';
+import { MasterViewBar } from './MasterRail.tsx';
 
 const pptxEditorRootProps = {
   /** `.pptx` bytes. Identity change loads the new document. */
@@ -404,7 +405,10 @@ export const PptxEditorContent = defineComponent({
           'data-pptx-canvas': '',
           onContextmenu: menu.onContextmenu,
           onKeydown: menu.onKeydown,
-        })
+        }),
+        // The slide master view's bar, in the canvas before the surface that `attach` adds,
+        // so it sits on the canvas in any host layout.
+        [h('div', { class: 'pptx-master-slot' }, [h(MasterViewBar)])]
       ),
       menu.layer(),
     ];

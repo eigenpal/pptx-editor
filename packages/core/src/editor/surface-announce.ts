@@ -15,6 +15,35 @@ export interface AnnouncementHost {
   readonly altText?: AltTextPort;
 }
 
+/** What the canvas name asks of the editor (a part of `SurfaceHost`). */
+export interface CanvasNameHost {
+  readonly label: (key: string, params?: Record<string, string | number>) => string;
+  slideCount(): number;
+  /** In the slide master view, the template on the canvas: its kind and name. */
+  template?(
+    index: number
+  ): { readonly template: 'master' | 'layout'; readonly name: string } | undefined;
+}
+
+/**
+ * The canvas's accessible name: "Slide 2 of 9", or in the slide master view the template on it,
+ * "Master: Office Theme" or "Layout: Title Slide".
+ */
+export function canvasName(host: CanvasNameHost, index: number): string {
+  const t = host.template?.(index);
+  if (t)
+    return host.label(
+      t.template === 'master' ? 'canvas.masterAriaLabel' : 'canvas.layoutAriaLabel',
+      // A template without a name keeps a name: "Master", "Untitled layout".
+      {
+        name:
+          t.name ||
+          host.label(t.template === 'master' ? 'masterView.master' : 'masterView.untitledLayout'),
+      }
+    );
+  return host.label('canvas.ariaLabel', { index: index + 1, total: host.slideCount() });
+}
+
 /** The i18n key of an item's kind: the Format panel's element kinds, and the frame kinds. */
 function kindKey(item: LayoutItem): string {
   if (item.kind === 'frame') return `canvas.kinds.${item.element.frameKind}`;

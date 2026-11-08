@@ -198,6 +198,25 @@ A text edit in a diagram shape SHALL write the drawing shape's text and the text
 - **WHEN** a node is deleted
 - **THEN** its subtree, transition points, connections, and presentation points leave the data model, and no connection names a missing point
 
+### Requirement: Slide master view
+
+The slide master view SHALL show a slide layout or a slide master on the canvas, and SHALL edit its own shapes, placeholders, and background through `PptxDocumentStore` operations on its part. A layout SHALL show its master's shapes under its own shapes. Every slide that uses an edited layout or master SHALL show the edit. Commands that act on slides SHALL refuse with `disabled.slideMaster` while the view is open. Closing the view SHALL return to the slide that was current when it opened. Undo, redo, and collaboration SHALL treat a template edit as any other edit of the deck.
+
+#### Scenario: Move a layout shape
+
+- **WHEN** a user opens the view on a slide, and moves a shape of its layout
+- **THEN** the layout part holds the new position, and every slide on that layout shows the shape there
+
+#### Scenario: A slide command in the view
+
+- **WHEN** a user adds a slide, writes speaker notes, or starts Find while the view is open
+- **THEN** the command is refused with `disabled.slideMaster`, and the deck does not change
+
+#### Scenario: A layout edit in a collaboration room
+
+- **WHEN** one collaborator moves a layout shape in the view while another moves a slide shape on that layout
+- **THEN** both replicas converge, and the slide shows the moved layout shape on both
+
 ### Requirement: Progressive open
 
 A long deck SHALL show its start slide and take input before its other slides parse, and SHALL parse them in background tasks that give way to input. Every read, edit, undo, search, and save before then SHALL give the result of a deck that parsed whole, and a save SHALL parse the rest first. A slide that does not parse SHALL refuse the deck (or, after edits, make it read-only), and SHALL never be saved. An editor with a collaboration module SHALL parse the whole deck before its first slide shows.

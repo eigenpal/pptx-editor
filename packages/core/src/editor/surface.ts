@@ -43,7 +43,7 @@ import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
 import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
-import { selectionAnnouncement } from './surface-announce.ts';
+import { canvasName, selectionAnnouncement, type CanvasNameHost } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
 import { boxOutline, commonOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
@@ -60,7 +60,7 @@ import { CursorLayer, NextFrame, PAINT_BUDGET, setAttr, setStyle } from './surfa
 const EMU_PER_PX = 9_525;
 
 /** What the surface asks of the editor. Input and clipboard calls are in `SurfaceInputHost`. */
-export interface SurfaceHost extends SurfaceInputHost {
+export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost {
   /** Unique to the editor instance: SVG ids of two editors on one page never collide. */
   readonly idPrefix: string;
   readonly layout: () => SlideLayout | undefined;
@@ -309,10 +309,7 @@ export class SlideSurface {
     }
     this.#zoomAnchor = null;
     this.#renderedZoom = zoom;
-    const name = this.editor.label('canvas.ariaLabel', {
-      index: layout.slide.index + 1,
-      total: this.editor.slideCount(),
-    });
+    const name = canvasName(this.editor, layout.slide.index);
     if (this.root.getAttribute('aria-label') !== name) this.root.setAttribute('aria-label', name);
     const said = selectionAnnouncement(layout, this.editor);
     // A canceled drag is said in place of the selection, until the selection changes.

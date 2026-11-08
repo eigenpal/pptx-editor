@@ -824,7 +824,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Change layout and reset slide work. Placeholders without a place, animated empty placeholders, and placeholders in mc:AlternateContent keep their box: an approximation. The placeholder match order is not measured. Themes and the slide master cannot be edited.',
+      'Change layout and reset slide work. The slide master view edits the shapes, placeholders, and background of layouts and masters, and every slide that uses them updates. Placeholders without a place, animated empty placeholders, and placeholders in mc:AlternateContent keep their box: an approximation. The placeholder match order is not measured. Layouts, masters, and themes cannot be added, deleted, or switched.',
   },
 
   // --- Presenting ------------------------------------------------------

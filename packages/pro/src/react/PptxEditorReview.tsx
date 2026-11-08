@@ -31,7 +31,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
+import { currentSlideSummary, registerCommentDraft } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useReviewAuthors } from '@pptx-editor.dev/react';
 import {
   commentTarget,
@@ -179,7 +179,7 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
   const roster = useReviewAuthors();
   const authors = useMemo(() => reviewAuthorMap(roster), [roster]);
   // A new slide, or view mode, closes the open fields.
-  const slide = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+  const slide = useEditorState((s) => currentSlideSummary(s)?.id ?? '');
   // Only a change closes them: a second run of the effect (StrictMode) keeps a draft that the
   // New comment row opened as the pane mounted.
   const shown = useRef({ slide, readOnly: review.readOnly });

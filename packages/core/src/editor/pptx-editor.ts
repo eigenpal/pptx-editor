@@ -6,7 +6,7 @@
 import { pickImageInto } from './chrome-actions.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
-import { writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
+import { slideRefAt, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
@@ -26,9 +26,10 @@ import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
 import type { DocumentSession } from './document-session.ts';
 import { clampSlide } from './progressive-open.ts';
-import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
+import { changedSlide, historyAnswer, isHistoryMark, validSelection } from './history-marks.ts';
+import type { HistoryMark } from './history-marks.ts';
 import { markOf, markOptions } from './history-marks.ts';
-import { EditorHistoryGroups } from './history-groups.ts';
+import { EditorHistoryGroups, nextPasteSeries, type PasteSeries } from './history-groups.ts';
 import {
   CommandRefusal,
   commitRefusalDetail,
@@ -49,6 +50,7 @@ import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { chartDataAt, selectedObjectsAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
+import { MasterView, railSummaries } from './master-view.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
 import { CanCache, checkCommand, createStructureKey, typingBox } from './can-cache.ts';
@@ -109,12 +111,13 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let fitZoom = options.zoom === undefined || options.zoom === 'fit';
   let fitValue = 1;
   const views = new ViewSettings(options.smartGuides ?? true);
+  const master = new MasterView(); // The slide master view's slide (`master-view.ts`).
   let surface: SlideSurface | null = null;
   let cached: EditorSnapshot | null = null;
   // The typing burst, the drag, and the host handles that make one undo step each.
   const groups = new EditorHistoryGroups();
   // Repeated pastes of one payload cascade; a parsed payload is cached by its clipboard text.
-  let pasteSeries: { payload: unknown; count: number } = { payload: null, count: 0 };
+  let pasteSeries: PasteSeries = { payload: null, count: 0 };
   let lastRejection: EditorRejection | null = null;
   const removal = new RemovalNotice(); // `snapshot.lastRemoval`
   const painter = new FormatPainter();
@@ -185,7 +188,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const lay = layout();
     const revision = session?.store.revision ?? 0;
     const pkg = session?.store.package;
-    const slides = slideSummaries(session, pkg);
+    const slides = rail(views.presentationView, session, pkg);
     cached = {
       status,
       ...(failure ? { error: failure.code, openFailure: failure } : {}),
@@ -239,6 +242,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     return cached;
   };
   const [slideSummaries, shapeList] = [createSlideSummaries(), createShapeListSource()];
+  const rail = railSummaries(slideSummaries); // The slides, or the master view's templates.
   const animationsOf = createAnimationsSource();
   const [layoutSummaries, sectionSummaries] = [createLayoutSummaries(), createSectionSummaries()];
   const customShowSummaries = createCustomShowSummaries();
@@ -280,6 +284,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     selection,
     readOnly: mode === 'view',
     ...(views.presentationView === 'slideSorter' ? { slideSorter: true } : {}),
+    ...(views.presentationView === 'slideMaster' ? { slideMaster: true } : {}),
     ...(probe ? { probe } : {}),
     ...(modules.collaboration ? { collaborating: true } : {}),
     ...comments.context(session?.store.package),
@@ -305,19 +310,16 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   };
 
   const sectionIds = () => sectionSummaries(session?.store.package).map((x) => x.id);
-  const viewRefusal = (command: ViewCommand) => views.refused(command, sectionIds());
+  const viewRefusal = (command: ViewCommand) =>
+    views.refused(command, sectionIds()) ?? master.refused(session?.store.package, command);
   const canUncached = (command: EditorCommand): CanResult => {
     if (isViewCommand(command)) return viewRefusal(command) ?? { ok: true };
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
-    if (command.type === 'undo')
-      return (arm.current() || (seam.canSessionHistory(modules, true) ?? session.store.canUndo)) &&
-        mode === 'edit'
-        ? { ok: true }
-        : { ok: false, reason: mode === 'view' ? 'disabled.viewing' : 'disabled.nothingToUndo' };
-    if (command.type === 'redo')
-      return (seam.canSessionHistory(modules, false) ?? session.store.canRedo) && mode === 'edit'
-        ? { ok: true }
-        : { ok: false, reason: mode === 'view' ? 'disabled.viewing' : 'disabled.nothingToRedo' };
+    if (command.type === 'undo' || command.type === 'redo') {
+      const undo = command.type === 'undo';
+      const own = undo ? !!arm.current() || session.store.canUndo : session.store.canRedo;
+      return historyAnswer(undo, seam.canSessionHistory(modules, undo) ?? own, mode);
+    }
     return checkCommand(command, selection, mode === 'view', session, slide, slideSel, (only) => {
       try {
         // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
@@ -343,7 +345,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     return { ok: false, ...rejection };
   };
 
-  const partAt = (index: number): string | undefined => session?.info.slides[index]?.partName;
+  const partAt = (i: number) =>
+    session ? slideRefAt(session.store.package, i)?.partName : undefined;
 
   /** The history mark for an edit of `part`: the selection, when it is on that slide. */
   const markFor = (part: string | undefined): HistoryMark => markOf(part, partAt(slide), selection);
@@ -378,9 +381,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   /** Go to the slide of a history mark and restore its selection, if it is still valid. */
   const restore = (mark: HistoryMark | undefined): void => {
     if (!session) return;
-    const index = mark?.part ? session.info.slides.findIndex((s) => s.partName === mark.part) : -1;
-    slide = index >= 0 ? index : Math.min(slide, Math.max(0, session.info.slides.length - 1));
-    selection = mark && index >= 0 ? validSelection(layout(), mark.selection) : { kind: 'none' };
+    ({ slide, selection } = master.restore(session, views.presentationView, mark, slide));
   };
 
   // Objects inserted so far (`snapshot.insertions`): a ribbon opens their Format tab.
@@ -390,10 +391,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (hostGroup === null) return refuse('errors.unsupported', 'historyGroup');
     if (isViewCommand(command)) {
       const no = viewRefusal(command);
+      const to = master.target(session, views.presentationView, command, slide);
       if (no || !views.apply(command, sectionIds())) return refuse(no?.reason ?? 'errors.view');
-      // The slide sorter edits slides only: no shape or text stays selected behind it.
-      if (views.presentationView === 'slideSorter') selection = { kind: 'none' };
-      return (emit(), { ok: true });
+      if (typeof to === 'number') ((slide = to), (selection = { kind: 'none' }), painter.reset());
+      return (emit(), { ok: true }); // `emit` clears the selection in the slide sorter.
     }
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (command.type === 'undo' || command.type === 'redo') {
@@ -410,9 +411,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (shared === 'empty')
         return refuse(undo ? 'disabled.nothingToUndo' : 'disabled.nothingToRedo');
       if (shared === 'ok') {
-        const slides = session.info.slides.map((sl) => sl.partName);
-        const to = presence.historyTarget(pkgBefore, session.store.package, slides, slide);
-        slide = to.slide;
+        const { parts, base } = master.parts(session.store.package, views.presentationView);
+        const to = presence.historyTarget(pkgBefore, session.store.package, parts, slide - base);
+        slide = to.slide + base;
         selection = validSelection(layout(), to.selection ?? selection);
         slideSel.reset(partAt(slide));
         session.store.closeHistoryGroup(); // a boundary in the room too
@@ -483,11 +484,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       markAfter(effect.slide !== undefined ? partAt(slide) : target);
       removal.record(removed);
     }
-    if (command.type === 'paste')
-      pasteSeries = {
-        payload: command.payload,
-        count: command.payload === pasteSeries.payload ? pasteSeries.count + 1 : 1,
-      };
+    pasteSeries = nextPasteSeries(command, pasteSeries);
     emit();
     // Deleting a table removes its contextual chrome, and the focus with it: it goes to the
     // slide, not to the page.
@@ -767,9 +764,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         // A change made on the store directly (a host, a script): the editor did not set the
         // slide and the selection for it, so keep them valid and tell the chrome.
         if (committing > 0 || session !== opened) return;
-        const at = opened.info.slides.findIndex((s) => s.partName === shownPart);
+        const at = master.indexOf(opened.store.package, views.presentationView, shownPart);
         if (at < 0) selection = { kind: 'none' };
-        slide = at >= 0 ? at : Math.min(slide, Math.max(0, opened.info.slides.length - 1));
+        slide = at >= 0 ? at : master.kept(opened.store.package, views.presentationView, slide);
         if (at < 0) slideSel.reset(partAt(slide));
         arm.follow(() => {
           selection = presence.followRemote(opened.store.package, partAt(slide), selection);
@@ -783,6 +780,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       readOnly = null;
       mode = hostMode;
       slide = clampSlide(startSlide, session.info.slides.length);
+      if (views.presentationView === 'slideMaster') views.presentationView = 'normal'; // New deck.
       slideSel.reset(session.info.slides[slide]?.partName);
       selection = { kind: 'none' };
       lastRejection = null;
@@ -884,7 +882,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (!session) return;
       const before = slide;
       const next = Math.max(0, Math.min(index, session.info.slides.length - 1));
-      slide = slideSel.click(session.info.slides, slide, next, mode);
+      if (views.presentationView === 'slideMaster')
+        slide = master.clamp(session.store.package, index, slide);
+      else slide = slideSel.click(session.info.slides, slide, next, mode);
       if (slide !== before) {
         selection = { kind: 'none' };
         lastRejection = null;

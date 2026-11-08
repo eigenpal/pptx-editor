@@ -915,7 +915,7 @@ export interface NewSlideControlProps {
 }
 
 // @public
-export function NotesPane(props?: NotesPaneProps): react.JSX.Element;
+export function NotesPane(props?: NotesPaneProps): react.JSX.Element | null;
 
 // @public
 export interface NotesPaneProps extends Omit<PaneProps, 'paneWidth'> {
