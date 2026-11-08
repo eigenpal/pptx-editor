@@ -14,7 +14,7 @@ import {
   startComposition,
   type CompositionHost,
 } from '../composition.ts';
-import type { ReplacementPlace, ReplacementTarget, TypingContext } from '../replacement-text.ts';
+import type { ReplacementTarget, TextPlace, TypingContext } from '../replacement-text.ts';
 
 const caret = (offset: number, paragraph = 0): Extract<EditorSelection, { kind: 'text' }> => ({
   kind: 'text',
@@ -28,8 +28,8 @@ const ctx = (text: string, revision = 1, key = 'p0', paragraphId = 'para-a'): Ty
   selection: caret(text.length),
   revision,
   paragraphId,
+  before: text,
 });
-const expectA = (text: string) => ({ paragraph: 'para-a', text });
 
 describe('the composition state', () => {
   test('a start records the context and the input selection the system made', () => {
@@ -45,7 +45,7 @@ describe('the composition state', () => {
   test('a new context is the same place, an edit that moves it, or a caret that left', () => {
     const state = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
     expect(contextChange(state, ctx('abc '))).toBe('same');
-    // A peer's edit before the caret: a new revision, so the place maps through it.
+    // A peer's edit before the caret: a new revision, so the place is checked again.
     expect(contextChange(state, ctx('xabc ', 2))).toBe('follow');
     // A click: the same revision, another caret.
     expect(contextChange(state, ctx('a'))).toBe('left');
@@ -67,16 +67,20 @@ describe('the composition state', () => {
     expect(ending(IDLE)).toBe(IDLE);
   });
 
-  test('the text goes in at the caret while it is the place, else at the place', () => {
+  test('the place is the caret, its paragraph by element id, and the exact text before it', () => {
     const state = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
-    const expect4 = expectA('abc ');
-    expect(placement(state, ctx('abc '))).toEqual({ typed: true, expect: expect4 });
-    // An edit that sync has not followed yet: the place, checked by its paragraph and text.
-    expect(placement(state, ctx('xabc ', 2))).toEqual({ at: caret(4), expect: expect4 });
-    expect(placement(state, ctx('a'))).toEqual({ at: caret(4), expect: expect4 });
-    expect(placement(state, null)).toEqual({ at: caret(4), expect: expect4 });
-    expect(placement(startComposition(null, '', 0, 0, 0), null)).toBeNull();
-    expect(placement(IDLE, null)).toBeNull();
+    expect(placement(state)).toEqual({ at: caret(4), paragraph: 'para-a', before: 'abc ' });
+    // An edit that kept the place: its context there.
+    expect(placement(followEdit(state, ctx('abc ', 2, 'p1')))).toEqual({
+      at: caret(4),
+      paragraph: 'para-a',
+      before: 'abc ',
+    });
+    // No paragraph id or exact text: no place, so nothing is written.
+    const loose = { key: 'p0', text: 'abc ', selection: caret(4), revision: 1 };
+    expect(placement(startComposition(loose, 'abc ', 4, 4, 0))).toBeNull();
+    expect(placement(startComposition(null, '', 0, 0, 0))).toBeNull();
+    expect(placement(IDLE)).toBeNull();
   });
 });
 
@@ -114,55 +118,29 @@ describe('the change a composition makes', () => {
 });
 
 describe('applyComposition', () => {
-  type Call = [ReplacementTarget | null, string, ReplacementPlace | undefined];
+  type Call = [TextPlace, ReplacementTarget, string];
   const fake = (results: boolean[]) => {
     const calls: Call[] = [];
-    const typed: string[] = [];
     const refused: string[] = [];
     const host: CompositionHost = {
-      textInput: (_kind, data) => void typed.push(data),
-      replaceText: (target, text, where) => (calls.push([target, text, where]), results.shift()!),
+      compose: (place, target, text) => (calls.push([place, target, text]), results.shift()!),
       refuse: (reason, detail) => void refused.push(`${reason}:${detail}`),
     };
-    return { host, calls, typed, refused };
+    return { host, calls, refused };
   };
   const insert = { target: { text: '', after: 0, between: '', paragraph: 'p0' }, text: 'にほ' };
+  const here: TextPlace = { at: caret(4), paragraph: 'para-a', before: 'abc ' };
 
-  test('plain typing at the caret is the editor text input', () => {
-    const { host, typed, calls } = fake([]);
-    expect(applyComposition(host, { typed: true }, insert)).toBe(true);
-    expect(typed).toEqual(['にほ']);
-    expect(calls).toEqual([]);
-  });
-
-  test('at a place the caret left, the text goes to that place', () => {
+  test('every change goes to the place, through the one checked write', () => {
     const { host, calls } = fake([true]);
-    expect(applyComposition(host, { at: caret(4) }, insert)).toBe(true);
-    expect(calls).toEqual([[insert.target, 'にほ', { at: caret(4) }]]);
+    expect(applyComposition(host, here, insert)).toBe(true);
+    expect(calls).toEqual([[here, insert.target, 'にほ']]);
   });
 
-  test('added text whose place is gone goes to the start of its own paragraph', () => {
-    const { host, calls } = fake([false, true]);
-    const where = { at: caret(9, 2), expect: expectA('abc ') };
-    expect(applyComposition(host, where, insert)).toBe(true);
-    // The paragraph by its element id: never the paragraph that now has its index.
-    const start = { at: caret(0, 2), expect: expectA('') };
-    expect(calls[1]).toEqual([{ ...insert.target, paragraph: null }, 'にほ', start]);
-  });
-
-  test('a place with no paragraph id gets no fallback', () => {
+  test('a place that no longer holds writes nothing else', () => {
     const { host, calls } = fake([false]);
-    expect(applyComposition(host, { at: caret(9, 2) }, insert)).toBe(false);
-    expect(calls).toHaveLength(1);
-  });
-
-  test('a changed word whose place is gone is refused, and nothing else changes', () => {
-    const { host, calls } = fake([false]);
-    const word = {
-      target: { text: 'wrold', after: 0, between: '', paragraph: 'p0' },
-      text: 'world',
-    };
-    expect(applyComposition(host, { at: caret(11) }, word)).toBe(false);
+    expect(applyComposition(host, here, insert)).toBe(false);
+    // No second write: never the paragraph start, never another paragraph.
     expect(calls).toHaveLength(1);
   });
 

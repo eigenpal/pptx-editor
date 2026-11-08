@@ -19,7 +19,9 @@ import type { EditorSelection } from '../contracts/index.ts';
 import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectionBody } from './table-cells.ts';
-import { caretInParagraph, placeAfterEdits } from './paragraph-place.ts';
+import { placeCaret, type TextPlace } from './paragraph-place.ts';
+
+export type { TextPlace } from './paragraph-place.ts';
 
 /** The text the hidden input holds for the system: the caret paragraph before the caret. */
 export interface TypingContext {
@@ -32,22 +34,8 @@ export interface TypingContext {
   readonly revision?: number;
   /** The element id of the caret's paragraph, which edits do not change (`paragraph-place.ts`). */
   readonly paragraphId?: string;
-  /** The whole text of the caret's paragraph, for the place of a composition through edits. */
-  readonly paragraphText?: string;
-}
-
-/**
- * Where an IME composition goes in. `at`: the caret of the composition, when the caret
- * moved away from it (a click, an arrow key, the API); the replacement must match there, and
- * the caret stays where it moved to. `typed`: the caret is the composition's place, which an
- * edit moved, so added characters whose target no longer matches go in at the caret.
- * `expect`: the paragraph (its element id) and the text before the caret that the place must
- * still hold; a place that does not is refused, so the text never goes in elsewhere.
- */
-export interface ReplacementPlace {
-  readonly at?: EditorSelection;
-  readonly typed?: boolean;
-  readonly expect?: { readonly paragraph: string; readonly text: string };
+  /** The paragraph's exact text before the caret: the place of a composition (`TextPlace`). */
+  readonly before?: string;
 }
 
 /** What one system replacement targeted. */
@@ -191,10 +179,17 @@ function shifted(
   return { ...sel, anchor: move(sel.anchor), focus: move(sel.focus) };
 }
 
-/** Whether `a` is the collapsed caret `b`: the same text body, paragraph, and offset. */
-function sameCaret(a: EditorSelection, b: EditorSelection & { kind: 'text' }): boolean {
+/** Whether the selection `a` has a point in the paragraph of the caret `b`. */
+function sameParagraph(a: EditorSelection, b: EditorSelection & { kind: 'text' }): boolean {
   if (a.kind !== 'text' || a.nodeId !== b.nodeId || a.diagramNode !== b.diagramNode) return false;
   if (a.cell?.row !== b.cell?.row || a.cell?.column !== b.cell?.column) return false;
+  const paragraph = b.focus.paragraph;
+  return a.anchor.paragraph === paragraph || a.focus.paragraph === paragraph;
+}
+
+/** Whether `a` is the collapsed caret `b`: the same text body, paragraph, and offset. */
+function sameCaret(a: EditorSelection, b: EditorSelection & { kind: 'text' }): boolean {
+  if (!sameParagraph(a, b) || a.kind !== 'text') return false;
   const same = (p: { paragraph: number; offset: number }) =>
     p.paragraph === b.focus.paragraph && p.offset === b.focus.offset;
   return same(a.anchor) && same(a.focus);
@@ -217,13 +212,13 @@ export interface SystemTextHost {
   /** Publish why an input was not applied. */
   refuse(reason: string, detail?: string): void;
   /**
-   * The editor's text input, as a system replacement: no AutoCorrect, and an undo gives
-   * `before` back as the selection.
+   * The editor's text input. With `before`, a system replacement: no AutoCorrect, and an undo
+   * gives `before` back as the selection. With none, the user's own typing.
    */
   textInput(
     kind: 'text' | 'deleteBackward',
     data: string | undefined,
-    before: EditorSelection
+    before?: EditorSelection
   ): void;
 }
 
@@ -241,7 +236,8 @@ export function createSystemText(host: SystemTextHost) {
     if (!at) return null;
     const revision = host.session()?.store.revision;
     const text = contextBefore(at.text, at.offset);
-    return { key: at.key, text, selection, revision, paragraphId: at.id, paragraphText: at.text };
+    const before = at.text.slice(0, at.offset);
+    return { key: at.key, text, selection, revision, paragraphId: at.id, before };
   };
   /** Run one text input; whether it applied (an applied input sets a new selection). */
   const input = (replacement: string, before: EditorSelection): boolean => {
@@ -255,92 +251,85 @@ export function createSystemText(host: SystemTextHost) {
     host.refuse('errors.inputUnsupported', detail);
     return false;
   };
-  /**
-   * The caret `at` in the paragraph that `expect` names, wherever an edit moved that
-   * paragraph, when the text before it is the expected text; null when the paragraph is gone
-   * or holds other text there. With no `expect`, `at` as it is.
-   */
-  const placeAt = (
-    at: EditorSelection,
-    expect: ReplacementPlace['expect']
-  ): EditorSelection | null => {
-    if (!expect) return at;
+  /** The caret of a composition's place, when the place still holds (`placeCaret`). */
+  const caretOf = (place: TextPlace) => {
     const session = host.session();
     const part = host.part();
-    if (!session || !part || at.kind !== 'text') return null;
-    const moved = caretInParagraph(session.probeBatch(), part, at, expect.paragraph);
-    const there = moved && caretAt(moved);
-    return there && contextBefore(there.text, there.offset) === expect.text ? moved : null;
-  };
-  /**
-   * Replace `target` before the caret `at`, the caret of a composition that the selection
-   * moved away from; whether it applied. A place that no longer holds the expected text, or a
-   * target that the text before `at` does not hold, is refused, and the composition goes
-   * nowhere else. The selection stays where it moved to; the edit moves it when it comes
-   * after the edit in the same paragraph.
-   */
-  const replaceAt = (
-    to: EditorSelection,
-    target: ReplacementTarget | null,
-    replacement: string,
-    expect: ReplacementPlace['expect']
-  ): boolean => {
-    const user = host.selection();
-    const at = placeAt(to, expect);
-    if (!at) return refuse('insertCompositionText');
-    const there = caretAt(at);
-    const range = target && there && replacementRange(there.text, there.offset, there.key, target);
-    if (at.kind !== 'text' || !there || !range) return refuse('insertCompositionText');
-    if (there.text.slice(range.from, range.to) === replacement) return true;
-    const paragraph = at.focus.paragraph;
-    const point = (offset: number) => ({ paragraph, offset });
-    host.select({ ...at, anchor: point(range.from), focus: point(range.to) });
-    const done = input(replacement, at);
-    host.select(shifted(user, at, range.to, done ? replacement.length - range.to + range.from : 0));
-    host.emit();
-    return done;
+    return session && part && !host.viewing()
+      ? placeCaret(session.probeBatch(), part, place)
+      : null;
   };
   return {
     /** The text the surface's input holds for the system. */
     typingContext,
+    /** The store revision. */
+    revision: (): number | undefined => host.session()?.store.revision,
     /**
-     * The place of a composition, last seen at `seen`, after an edit (`placeAfterEdits`), with
-     * the caret put there: the caret that the edit left is not the place. The context there,
-     * or null when no place holds.
+     * The context at a composition's place after an edit, with the caret put back there: the
+     * caret that the edit left is not the place. Null when the place no longer holds. The
+     * text alone can miss an edit before the place that leaves the same text there (a peer
+     * types "Hello " before "Hello|"). A collaboration session moves the caret with its
+     * characters, so a caret that the edit moved inside the place's paragraph also ends the
+     * place. That caret only refuses: it never places text.
      */
-    mapPlace(seen: TypingContext): TypingContext | null {
-      const session = host.session();
-      const part = host.part();
-      const { selection: caret, paragraphId: id, paragraphText: text } = seen;
-      if (!session || !part || caret?.kind !== 'text' || id === undefined || text === undefined)
-        return null;
-      const place = placeAfterEdits(session.probeBatch(), part, { caret, id, text });
-      if (!place) return null;
-      if (!sameCaret(host.selection(), place.caret)) host.select(place.caret);
+    keepPlace(place: TextPlace): TypingContext | null {
+      const at = caretOf(place);
+      if (!at) return null;
+      const now = host.selection();
+      if (!sameCaret(now, at)) {
+        if (now.kind === 'text' && sameParagraph(now, at)) return null;
+        host.select(at);
+      }
       return typingContext();
     },
     /**
-     * Apply a system text change. With no target, the replacement goes in at the caret, but
-     * one word right after a word is refused (`correctsWord`). With
-     * one, it replaces the target when the model text before the caret holds it, in the
-     * caret's paragraph; else the input is refused, so no word goes in twice. An empty
-     * replacement deletes the target. A caret format that waits at the caret stays for the
-     * next typed text. The edit is one text input over the target: one store transaction,
-     * one undo step, and an undo puts the caret back where it was. Whether it applied: a
-     * change that changes nothing applies; a refusal publishes its reason.
+     * Write a composition's change at its place: the only way a composition writes. The place
+     * must still hold its paragraph, by element id, and the exact text before its offset
+     * (`placeCaret`); else the change is refused with its reason, and goes in nowhere else.
+     * Added text at the caret is the editor's own typing (AutoCorrect, list starts). Any other
+     * change is one text input over its target; the caret stays where it is, and moves with
+     * the text when it comes after the change. Whether it applied.
      */
-    replaceText(
-      target: ReplacementTarget | null,
-      replacement: string,
-      place: ReplacementPlace = {}
-    ): boolean {
-      // A place with `expect` names its paragraph by element id, not by the key of its index.
-      if (place.expect && target) target = { ...target, paragraph: null };
-      if (place.at) return replaceAt(place.at, target, replacement, place.expect);
+    compose(place: TextPlace, target: ReplacementTarget, replacement: string): boolean {
+      const at = caretOf(place);
+      const there = at && caretAt(at);
+      const range =
+        there &&
+        replacementRange(there.text, there.offset, there.key, { ...target, paragraph: null });
+      if (!at || !there || !range) {
+        host.refuse('errors.compositionChanged');
+        return false;
+      }
+      // A change that changes nothing writes nothing: no undo step, no collaboration op.
+      if (there.text.slice(range.from, range.to) === replacement) return true;
+      const user = host.selection();
+      if (range.from === range.to && range.to === there.offset && sameCaret(user, at)) {
+        host.textInput('text', replacement);
+        return host.selection() !== user;
+      }
+      const point = (offset: number) => ({ paragraph: at.focus.paragraph, offset });
+      let done = false;
+      host.follow(() => {
+        host.select({ ...at, anchor: point(range.from), focus: point(range.to) });
+        done = input(replacement, at);
+        const by = done ? replacement.length - range.to + range.from : 0;
+        host.select(shifted(user, at, range.to, by));
+      });
+      host.emit();
+      return done;
+    },
+    /**
+     * Apply a system text change. With no target, the replacement goes in at the caret, but
+     * one word right after a word is refused (`correctsWord`). With one, it replaces the
+     * target when the model text before the caret holds it, in the caret's paragraph; else the
+     * input is refused, so no word goes in twice. An empty replacement deletes the target. A
+     * caret format that waits at the caret stays for the next typed text. The edit is one
+     * text input over the target: one store transaction, one undo step, and an undo puts the
+     * caret back where it was. Whether it applied: a change that changes nothing applies; a
+     * refusal publishes its reason.
+     */
+    replaceText(target: ReplacementTarget | null, replacement: string): boolean {
       const sel = host.selection();
-      // A composition at the caret: the caret must still be its place.
-      if (place.expect && placeAt(sel, place.expect) === null)
-        return refuse('insertCompositionText');
       const at = caretAt(sel);
       if (!target) {
         // A single word right after a word can be a correction of that word whose target
@@ -351,15 +340,7 @@ export function createSystemText(host: SystemTextHost) {
         return !replacement || input(replacement, sel);
       }
       const range = at && replacementRange(at.text, at.offset, at.key, target);
-      if (sel.kind !== 'text' || !at || !range) {
-        // A composition that only adds characters (`typed`, an empty target) is the user's
-        // typing: when an edit moved the caret, its place, they go in at the caret, as typing
-        // would, so none is lost and none repeats. A composition that changes characters
-        // which moved is refused: it goes in nowhere else. The surface passes `typed` only
-        // when the caret is the composition's own place; a caret that moved away gets `at`.
-        if (place.typed && replacement && target.text === '') return input(replacement, sel);
-        return refuse('insertReplacementText');
-      }
+      if (sel.kind !== 'text' || !at || !range) return refuse('insertReplacementText');
       // A change that changes nothing writes nothing: no undo step, no collaboration op.
       if (at.text.slice(range.from, range.to) === replacement) return true;
       const point = (offset: number) => ({ paragraph: sel.focus.paragraph, offset });

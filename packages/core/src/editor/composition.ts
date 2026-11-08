@@ -1,22 +1,23 @@
 // The state of one IME composition in the surface's input, and where its text goes in.
 //
 // A composition changes the model only when it ends. Its place is fixed when it starts: the
-// caret's paragraph and offset, and the part of the input's value that the system selected
-// for it (a keyboard that composes a word again selects that word). Every change it makes
-// applies there, and nowhere else. When the model caret leaves that place (a click or a tap,
-// an arrow key, the API, a slide change), the surface makes the browser end the composition
-// (`surface-input.ts`), and the browser's final text goes to the place. An edit (a peer's, or
-// the API's) moves the place through the change (`paragraph-place.ts`).
+// caret's paragraph (by element id), the paragraph's exact text before the caret, and the
+// part of the input's value that the system selected for it (a keyboard that composes a word
+// again selects that word). Every change it makes applies there, and nowhere else
+// (`applyComposition`). When the model caret leaves that place (a click or a tap, an arrow
+// key, the API, a slide change), the surface makes the browser end the composition
+// (`surface-input.ts`), and the browser's final text goes to the place. An edit after the
+// place, or in another paragraph, keeps the place; any other edit ends the composition, and
+// its text is refused (`paragraph-place.ts`).
 //
-// The transitions are pure; `applyComposition` writes through the editor's text input.
+// The transitions are pure; `applyComposition` writes through the editor.
 
-import type { EditorSelection } from '../contracts/index.ts';
 import {
   compositionEdit,
   fieldEdit,
   type ContextEdit,
-  type ReplacementPlace,
   type ReplacementTarget,
+  type TextPlace,
   type TypingContext,
 } from './replacement-text.ts';
 
@@ -29,12 +30,13 @@ export interface CompositionPlace {
   /** The input selection that the system made for the composition, in `value`. */
   readonly from: number;
   readonly to: number;
+  /** The store revision then, for a composition with no text caret (a selected range). */
+  readonly revision?: number;
 }
 
 /**
- * Idle; composing at a place (`seen`: the context at the place, moved by edits since the
- * start); or ending: the surface asked the browser to end the composition, and waits for
- * its final text.
+ * Idle; composing at a place (`seen`: the context at the place); or ending: the surface asked
+ * the browser to end the composition, and waits for its final text.
  */
 export type CompositionState =
   | { readonly phase: 'idle' }
@@ -44,6 +46,8 @@ export type CompositionState =
       readonly seen: TypingContext | null;
       /** The input's text width when the composition started, for the overlay. */
       readonly width: number;
+      /** An edit before or over the place ended it: the composition's text is refused. */
+      readonly lost?: true;
     };
 
 export const IDLE: CompositionState = { phase: 'idle' };
@@ -54,16 +58,18 @@ export function startComposition(
   value: string,
   from: number,
   to: number,
-  width: number
+  width: number,
+  revision?: number
 ): CompositionState {
-  return { phase: 'composing', place: { context, value, from, to }, seen: context, width };
+  const place = { context, value, from, to, ...(revision === undefined ? {} : { revision }) };
+  return { phase: 'composing', place, seen: context, width };
 }
 
 /**
  * What a new context during a composition means. `follow`: the model changed (a peer's
- * edit, or the API's), so the place maps through the change (`paragraph-place.ts`); the caret
- * that the edit left is not the place. `same`: the caret is still at the place. `left`: the
- * caret moved with no edit (a click, a tap, a key, the API), so the composition must end.
+ * edit, or the API's), so the place must be checked again (`keepPlace`); the caret that the
+ * edit left is not the place. `same`: the caret is still at the place. `left`: the caret
+ * moved with no edit (a click, a tap, a key, the API), so the composition must end.
  */
 export function contextChange(
   state: CompositionState,
@@ -75,7 +81,7 @@ export function contextChange(
   return now?.key === seen?.key && now?.text === seen?.text ? 'same' : 'left';
 }
 
-/** The state after an edit moved the place (`contextChange` gave `follow`). */
+/** The state after an edit kept the place (`contextChange` gave `follow`). */
 export function followEdit(state: CompositionState, now: TypingContext): CompositionState {
   return state.phase === 'idle' ? state : { ...state, seen: now };
 }
@@ -85,29 +91,19 @@ export function ending(state: CompositionState): CompositionState {
   return state.phase === 'composing' ? { ...state, phase: 'ending' } : state;
 }
 
-/**
- * Where the composition's text goes, for the caret context `now`. At the caret, while the
- * caret is the place (`typed`: added characters whose target an edit moved still go in at
- * the caret). At the place's own caret (`at`) when the caret left it. Either way the place
- * must still hold its paragraph and the text before it (`expect`), or the write is refused.
- * Null: no text caret.
- */
-export function placement(
-  state: CompositionState,
-  now: TypingContext | null
-): ReplacementPlace | null {
-  if (state.phase === 'idle' || !state.seen) return null;
-  const { seen } = state;
-  const expect = expectAt(seen);
-  if (now?.key === seen.key && now.text === seen.text) return { typed: true, expect };
-  return seen.selection ? { at: seen.selection, expect } : null;
+/** The state after an edit took the place away (`keepPlace`): its text will be refused. */
+export function lose(state: CompositionState): CompositionState {
+  return state.phase === 'idle' ? state : { ...state, lost: true };
 }
 
-/** What a place must still hold: its paragraph and the text before its caret. */
-function expectAt(seen: TypingContext): ReplacementPlace['expect'] {
-  return seen.paragraphId === undefined
-    ? undefined
-    : { paragraph: seen.paragraphId, text: seen.text };
+/**
+ * The composition's place: its caret, its paragraph's element id, and the paragraph's exact
+ * text before the caret. Null with no text caret.
+ */
+export function placement(state: CompositionState): TextPlace | null {
+  if (state.phase === 'idle' || !state.seen) return null;
+  const { selection: at, paragraphId: paragraph, before } = state.seen;
+  return at && paragraph !== undefined && before !== undefined ? { at, paragraph, before } : null;
 }
 
 /**
@@ -146,47 +142,25 @@ export function partialEdit(place: CompositionPlace, value: string): ContextEdit
 
 /** What `applyComposition` asks of the editor. */
 export interface CompositionHost {
-  textInput(kind: 'text', data: string): void;
-  replaceText?(
-    target: ReplacementTarget | null,
-    replacement: string,
-    place?: ReplacementPlace
-  ): boolean | void;
+  /** Write a change at a composition's place, which must still hold; whether it applied. */
+  compose?(place: TextPlace, target: ReplacementTarget, replacement: string): boolean;
   refuse(reason: string, detail?: string): void;
 }
 
 /**
- * Apply a composition's change at `where` (`placement`); whether it went in. When the place's
- * caret no longer holds the change, added text goes in at the start of the place's
- * paragraph, and a change to existing text is refused; with no paragraph, the text is refused.
- * A refusal publishes its reason.
+ * Apply a composition's change at its place `where` (`placement`); whether it went in. The
+ * editor checks the place and writes there (`compose`), or refuses the change with its
+ * reason. Never anywhere else.
  */
 export function applyComposition(
   host: CompositionHost,
-  where: ReplacementPlace | null,
+  where: TextPlace | null,
   edit: ContextEdit
 ): boolean {
   if (edit.target.text === '' && edit.text === '') return true; // Nothing changed.
-  if (!where || !host.replaceText) {
+  if (!where || !host.compose) {
     host.refuse('errors.inputUnsupported', 'insertCompositionText');
     return false;
   }
-  // Plain typing at the caret: the editor's own text input (AutoCorrect, list starts).
-  if (!where.at && edit.target.text === '' && edit.target.after === 0) {
-    host.textInput('text', edit.text);
-    return true;
-  }
-  if (host.replaceText(edit.target, edit.text, where) !== false) return true;
-  const { at, expect } = where;
-  if (!at || at.kind !== 'text' || !expect || edit.target.text !== '' || !edit.text) return false;
-  // Only in the place's own paragraph, found by its element id.
-  const start = { paragraph: at.focus.paragraph, offset: 0 };
-  const target = { text: '', after: 0, between: '', paragraph: null };
-  const there = { at: atPoint(at, start), expect: { paragraph: expect.paragraph, text: '' } };
-  return host.replaceText(target, edit.text, there) !== false;
+  return host.compose(where, edit.target, edit.text);
 }
-
-const atPoint = (
-  sel: EditorSelection & { kind: 'text' },
-  point: { paragraph: number; offset: number }
-): EditorSelection => ({ ...sel, anchor: point, focus: point });

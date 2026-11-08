@@ -673,17 +673,20 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('text that an edit puts at the place of a composition goes after it', async () => {
+  test('an edit at the place of a composition ends it, and its text goes in nowhere', async () => {
     const { e, input, fire } = await open(para(run('a helo')));
     caret(e, 0, 6);
     fire(composition('compositionstart'));
-    // An edit lands while the keyboard composes: the model is no longer the field.
+    input.value = 'a hel';
+    // An edit at the place moves the caret in the paragraph: the place no longer holds.
     e.input('text', '!');
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
+    expect(e.snapshot().lastRejection?.reason).toBe('errors.compositionChanged');
+    // The browser's late end adds nothing, and no letter goes in twice.
     input.value = 'a hello';
     input.setSelectionRange(7, 7);
     fire(composition('compositionend', 'hello'));
-    // The composition was there first: nothing is lost, and no letter goes in twice.
-    expect(texts(e)).toEqual(['a hello!']);
+    expect(texts(e)).toEqual(['a helo!']);
     e.destroy();
   });
 
@@ -903,16 +906,14 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('an edit at the caret keeps a recomposed word at its place', async () => {
+  test('an edit at the caret ends a recomposition, and the word stays', async () => {
     const { e, input, fire } = await composeWord('hello wrold', 6, 11);
-    // An edit at the caret (as a peer's) keeps the composition, before the new text.
     e.input('text', '!');
-    expect(input.classList.contains(COMPOSING_CLASS)).toBe(true);
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
     input.value = 'hello world';
     input.setSelectionRange(11, 11);
     fire(composition('compositionend', 'world'));
-    expect(texts(e)).toEqual(['hello world!']);
-    expect(e.snapshot().lastRejection).toBeNull();
+    expect(texts(e)).toEqual(['hello wrold!']);
     e.destroy();
   });
 

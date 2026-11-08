@@ -1185,6 +1185,7 @@
     "clipboard": "클립보드에 이 편집기에서 붙여 넣을 수 있는 도형이 없습니다.",
     "unsafeLink": "링크는 http, https, mailto, tel 또는 ftp로 시작할 수 있습니다",
     "inputUnsupported": "이 유형의 입력은 지원되지 않습니다: {detail}",
+    "compositionChanged": "입력 위치 앞의 텍스트가 변경되어 완성되지 않은 텍스트를 추가하지 않았습니다.",
     "invalidText": "이 텍스트에는 슬라이드에 넣을 수 있는 문자가 없습니다.",
     "superseded": "이 프레젠테이션을 다 열기 전에 다른 프레젠테이션이 열렸습니다.",
     "coordinateRange": "위치나 크기가 슬라이드에서 허용하는 범위를 벗어났습니다.",

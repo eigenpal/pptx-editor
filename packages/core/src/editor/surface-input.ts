@@ -26,6 +26,7 @@ import {
   finalEdit,
   followEdit,
   IDLE,
+  lose,
   partialEdit,
   placement,
   startComposition,
@@ -35,8 +36,8 @@ import { createCompositionOverlay } from './composition-overlay.ts';
 import {
   fieldEdit,
   type ContextEdit,
-  type ReplacementPlace,
   type ReplacementTarget,
+  type TextPlace,
   type TypingContext,
 } from './replacement-text.ts';
 
@@ -50,21 +51,23 @@ export interface SurfaceInputHost {
   /**
    * Apply a system text change: `replacement` replaces `target` when the model text before
    * the caret holds it, and goes in at the caret when there is no target
-   * (`replacement-text.ts`). `place` puts an IME composition at its own place
-   * (`ReplacementPlace`).
+   * (`replacement-text.ts`).
    */
-  replaceText?(
-    target: ReplacementTarget | null,
-    replacement: string,
-    place?: ReplacementPlace
-  ): boolean;
+  replaceText?(target: ReplacementTarget | null, replacement: string): boolean;
+  /**
+   * Write an IME composition's change at its place, when the place still holds; else refuse
+   * it with its reason (`replacement-text.ts`). The only write of a composition at a caret.
+   */
+  compose?(place: TextPlace, target: ReplacementTarget, replacement: string): boolean;
   /** The text the input holds for the system, or null for none. */
   typingContext?(): TypingContext | null;
   /**
-   * The place of a composition after an edit, with the caret put there; the context there,
-   * or null when no place holds (`replacement-text.ts`).
+   * The context at a composition's place after an edit, with the caret put back there; null
+   * when the place no longer holds (`paragraph-place.ts`).
    */
-  mapPlace?(seen: TypingContext): TypingContext | null;
+  keepPlace?(place: TextPlace): TypingContext | null;
+  /** The store revision: a composition over a selected range ends unwritten after an edit. */
+  revision?(): number | undefined;
   /** The text for a translation key: the input's description. */
   label?(key: string): string;
   shortcut(key: string, event: KeyboardEvent): boolean;
@@ -312,11 +315,15 @@ export function bindSurfaceInput(
       const now = host.typingContext?.() ?? null;
       const change = contextChange(composition, now);
       if (change === 'follow') {
-        // An edit: the place maps through it, and the caret goes back to the place.
-        const { seen } = composition;
-        const at = seen && host.mapPlace ? host.mapPlace(seen) : now;
+        // An edit: the place must still hold (an edit after it, or in another paragraph), and
+        // the caret goes back to it. Else the composition ends, and its text is refused.
+        const where = placement(composition);
+        const at = host.keepPlace ? where && host.keepPlace(where) : now;
         if (at && composition.phase === 'composing') composition = followEdit(composition, at);
-        else interrupt();
+        else {
+          composition = lose(composition);
+          interrupt();
+        }
       } else if (change === 'left') interrupt();
       return;
     }
@@ -362,11 +369,19 @@ export function bindSurfaceInput(
     composition = IDLE;
     input.classList.remove(COMPOSING_CLASS);
     fit();
-    // With no text caret when it started (a selected range), the text replaces the range.
-    if (state.phase !== 'idle' && !state.place.context) {
-      if (data) host.textInput('text', data);
-    } else if (state.phase !== 'idle' && edit) {
-      applyComposition(host, placement(state, host.typingContext?.() ?? null), edit);
+    if (state.phase === 'idle') return sync();
+    if (state.lost) {
+      // An edit before or over the place: the text goes in nowhere, and the user learns why.
+      if (data || (edit && (edit.text || edit.target.text)))
+        host.refuse('errors.compositionChanged');
+    } else if (state.place.context) {
+      if (edit) applyComposition(host, placement(state), edit);
+    } else if (data) {
+      // With no text caret when it started (a selected range), the text replaces the range,
+      // unless the model changed or the editor ended the composition: never another range.
+      const kept = state.phase === 'composing' && state.place.revision === host.revision?.();
+      if (kept) host.textInput('text', data);
+      else host.refuse('errors.compositionChanged');
     }
     sync();
   };
@@ -445,7 +460,8 @@ export function bindSurfaceInput(
     echo = null;
     const { value, selectionStart, selectionEnd } = input;
     const width = value ? input.scrollWidth : 0;
-    composition = startComposition(context, value, selectionStart, selectionEnd, width);
+    const revision = host.revision?.();
+    composition = startComposition(context, value, selectionStart, selectionEnd, width, revision);
     input.classList.add(COMPOSING_CLASS);
     // The candidate window opens at the caret: the end of a long context.
     input.scrollLeft = input.scrollWidth;
