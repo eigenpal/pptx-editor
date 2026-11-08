@@ -89,12 +89,13 @@ A selection can change while a file loads. Recheck the selected picture before r
 
 ## Slides with many large pictures
 
-The editor limits the decoded pixels that the pictures of one slide, layout, or master hold on screen. The limit is 100 million pixels for the PNG, JPEG, GIF, BMP, and WebP pictures of each part. SVG pictures do not count.
+The editor limits the decoded pixels that the pictures of one slide, layout, or master hold on screen. The limit is about 105 million pixels for the PNG, JPEG, GIF, BMP, and WebP pictures of each part. SVG pictures do not count.
 
 When a part's pictures exceed the limit, the editor applies these rules:
 
 - Each picture draws scaled down to its share of the limit, in the editor and in the slide show. The browser decodes and scales it off the main thread.
-- The picture placeholder shows until a scaled picture is ready. After an edit, a picture keeps its last scaled size until its new size is ready.
+- The picture placeholder shows until a scaled picture is ready.
+- After an edit, scaled sizes stay until a picture's share moves by more than 25%. A part can then hold up to about 1.56 times the limit. A picture keeps its last scaled size until its new size is ready.
 - An animated GIF shows its first frame.
 - PDF and image export, copy, and save use the stored pictures at their full size.
 
