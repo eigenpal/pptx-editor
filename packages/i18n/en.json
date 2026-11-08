@@ -1146,6 +1146,7 @@
     "emptyAriaLabel": "No presentation open",
     "inputAriaLabel": "Text of the selected shape",
     "adjustHandle": "Drag to change the shape",
+    "segmentHandle": "Drag to move this segment",
     "placeholderTable": "Insert a table here",
     "placeholderChart": "Insert a chart here",
     "placeholderPicture": "Insert a picture here",

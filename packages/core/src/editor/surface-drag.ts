@@ -33,7 +33,10 @@ import {
   byDrawingId,
   connectorRoute,
   gluedSite,
+  elbowCorners,
   isConnector,
+  moveElbowSegment,
+  segmentAxis,
   sitesNear,
   type RouteEnd,
 } from '../automation/commands/connectors.ts';
@@ -48,8 +51,16 @@ import type { SnapGuide } from './snapping.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
 import { clampTableResize } from './surface-table.ts';
 
-export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end';
-export type BoxHandle = Exclude<Handle, 'start' | 'end'>;
+/** A segment of an elbow or curve connector's route, by its index from the start. */
+export type SegmentHandle = `segment${number}`;
+export type Handle =
+  'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end' | SegmentHandle;
+export type BoxHandle = Exclude<Handle, 'start' | 'end' | SegmentHandle>;
+
+/** Whether a handle moves a segment of a connector's route. */
+export function isSegment(handle: Handle | 'move'): handle is SegmentHandle {
+  return /^segment\d$/.test(handle);
+}
 export const HANDLES: readonly BoxHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rot'];
 export const HANDLE_POS: Record<BoxHandle, [number, number]> = {
   nw: [0, 0],
@@ -148,6 +159,11 @@ export function dragStep(
     return moveConnectorEnd(d, d.handle, p, input);
   if (d.handle === 'start' || d.handle === 'end')
     return { items: [moveLineEnd(d, p, input.shift)], guides };
+  if (isSegment(d.handle)) {
+    // A route the presets cannot draw keeps the last route the drag showed.
+    const t = moveElbowSegment(d.items[0].item, Number(d.handle.slice(7)), p, input.snapTo);
+    return { items: t ? [t] : [...(d.pending ?? [])], guides };
+  }
   const [hx, hy] = HANDLE_POS[d.handle];
   // A resize snaps its dragged edges.
   if (d.handle !== 'rot') {
@@ -295,6 +311,27 @@ export class ShapeDrag {
   /** The drag turns its shape by the rotation handle. */
   get rotating(): boolean {
     return this.#drag?.handle === 'rot';
+  }
+
+  /**
+   * Keep the drag's pointer on the whole surface, off the handle too: the rotate pointer
+   * (`pptx-surface--rotating`), or a segment's resize pointer (`pptx-surface--segment-x`, `-y`).
+   */
+  pointer(classes: DOMTokenList): void {
+    classes.toggle('pptx-surface--rotating', this.rotating);
+    const axis = this.segmentAxis;
+    classes.toggle('pptx-surface--segment-x', axis === 'x');
+    classes.toggle('pptx-surface--segment-y', axis === 'y');
+  }
+
+  /** The axis a connector segment drag moves along, or null for another drag. */
+  get segmentAxis(): 'x' | 'y' | null {
+    const d = this.#drag;
+    if (!d || !isSegment(d.handle)) return null;
+    const corners = elbowCorners(d.items[0].item);
+    const i = Number(d.handle.slice(7));
+    const [a, b] = [corners?.[i], corners?.[i + 1]];
+    return a && b ? segmentAxis(a, b) : null;
   }
 
   /** The smart guides of the last pointer move. */

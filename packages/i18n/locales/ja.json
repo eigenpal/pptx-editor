@@ -1146,6 +1146,7 @@
     "emptyAriaLabel": "開いているプレゼンテーションはありません",
     "inputAriaLabel": "選択した図形のテキスト",
     "adjustHandle": "ドラッグして図形の形を変更",
+    "segmentHandle": "ドラッグしてこの線分を移動",
     "placeholderTable": "ここに表を挿入",
     "placeholderChart": "ここにグラフを挿入",
     "placeholderPicture": "ここに画像を挿入",

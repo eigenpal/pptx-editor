@@ -1871,6 +1871,23 @@
   stroke: #5c4a00;
   cursor: pointer;
 }
+/* A connector segment handle (surface-handles.ts) moves its segment across. Its drag keeps the
+   pointer off the handle too (surface.ts). The hit area is wider than the diamond, for touch. */
+.pptx-surface__handle--segment-y,
+.pptx-surface--segment-y,
+.pptx-surface--segment-y * {
+  cursor: ns-resize !important;
+}
+.pptx-surface__handle--segment-x,
+.pptx-surface--segment-x,
+.pptx-surface--segment-x * {
+  cursor: ew-resize !important;
+}
+.pptx-surface__handle-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
 /* Crop mode (surface-crop.ts): the image outside the frame, dimmed, and the crop handles. */
 .pptx-surface__crop-image {
   opacity: 0.4;

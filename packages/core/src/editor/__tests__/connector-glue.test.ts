@@ -11,6 +11,7 @@ import { elbowPoints, placedSites } from '../../automation/commands/connectors.t
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { dragStep, startDrag } from '../surface-drag.ts';
 import { preview } from '../drag-preview.ts';
+import { handleElements } from '../surface-handles.ts';
 
 const IN = 914_400;
 
@@ -401,5 +402,131 @@ describe('a glued end from untrusted ids', () => {
     e.exec({ type: 'setTransforms', items: step.items });
     expect(slideXml(e)).not.toContain('foo="x"');
     expect(slideXml(e)).not.toContain('Cxn id=');
+  });
+});
+
+describe('elbow segment drags', () => {
+  const input = { shift: false, snapTo: null, aspectLocked: () => false };
+  /** Drag segment `index` of connector `name` to slide point `to`, and release. */
+  function dragSegment(
+    e: PptxEditorInstance,
+    name: string,
+    index: number,
+    to: { x: number; y: number },
+    snapTo: number | null = null
+  ): ReturnType<typeof dragStep> {
+    const id = named(e, name).element.nodeId;
+    const d = startDrag(e.session!.layout(0), `segment${index}`, [id], to, 'g')!;
+    const step = dragStep(d, to, { ...input, snapTo });
+    if (step.items.length)
+      expect(e.exec({ type: 'setTransforms', items: step.items }).ok).toBe(true);
+    return step;
+  }
+  // An L from (1 in, 1 in): right 4 in, then down 2 in.
+  const ell = connector({ id: 4, prst: 'bentConnector2', x: IN, y: IN, cx: 4 * IN, cy: 2 * IN });
+
+  test('an end segment adds a bend, a middle one moves, and segments in line merge', async () => {
+    const e = await open(deck(ell));
+    dragSegment(e, 'C4', 1, { x: 3 * IN, y: 2 * IN });
+    expect(presetOf(e, 'C4')).toBe('bentConnector3');
+    expect(cornersOf(e, 'C4')).toEqual([
+      [1, 1],
+      [3, 1],
+      [3, 3],
+      [5, 3],
+    ]);
+    // A middle segment moves with its two corners.
+    dragSegment(e, 'C4', 1, { x: 4 * IN, y: 2 * IN });
+    expect(cornersOf(e, 'C4')).toEqual([
+      [1, 1],
+      [4, 1],
+      [4, 3],
+      [5, 3],
+    ]);
+    // Back in line with the end: the segments merge, and the L comes back.
+    dragSegment(e, 'C4', 1, { x: 5 * IN, y: 2 * IN });
+    expect(presetOf(e, 'C4')).toBe('bentConnector2');
+    expect(cornersOf(e, 'C4')).toEqual([
+      [1, 1],
+      [5, 1],
+      [5, 3],
+    ]);
+  });
+
+  test('the first segment moved down starts the route with a vertical segment', async () => {
+    const e = await open(deck(ell));
+    dragSegment(e, 'C4', 0, { x: 3 * IN, y: 2 * IN });
+    expect(presetOf(e, 'C4')).toBe('bentConnector3');
+    expect(cornersOf(e, 'C4')).toEqual([
+      [1, 1],
+      [1, 2],
+      [5, 2],
+      [5, 3],
+    ]);
+  });
+
+  test('a route past five segments writes nothing', async () => {
+    const four = connector({ id: 4, prst: 'bentConnector4', x: IN, y: IN, cx: 4 * IN, cy: 2 * IN });
+    const e = await open(deck(four));
+    dragSegment(e, 'C4', 0, { x: 2 * IN, y: 0.5 * IN });
+    expect(presetOf(e, 'C4')).toBe('bentConnector5');
+    // A sixth segment: no preset draws it, so the drag writes nothing.
+    expect(dragSegment(e, 'C4', 0, { x: 0.5 * IN, y: IN }).items).toEqual([]);
+    expect(presetOf(e, 'C4')).toBe('bentConnector5');
+  });
+
+  test('an elbow shows a handle at the middle of each long segment', async () => {
+    const { GlobalWindow } = await import('happy-dom');
+    const win = new GlobalWindow();
+    const e = await open(deck(ell));
+    const item = named(e, 'C4');
+    const doc = win.document as unknown as Document;
+    const nodes = handleElements(doc, [item], lineEnds(item), 9525, 'Move');
+    const diamonds = nodes.filter((n) => n.getAttribute('class')?.includes('handle--adjust'));
+    expect(diamonds.map((n) => n.getAttribute('data-handle'))).toEqual(['segment0', 'segment1']);
+    expect(diamonds[1].getAttribute('class')).toContain('segment-x');
+    expect(diamonds[1].getAttribute('d')).toStartWith(`M${5 * IN} ${2 * IN - 5 * 9525}L`);
+    expect(diamonds[1].textContent).toBe('Move');
+    // Each diamond has a wider hit area under it that starts the same drag.
+    const hits = nodes.filter((n) => n.getAttribute('class')?.includes('handle-hit'));
+    expect(hits.map((n) => n.getAttribute('data-handle'))).toEqual(['segment0', 'segment1']);
+    expect(Number(hits[1].getAttribute('r'))).toBe(11 * 9525);
+    // The end points paint last, over the segment handles.
+    expect(nodes.slice(-2).map((n) => n.getAttribute('data-handle'))).toEqual(['start', 'end']);
+    await win.happyDOM.close();
+  });
+
+  test('a segment near another corner line snaps to it, so a bend comes out', async () => {
+    const e = await open(deck(ell));
+    dragSegment(e, 'C4', 1, { x: 3 * IN, y: 2 * IN });
+    dragSegment(e, 'C4', 1, { x: 4.95 * IN, y: 2 * IN }, 0.1 * IN);
+    expect(presetOf(e, 'C4')).toBe('bentConnector2');
+    // Out of snap distance, it stays where the pointer is.
+    dragSegment(e, 'C4', 1, { x: 4.5 * IN, y: 2 * IN }, 0.1 * IN);
+    expect(presetOf(e, 'C4')).toBe('bentConnector3');
+  });
+
+  test('a glued end keeps a short run into its site before the new bend', async () => {
+    // An L from (1 in, 1 in) to the top site of B at (7 in, 3 in): right, then down into B.
+    const glued = connector({
+      id: 4,
+      prst: 'bentConnector2',
+      x: IN,
+      y: IN,
+      cx: 6 * IN,
+      cy: 2 * IN,
+      end: [3, 0],
+    });
+    const e = await open(deck(glued));
+    dragSegment(e, 'C4', 1, { x: 5 * IN, y: 2 * IN });
+    expect(presetOf(e, 'C4')).toBe('bentConnector4');
+    expect(cornersOf(e, 'C4')).toEqual([
+      [1, 1],
+      [5, 1],
+      [5, 2.75],
+      [7, 2.75],
+      [7, 3],
+    ]);
+    expect(slideXml(e)).toContain('<a:endCxn id="3" idx="0"/>');
   });
 });

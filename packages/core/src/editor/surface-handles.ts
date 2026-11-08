@@ -8,6 +8,7 @@
 import { apply, type LayoutItem, type Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { rotationHandle, unionBounds } from '../automation/commands/placement.ts';
+import { elbowCorners, segmentAxis } from '../automation/commands/connectors.ts';
 import { HANDLE_POS, HANDLES } from './surface-drag.ts';
 
 /** A table frame: it has a grid, and no rotation handle. */
@@ -15,16 +16,19 @@ const isTable = (item: LayoutItem): boolean => item.kind === 'frame' && !!item.t
 
 /**
  * The handles of `selected`, in slide units (`px` is one CSS pixel): the end points of `line`
- * when one line is selected, else the box handles.
+ * when one line is selected, with a handle on each segment of an elbow or curve connector
+ * (titled `segmentLabel`), else the box handles.
  */
 export function handleElements(
   doc: Document,
   selected: readonly LayoutItem[],
   line: { readonly start: { x: number; y: number }; readonly end: { x: number; y: number } } | null,
-  px: number
+  px: number,
+  segmentLabel = ''
 ): Element[] {
   const parts: Element[] = [];
   if (line) {
+    if (selected.length === 1) parts.push(...segmentHandles(doc, selected[0], px, segmentLabel));
     for (const [handle, p] of [
       ['start', line.start],
       ['end', line.end],
@@ -72,6 +76,52 @@ export function handleElements(
     parts.push(node);
   }
   return parts;
+}
+
+/** Segments shorter than this, in CSS pixels, show no handle: it would cover the ends. */
+const SHORTEST_SEGMENT = 24;
+
+/**
+ * A diamond at the middle of each segment of an elbow or curve connector. A drag moves the
+ * segment across (`moveElbowSegment`); on an end segment it adds a bend.
+ */
+function segmentHandles(doc: Document, item: LayoutItem, px: number, label: string): Element[] {
+  const corners = elbowCorners(item);
+  if (!corners) return [];
+  const out: Element[] = [];
+  for (let i = 0; i < corners.length - 1; i += 1) {
+    const a = apply(item.parentMatrix, corners[i].x, corners[i].y);
+    const b = apply(item.parentMatrix, corners[i + 1].x, corners[i + 1].y);
+    if (Math.hypot(b.x - a.x, b.y - a.y) < SHORTEST_SEGMENT * px) continue;
+    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const r = px * 5;
+    const axis = segmentAxis(a, b);
+    const titled = (node: Element): Element => {
+      node.setAttribute('data-handle', `segment${i}`);
+      const title = doc.createElementNS(SVG_NS, 'title');
+      title.textContent = label;
+      node.append(title);
+      return node;
+    };
+    // A wider, unseen hit area first, so a finger or a quick pointer finds the small diamond.
+    const hit = doc.createElementNS(SVG_NS, 'circle');
+    hit.setAttribute('class', `pptx-surface__handle-hit pptx-surface__handle--segment-${axis}`);
+    hit.setAttribute('cx', String(m.x));
+    hit.setAttribute('cy', String(m.y));
+    hit.setAttribute('r', String(px * 11));
+    const node = doc.createElementNS(SVG_NS, 'path');
+    node.setAttribute(
+      'class',
+      `pptx-surface__handle pptx-surface__handle--adjust pptx-surface__handle--segment-${axis}`
+    );
+    node.setAttribute(
+      'd',
+      `M${m.x} ${m.y - r}L${m.x + r} ${m.y}L${m.x} ${m.y + r}L${m.x - r} ${m.y}Z`
+    );
+    node.setAttribute('stroke-width', String(px));
+    out.push(titled(hit), titled(node));
+  }
+  return out;
 }
 
 /**

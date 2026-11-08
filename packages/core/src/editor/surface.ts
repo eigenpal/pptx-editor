@@ -408,12 +408,11 @@ export class SlideSurface {
     }
     // Handles show while text is edited too, so a text box can be resized without leaving it.
     if (sel.kind !== 'none' && !crop && !this.editor.readOnly()) {
-      parts.push(...handleElements(doc, selected, line, px));
+      const label = (key: string): string => this.editor.label(key);
+      parts.push(...handleElements(doc, selected, line, px, label('canvas.segmentHandle')));
       // One selected preset shape also shows its adjust handles, over the box handles.
       if (sel.kind === 'shapes' && selected.length === 1 && !line && this.editor.adjust)
-        parts.push(
-          ...adjustHandleElements(doc, selected[0], px, this.editor.label('canvas.adjustHandle'))
-        );
+        parts.push(...adjustHandleElements(doc, selected[0], px, label('canvas.adjustHandle')));
     }
     parts.push(...animationMarkElements(doc, layout, this.editor.animationMarks?.() ?? [], px));
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
@@ -528,9 +527,9 @@ export class SlideSurface {
     this.#syncRotating();
   }
 
-  /** A rotation drag keeps the rotate pointer, off the handle too (`pptx-surface--rotating`). */
+  /** A rotation or segment drag keeps its pointer off the handle too (`ShapeDrag.pointer`). */
   #syncRotating(): void {
-    this.root.classList.toggle('pptx-surface--rotating', this.#drag.rotating);
+    this.#drag.pointer(this.root.classList);
   }
 
   #onPointerDown = (e: PointerEvent): void => {
