@@ -12,7 +12,7 @@ import { imageSize } from '../store/index.ts';
 import { createSvgDocument, elementsWithAttribute, serializeSvgElement } from '../output/index.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import type { DocumentSession } from './document-session.ts';
-import { drawPng, mayTravel, paintLayout } from './export-image.ts';
+import { drawPng, fontsSettled, mayTravel, paintLayout } from './export-image.ts';
 import type { RegisteredFace } from '../layout/index.ts';
 
 /** What `renderImagePng` draws: a slide, or one shape of it, fit into a box of pixels. */
@@ -129,7 +129,7 @@ export async function renderImagePng(
   request: ImageRender
 ): Promise<Uint8Array> {
   if (typeof document === 'undefined') throw new CommandRefusal('errors.exportFailed', 'no DOM');
-  await Promise.all([document.fonts?.ready, session.picturesReady(index)]);
+  await Promise.all([fontsSettled(), session.picturesReady(index)]);
   const { svg, width, height } = paintPicture(session, index, request, document, () => true);
   const png = await drawPng(svg, width, height);
   return new Uint8Array(await png.arrayBuffer());

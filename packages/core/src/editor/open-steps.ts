@@ -52,6 +52,7 @@ export async function prepareDeck(
   const parseMs = performance.now() - parseAt;
   if (!r.ok) return stale() ? { kind: 'stale' } : { kind: 'refused', error: r.error };
   const session = r.session;
+  let faces: FontFaceHandle | undefined;
   try {
     step('fonts');
     // One wait from the end of the parse, for the text engine and the host's fonts at once.
@@ -68,7 +69,7 @@ export async function prepareDeck(
     step('faces');
     const generation = session.fontGeneration;
     if (typeof document === 'undefined') return { kind: 'ready', session, faces: null, generation };
-    const faces = registerFontFaces(document, session.faces);
+    faces = registerFontFaces(document, session.faces);
     await faces.ready;
     if (!stale()) {
       step('layout');
@@ -80,6 +81,8 @@ export async function prepareDeck(
     }
     return { kind: 'ready', session, faces, generation };
   } catch (cause) {
+    // A failed layout step also releases the faces it registered.
+    faces?.dispose();
     hostFonts.abandon(session);
     session.dispose();
     throw cause;
