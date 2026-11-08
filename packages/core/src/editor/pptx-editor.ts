@@ -27,8 +27,7 @@ import { commandCacheKey, compile, type CommandContext } from './commands.ts';
 import type { DocumentSession } from './document-session.ts';
 import { clampSlide } from './progressive-open.ts';
 import { changedSlide, historyAnswer, isHistoryMark, validSelection } from './history-marks.ts';
-import type { HistoryMark } from './history-marks.ts';
-import { markOf, markOptions } from './history-marks.ts';
+import { markOf, markOptions, type HistoryMark } from './history-marks.ts';
 import { EditorHistoryGroups, nextPasteSeries, type PasteSeries } from './history-groups.ts';
 import {
   CommandRefusal,
@@ -759,8 +758,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       const offPresence = presence.subscribe(() => surface?.render());
       presence.reset();
       detachModules = () => (offPresence(), detachSession());
-      opened.store.subscribe(() => {
+      opened.store.subscribe((change) => {
         cached = null;
+        presence.delivered(change);
         // A change made on the store directly (a host, a script): the editor did not set the
         // slide and the selection for it, so keep them valid and tell the chrome.
         if (committing > 0 || session !== opened) return;

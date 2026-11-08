@@ -26,17 +26,23 @@ const range = (e: PptxEditorInstance, paragraph: number, from: number, to: numbe
 const rejection = (e: PptxEditorInstance) => e.snapshot().lastRejection?.reason ?? null;
 
 /** A host's store edit: the first text node of the slide gets `text`. */
-function hostSetsText(e: PptxEditorInstance, text: string): void {
+/**
+ * A store edit from outside the editor: text node `index` of the slide gets `text`. Origin
+ * `user` is a host's own transaction; `remote` is a peer's, as a collaboration session sends.
+ */
+function hostSetsText(
+  e: PptxEditorInstance,
+  text: string,
+  index = 0,
+  origin: 'user' | 'remote' = 'user'
+): void {
   const part = e.session!.info.slides[0]!.partName;
   type Node = Element | { type: 'text' };
-  const first = (n: Node): Element | null =>
-    n.type !== 'element'
-      ? null
-      : n.local === 't'
-        ? n
-        : (n.children.map((c) => first(c as Node)).find(Boolean) ?? null);
-  const t = first(xmlPartOf(e.session!.store.package, part)!.root as Node)!;
-  expect(e.session!.store.transact([{ op: 'setText', part, node: t.id, text }]).ok).toBe(true);
+  const all = (n: Node): Element[] =>
+    n.type !== 'element' ? [] : n.local === 't' ? [n] : n.children.flatMap((c) => all(c as Node));
+  const t = all(xmlPartOf(e.session!.store.package, part)!.root as Node)[index]!;
+  const ops = [{ op: 'setText' as const, part, node: t.id, text }];
+  expect(e.session!.store.transact(ops, { origin }).ok).toBe(true);
 }
 
 describe('a composition over a selected range', () => {
@@ -149,6 +155,51 @@ describe('a host store edit during a composition at a caret', () => {
     beforeInput('insertText', 'Z');
     expect(texts(e)).toEqual(['HiZ']);
     expect(focusOf(e)).toEqual({ paragraph: 0, offset: 3 });
+    e.destroy();
+  });
+});
+
+describe('the origin of a change during a composition', () => {
+  /** A composition of "日本" at the end of the second of two paragraphs. */
+  async function composing() {
+    const opened = await open(para(run('one')) + para(run('two')));
+    caret(opened.e, 1, 3);
+    opened.fire(composition('compositionstart'));
+    opened.input.value = 'two日本';
+    const busy = () => opened.input.classList.contains(COMPOSING_CLASS);
+    return { ...opened, busy };
+  }
+
+  test('a peer transaction in another paragraph keeps the composition', async () => {
+    const { e, input, fire, busy } = await composing();
+    hostSetsText(e, 'ONE', 0, 'remote');
+    expect(busy()).toBe(true);
+    input.setSelectionRange(5, 5);
+    fire(composition('compositionend', '日本'));
+    expect(texts(e)).toEqual(['ONE', 'two日本']);
+    expect(rejection(e)).toBeNull();
+    e.destroy();
+  });
+
+  test('a local transaction that a listener makes during a peer change reads as local', async () => {
+    const { e, busy } = await composing();
+    // A host answers the peer's change, while the store delivers it, with its own edit.
+    let answered = false;
+    const off = e.subscribe(() => {
+      if (answered || e.session!.store.revision === 0) return;
+      answered = true;
+      hostSetsText(e, 'ONE!', 0);
+      // The editor publishes again before the store delivers the host's edit: the surface
+      // reads the store while the peer's change is still the one delivered.
+      e.setFontFamilies(['Open Sans']);
+    });
+    hostSetsText(e, 'ONE', 0, 'remote');
+    off();
+    expect(answered).toBe(true);
+    // The host's edit is local: the composition ends, and its text goes in at its place.
+    expect(busy()).toBe(false);
+    expect(texts(e)).toEqual(['ONE!', 'two日本']);
+    expect(rejection(e)).toBeNull();
     e.destroy();
   });
 });

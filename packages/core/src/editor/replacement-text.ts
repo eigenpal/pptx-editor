@@ -19,7 +19,6 @@ import type { EditorSelection } from '../contracts/index.ts';
 import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectionBody } from './table-cells.ts';
-import { deliveringChange } from '../store/store/delivering.ts';
 import {
   holdsSelection,
   placeCaret,
@@ -216,6 +215,11 @@ export interface SystemTextHost {
   follow(update: () => void): void;
   /** Publish the editor state. */
   emit(): void;
+  /**
+   * Whether the store state is what a peer's transaction made, with no local change since
+   * (`PresenceLink.remoteAt`): only that can keep a composition's place.
+   */
+  remoteChange?(): boolean;
   /** Publish why an input was not applied. */
   refuse(reason: string, detail?: string): void;
   /**
@@ -278,10 +282,7 @@ export function createSystemText(host: SystemTextHost) {
     /** The text the surface's input holds for the system. */
     typingContext,
     /** Whether the store delivers a peer's transaction now (origin `remote`). */
-    remoteChange(): boolean {
-      const store = host.session()?.store;
-      return !!store && deliveringChange(store)?.origin === 'remote';
-    },
+    remoteChange: (): boolean => host.remoteChange?.() ?? false,
     /** The place of the selection now, for a composition over a selected range. */
     selectionPlace: placeOfSelection,
     /**

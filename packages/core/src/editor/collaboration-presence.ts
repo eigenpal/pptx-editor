@@ -222,6 +222,24 @@ export class PresenceLink {
     return session?.subscribeRemoteSelections?.(() => listener()) ?? (() => {});
   }
 
+  /** The store revision that a peer's transaction made, while no other change followed. */
+  #remoteAt = -1;
+
+  /** Record a store change the editor handles: a peer's transaction (`remote`) or another. */
+  delivered(change: { readonly origin: string; readonly toRevision: number }): void {
+    this.#remoteAt = change.origin === 'remote' ? change.toRevision : -1;
+  }
+
+  /**
+   * Whether the store at `revision` is what a peer's transaction made. A local transaction
+   * raises the revision at once, also while the store delivers the peer's change, so it reads
+   * as local before the editor hears of it. An IME composition keeps its place only through
+   * a peer's change (`composition.ts`).
+   */
+  remoteAt(revision: number | undefined): boolean {
+    return revision !== undefined && revision === this.#remoteAt;
+  }
+
   /**
    * The local text selection after a remote change, moved with its characters. The editor
    * publishes on every change, so the session's `from` is the selection the editor shows.

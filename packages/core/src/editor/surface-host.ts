@@ -96,6 +96,7 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
       select: base.select,
       follow: (update) => s.arm.follow(update),
       refuse: base.refuse,
+      remoteChange: () => s.presence.remoteAt(s.session()?.store.revision),
       textInput: (kind, data, before) => base.textInput(kind, data, before),
     }),
     ...(s.commentMarkers ? { commentMarkers: s.commentMarkers } : {}),

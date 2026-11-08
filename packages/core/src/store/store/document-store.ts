@@ -37,7 +37,6 @@ import type { HistoryGroup, TransactOrigin } from './history-group.ts';
 import { introducedViolation } from './part-checks.ts';
 import { paragraphRangeFixes, type TextEditAt } from './paragraph-ranges.ts';
 import { commentAnchorFixes, type ParagraphText } from './comment-anchors.ts';
-import { setDelivering } from './delivering.ts';
 export type { TextEditAt } from './paragraph-ranges.ts';
 
 /** What a committed transaction changed. */
@@ -529,7 +528,6 @@ export class PptxDocumentStore {
     this.#delivering = true;
     try {
       for (let change = this.#pending.shift(); change; change = this.#pending.shift()) {
-        setDelivering(this, change);
         for (const listener of [...this.#listeners]) {
           try {
             listener(change);
@@ -539,7 +537,6 @@ export class PptxDocumentStore {
         }
       }
     } finally {
-      setDelivering(this, undefined);
       this.#delivering = false;
     }
   }
