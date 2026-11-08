@@ -172,7 +172,7 @@ export function createSystemText(host: SystemTextHost) {
      * next typed text. The edit is one text input over the target: one store transaction,
      * one undo step, and an undo puts the caret back where it was.
      */
-    replaceText(target: ReplacementTarget | null, replacement: string, committed?: string): void {
+    replaceText(target: ReplacementTarget | null, replacement: string, typed = false): void {
       const sel = host.selection();
       if (!target) {
         if (replacement) host.textInput('text', replacement, sel);
@@ -181,10 +181,11 @@ export function createSystemText(host: SystemTextHost) {
       const at = caretAt(sel);
       const range = at && replacementRange(at.text, at.offset, at.key, target);
       if (sel.kind !== 'text' || !at || !range) {
-        // An IME's text is the user's typing: when a peer's edit moved its target, the
-        // characters the model does not hold before the caret go in there, as typing would.
-        const fresh = committed && at ? newCharacters(at.text.slice(0, at.offset), committed) : '';
-        if (fresh) return host.textInput('text', fresh, sel);
+        // A composition's new characters are the user's typing (`typed`): when a peer's edit
+        // moved their target, they go in at the caret, as typing would. They are exactly the
+        // characters that the field did not hold when the composition started, so none
+        // repeats and none is lost.
+        if (typed && replacement) return host.textInput('text', replacement, sel);
         return host.refuse('errors.inputUnsupported', 'insertReplacementText');
       }
       // A change that changes nothing writes nothing: no undo step, no collaboration op.
@@ -209,21 +210,31 @@ export function createSystemText(host: SystemTextHost) {
   };
 }
 
-/**
- * The end of `committed` that `before` (the model text before the caret) does not already
- * end with: the characters to type so that the text before the caret ends with `committed`.
- * A word the model holds is never typed twice.
- */
-export function newCharacters(before: string, committed: string): string {
-  for (let k = Math.min(committed.length, before.length); k > 0; k -= 1)
-    if (before.endsWith(committed.slice(0, k))) return committed.slice(k);
-  return committed;
-}
-
 /** One change to the context: `target` becomes `text`. */
 export interface ContextEdit {
   readonly target: ReplacementTarget;
   readonly text: string;
+}
+
+const isHigh = (c: number): boolean => c >= 0xd800 && c <= 0xdbff;
+const isLow = (c: number): boolean => c >= 0xdc00 && c <= 0xdfff;
+
+/**
+ * How many UTF-16 units `a` and `b` share at the start and at the end (not overlapping),
+ * by whole code points: a shared end never splits a surrogate pair, so 😀 → 😃 is one change
+ * of one emoji.
+ */
+function sharedEnds(a: string, b: string): [number, number] {
+  const most = Math.min(a.length, b.length);
+  let lead = 0;
+  while (lead < most && a[lead] === b[lead]) lead += 1;
+  // A shared high surrogate whose low half differs belongs to the change.
+  if (lead > 0 && isHigh(a.charCodeAt(lead - 1))) lead -= 1;
+  let trail = 0;
+  while (trail < most - lead && a[a.length - 1 - trail] === b[b.length - 1 - trail]) trail += 1;
+  // A shared low surrogate whose high half differs belongs to the change.
+  if (trail > 0 && isLow(a.charCodeAt(a.length - trail))) trail -= 1;
+  return [lead, trail];
 }
 
 /**
@@ -232,15 +243,7 @@ export interface ContextEdit {
  * target's distance to the caret.
  */
 export function fieldEdit(before: string, after: string, key: string): ContextEdit {
-  let lead = 0;
-  const most = Math.min(before.length, after.length);
-  while (lead < most && before[lead] === after[lead]) lead += 1;
-  let trail = 0;
-  while (
-    trail < most - lead &&
-    before[before.length - 1 - trail] === after[after.length - 1 - trail]
-  )
-    trail += 1;
+  const [lead, trail] = sharedEnds(before, after);
   return {
     target: {
       text: before.slice(lead, before.length - trail),
@@ -273,21 +276,10 @@ export function compositionEdit(
   // The field outside the composition is unchanged.
   if (tail > before.length - at || before.slice(0, at) !== after.slice(0, at)) return null;
   if (before.slice(before.length - tail) !== after.slice(caret)) return null;
-  let replaced = before.slice(at, before.length - tail);
-  let text = data;
-  let lead = 0;
-  while (lead < replaced.length && lead < text.length && replaced[lead] === text[lead]) lead += 1;
-  replaced = replaced.slice(lead);
-  text = text.slice(lead);
-  let trail = 0;
-  while (
-    trail < replaced.length &&
-    trail < text.length &&
-    replaced[replaced.length - 1 - trail] === text[text.length - 1 - trail]
-  )
-    trail += 1;
-  replaced = replaced.slice(0, replaced.length - trail);
-  text = text.slice(0, text.length - trail);
+  const covered = before.slice(at, before.length - tail);
+  const [lead, trail] = sharedEnds(covered, data);
+  const replaced = covered.slice(lead, covered.length - trail);
+  const text = data.slice(lead, data.length - trail);
   const reach = tail + trail;
   const between = before.slice(before.length - reach);
   return { target: { text: replaced, after: reach, between, paragraph: key }, text };

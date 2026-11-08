@@ -36,10 +36,11 @@ export interface SurfaceInputHost {
   /**
    * Apply a system text change: `replacement` replaces `target` when the model text before
    * the caret holds it, and goes in at the caret when there is no target
-   * (`replacement-text.ts`). `committed`: the text an IME committed; when the target no
-   * longer matches, its new characters go in at the caret, so no typed text is lost.
+   * (`replacement-text.ts`). `typed`: `replacement` holds the new characters of an IME
+   * composition; when the target no longer matches, they go in at the caret, so no typed
+   * text is lost.
    */
-  replaceText?(target: ReplacementTarget | null, replacement: string, committed?: string): void;
+  replaceText?(target: ReplacementTarget | null, replacement: string, typed?: boolean): void;
   /** The text the input holds for the system, or null for none. */
   typingContext?(): TypingContext | null;
   /** The text for a translation key: the input's description. */
@@ -253,6 +254,9 @@ function measurer(input: HTMLTextAreaElement): (text: string) => number {
   };
 }
 
+/** A strong right-to-left letter: Hebrew, Arabic, Syriac, Thaana, N'Ko, and their forms. */
+const RTL = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/u;
+
 /** The surface's input binding. */
 export interface SurfaceInputBinding {
   /** Put the caret's context in the input (`TypingContext`); none while an IME composes. */
@@ -303,6 +307,16 @@ export function bindSurfaceInput(
     if (input.selectionStart !== end || input.selectionEnd !== end)
       input.setSelectionRange(end, end);
   };
+  /**
+   * The input selection counts only for the edit that the system sends with it, in the same
+   * task: a system replacement selects its target and sends its `beforeinput` at once. A
+   * selection that is still there when `selectionchange` (or `select`) runs, a task later,
+   * came from something with no edit after it: a native key, a pointer, an emoji picker or
+   * dictation that opens. The caret goes back before any later input can use it.
+   */
+  const onSelectionChange = (): void => {
+    if (input.ownerDocument.activeElement === input) collapse();
+  };
   const width = measurer(input);
   // The input grows with the text being composed, so the text shows at the caret while the
   // IME composes it (the slide shows the text only once the composition ends). The context
@@ -311,6 +325,7 @@ export function bindSurfaceInput(
   const fit = (): void => {
     input.style.width = '';
     input.style.marginLeft = '';
+    input.style.direction = '';
     if (!composing || input.value === composeFrom.value) return;
     const from = composeFrom.value;
     const value = input.value;
@@ -320,8 +335,15 @@ export function bindSurfaceInput(
     const back = shared < from.length ? width(from.slice(shared)) : 0;
     const shown = back > 0 ? width(value.slice(shared)) : 0;
     if (back > 0 && shown > 0) {
-      input.style.marginLeft = `${-back}px`;
       input.style.width = `${Math.ceil(shown) + 1}px`;
+      // In right-to-left text the word before the caret is on its right: the input stays at
+      // the caret and grows right, and shows the end of its text, which is on its left.
+      if (RTL.test(from.slice(shared))) {
+        input.style.direction = 'rtl';
+        input.scrollLeft = -input.scrollWidth;
+        return;
+      }
+      input.style.marginLeft = `${-back}px`;
       input.scrollLeft = input.scrollWidth;
       return;
     }
@@ -337,6 +359,9 @@ export function bindSurfaceInput(
   const onBeforeInput = (e: InputEvent): void => {
     // The IME owns the field until it finishes; the result arrives at composition end.
     if (composing) return;
+    // An edit the browser does not let the editor cancel changes the field itself: the
+    // `input` event after it applies that change once (`fieldEdit`), so nothing goes in twice.
+    if (!e.cancelable) return;
     e.preventDefault();
     const target =
       e.inputType === 'insertReplacementText'
@@ -384,7 +409,7 @@ export function bindSurfaceInput(
     if (edit.target.text === '' && edit.text === '') return; // Nothing changed.
     if (edit.target.text === '' && edit.target.after === 0)
       return host.textInput('text', edit.text);
-    host.replaceText(edit.target, edit.text, data);
+    host.replaceText(edit.target, edit.text, true);
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     // Before the key acts, also the first key of a composition (key code 229): a caret or a
@@ -412,6 +437,12 @@ export function bindSurfaceInput(
   };
   input.addEventListener('beforeinput', onBeforeInput);
   input.addEventListener('input', onInput);
+  // A browser fires `selectionchange` at the document, at the input, or both; `select` covers
+  // a selection with no `selectionchange`. The reset is the same for each.
+  const doc = input.ownerDocument;
+  doc.addEventListener('selectionchange', onSelectionChange);
+  input.addEventListener('selectionchange', onSelectionChange);
+  input.addEventListener('select', onSelectionChange);
   input.addEventListener('compositionstart', onCompositionStart);
   input.addEventListener('compositionend', onCompositionEnd);
   input.addEventListener('keydown', onKeyDown);
@@ -429,6 +460,9 @@ export function bindSurfaceInput(
     root.removeEventListener('contextmenu', onContextMenu);
     input.removeEventListener('beforeinput', onBeforeInput);
     input.removeEventListener('input', onInput);
+    doc.removeEventListener('selectionchange', onSelectionChange);
+    input.removeEventListener('selectionchange', onSelectionChange);
+    input.removeEventListener('select', onSelectionChange);
     input.removeEventListener('compositionstart', onCompositionStart);
     input.removeEventListener('compositionend', onCompositionEnd);
     input.removeEventListener('keydown', onKeyDown);

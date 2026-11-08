@@ -20,7 +20,6 @@ import {
   contextBefore,
   CONTEXT_LIMIT,
   paragraphKey,
-  newCharacters,
   replacementRange,
 } from '../replacement-text.ts';
 import { dispatchBeforeInput, replacementTarget } from '../surface-input.ts';
@@ -319,6 +318,64 @@ describe('a system replacement (insertReplacementText)', () => {
     e.destroy();
   });
 
+  for (const [label, data] of [
+    ['an emoji picker', '😀'],
+    ['dictation', ' and more'],
+  ] as const) {
+    test(`${label} with no key never types over a selection a native key left`, async () => {
+      const { e, input, type, fire, beforeInput } = await open(para(''));
+      caret(e, 0, 0);
+      type('hello world');
+      // A native key (Shift+PageUp) selects in the input; the model caret stays.
+      input.focus();
+      input.setSelectionRange(0, 11);
+      fire(new win.Event('selectionchange') as unknown as Event);
+      expect([input.selectionStart, input.selectionEnd]).toEqual([11, 11]);
+      // The text arrives with no keydown first.
+      beforeInput('insertText', data);
+      expect(texts(e)).toEqual([`hello world${data}`]);
+      e.destroy();
+    });
+  }
+
+  test('an input that cannot be canceled goes to the model once, by the field', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('ab');
+    const event = new win.InputEvent('beforeinput', {
+      inputType: 'insertText',
+      data: 'c',
+      bubbles: true,
+      cancelable: false,
+    }) as unknown as Event;
+    fire(event);
+    expect(texts(e)).toEqual(['ab']);
+    // The browser applies the text to the field; the input event reports it.
+    input.value = 'abc';
+    fire(
+      new win.InputEvent('input', {
+        inputType: 'insertText',
+        data: 'c',
+        bubbles: true,
+      }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['abc']);
+    e.destroy();
+  });
+
+  test('a field change of one emoji to another replaces the whole emoji', async () => {
+    const { e, input, fire, beforeInput } = await open(para(''));
+    caret(e, 0, 0);
+    beforeInput('insertText', 'ok 😀');
+    input.value = 'ok 😃';
+    fire(
+      new win.InputEvent('input', { inputType: 'insertText', bubbles: true }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['ok 😃']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 5 });
+    e.destroy();
+  });
+
   test('a selection over a field that is not the synced text is refused', async () => {
     const { e, input, type, replace } = await open(para(''));
     caret(e, 0, 0);
@@ -477,10 +534,11 @@ describe('a composition over the text the input holds', () => {
       target: { text: '', after: 0, between: '', paragraph: 'k' },
       text: '',
     });
-    // When the model lost the target, only the committed characters it lacks are new.
-    expect(newCharacters('a hel', 'hello')).toBe('lo');
-    expect(newCharacters('a hello', 'hello')).toBe('');
-    expect(newCharacters('a help', 'hello')).toBe('hello');
+    // An emoji recomposed to another is one change of the whole emoji.
+    expect(compositionEdit('ok 😀', 'ok 😃', 5, '😃', 'k')).toEqual({
+      target: { text: '😀', after: 0, between: '', paragraph: 'k' },
+      text: '😃',
+    });
     // The field does not hold the committed text at the caret.
     expect(compositionEdit('abc', 'abcに', 4, '日本', 'k')).toBeNull();
   });
@@ -562,8 +620,8 @@ describe('a composition over the text the input holds', () => {
     input.value = 'a hello';
     input.setSelectionRange(7, 7);
     fire(composition('compositionend', 'hello'));
-    // Nothing is lost and no word goes in twice: the committed word follows the caret.
-    expect(texts(e)).toEqual(['a helo!hello']);
+    // Nothing is lost and no letter goes in twice: the new letter follows the caret.
+    expect(texts(e)).toEqual(['a helo!l']);
     e.destroy();
   });
 
