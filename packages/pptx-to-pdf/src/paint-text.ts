@@ -147,7 +147,12 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       }
       const key = p.fontKey(run.face.id, font);
       const size = run.sizePt * EMU_PER_PT;
-      const y = line.baseline - run.rise;
+      // Stacked text: the line's baseline is the axis through the letter centers (core's
+      // `columnLines`). The turned letters center their ascent and descent on it, as the
+      // upright letters of the SVG paint center on it.
+      const m = run.face.metrics;
+      const across = layout.upright === 'all' ? ((m.ascent - m.descent) / 2) * size : 0;
+      const y = line.baseline - run.rise + across;
       p.push(pushGraphicsState(), beginText(), setFontAndSize(key, 1));
       if (runColor) {
         p.alpha(runColor.a, 1);
