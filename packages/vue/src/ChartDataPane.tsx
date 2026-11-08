@@ -10,7 +10,7 @@ import {
   CHART_TYPE_CHOICES,
   chartAxisTitleLabels,
   chartSeriesNote,
-  chartTypeChangeNote,
+  changeChartTypeKeeping,
   chartTypeHint,
   chartColorCommand,
   chartColorPick,
@@ -19,6 +19,7 @@ import {
   chartPaneDraftContinues,
   chartTitleCommand,
   chartValueText,
+  focusChartRow,
   colorPickOf,
   nextChartCategoryLabel,
   renderedColorOf,
@@ -124,6 +125,7 @@ const SeriesCard = defineComponent({
       const name = series.name || t('chartData.unnamed');
       return (
         <details
+          data-chart-row="series"
           class="pptx-chart-pane__card"
           open={props.open}
           onToggle={(e: Event) => props.onToggle((e.currentTarget as HTMLDetailsElement).open)}
@@ -159,7 +161,11 @@ const SeriesCard = defineComponent({
               class="pptx-button pptx-chart-pane__remove"
               disabled={disabled || data.series.length <= 1}
               aria-label={t('chartData.removeSeriesNamed', { name })}
-              onClick={() => props.run({ type: 'removeSeries', series: index })}
+              onClick={(e: MouseEvent) => {
+                const pane = (e.currentTarget as Element).closest('.pptx-chart-pane');
+                if (props.run({ type: 'removeSeries', series: index }))
+                  focusChartRow(pane, 'series', index);
+              }}
             >
               {t('chartData.removeSeries')}
             </button>
@@ -233,10 +239,12 @@ const ChartFormatSection = defineComponent({
       const set = (change: ChartFormatChange) => run({ type: 'setChartFormat', format: change });
       const nodeId = props.nodeId;
       const changeType = (chartType: ChartType) => {
-        const reason = run({ type: 'setChartType', chartType });
-        const after = reason === null && editor.value ? editor.value.chartFormat(nodeId) : null;
-        const key = after?.ok ? chartTypeChangeNote(format, after.format) : null;
-        typeNote.value = key ? { nodeId, key } : null;
+        if (!editor.value) return;
+        const { reason, note } = changeChartTypeKeeping(editor.value, nodeId, chartType);
+        // A refusal runs the command again through the tab, which announces it.
+        if (reason) run({ type: 'setChartType', nodeId, chartType });
+        else run(null);
+        typeNote.value = note ? { nodeId, key: note } : null;
       };
       const notes = [
         typeNote.value?.nodeId === nodeId ? typeNote.value.key : chartTypeHint(format),
@@ -369,6 +377,7 @@ export const ChartDataPane = defineComponent({
     const revision = useEditorState((s) => s.revision);
     const readOnly = useEditorState((s) => s.mode === 'view');
     const refusal = ref<string | null>(null);
+    const pane = ref<HTMLDivElement | null>(null);
     const open = ref<ReadonlySet<number>>(new Set([0]));
     let draftScope = { key: '', reset: 0 };
     const toggle = (index: number, isOpen: boolean): void => {
@@ -419,7 +428,10 @@ export const ChartDataPane = defineComponent({
       };
       /** Runs a command of the type, elements, or colors; the tab announces a refusal. */
       const runFormat = (command: EditorCommand | null): string | null => {
-        if (!command) return null;
+        if (!command) {
+          refusal.value = null;
+          return null;
+        }
         const result = editor.value?.exec(command);
         const reason = !result || result.ok ? null : t(result.reason as TranslationKey);
         refusal.value = reason;
@@ -439,7 +451,7 @@ export const ChartDataPane = defineComponent({
             ? t('chartData.workbookExternal')
             : null;
       return (
-        <div class="pptx-chart-pane">
+        <div ref={pane} class="pptx-chart-pane">
           <p class="pptx-chart-pane__error" role="alert">
             {refusal.value ?? ''}
           </p>
@@ -458,7 +470,7 @@ export const ChartDataPane = defineComponent({
             {note ? <p class="pptx-chart-pane__note">{note}</p> : null}
             <ul class="pptx-chart-pane__list">
               {data.categories.map((c, i) => (
-                <li key={i} class="pptx-chart-pane__row">
+                <li key={i} data-chart-row="category" class="pptx-chart-pane__row">
                   <ChartField
                     draftKey={draftKey}
                     label={t(xy ? 'chartData.xValueLabel' : 'chartData.categoryLabel', {
@@ -470,10 +482,15 @@ export const ChartDataPane = defineComponent({
                     onCommit={(text: string) => apply({ type: 'label', category: i, text })}
                   />
                   <ToolButton
-                    label={t('chartData.removeCategoryNamed', { name: c.label })}
+                    label={t(xy ? 'chartData.removeXValueNamed' : 'chartData.removeCategoryNamed', {
+                      name: c.label,
+                    })}
                     icon="delete"
                     disabled={disabled || data.categories.length <= 1}
-                    onClick={() => run({ type: 'removeCategory', category: i })}
+                    onClick={() => {
+                      if (run({ type: 'removeCategory', category: i }))
+                        focusChartRow(pane.value, 'category', i);
+                    }}
                   />
                 </li>
               ))}
@@ -482,17 +499,16 @@ export const ChartDataPane = defineComponent({
               type="button"
               class="pptx-button"
               disabled={disabled}
-              onClick={() =>
-                run({
-                  type: 'addCategory',
-                  label: nextChartCategoryLabel(
-                    data,
-                    t('chartData.newCategory', { number: data.categories.length + 1 })
-                  ),
-                })
-              }
+              onClick={() => {
+                const label = nextChartCategoryLabel(
+                  data,
+                  t('chartData.newCategory', { number: data.categories.length + 1 })
+                );
+                if (run({ type: 'addCategory', label }))
+                  focusChartRow(pane.value, 'category', data.categories.length, true);
+              }}
             >
-              {t('chartData.addCategory')}
+              {t(xy ? 'chartData.addXValue' : 'chartData.addCategory')}
             </button>
           </section>
           <section class="pptx-panel__section">
@@ -516,8 +532,12 @@ export const ChartDataPane = defineComponent({
               disabled={disabled}
               onClick={() => {
                 const at = data.series.length;
-                if (run({ type: 'addSeries', name: t('chartData.newSeries', { number: at + 1 }) }))
+                if (
+                  run({ type: 'addSeries', name: t('chartData.newSeries', { number: at + 1 }) })
+                ) {
                   toggle(at, true);
+                  focusChartRow(pane.value, 'series', at, true);
+                }
               }}
             >
               {t('chartData.addSeries')}

@@ -7,13 +7,13 @@
 // core (`chart-pane.ts`), so the Vue twin (`packages/vue/src/ChartDataPane.tsx`) checks the same
 // input with the same keys.
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   CHART_LEGEND_CHOICES,
   CHART_TYPE_CHOICES,
   chartAxisTitleLabels,
   chartSeriesNote,
-  chartTypeChangeNote,
+  changeChartTypeKeeping,
   chartTypeHint,
   chartColorCommand,
   chartColorPick,
@@ -22,6 +22,7 @@ import {
   chartPaneDraftContinues,
   chartTitleCommand,
   chartValueText,
+  focusChartRow,
   colorPickOf,
   nextChartCategoryLabel,
   renderedColorOf,
@@ -133,6 +134,7 @@ function SeriesCard({
   const name = series.name || t('chartData.unnamed');
   return (
     <details
+      data-chart-row="series"
       className="pptx-chart-pane__card"
       open={open}
       onToggle={(e) => onToggle(e.currentTarget.open)}
@@ -166,7 +168,10 @@ function SeriesCard({
           className="pptx-button pptx-chart-pane__remove"
           disabled={disabled || data.series.length <= 1}
           aria-label={t('chartData.removeSeriesNamed', { name })}
-          onClick={() => run({ type: 'removeSeries', series: index })}
+          onClick={(e) => {
+            const pane = e.currentTarget.closest('.pptx-chart-pane');
+            if (run({ type: 'removeSeries', series: index })) focusChartRow(pane, 'series', index);
+          }}
         >
           {t('chartData.removeSeries')}
         </button>
@@ -231,10 +236,12 @@ function ChartFormatSection({
   if (!read?.ok) return null;
   const format = read.format;
   const changeType = (chartType: ChartType) => {
-    const reason = run({ type: 'setChartType', chartType });
-    const after = reason === null && editor ? editor.chartFormat(nodeId) : null;
-    const key = after?.ok ? chartTypeChangeNote(format, after.format) : null;
-    setTypeNote(key ? { nodeId, key } : null);
+    if (!editor) return;
+    const { reason, note } = changeChartTypeKeeping(editor, nodeId, chartType);
+    // A refusal runs the command again through the tab, which announces it.
+    if (reason) run({ type: 'setChartType', nodeId, chartType });
+    else run(null);
+    setTypeNote(note ? { nodeId, key: note } : null);
   };
   const notes = [
     typeNote?.nodeId === nodeId ? typeNote.key : chartTypeHint(format),
@@ -363,6 +370,7 @@ export function ChartDataPane() {
   const readOnly = useEditorState((s) => s.mode === 'view');
   const read = editor && chart ? editor.chartData(chart.nodeId) : null;
   const [refusal, setRefusal] = useState<string | null>(null);
+  const pane = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
   const [draftScope, setDraftScope] = useState({ key: '', reset: 0 });
   if (!chart || !read)
@@ -403,7 +411,10 @@ export function ChartDataPane() {
   };
   /** Runs a command of the type, elements, or colors; the tab announces a refusal. */
   const runFormat = (command: EditorCommand | null): string | null => {
-    if (!command) return null;
+    if (!command) {
+      setRefusal(null);
+      return null;
+    }
     const result = editor?.exec(command);
     const reason = !result || result.ok ? null : t(result.reason as TranslationKey);
     setRefusal(reason);
@@ -431,7 +442,7 @@ export function ChartDataPane() {
         ? t('chartData.workbookExternal')
         : null;
   return (
-    <div className="pptx-chart-pane">
+    <div ref={pane} className="pptx-chart-pane">
       <p className="pptx-chart-pane__error" role="alert">
         {refusal ?? ''}
       </p>
@@ -450,7 +461,7 @@ export function ChartDataPane() {
         {note ? <p className="pptx-chart-pane__note">{note}</p> : null}
         <ul className="pptx-chart-pane__list">
           {data.categories.map((c, i) => (
-            <li key={i} className="pptx-chart-pane__row">
+            <li key={i} data-chart-row="category" className="pptx-chart-pane__row">
               <ChartField
                 draftKey={draftKey}
                 label={t(xy ? 'chartData.xValueLabel' : 'chartData.categoryLabel', {
@@ -462,10 +473,15 @@ export function ChartDataPane() {
                 onCommit={(text) => apply({ type: 'label', category: i, text })}
               />
               <ToolButton
-                label={t('chartData.removeCategoryNamed', { name: c.label })}
+                label={t(xy ? 'chartData.removeXValueNamed' : 'chartData.removeCategoryNamed', {
+                  name: c.label,
+                })}
                 icon="delete"
                 disabled={disabled || data.categories.length <= 1}
-                onClick={() => run({ type: 'removeCategory', category: i })}
+                onClick={() => {
+                  if (run({ type: 'removeCategory', category: i }))
+                    focusChartRow(pane.current, 'category', i);
+                }}
               />
             </li>
           ))}
@@ -474,17 +490,16 @@ export function ChartDataPane() {
           type="button"
           className="pptx-button"
           disabled={disabled}
-          onClick={() =>
-            run({
-              type: 'addCategory',
-              label: nextChartCategoryLabel(
-                data,
-                t('chartData.newCategory', { number: data.categories.length + 1 })
-              ),
-            })
-          }
+          onClick={() => {
+            const label = nextChartCategoryLabel(
+              data,
+              t('chartData.newCategory', { number: data.categories.length + 1 })
+            );
+            if (run({ type: 'addCategory', label }))
+              focusChartRow(pane.current, 'category', data.categories.length, true);
+          }}
         >
-          {t('chartData.addCategory')}
+          {t(xy ? 'chartData.addXValue' : 'chartData.addCategory')}
         </button>
       </section>
       <section className="pptx-panel__section">
@@ -508,8 +523,10 @@ export function ChartDataPane() {
           disabled={disabled}
           onClick={() => {
             const at = data.series.length;
-            if (run({ type: 'addSeries', name: t('chartData.newSeries', { number: at + 1 }) }))
+            if (run({ type: 'addSeries', name: t('chartData.newSeries', { number: at + 1 }) })) {
               toggle(at, true);
+              focusChartRow(pane.current, 'series', at, true);
+            }
           }}
         >
           {t('chartData.addSeries')}

@@ -66,6 +66,32 @@ export function focusCurrentSwatch(panel: HTMLElement | null): void {
 }
 
 /**
+ * After a row of the Chart tab is added or removed, move the focus to row `index` of `list`
+ * (`data-chart-row`), else to its last row: its first field (the summary of a closed card),
+ * with the text selected for a new row. `from` is the tab or an element in it; the focus moves
+ * after the tab renders again, so a keyboard user keeps their place. @internal
+ */
+export function focusChartRow(
+  from: Element | null,
+  list: 'category' | 'series',
+  index: number,
+  select = false
+): void {
+  const pane = from?.closest('.pptx-chart-pane');
+  const view = pane?.ownerDocument.defaultView;
+  if (!pane || !view) return;
+  view.requestAnimationFrame(() => {
+    const rows = pane.querySelectorAll(`[data-chart-row="${list}"]`);
+    const row = rows[Math.min(index, rows.length - 1)];
+    // A closed series card shows its summary only.
+    const closed = row instanceof view.HTMLDetailsElement && !row.open;
+    const field = row?.querySelector<HTMLElement>(closed ? 'summary' : 'input:not([disabled])');
+    field?.focus();
+    if (select && field instanceof view.HTMLInputElement) field.select();
+  });
+}
+
+/**
  * The arrow keys, Home, and End in a roving swatch grid, as a WAI-ARIA grid of buttons: they
  * move by column and row, and the Tab stop moves with the focus. @internal
  */

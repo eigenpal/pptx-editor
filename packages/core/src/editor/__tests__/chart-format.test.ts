@@ -13,6 +13,7 @@ import { CHART_TYPES } from '../../automation/commands/chart-type.ts';
 import {
   chartSeriesNote,
   chartTypeChangeNote,
+  changeChartTypeKeeping,
   createPptxEditor,
   listenPaneRequests,
   runToolbarCommand,
@@ -340,6 +341,28 @@ describe('the Chart tab after an insert or a type change', () => {
     expect(runToolbarCommand(e, 'insert.chart', 'pie').ok).toBe(true);
     stop();
     expect(asked).toEqual([['chart', false]]);
+  });
+
+  test('a change through Pie and back gives the colors and axis titles back', async () => {
+    const e = await inserted('columnClustered');
+    const selection = e.snapshot().selection;
+    if (selection.kind !== 'shapes') throw new Error('selection');
+    const nodeId = selection.nodeIds[0]!;
+    expect(e.exec({ type: 'setChartColor', index: 1, color: '#7030A0' }).ok).toBe(true);
+    const titles = { categoryAxisTitle: 'Quarter', valueAxisTitle: 'Sales' };
+    expect(e.exec({ type: 'setChartFormat', format: titles }).ok).toBe(true);
+    expect(changeChartTypeKeeping(e, nodeId, 'pie')).toEqual({
+      reason: null,
+      note: 'chartFormat.typeChangeRemoved',
+    });
+    expect(changeChartTypeKeeping(e, nodeId, 'barClustered')).toEqual({ reason: null, note: null });
+    const back = format(e);
+    expect(back.colors[1]!.color).toBe('#7030A0');
+    expect(back.axisTitles).toEqual({ category: 'Quarter', value: 'Sales' });
+    // The change and the restore are one undo step: Undo goes back to the pie.
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(format(e).type).toBe('pie');
+    expect(changeChartTypeKeeping(e, nodeId, 'pie').reason).toBe('errors.chartFormat.sameType');
   });
 
   test('a type change says what it drops, and a pie chart says it shows one series', async () => {

@@ -429,6 +429,16 @@ export type CapsStyle = 'none' | 'small' | 'all';
 // @public
 export type CaretAffinity = 'downstream' | 'upstream';
 
+// @internal
+export function changeChartTypeKeeping(editor: {
+    exec: Editor['exec'];
+    beginHistoryGroup: Editor['beginHistoryGroup'];
+    chartFormat(nodeId?: string): ChartFormatRead;
+}, nodeId: string, chartType: ChartType): {
+    readonly reason: string | null;
+    readonly note: 'chartFormat.typeChangeRemoved' | null;
+};
+
 // @public
 export const CHART_LEGEND_CHOICES: readonly ChartLegendPosition[];
 
@@ -2856,6 +2866,9 @@ export interface FixedView {
 
 // @internal
 export function focusAfterFindBar(editor: PptxEditorInstance | null, bar: Element | null | undefined, scopeFrom: Element | null | undefined, opener: HTMLElement | null): void;
+
+// @internal
+export function focusChartRow(from: Element | null, list: 'category' | 'series', index: number, select?: boolean): void;
 
 // @internal
 export function focusCurrentSlideIn(root: HTMLElement | null | undefined): void;

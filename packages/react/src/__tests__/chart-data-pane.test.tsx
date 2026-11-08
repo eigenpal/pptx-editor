@@ -124,6 +124,19 @@ describe('Chart Data tab (React)', () => {
     expect(values(editor).series.map((s) => s.name)).toEqual(['Plan', 'Forecast', 'Stretch']);
   });
 
+  test('an add focuses the new row, and a remove focuses the row that takes its place', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    const frame = () => act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Add category' })));
+    await frame();
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Category 5' }));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Remove category South' })));
+    await frame();
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Category 2' }));
+    expect((document.activeElement as HTMLInputElement).value).toBe('East');
+  });
+
   test('removing a category clears rejected drafts before indexes change', async () => {
     const editor = await mount(<SidePanel tab="chart" />);
     selectChart(editor);

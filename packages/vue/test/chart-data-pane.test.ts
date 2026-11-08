@@ -115,6 +115,24 @@ describe('Chart Data tab', () => {
     expect(v).toContain('Enter a number, or leave the cell empty.');
   });
 
+  test('Vue focuses the new row after an add, and the next row after a remove', async () => {
+    const el = await mountVue(await deck());
+    const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+    const button = (name: string) =>
+      [...el.querySelectorAll('button')].find(
+        (b) => (b.getAttribute('aria-label') ?? b.textContent) === name
+      )!;
+    button('Add category').click();
+    await flush();
+    await frame();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Category 5');
+    button('Remove category South').click();
+    await flush();
+    await frame();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Category 2');
+    expect((document.activeElement as HTMLInputElement).value).toBe('East');
+  });
+
   test('Vue clears rejected drafts after categories and series are removed', async () => {
     const editor = await deck();
     const el = await mountVue(editor);

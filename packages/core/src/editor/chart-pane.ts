@@ -8,8 +8,10 @@ import type {
   ChartColorEntry,
   ChartData,
   ChartFormat,
+  ChartFormatRead,
   ChartLegendPosition,
   ChartType,
+  Editor,
   EditorCommand,
   EditorSnapshot,
 } from '../contracts/index.ts';
@@ -235,6 +237,69 @@ export function chartSeriesNote(
   seriesCount: number
 ): 'chartFormat.pieFirstSeries' | null {
   return format.type === 'pie' && seriesCount > 1 ? 'chartFormat.pieFirstSeries' : null;
+}
+
+/** For each editor and chart: the format before a type change that dropped some of it. */
+const dropped = new WeakMap<object, Map<string, ChartFormat>>();
+
+/** The commands that give `now` back the colors and axis titles of `saved` that it lacks. */
+function restoreCommands(nodeId: string, saved: ChartFormat, now: ChartFormat): EditorCommand[] {
+  const out: EditorCommand[] = [];
+  if (saved.colorsBy === now.colorsBy)
+    for (const [index, entry] of saved.colors.entries())
+      if (entry.color !== null && now.colors[index]?.color === null)
+        out.push({ type: 'setChartColor', nodeId, index, color: entry.color });
+  const titles = saved.axisTitles;
+  if (titles && now.axisTitles) {
+    const change: { categoryAxisTitle?: string; valueAxisTitle?: string } = {};
+    if (titles.category && !now.axisTitles.category) change.categoryAxisTitle = titles.category;
+    if (titles.value && !now.axisTitles.value) change.valueAxisTitle = titles.value;
+    if (Object.keys(change).length) out.push({ type: 'setChartFormat', nodeId, format: change });
+  }
+  return out;
+}
+
+/**
+ * Change the type of chart `nodeId` from the Chart tab, as one undo step. A type that cannot
+ * keep the colors or axis titles that the user set drops them, and the editor remembers them
+ * for this session: a later change to a type that can keep them gives them back. Returns the
+ * refusal reason or null, and the note to show (`chartTypeChangeNote`). @internal
+ */
+export function changeChartTypeKeeping(
+  editor: {
+    exec: Editor['exec'];
+    beginHistoryGroup: Editor['beginHistoryGroup'];
+    chartFormat(nodeId?: string): ChartFormatRead;
+  },
+  nodeId: string,
+  chartType: ChartType
+): { readonly reason: string | null; readonly note: 'chartFormat.typeChangeRemoved' | null } {
+  const before = editor.chartFormat(nodeId);
+  if (!before.ok) return { reason: before.reason, note: null };
+  const group = editor.beginHistoryGroup();
+  try {
+    const result = editor.exec(
+      { type: 'setChartType', nodeId, chartType },
+      { historyGroup: group }
+    );
+    if (!result.ok) return { reason: result.reason, note: null };
+    const memory = dropped.get(editor) ?? new Map<string, ChartFormat>();
+    dropped.set(editor, memory);
+    const saved = memory.get(nodeId);
+    const changed = editor.chartFormat(nodeId);
+    if (saved && changed.ok) {
+      for (const command of restoreCommands(nodeId, saved, changed.format))
+        editor.exec(command, { historyGroup: group });
+    }
+    const now = editor.chartFormat(nodeId);
+    const note = now.ok ? chartTypeChangeNote(before.format, now.format) : null;
+    if (note) memory.set(nodeId, saved ?? before.format);
+    else if (saved && now.ok && restoreCommands(nodeId, saved, now.format).length === 0)
+      memory.delete(nodeId);
+    return { reason: null, note };
+  } finally {
+    group.end();
+  }
 }
 
 /** The labels of the two axis title fields: category and value, or X and Y. @public */
