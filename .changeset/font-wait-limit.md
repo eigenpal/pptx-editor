@@ -5,4 +5,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Decks no longer stay on the loading spinner: the open waits at most 2 seconds for fonts. Add `editor.fontMeasurement()`, `openFailureReport()`, and the `blocked` open-failure reason. Large and damaged decks open faster and more safely.
+Decks no longer stay on the loading spinner: the open waits at most 2 seconds for fonts. Add `editor.fontMeasurement()`, `openFailureReport()`, and `showCopy`. `DocumentOpenFailureReason` adds `blocked`, so update exhaustive maps of it. Large and damaged decks open faster and more safely.

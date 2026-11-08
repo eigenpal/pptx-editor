@@ -6,4 +6,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Add **New comment** to the canvas context menus, with `registerCommentDraft` and `requestCommentDraft`. Comment commands take `expect`, and threads report `identity`. Comments with repeated ids get new ids, so read ids from the current snapshot.
+Add **New comment** to the canvas context menus, with `registerCommentDraft` and `requestCommentDraft`. Comment commands take `expect` and can fail with `errors.commentChanged`, `errors.commentAmbiguous`, or `errors.noComment`. Threads report `identity`. Ids of repeated comments, comments with `~`, and legacy comments with `-`, `#`, or `%` change, so read ids from the current snapshot.

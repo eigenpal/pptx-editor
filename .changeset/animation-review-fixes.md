@@ -5,4 +5,4 @@
 '@pptx-editor.dev/i18n': patch
 ---
 
-Keep more of the file and converge in collaboration when you edit animations and transitions. Add `animationStartLabel`.
+Keep more of the file and converge in collaboration when you edit animations and transitions. `setTransition` refuses unknown kinds. Add `animationStartLabel`.

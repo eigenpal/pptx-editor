@@ -3,4 +3,4 @@
 '@pptx-editor.dev/pptx-to-pdf': minor
 ---
 
-Draw EMF and WMF pictures. Add `session.picturesReady`, `session.pictureStatus`, and `picturesTimeoutMs`. Open and save damaged files more safely.
+Draw EMF and WMF pictures. Add `session.picturesReady`, `session.pictureStatus`, and `picturesTimeoutMs`. Call `session.picturesReady` before `exportSlideSvg()`. On Node.js, PDF export uses `@napi-rs/canvas` when installed. Open and save damaged files more safely.
