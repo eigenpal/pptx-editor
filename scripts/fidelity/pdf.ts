@@ -137,8 +137,10 @@ export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<P
         // columns. Spaces come from the gaps instead (`groupLines`).
         if (!('str' in item) || !item.str.trim()) continue;
         const [a, b, c, d, e, f] = item.transform as number[];
-        // Rotated, mirrored, and vertical text is checked by pixels only.
-        if (Math.abs(b) > 1e-6 || Math.abs(c) > 1e-6 || a <= 0 || d <= 0) continue;
+        // Rotated, mirrored, and vertical text is checked by pixels only. Text that is only
+        // sheared (`c`) stays: its baseline is level. A synthetic oblique face shears its
+        // glyphs, and pdf.js can merge upright text next to it into the same sheared item.
+        if (Math.abs(b) > 1e-6 || a <= 0 || d <= 0 || Math.abs(c) >= d) continue;
         const [x, y] = viewport.convertToViewportPoint(e, f);
         items.push({ text: item.str, x, y, width: item.width, size: d, font: item.fontName });
       }
