@@ -8,7 +8,7 @@
 import { apply, type LayoutItem, type Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { rotationHandle, unionBounds } from '../automation/commands/placement.ts';
-import { elbowCorners, segmentAxis } from '../automation/commands/connectors.ts';
+import { elbowCorners, segmentAxis, segmentMovable } from '../automation/commands/connectors.ts';
 import { HANDLE_POS, HANDLES } from './surface-drag.ts';
 
 /** A table frame: it has a grid, and no rotation handle. */
@@ -132,6 +132,8 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
     const a = apply(item.parentMatrix, corners[i].x, corners[i].y);
     const b = apply(item.parentMatrix, corners[i + 1].x, corners[i + 1].y);
     if (Math.hypot(b.x - a.x, b.y - a.y) < SHORTEST_SEGMENT * px) continue;
+    // A segment whose drag would need more segments than a preset draws shows no handle.
+    if (!segmentMovable(item, corners, i)) continue;
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const m = nearest(drawn, mid) ?? mid;
     const r = px * 5;

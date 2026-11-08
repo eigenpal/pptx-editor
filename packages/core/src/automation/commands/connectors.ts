@@ -439,6 +439,22 @@ function simplified(pts: readonly Point[]): Point[] {
   return out;
 }
 
+/**
+ * Whether a drag of segment `index` of `corners` can draw a route a preset has: an end
+ * segment adds one bend, or two at a glued end, and no preset draws more than five segments.
+ */
+export function segmentMovable(
+  item: LayoutItem,
+  corners: readonly Point[],
+  index: number
+): boolean {
+  const glue = item.kind === 'shape' ? item.element.connections : undefined;
+  const last = corners.length - 2;
+  const added =
+    (index === 0 ? (glue?.start ? 2 : 1) : 0) + (index === last ? (glue?.end ? 2 : 1) : 0);
+  return corners.length - 1 + added <= MOST_SEGMENTS;
+}
+
 /** The axis a segment of a route moves along: `y` for a horizontal segment, `x` for a vertical. */
 export function segmentAxis(a: Point, b: Point): 'x' | 'y' {
   return Math.abs(a.y - b.y) < Math.abs(a.x - b.x) ? 'y' : 'x';
@@ -449,7 +465,7 @@ export function segmentAxis(a: Point, b: Point): 'x' | 'y' {
  * as far as the pointer moved from slide point `from` to `to`. A middle segment moves with its two corners. An end segment keeps
  * its end and gains a bend there. A glued end keeps a short run in its site's direction
  * before the bend, so the connector still meets the shape square. Segments that come in line
- * merge. Within `snap` (slide units) of another corner's line or of its own first line, the
+ * merge, and a route back where it started is `same`. Within `snap` (slide units) of another corner's line or of its own first line, the
  * segment snaps to it, so a bend is easy to take out and a slip is easy to undo. The ends and their glue stay. Null when the route would need more
  * segments than a preset draws, or when the item is no elbow or curve.
  */
@@ -459,7 +475,7 @@ export function moveElbowSegment(
   from: Point,
   to: Point,
   snap: number | null = null
-): TransformItem | null {
+): TransformItem | 'same' | null {
   const corners = elbowCorners(item);
   const family = familyOf(item);
   if (!corners || index < 0 || index >= corners.length - 1) return null;
@@ -496,8 +512,13 @@ export function moveElbowSegment(
     ...(index === last ? head(b, a, !!glue?.end).reverse() : [moved(b)]),
     ...corners.slice(index + 2),
   ]);
+  // Back on its first route (a straight elbow back in line too): nothing to write.
+  const same =
+    route.length === corners.length &&
+    route.every((q, i) => Math.abs(q.x - corners[i].x) < 1 && Math.abs(q.y - corners[i].y) < 1);
+  if (same || route.length < 3) return 'same';
   const n = route.length - 1;
-  if (n < 2 || n > MOST_SEGMENTS) return null;
+  if (n > MOST_SEGMENTS) return null;
   const vertical = Math.abs(route[1].x - route[0].x) < 1;
   const fit = fitElbow(route, vertical);
   const connector: ConnectorRoute = { preset: `${family}${n}`, adjust: fit.adjust };

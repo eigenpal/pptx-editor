@@ -557,9 +557,48 @@ describe('elbow segment drags', () => {
     // Press 0.1 in left of the vertical segment's middle, and do not move.
     const press = { x: 4.9 * IN, y: 2 * IN };
     const d = startDrag(e.session!.layout(0), 'segment1', [item.element.nodeId], press, 'g')!;
-    const step = dragStep(d, press, input);
-    expect(e.exec({ type: 'setTransforms', items: step.items }).ok).toBe(true);
-    expect(presetOf(e, 'C4')).toBe('bentConnector2');
+    // The route stays where it was, so the drag has nothing to write.
+    expect(dragStep(d, press, input).items).toEqual([]);
+  });
+
+  test('a straight elbow dragged out and back writes nothing', async () => {
+    // Level ends: a bentConnector3 with no height, drawn as one straight segment.
+    const level = connector({ id: 4, prst: 'bentConnector3', x: IN, y: IN, cx: 4 * IN, cy: 0 });
+    const e = await open(deck(level));
+    const item = named(e, 'C4');
+    const from = { x: 3 * IN, y: IN };
+    const d = startDrag(e.session!.layout(0), 'segment0', [item.element.nodeId], from, 'g')!;
+    const out = dragStep(d, { x: 3 * IN, y: 2 * IN }, input);
+    expect(out.items).toHaveLength(1);
+    d.pending = out.items;
+    // Back near its line, with snapping: the segment snaps home, and the bend goes.
+    const back = dragStep(d, { x: 3 * IN, y: 1.05 * IN }, { ...input, snapTo: 0.1 * IN });
+    expect(back.items).toEqual([]);
+  });
+
+  test('a segment whose drag needs a sixth segment shows no handle', async () => {
+    const { GlobalWindow } = await import('happy-dom');
+    const win = new GlobalWindow();
+    // A bentConnector4 glued at both ends: an end segment drag adds two segments.
+    const four = connector({
+      id: 4,
+      prst: 'bentConnector4',
+      x: 3 * IN,
+      y: 2 * IN,
+      cx: 3 * IN,
+      cy: IN,
+      st: [2, 3],
+      end: [3, 1],
+    });
+    const e = await open(deck(four));
+    const item = named(e, 'C4');
+    const doc = win.document as unknown as Document;
+    const nodes = handleElements(doc, [item], lineEnds(item), 9525, 'Move');
+    const shown = nodes
+      .filter((n) => n.getAttribute('class')?.includes('handle--adjust'))
+      .map((n) => n.getAttribute('data-handle'));
+    expect(shown).toEqual(['segment1', 'segment2']);
+    await win.happyDOM.close();
   });
 
   test('a curve shows its segment handles on the drawn curve', async () => {

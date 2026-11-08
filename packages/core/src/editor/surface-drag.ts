@@ -57,6 +57,11 @@ export type Handle =
   'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end' | SegmentHandle;
 export type BoxHandle = Exclude<Handle, 'start' | 'end' | SegmentHandle>;
 
+/** The index of the segment a segment handle moves. */
+export function segmentIndex(handle: SegmentHandle): number {
+  return Number(handle.slice('segment'.length));
+}
+
 /** Whether a handle moves a segment of a connector's route. */
 export function isSegment(handle: Handle | 'move'): handle is SegmentHandle {
   return /^segment\d$/.test(handle);
@@ -160,14 +165,10 @@ export function dragStep(
   if (d.handle === 'start' || d.handle === 'end')
     return { items: [moveLineEnd(d, p, input.shift)], guides };
   if (isSegment(d.handle)) {
-    // A route the presets cannot draw keeps the last route the drag showed.
-    const t = moveElbowSegment(
-      d.items[0].item,
-      Number(d.handle.slice(7)),
-      d.start,
-      p,
-      input.snapTo
-    );
+    const t = moveElbowSegment(d.items[0].item, segmentIndex(d.handle), d.start, p, input.snapTo);
+    // Back where it started: nothing to write. A route the presets cannot draw keeps the last
+    // route the drag showed.
+    if (t === 'same') return { items: [], guides };
     return { items: t ? [t] : [...(d.pending ?? [])], guides };
   }
   const [hx, hy] = HANDLE_POS[d.handle];
@@ -336,7 +337,7 @@ export class ShapeDrag {
     if (!d || !isSegment(d.handle)) return null;
     const { item } = d.items[0];
     const corners = elbowCorners(item);
-    const i = Number(d.handle.slice(7));
+    const i = segmentIndex(d.handle);
     const [a, b] = [corners?.[i], corners?.[i + 1]];
     // On the slide, as the handle's own pointer: a turned group turns the segment too.
     const slide = (q: Point): Point => apply(item.parentMatrix, q.x, q.y);
@@ -408,7 +409,7 @@ export class ShapeDrag {
     // The preview goes first: a refused edit repaints nothing, and the shapes must not stay
     // where the preview put them.
     this.#end();
-    if (d.pending) this.host.transform(d.pending, d.gesture);
+    if (d.pending?.length) this.host.transform(d.pending, d.gesture);
     const guides = this.#guides.length > 0;
     this.#guides = [];
     if (guides || d.pending) this.host.repaint();
