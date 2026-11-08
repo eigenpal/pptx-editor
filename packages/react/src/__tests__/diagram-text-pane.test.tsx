@@ -92,10 +92,14 @@ describe('Diagram tab (React)', () => {
       () => void fireEvent.click(screen.getByRole('button', { name: `Add shape after ${first}` }))
     );
     expect(texts(editor)).toEqual([first, '', ...before.slice(1)]);
+    // The focus goes to the new shape's field, so the user can type its text.
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Text of shape 2' }));
     act(
       () => void fireEvent.click(screen.getByRole('button', { name: 'Delete shape Empty shape' }))
     );
     expect(texts(editor)).toEqual(before);
+    // After a delete, the focus goes to the field that took the deleted row's place.
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Text of shape 2' }));
     // The process has no children: Add shape below is off.
     const below = screen.getByRole('button', { name: `Add shape below ${first}` });
     expect(below.hasAttribute('disabled') || below.getAttribute('aria-disabled') === 'true').toBe(

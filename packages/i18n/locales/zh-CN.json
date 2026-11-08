@@ -1717,6 +1717,7 @@
       "emptyTitle": "未选择图示",
       "emptyBody": "在幻灯片上选择图示以编辑其形状的文本。",
       "nodeLabel": "形状 {number} 的文本",
+      "nodeLabelLevel": "形状 {number} 的文本，级别 {level}",
       "readOnly": "无法在此处编辑此形状的文本。",
       "addAfterNamed": "在 {name} 后添加形状",
       "addBelowNamed": "在 {name} 下方添加形状",

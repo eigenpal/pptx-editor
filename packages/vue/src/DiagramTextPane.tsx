@@ -3,7 +3,7 @@
 // with the same markup, classes, and ARIA. A field applies when the user presses Enter or leaves
 // it, as one undo step (`setDiagramText`).
 
-import { defineComponent, ref, useId, type PropType } from 'vue';
+import { defineComponent, nextTick, ref, useId, type PropType } from 'vue';
 import type { DiagramNodeState, EditorCommand } from '@pptx-editor.dev/core/contracts';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton } from './chrome.tsx';
@@ -19,7 +19,10 @@ const NodeField = defineComponent({
   props: {
     label: { type: String, required: true },
     value: { type: String, required: true },
-    disabled: { type: Boolean, required: true },
+    /** The node's data model id, so the tab can focus the field after an add or a delete. */
+    node: { type: String, required: true },
+    /** Shown but not editable: the text stays readable, focusable, and copyable. */
+    readOnly: { type: Boolean, required: true },
     /** The id of a note that describes the field, if any. */
     note: { type: String, default: undefined },
     onCommit: { type: Function as PropType<(text: string) => string | null>, required: true },
@@ -53,7 +56,8 @@ const NodeField = defineComponent({
             }
             rows={Math.min(6, shown.split('\n').length)}
             value={shown}
-            disabled={props.disabled}
+            readonly={props.readOnly}
+            data-node={props.node}
             data-draft={draft.value !== null}
             onInput={(e: Event) => {
               draft.value = (e.target as HTMLTextAreaElement).value;
@@ -88,6 +92,17 @@ export const DiagramTextPane = defineComponent({
     const readOnly = useEditorState((s) => s.mode === 'view');
     const refusal = ref<string | null>(null);
     const noteId = useId();
+    const root = ref<HTMLElement | null>(null);
+    /** Focus the new node's field after an add, or the field at `index` after a delete. */
+    const focusField = (node: string | undefined, index: number): void => {
+      void nextTick(() => {
+        const fields = [...(root.value?.querySelectorAll('textarea') ?? [])];
+        const field =
+          fields.find((f) => node !== undefined && f.dataset.node === node) ??
+          fields[Math.min(index, fields.length - 1)];
+        field?.focus();
+      });
+    };
     return () => {
       const selected = diagram.value;
       if (!selected)
@@ -103,9 +118,17 @@ export const DiagramTextPane = defineComponent({
         const result = editor.value?.exec(command);
         return !result || result.ok ? null : t(result.reason as TranslationKey);
       };
-      /** Runs an add or a delete; the tab announces a refusal, as no field shows it. */
-      const run = (command: EditorCommand): void => {
-        refusal.value = apply(command);
+      /**
+       * Runs an add or a delete; the tab announces a refusal, as no field shows it. The focus
+       * goes to the new node's field after an add, and to the field at `index` after a delete.
+       */
+      const run = (command: EditorCommand, index: number): void => {
+        const reason = apply(command);
+        refusal.value = reason;
+        if (reason !== null) return;
+        const sel = editor.value?.snapshot().selection;
+        const added = sel?.kind === 'text' ? sel.diagramNode : undefined;
+        focusField(command.type === 'addDiagramShape' ? added : undefined, index);
       };
       const canBelow = (node: DiagramNodeState): boolean =>
         !!editor.value?.can({
@@ -122,7 +145,7 @@ export const DiagramTextPane = defineComponent({
         return text.length > 40 ? `${text.slice(0, 40)}…` : text || t('diagram.pane.emptyShape');
       };
       return (
-        <div class="pptx-diagram-pane">
+        <div ref={root} class="pptx-diagram-pane">
           <p class="pptx-chart-pane__note">{t('diagram.pane.help')}</p>
           {!selected.structure && selected.reason ? (
             <p class="pptx-chart-pane__note">{t(selected.reason as TranslationKey)}</p>
@@ -141,9 +164,17 @@ export const DiagramTextPane = defineComponent({
                   style={{ '--pptx-diagram-level': String(Math.min(node.level, 4)) }}
                 >
                   <NodeField
-                    label={t('diagram.pane.nodeLabel', { number: i + 1 })}
+                    label={
+                      node.level > 0
+                        ? t('diagram.pane.nodeLabelLevel', {
+                            number: i + 1,
+                            level: node.level + 1,
+                          })
+                        : t('diagram.pane.nodeLabel', { number: i + 1 })
+                    }
                     value={node.text}
-                    disabled={readOnly.value || !node.editable}
+                    node={node.node}
+                    readOnly={readOnly.value || !node.editable}
                     note={node.editable ? undefined : `${noteId}-${i}`}
                     onCommit={(text: string) =>
                       apply({ type: 'setDiagramText', nodeId: frame, node: node.node, text })
@@ -155,12 +186,15 @@ export const DiagramTextPane = defineComponent({
                       icon="add"
                       disabled={!structure}
                       onClick={() =>
-                        run({
-                          type: 'addDiagramShape',
-                          position: 'after',
-                          nodeId: frame,
-                          node: node.node,
-                        })
+                        run(
+                          {
+                            type: 'addDiagramShape',
+                            position: 'after',
+                            nodeId: frame,
+                            node: node.node,
+                          },
+                          i + 1
+                        )
                       }
                     />
                     <ToolButton
@@ -168,12 +202,15 @@ export const DiagramTextPane = defineComponent({
                       icon="add_row_below"
                       disabled={!structure || !canBelow(node)}
                       onClick={() =>
-                        run({
-                          type: 'addDiagramShape',
-                          position: 'below',
-                          nodeId: frame,
-                          node: node.node,
-                        })
+                        run(
+                          {
+                            type: 'addDiagramShape',
+                            position: 'below',
+                            nodeId: frame,
+                            node: node.node,
+                          },
+                          i + 1
+                        )
                       }
                     />
                     <ToolButton
@@ -181,7 +218,7 @@ export const DiagramTextPane = defineComponent({
                       icon="delete"
                       disabled={!structure || (node.level === 0 && topLevel <= 1)}
                       onClick={() =>
-                        run({ type: 'deleteDiagramShape', nodeId: frame, node: node.node })
+                        run({ type: 'deleteDiagramShape', nodeId: frame, node: node.node }, i)
                       }
                     />
                   </div>
@@ -198,7 +235,12 @@ export const DiagramTextPane = defineComponent({
             type="button"
             class="pptx-button"
             disabled={!structure}
-            onClick={() => run({ type: 'addDiagramShape', position: 'after', nodeId: frame })}
+            onClick={() =>
+              run(
+                { type: 'addDiagramShape', position: 'after', nodeId: frame },
+                selected.nodes.length
+              )
+            }
           >
             {t('diagram.pane.addShape')}
           </button>

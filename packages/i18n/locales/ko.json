@@ -1717,6 +1717,7 @@
       "emptyTitle": "선택한 다이어그램 없음",
       "emptyBody": "슬라이드에서 다이어그램을 선택하여 도형의 텍스트를 편집하세요.",
       "nodeLabel": "도형 {number}의 텍스트",
+      "nodeLabelLevel": "도형 {number}의 텍스트, 수준 {level}",
       "readOnly": "이 도형의 텍스트는 여기에서 편집할 수 없습니다.",
       "addAfterNamed": "{name} 뒤에 도형 추가",
       "addBelowNamed": "{name} 아래에 도형 추가",

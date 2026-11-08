@@ -30,6 +30,7 @@ import {
   insertText,
   paragraphsOf,
   paragraphText,
+  slotsOf,
   splitParagraph,
 } from '../automation/commands/text-model.ts';
 import {
@@ -215,6 +216,28 @@ function pointAt(texts: readonly string[], offset: number): TextPoint {
 }
 
 /**
+ * The offset of the text `texts` makes moved out of the middle of a field, a math zone, or a
+ * surrogate pair: to the item's start for the start of a change, to its end for its end.
+ */
+function paragraphEdge(
+  paragraphs: readonly Element[],
+  texts: readonly string[],
+  offset: number,
+  side: 'start' | 'end'
+): number {
+  const at = pointAt(texts, offset);
+  const base = offset - at.offset;
+  for (const s of slotsOf(paragraphs[at.paragraph]!)) {
+    if (at.offset <= s.start || at.offset >= s.end) continue;
+    if (s.kind === 'field' || s.kind === 'math') return base + (side === 'start' ? s.start : s.end);
+    const code = s.text.charCodeAt(at.offset - s.start);
+    // A low surrogate at the offset: the offset splits a pair.
+    if (code >= 0xdc00 && code <= 0xdfff) return offset + (side === 'start' ? -1 : 1);
+  }
+  return offset;
+}
+
+/**
  * Replace the text of a body with `text`, a newline between paragraphs: the caret after the
  * new text. Only the changed middle is replaced, so runs, fields, line breaks, and paragraph
  * properties outside the change stay as typing keeps them. The new text goes in at the end of
@@ -231,6 +254,11 @@ function replaceBodyText(batch: OpBatch, part: string, bodyId: string, text: str
   let tail = 0;
   while (tail < most - head && old[old.length - 1 - tail] === text[text.length - 1 - tail])
     tail += 1;
+  // The change never starts or ends inside a field, a math zone, or a surrogate pair: the
+  // whole item is replaced. The prefix and suffix are the same in both texts, so the new text
+  // widens with the old.
+  head = paragraphEdge(paragraphs, texts, head, 'start');
+  tail = old.length - paragraphEdge(paragraphs, texts, old.length - tail, 'end');
   const start = pointAt(texts, head);
   let at = pointAt(texts, old.length - tail);
   text

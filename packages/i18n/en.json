@@ -1717,6 +1717,7 @@
       "emptyTitle": "No diagram selected",
       "emptyBody": "Select a diagram on the slide to edit the text of its shapes.",
       "nodeLabel": "Text of shape {number}",
+      "nodeLabelLevel": "Text of shape {number}, level {level}",
       "readOnly": "You cannot edit the text of this shape here.",
       "addAfterNamed": "Add shape after {name}",
       "addBelowNamed": "Add shape below {name}",

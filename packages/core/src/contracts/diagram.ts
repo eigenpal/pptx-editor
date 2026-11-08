@@ -11,7 +11,7 @@ export type DiagramShapePosition = 'after' | 'before' | 'below';
 export interface DiagramNodeState {
   /** The data model id of the node (`dgm:pt/@modelId`). */
   readonly node: string;
-  /** The node's plain text, one line per paragraph. */
+  /** The node's plain text: a newline between paragraphs and at each line break. */
   readonly text: string;
   /** 0 for a top-level node, 1 for its child, and so on. */
   readonly level: number;
@@ -69,10 +69,12 @@ export type DiagramCommand =
   | {
       /**
        * Replace the text of diagram node `node` of the selected diagram, or of the diagram frame
-       * `nodeId` on the current slide. The data model and the saved drawing get the same text,
-       * with the formatting of the first run. A newline starts a paragraph. Empty text leaves
-       * the shape empty. Refused with `errors.diagram.noText` for a node whose text no single
-       * drawing shape shows.
+       * `nodeId` on the current slide. The data model and the saved drawing get the same text.
+       * Only the changed part is replaced: new text takes the formatting of the run where it
+       * goes in, and a field or math zone that the change touches becomes plain text. A new
+       * newline starts a paragraph; tabs become spaces. Empty text leaves the shape empty.
+       * Refused with `errors.diagram.noText` for a node whose text no single drawing shape
+       * shows, and with `errors.diagram.textTooLong` past 10,000 characters or 1,000 lines.
        */
       readonly type: 'setDiagramText';
       readonly node: string;

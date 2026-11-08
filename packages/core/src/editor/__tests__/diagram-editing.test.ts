@@ -304,6 +304,43 @@ describe('diagram text pane', () => {
     e.destroy();
   });
 
+  test('a change never splits an emoji or a field', async () => {
+    // The first node gets a line break, a bold run, and a date field after its text.
+    const files = unzipSync(fixture('diagrams'));
+    const extra =
+      '<a:br><a:rPr lang="en-US"/></a:br><a:r><a:rPr lang="en-US" b="1"/><a:t>Bold</a:t></a:r>' +
+      '<a:fld id="{11111111-1111-4111-8111-111111111111}" type="datetime1"><a:rPr lang="en-US"/>' +
+      '<a:t>11/8/2026</a:t></a:fld>';
+    for (const name of ['ppt/diagrams/drawing1.xml', 'ppt/diagrams/data1.xml'])
+      files[name] = strToU8(
+        strFromU8(files[name]!).replace('<a:t>Plan</a:t></a:r>', `<a:t>Plan</a:t></a:r>${extra}`)
+      );
+    const e = await open('diagrams', 0, zipSync(files));
+    const frame = frameOf(e);
+    e.setSelection({ kind: 'shapes', nodeIds: [frame] });
+    const node = e.snapshot().diagram!.nodes[0]!;
+    expect(node.text).toBe('Plan\nBold11/8/2026');
+    const set = (text: string) => {
+      const command = { type: 'setDiagramText', nodeId: frame, node: node.node, text } as const;
+      expect(e.can(command).ok).toBe(true);
+      expect(e.exec(command).ok).toBe(true);
+      return e.snapshot().diagram!.nodes[0]!.text;
+    };
+    // An edit before the line break keeps the break and the bold run.
+    expect(set('Plans\nBold11/8/2026')).toBe('Plans\nBold11/8/2026');
+    expect(partText(e, '/ppt/diagrams/drawing1.xml')).toContain(
+      '<a:rPr lang="en-US" b="1"/><a:t>Bold</a:t>'
+    );
+    // An edit inside the field keeps its text, as plain text.
+    expect(set('Plans\nBold11/9/2026')).toBe('Plans\nBold11/9/2026');
+    expect(partText(e, '/ppt/diagrams/drawing1.xml')).not.toContain('<a:fld');
+    // Emoji that share their first code unit change whole.
+    expect(set('x\u{1F600}y')).toBe('x\u{1F600}y');
+    expect(set('x\u{1F603}y')).toBe('x\u{1F603}y');
+    expect(set('\u{1F600}')).toBe('\u{1F600}');
+    e.destroy();
+  });
+
   test('a shape with no paragraph is not editable, and setDiagramText refuses it', async () => {
     const files = unzipSync(fixture('diagram-editing'));
     const drawing = strFromU8(files['ppt/diagrams/drawing1.xml']!);

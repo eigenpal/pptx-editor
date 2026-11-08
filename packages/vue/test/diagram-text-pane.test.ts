@@ -113,6 +113,8 @@ describe('Diagram tab', () => {
     fireEvent.click(button(`Add shape after ${before[0]}`));
     await flush();
     expect(texts(editor)).toEqual([before[0]!, '', ...before.slice(1)]);
+    await flush();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Text of shape 2');
     fireEvent.click(button('Delete shape Empty shape'));
     await flush();
     expect(texts(editor)).toEqual(before);
