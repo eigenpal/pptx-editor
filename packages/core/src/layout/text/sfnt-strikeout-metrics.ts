@@ -1,11 +1,17 @@
 // Adapted from DOCX Editor `packages/core/src/layout/sfnt-strikeout-metrics.ts` at commit adf0e178.
-// The reader is unchanged. Only this header comment is new.
+// The reader is unchanged. Changes: this header comment replaces the source's, and the
+// `StrikeoutStrokePt` type is not ported (paint scales the em fractions itself).
 //
 // OS/2 strikeout stroke, read from a face's own bytes. Slide text paints its strikethrough with
 // the face's `yStrikeoutSize` and `yStrikeoutPosition` scaled to the run size
 // (`strikeoutBars` in `strikeout-bars.ts`), not with fixed em fractions.
 
-/** A strikeout stroke, as a fraction of the em. `offsetEm` is the stroke TOP. */
+/**
+ * A strikeout stroke, as a fraction of the em. The OpenType specification defines
+ * `yStrikeoutPosition`, and so `offsetEm`, as the stroke TOP. Slide paint centers the bar on
+ * it instead (`strikeoutBars`): the `font-effects` and `text-runs` reference PDFs put the
+ * 18 pt Carlito stroke around 4.5 pt above the baseline, which is 512 / 2048 em.
+ */
 export interface StrikeoutStrokeEm {
   /** `yStrikeoutPosition` over `unitsPerEm`. Positive is above the baseline. */
   readonly offsetEm: number;
