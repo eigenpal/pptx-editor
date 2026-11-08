@@ -7,7 +7,7 @@
 // above the ink, and never more than its own font box. A glyph piece with no outline claims the
 // font box of the face that draws it. Text that draws nothing claims no height.
 //
-// Two rules differ from DOCX Editor, because the reference PDFs contradict them:
+// These rules differ from DOCX Editor. The reference PDFs contradict the first two:
 // - The math leading is 0, not 300/2048 em. With the leading, the lines of the `equations`,
 //   `equation-lines`, and `preserved-content` fixtures move down by up to 3 pt (see
 //   `MATH_LEADING`).
@@ -15,6 +15,16 @@
 //   its box, also a fraction of a display equation. The reference PDF of `equation-lines`, slide
 //   1, stacks two display fractions closer than their boxes: the ink of the second starts 1.25
 //   pt above the end of the ink of the first.
+// These are not measured, because no fixture holds them (the reference draws n-ary operators
+// with a math font that is not open), so they keep the ink rule:
+// - The operator of an inline n-ary structure claims its ink, not its whole box, and an inline
+//   integral claims the ink of its parts, not the box of the whole structure.
+// - The band is the line's own: the face and size of the zone's base runs. DOCX Editor takes the
+//   font box of the first text atom, or of the structure size when a structure opens the
+//   equation. In the fixtures, both are the same box.
+// - A fraction part has no floor at the ascent of its font box. DOCX Editor needs the floor
+//   because it trims the parts of a fraction to the typographic ascent of the math face; the
+//   parts here are not trimmed, and a part claims at most its font box either way.
 
 import { mathTextInk, isInvisibleMathText } from './math-ink.ts';
 import type { MathGlyphs, MathMark } from './math-layout.ts';
