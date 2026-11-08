@@ -1,23 +1,33 @@
 // The fidelity harness.
 //
-//   bun run fidelity                  # every fixture: the gate
+//   bun run fidelity                  # every fixture, both lanes: the gate
 //   bun run fidelity tables           # one fixture
+//   bun run fidelity --lane export    # one lane: editor (the editor's print) or export
 //   bun run fidelity --update-gaps    # remove checks that pass now from thresholds.ts
 //   bun run fidelity x --update-gaps --accept-worse   # also add new entries and kinds
 //   bun run fidelity:corpus           # the private corpus in demo-presentations/ (local only)
 //   bun scripts/fidelity/run.ts --list jobs.jsonl --out <dir> ...   # corpus mode for pptx-eval
 //
 // The editor prints each deck to PDF with its own paint, and `score-deck.ts` compares that PDF
-// with the reference PDF. Fixture and corpus sets write an HTML report, both PDFs, and the page
-// images to fidelity-report/<set>/. The fixture set exits 1 when the gate fails (`known-gaps.ts`).
+// with the reference PDF. The export lane compares the PDF of `exportPdf` in the same way. Fixture
+// and corpus sets write an HTML report, both PDFs, and the page images to fidelity-report/<set>/
+// (the export lane: fidelity-report/<set>-export/). The fixture set exits 1 when the gate of a
+// lane fails (`known-gaps.ts`); each lane has its own known-gap list.
 // Corpus mode writes JSON only and exits 0 when every deck was scored: the caller owns the
 // policy. Every mode exits 2 on a usage error.
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
-import { FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
-import { checkFixtureGate, planUpdate, slideKey, slideVerdict, writeGaps } from './known-gaps.ts';
+import { FIXTURE_EXPORT_KNOWN_GAPS, FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
+import {
+  checkFixtureGate,
+  planUpdate,
+  slideKey,
+  slideVerdict,
+  writeGaps,
+  type GapListName,
+} from './known-gaps.ts';
 import { pinnedChromium, withHarnessPage } from './harness-page.ts';
 import { laneCount, scoreInLanes, type LaneJob } from './lanes.ts';
 import {
@@ -41,7 +51,7 @@ import {
 import { PDFJS_VERSION } from './pdf.ts';
 import { deckFacts, readManifest, referenceState, sha256 } from './reference-identity.ts';
 import { writeReport, type DeckResult } from './report.ts';
-import { parseRunArgs, RUN_USAGE, type RunArgs } from './run-args.ts';
+import { parseRunArgs, RUN_USAGE, type Lane, type RunArgs } from './run-args.ts';
 import { scoreSafely, type DeckInput } from './score-deck.ts';
 
 const THRESHOLDS_FILE = resolve(import.meta.dir, 'thresholds.ts');
@@ -52,8 +62,8 @@ const pct = (v: number): string => `${(v * 100).toFixed(2)} %`;
  * One console line for a scored deck: slides that pass, failing slides that the known-gap list
  * names, hidden slides, the worst pixel score, and the time.
  */
-function deckLine(r: DeckResult, list?: KnownGapList): string {
-  if (r.error) return `${r.name}: not scored: ${r.error}`;
+function deckLine(r: DeckResult, list?: KnownGapList, prefix = ''): string {
+  if (r.error) return `${prefix}${r.name}: not scored: ${r.error}`;
   const compared = r.slides.filter((s) => s.status === 'pass' || s.status === 'fail');
   const passing = compared.filter((s) => s.status === 'pass').length;
   const listed = list
@@ -69,14 +79,51 @@ function deckLine(r: DeckResult, list?: KnownGapList): string {
     r.reference === 'pdf' ? '' : ` (${r.reference === 'stale' ? 'stale' : 'no'} reference)`;
   const saved = r.slides.some((s) => s.selfConsistent === false) ? ', save/reopen DIFFERS' : '';
   const time = `${((r.milliseconds ?? 0) / 1000).toFixed(1)} s`;
-  return `${r.name}: ${passing}/${r.slides.length - hidden} pass${known}${hiddenText}, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
+  return `${prefix}${r.name}: ${passing}/${r.slides.length - hidden} pass${known}${hiddenText}, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
 }
 
-/** `bun run fidelity` and `bun run fidelity:corpus`: decks in a folder, an HTML report. */
+/** What differs between the two lanes of a run. */
+const LANE_INFO: Record<
+  Lane,
+  {
+    /** The report folder after `fidelity-report/<set>`. */
+    readonly suffix: string;
+    readonly gaps: GapListName;
+    /** The start of each console line of the lane. */
+    readonly prefix: string;
+    /** The name of the lane in the report and the summary line. */
+    readonly title: string;
+    /** How our PDF is made, for the report. */
+    readonly method: string;
+  }
+> = {
+  editor: {
+    suffix: '',
+    gaps: 'FIXTURE_KNOWN_GAPS',
+    prefix: '',
+    title: 'editor print',
+    method: "Our PDF is printed with the editor's own paint.",
+  },
+  export: {
+    suffix: '-export',
+    gaps: 'FIXTURE_EXPORT_KNOWN_GAPS',
+    prefix: 'export ',
+    title: 'PDF export',
+    method:
+      'Our PDF is the PDF of exportPdf (@pptx-editor.dev/pptx-to-pdf), with the fonts that the editor lane gets.',
+  },
+};
+
+/** The known-gap list of a lane, as `thresholds.ts` holds it. */
+const laneGaps = (lane: Lane): KnownGapList =>
+  lane === 'export' ? FIXTURE_EXPORT_KNOWN_GAPS : FIXTURE_KNOWN_GAPS;
+
+/** `bun run fidelity` and `bun run fidelity:corpus`: decks in a folder, an HTML report per lane. */
 async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> {
-  const { set, decks: only } = args;
+  const { set, decks: only, lanes } = args;
   const dir = set === 'corpus' ? 'demo-presentations' : 'fixtures';
-  const out = resolve('fidelity-report', set);
+  const outOf = (lane: Lane): string =>
+    resolve('fidelity-report', `${set}${LANE_INFO[lane].suffix}`);
   if (!existsSync(dir)) {
     console.log(`No decks in ${dir}/.`);
     return set === 'fixtures' ? 1 : 0;
@@ -102,7 +149,7 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     return 2;
   }
   const targets = only.length ? inputs.filter((d) => only.includes(d.name)) : inputs;
-  if (!only.length) rmSync(out, { recursive: true, force: true });
+  if (!only.length) for (const lane of lanes) rmSync(outOf(lane), { recursive: true, force: true });
   // The decks with the most slides start first, so no lane is left with a long deck at the end.
   const slideCount = (d: DeckInput): number => {
     try {
@@ -114,21 +161,28 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   const jobs: LaneJob[] = targets
     .map((d) => ({ d, n: slideCount(d) }))
     .sort((a, b) => b.n - a.n)
-    .map(({ d }) => ({
-      input: set === 'fixtures' ? { ...d, fontSet: 'fixtures' as const } : d,
-      imagesDir: join(out, d.name),
-      redact: false,
-    }));
+    .flatMap(({ d }) =>
+      lanes.map((lane) => ({
+        input: {
+          ...d,
+          ...(set === 'fixtures' ? { fontSet: 'fixtures' as const } : {}),
+          ...(lane === 'export' ? { lane } : {}),
+        },
+        imagesDir: join(outOf(lane), d.name),
+        redact: false,
+      }))
+    );
+  const laneOf = (job: LaneJob): Lane => job.input.lane ?? 'editor';
   const started = Date.now();
-  const scored = await scoreInLanes(jobs, laneCount(jobs.length), (_, r) =>
-    console.log(deckLine(r, set === 'fixtures' ? FIXTURE_KNOWN_GAPS : undefined))
+  const scored = await scoreInLanes(jobs, laneCount(jobs.length), (job, r) => {
+    const lane = laneOf(job);
+    console.log(
+      deckLine(r, set === 'fixtures' ? laneGaps(lane) : undefined, LANE_INFO[lane].prefix)
+    );
+  });
+  const byKey = new Map(
+    scored.results.map((r, i) => [`${laneOf(jobs[i])}\0${jobs[i].input.name}`, r])
   );
-  const byName = new Map(scored.results.map((r, i) => [jobs[i].input.name, r]));
-  const results = targets.map((d) => byName.get(d.name)!);
-  const all = results.flatMap((r) => r.slides);
-  const passing = all.filter((s) => s.status === 'pass').length;
-  const hidden = all.filter((s) => s.hidden).length;
-  const hiddenText = hidden ? `, ${hidden} hidden` : '';
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   const tools = {
     pdfjs: PDFJS_VERSION,
@@ -136,71 +190,99 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     fonts: set === 'fixtures' ? fixtureFontsIdentity() : localFontsIdentity(),
   };
   const toolsText = `pdf.js ${tools.pdfjs}, ${tools.chromium} (Chromium ${scored.chromium ?? 'unknown'}), fonts ${tools.fonts}`;
-  const report = join(relative(process.cwd(), out) || '.', 'index.html');
+  const reportOf = (lane: Lane): string =>
+    join(relative(process.cwd(), outOf(lane)) || '.', 'index.html');
+  /** Links from the report of a lane to the reports of the other lanes of the run. */
+  const links = (lane: Lane) =>
+    lanes
+      .filter((l) => l !== lane)
+      .map((l) => ({
+        label: `the ${LANE_INFO[l].title} lane`,
+        href: relative(outOf(lane), join(outOf(l), 'index.html')),
+      }));
 
-  if (set !== 'fixtures') {
-    writeReport(out, set, results, { tools: toolsText });
+  let exitCode = 0;
+  for (const lane of lanes) {
+    const info = LANE_INFO[lane];
+    const results = targets.map((d) => byKey.get(`${lane}\0${d.name}`)!);
+    const all = results.flatMap((r) => r.slides);
+    const passing = all.filter((s) => s.status === 'pass').length;
+    const hidden = all.filter((s) => s.hidden).length;
+    const hiddenText = hidden ? `, ${hidden} hidden` : '';
+    const report = reportOf(lane);
+    const context = {
+      tools: toolsText,
+      lane: info.title,
+      method: info.method,
+      links: links(lane),
+    };
+
+    if (set !== 'fixtures') {
+      writeReport(outOf(lane), set, results, context);
+      console.log(
+        `${info.title}: ${passing} of ${all.length} slides pass${hiddenText}, in ${seconds} s. Report: ${report}`
+      );
+      const failed = results.some(
+        (r) => r.error || r.slides.some((s) => s.status === 'fail' || s.selfConsistent === false)
+      );
+      if (failed) exitCode = 1;
+      continue;
+    }
+
+    let list: KnownGapList = laneGaps(lane);
+    let refused = false;
+    if (args.updateGaps) {
+      // A partial run, or a deck that did not finish, replaces no entry of the decks it lacks.
+      const plan = planUpdate(list, results, tools, args.acceptWorse, !only.length);
+      // The regressions first: an update does not record them away.
+      for (const p of checkFixtureGate(results, list, tools, !only.length).problems)
+        if (p.kind === 'fix') console.log(`${info.prefix}FIX: ${p.text}`);
+      for (const e of plan.changes.tools) console.log(`${info.prefix}TOOLS: ${e}`);
+      for (const e of plan.changes.looser) console.log(`${info.prefix}LOOSER: ${e}`);
+      for (const e of plan.changes.added) console.log(`${info.prefix}NEW: ${e}`);
+      for (const e of plan.changes.removed) console.log(`${info.prefix}REMOVED: ${e}`);
+      refused = !plan.write;
+      if (plan.write) {
+        await writeGaps(THRESHOLDS_FILE, plan.next, info.gaps);
+        list = plan.next;
+      }
+    }
+    const gate = checkFixtureGate(results, list, tools, !only.length);
+    for (const r of results)
+      for (const s of r.slides) {
+        const key = slideKey(r.name, s.index);
+        s.knownGap = gate.knownGaps.has(key);
+        s.verdict = slideVerdict(s, Object.hasOwn(list.slides, key) ? list.slides[key] : undefined);
+      }
+    const fixes = gate.problems.filter((p) => p.kind === 'fix');
+    const records = gate.problems.filter((p) => p.kind === 'record');
+    const toolsStep = gate.problems.some((p) => p.kind === 'tools')
+      ? 'The list was measured with other tools (TOOLS above): record it in a pull request that changes only the tools, with bun run fidelity --update-gaps --accept-worse.'
+      : '';
+    const step = refused
+      ? 'Nothing was written: the run has new entries or kinds (LOOSER, NEW above). Fix the regression. Only a new fixture, a pull request that changes no engine or harness source, or a pull request that changes only the comparison (COMPARISON_FILES in thresholds.ts) may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
+      : args.updateGaps
+        ? `${info.gaps} in scripts/fidelity/thresholds.ts now records this run. Review its diff: a new kind is a regression to fix, not to record.`
+        : fixes.length
+          ? `Fix the problems above; see ${report}.`
+          : records.length
+            ? 'The list names checks that pass now (RECORD above). Remove them with: bun run fidelity --update-gaps'
+            : toolsStep
+              ? ''
+              : 'Nothing to do.';
+    const next = [toolsStep, step].filter(Boolean).join(' ');
+    const problems = gate.problems.map((p) => p.text);
+    writeReport(outOf(lane), set, results, { ...context, gate: { problems, next } });
     console.log(
-      `${passing} of ${all.length} slides pass${hiddenText}, in ${seconds} s. Report: ${report}`
+      `\n${info.title}: ${passing} of ${all.length} slides pass; ${gate.knownGaps.size} fail as known gaps${hiddenText}. ${seconds} s. Report: ${report}`
     );
-    const failed = results.some(
-      (r) => r.error || r.slides.some((s) => s.status === 'fail' || s.selfConsistent === false)
+    for (const p of gate.problems) console.log(`${info.prefix}${p.kind.toUpperCase()}: ${p.text}`);
+    console.log(
+      `${info.title} gate: ${gate.problems.length ? 'fails' : 'passes'}${only.length ? ` (only ${only.join(', ')})` : ''}. ${next}`
     );
-    return failed ? 1 : 0;
+    if (gate.problems.length || refused) exitCode = 1;
   }
-
-  let list: KnownGapList = FIXTURE_KNOWN_GAPS;
-  let refused = false;
-  if (args.updateGaps) {
-    // A partial run, or a deck that did not finish, replaces no entry of the decks it lacks.
-    const plan = planUpdate(list, results, tools, args.acceptWorse, !only.length);
-    // The regressions first: an update does not record them away.
-    for (const p of checkFixtureGate(results, list, tools, !only.length).problems)
-      if (p.kind === 'fix') console.log(`FIX: ${p.text}`);
-    for (const e of plan.changes.tools) console.log(`TOOLS: ${e}`);
-    for (const e of plan.changes.looser) console.log(`LOOSER: ${e}`);
-    for (const e of plan.changes.added) console.log(`NEW: ${e}`);
-    for (const e of plan.changes.removed) console.log(`REMOVED: ${e}`);
-    refused = !plan.write;
-    if (plan.write) {
-      await writeGaps(THRESHOLDS_FILE, plan.next);
-      list = plan.next;
-    }
-  }
-  const gate = checkFixtureGate(results, list, tools, !only.length);
-  for (const r of results)
-    for (const s of r.slides) {
-      const key = slideKey(r.name, s.index);
-      s.knownGap = gate.knownGaps.has(key);
-      s.verdict = slideVerdict(s, Object.hasOwn(list.slides, key) ? list.slides[key] : undefined);
-    }
-  const fixes = gate.problems.filter((p) => p.kind === 'fix');
-  const records = gate.problems.filter((p) => p.kind === 'record');
-  const toolsStep = gate.problems.some((p) => p.kind === 'tools')
-    ? 'The list was measured with other tools (TOOLS above): record it in a pull request that changes only the tools, with bun run fidelity --update-gaps --accept-worse.'
-    : '';
-  const step = refused
-    ? 'Nothing was written: the run has new entries or kinds (LOOSER, NEW above). Fix the regression. Only a new fixture, a pull request that changes no engine or harness source, or a pull request that changes only the comparison (COMPARISON_FILES in thresholds.ts) may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
-    : args.updateGaps
-      ? 'FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a new kind is a regression to fix, not to record.'
-      : fixes.length
-        ? `Fix the problems above; see ${report}.`
-        : records.length
-          ? 'The list names checks that pass now (RECORD above). Remove them with: bun run fidelity --update-gaps'
-          : toolsStep
-            ? ''
-            : 'Nothing to do.';
-  const next = [toolsStep, step].filter(Boolean).join(' ');
-  const problems = gate.problems.map((p) => p.text);
-  writeReport(out, set, results, { tools: toolsText, gate: { problems, next } });
-  console.log(
-    `\n${passing} of ${all.length} slides pass; ${gate.knownGaps.size} fail as known gaps${hiddenText}. ${seconds} s. Report: ${report}`
-  );
-  for (const p of gate.problems) console.log(`${p.kind.toUpperCase()}: ${p.text}`);
-  console.log(
-    `Gate: ${gate.problems.length ? 'fails' : 'passes'}${only.length ? ` (only ${only.join(', ')})` : ''}. ${next}`
-  );
-  return gate.problems.length || refused ? 1 : 0;
+  return exitCode;
 }
 
 function gitState(): { commit: string | null; dirty: boolean | null } {

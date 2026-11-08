@@ -167,19 +167,26 @@ Our PDF must draw only with fonts that the harness loaded: the fixture fonts, th
 ### Run
 
 ```bash
-bun run fidelity          # every fixture: the gate
-bun run fidelity tables   # one fixture
+bun run fidelity                 # every fixture, both lanes: the gate
+bun run fidelity tables          # one fixture
+bun run fidelity --lane export   # one lane: editor or export
 ```
 
-Each deck prints one line. The gate summary says what to do next. The report is `fidelity-report/fixtures/index.html`: for each slide, our page, the reference page, the diff, and the scores. Both PDFs are in `fidelity-report/fixtures/<deck>/`.
+Each deck prints one line for each lane. The gate summary of each lane says what to do next. The report is `fidelity-report/fixtures/index.html`: for each slide, our page, the reference page, the diff, and the scores. Both PDFs are in `fidelity-report/fixtures/<deck>/`.
+
+### The export lane
+
+The export lane gates the PDF export (`packages/pptx-to-pdf`) on the same fixtures. It exports each fixture with `exportPdf` from source, with the settings of the evaluation protocol (`packages/pptx-to-pdf/scripts/evaluation/settings.ts`) and the fonts that the editor lane gets. It compares that PDF with the same reference PDF through the same code (`rasterPdf`, `comparePixels`, and `compareLines`) and the same thresholds. It has no save check. `exportPdf` names each font that it embeds `PptxFont`, so the lane checks only that every font is embedded. Its report is `fidelity-report/fixtures-export/index.html`, and the report of each lane links to the other.
 
 ### Update the known gaps
 
-`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each slide that fails today, the checks it fails. It records no values, because rasters differ slightly between machines. The gate fails when a slide fails a check that is not listed, or passes a listed check. When your change fixes a check, remove it:
+`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each slide that fails today, the checks it fails. `FIXTURE_EXPORT_KNOWN_GAPS` is the list of the export lane, with the same rules. It records no values, because rasters differ slightly between machines. The gate fails when a slide fails a check that is not listed, or passes a listed check. When your change fixes a check, remove it:
 
 ```bash
 bun run fidelity --update-gaps
 ```
+
+The command updates the list of each lane that ran.
 
 A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, in a pull request that changes no engine or harness source, or in a pull request whose source changes are only the comparison files (`COMPARISON_FILES` in `scripts/fidelity/thresholds.ts`), harness tests, and documentation. Such a change prints the same pages and checks them in another way, so the failures it finds were there before. It may not check fewer lines, and it changes no engine code. The check reads `COMPARISON_FILES` from the base branch. A limit can go away only with its reason in `RETIRED_LIMITS`.
 

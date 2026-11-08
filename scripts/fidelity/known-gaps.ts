@@ -309,8 +309,11 @@ export function recordedList(decks: readonly DeckResult[], tools: GapTools): Kno
   return { ...tools, deckLines, slides };
 }
 
-/** The `FIXTURE_KNOWN_GAPS` constant as source text. */
-export function listSource(list: KnownGapList): string {
+/** The known-gap lists of `thresholds.ts`, by the constant's name. */
+export type GapListName = 'FIXTURE_KNOWN_GAPS' | 'FIXTURE_EXPORT_KNOWN_GAPS';
+
+/** A known-gap constant (`FIXTURE_KNOWN_GAPS` by default) as source text. */
+export function listSource(list: KnownGapList, name: GapListName = 'FIXTURE_KNOWN_GAPS'): string {
   const entries = Object.keys(list.slides)
     .sort()
     .map((key) => `    ${gapEntryLine(key, list.slides[key])}`);
@@ -318,7 +321,7 @@ export function listSource(list: KnownGapList): string {
     .sort()
     .map((deck) => `    '${deck}': ${list.deckLines[deck]},`);
   return [
-    'export const FIXTURE_KNOWN_GAPS: KnownGapList = {',
+    `export const ${name}: KnownGapList = {`,
     `  pdfjs: '${list.pdfjs}',`,
     `  chromium: '${list.chromium}',`,
     `  fonts: '${list.fonts}',`,
@@ -328,14 +331,21 @@ export function listSource(list: KnownGapList): string {
   ].join('\n');
 }
 
-/** Replace `FIXTURE_KNOWN_GAPS` in the thresholds file with `list`, formatted as the repo is. */
-export async function writeGaps(file: string, list: KnownGapList): Promise<void> {
+/**
+ * Replace a known-gap constant (`FIXTURE_KNOWN_GAPS` by default) in the thresholds file with
+ * `list`, formatted as the repo is.
+ */
+export async function writeGaps(
+  file: string,
+  list: KnownGapList,
+  name: GapListName = 'FIXTURE_KNOWN_GAPS'
+): Promise<void> {
   const text = readFileSync(file, 'utf8');
-  const start = text.indexOf('export const FIXTURE_KNOWN_GAPS');
+  const start = text.indexOf(`export const ${name}:`);
   const end = text.indexOf('\n};', start);
-  if (start < 0 || end < 0) throw new Error(`${file} has no FIXTURE_KNOWN_GAPS constant`);
+  if (start < 0 || end < 0) throw new Error(`${file} has no ${name} constant`);
   const prettier = await import('prettier');
-  const source = `${text.slice(0, start)}${listSource(list)}${text.slice(end + 3)}`;
+  const source = `${text.slice(0, start)}${listSource(list, name)}${text.slice(end + 3)}`;
   // The repository config, also for a file outside it (tests).
   const options = { ...(await prettier.resolveConfig(import.meta.path)), filepath: file };
   writeFileSync(file, await prettier.format(source, options));

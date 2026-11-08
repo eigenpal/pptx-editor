@@ -1,8 +1,8 @@
-// The known-gap ratchet in CI, one rule: `FIXTURE_KNOWN_GAPS` takes a new entry, a new kind,
-// or fewer checked lines only in a change that touches no engine or harness source
-// (`nonSourceFiles`), or for a new fixture. A change to the comparison alone (`comparisonOnly`,
-// with the base's `COMPARISON_FILES`) may take a new entry or kind, but not fewer checked lines.
-// A removed entry is always fine. No limit in
+// The known-gap ratchet in CI, one rule: `FIXTURE_KNOWN_GAPS` and `FIXTURE_EXPORT_KNOWN_GAPS`
+// take a new entry, a new kind, or fewer checked lines only in a change that touches no engine
+// or harness source (`nonSourceFiles`), or for a new fixture. A change to the comparison alone
+// (`comparisonOnly`, with the base's `COMPARISON_FILES`) may take a new entry or kind, but not
+// fewer checked lines. A removed entry is always fine. No limit in
 // `thresholds.ts` loosens, and none goes away unless `RETIRED_LIMITS` gives the reason.
 //
 //   bun scripts/fidelity/check-known-gaps.ts --base origin/main
@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { gapKinds } from './known-gaps.ts';
 import {
+  FIXTURE_EXPORT_KNOWN_GAPS,
   FIXTURE_KNOWN_GAPS,
   PAGE_SIZE_TOLERANCE_PT,
   RETIRED_LIMITS,
@@ -316,6 +317,7 @@ export async function checkAgainstBase(
   const source = gitShow(base, 'scripts/fidelity/thresholds.ts');
   let mod: Parameters<typeof limitsOf>[0] & {
     FIXTURE_KNOWN_GAPS?: KnownGapList;
+    FIXTURE_EXPORT_KNOWN_GAPS?: KnownGapList;
     RETIRED_LIMITS?: Record<string, string>;
     COMPARISON_FILES?: readonly string[];
   } = {};
@@ -329,7 +331,6 @@ export async function checkAgainstBase(
     }
   }
   const manifest = gitShow(base, 'fixtures/references.json');
-  const baseList = mod.FIXTURE_KNOWN_GAPS;
   const read: ReadChange = (file) => ({
     base: gitShow(base, file),
     head: existsSync(file) ? readFileSync(file, 'utf8') : undefined,
@@ -337,21 +338,25 @@ export async function checkAgainstBase(
   const notices = Object.entries(RETIRED_LIMITS)
     .filter(([key]) => !Object.hasOwn(mod.RETIRED_LIMITS ?? {}, key))
     .map(([key, reason]) => `NOTICE: ${key} is retired: ${reason}`);
+  const fresh = newFixtures(
+    manifest ? (JSON.parse(manifest) as ReferenceManifest) : { version: 1, references: {} },
+    readManifest('fixtures')
+  );
   const sources = nonSourceFiles(changedFiles(base), read);
   // The base's list, so a change cannot widen the exception for itself.
   const comparison = comparisonOnly(sources, mod.COMPARISON_FILES ?? []);
+  // A base without the export list allows any entry of it: the lane is new.
+  const exportGaps = looserGaps(
+    mod.FIXTURE_EXPORT_KNOWN_GAPS,
+    FIXTURE_EXPORT_KNOWN_GAPS,
+    fresh,
+    sources,
+    comparison
+  ).map((p) => `export lane: ${p}`);
   const problems = [
     ...looserLimits(limitsOf(mod), limitsOf({ THRESHOLDS, PAGE_SIZE_TOLERANCE_PT })),
-    ...looserGaps(
-      baseList,
-      FIXTURE_KNOWN_GAPS,
-      newFixtures(
-        manifest ? (JSON.parse(manifest) as ReferenceManifest) : { version: 1, references: {} },
-        readManifest('fixtures')
-      ),
-      sources,
-      comparison
-    ),
+    ...looserGaps(mod.FIXTURE_KNOWN_GAPS, FIXTURE_KNOWN_GAPS, fresh, sources, comparison),
+    ...exportGaps,
   ];
   if (!problems.length)
     return {

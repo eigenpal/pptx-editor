@@ -44,3 +44,27 @@ The harness SHALL print every slide to PDF with the editor's own pipeline and co
 
 - **WHEN** a fixture's reference PDF embeds a font that is not an open font that its deck names
 - **THEN** the fixture gate fails and names the font
+
+#### Scenario: Numbers and values
+
+- **WHEN** a text line holds two or more letters or digits, such as a number, a date, or a chart or table value
+- **THEN** the line check pairs it with the line of the same text in the other PDF, by the same rules for both PDFs, and a line of one letter or digit is checked by pixels only
+
+#### Scenario: Spaces in a text item
+
+- **WHEN** one PDF writes a space between two glyphs of a line and the other PDF does not
+- **THEN** both lines get the same line check, because the rule reads the text without whitespace
+
+### Requirement: Export lane
+
+The harness SHALL score the PDF of `exportPdf` for every fixture against the same reference PDF, with the same fonts, comparison code, and thresholds as the editor print, and SHALL gate it with its own known-gap list under the same ratchet rules.
+
+#### Scenario: The fixture gate
+
+- **WHEN** `bun run fidelity` runs with no `--lane` flag
+- **THEN** it scores both lanes, and the gate fails when either lane fails a check that its known-gap list does not name
+
+#### Scenario: A visible slide without a page
+
+- **WHEN** `exportPdf` gives no page for a visible slide
+- **THEN** the deck is not scored in the export lane, and the gate fails

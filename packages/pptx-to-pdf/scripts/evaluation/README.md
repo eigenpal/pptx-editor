@@ -122,7 +122,7 @@ Location excerpts in comparisons are clipped to 120 characters and marked untrus
 
 Every limit of the fidelity gates lives in `scripts/fidelity/thresholds.ts`; comparison B's limits are its `COMPARISON_B` block. `thresholds.json` beside the worker is generated from that file (`bun packages/pptx-to-pdf/scripts/evaluation/thresholds-json.ts --write`), and `contract.test.ts` fails when the two disagree. `worker.py` reads its screening limits from it when `compare` first needs them, and the evaluation caller reads the pass limits (`maxPixelMismatch`, `minWordMatchPercent`, `maxWordDisplacementPt`) from it. A missing or incomplete file stops `compare` with one error that names it. Its hash is part of the measurement identity. The worker keeps two sets of DOCX Editor's values in code, because they name report categories and are not gates: the 0.5, 2, and 8 pt movement buckets in `word_movement.py`, and the change level of 28 of 255 that `evidence` crops to.
 
-CI runs no comparison B yet. When the fixture PDFs land, comparison B on the fixtures gates in CI on the raster metric only. The word alignment needs PyMuPDF, which CI does not install, so its limits are a report until CI has it.
+CI gates comparison B on the fixtures in the export lane of `bun run fidelity` (`CONTRIBUTING.md`, "Fidelity harness"). That lane uses the checks of comparison A, with pdf.js for both PDFs: pixels, every reference line, no extra lines, baselines, and line positions. It replaces the word checks in CI. The word metrics (`minWordMatchPercent`, `maxWordDisplacementPt`) stay for this protocol, which measures words with PyMuPDF.
 
 ## Run the tests
 

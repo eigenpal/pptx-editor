@@ -3,15 +3,23 @@
 
 import { parseArgs } from 'node:util';
 
+/** The comparison lanes: the editor's print, and the PDF export (`packages/pptx-to-pdf`). */
+export type Lane = 'editor' | 'export';
+export const LANES: readonly Lane[] = ['editor', 'export'];
+
 export const RUN_USAGE = `Usage:
-  bun run fidelity [<deck>...] [--update-gaps [--accept-worse]]
-      Print each fixture in fixtures/ with the editor, and compare it with its reference PDF.
+  bun run fidelity [<deck>...] [--lane editor|export] [--update-gaps [--accept-worse]]
+      Print each fixture in fixtures/ with the editor, and export it with exportPdf. Compare
+      both PDFs with the fixture's reference PDF.
       <deck>          only these fixtures, for example: bun run fidelity tables
-      --update-gaps   write this run's failing slides to FIXTURE_KNOWN_GAPS in thresholds.ts
+      --lane          only one lane: editor (the editor's print) or export (exportPdf)
+      --update-gaps   write this run's failing slides to FIXTURE_KNOWN_GAPS (editor lane) and
+                      FIXTURE_EXPORT_KNOWN_GAPS (export lane) in thresholds.ts
       --accept-worse  also write new entries and kinds (a new fixture, a changed deck,
                       a new reference PDF, or new tools)
-  bun run fidelity:corpus [<deckN>...]
-      The private corpus in demo-presentations/ (local only): a report, no known gaps.
+  bun run fidelity:corpus [<deckN>...] [--lane editor|export]
+      The private corpus in demo-presentations/ (local only): a report, no known gaps. The
+      editor lane only, unless --lane names one.
   bun scripts/fidelity/run.ts --list <jobs.json|jobs.jsonl> --out <dir> [--shard i/n] [--resume | --fresh] [--images]
       Corpus mode for eigenpal/pptx-eval. --resume continues the run in --out; --fresh replaces
       its results. Without either, existing results stop the run.
@@ -29,6 +37,8 @@ export type RunArgs =
       readonly updateGaps: boolean;
       /** With `updateGaps`: write new entries and kinds too. */
       readonly acceptWorse: boolean;
+      /** The lanes to run: both for the fixtures, the editor lane for the corpus, by default. */
+      readonly lanes: readonly Lane[];
     }
   | {
       readonly mode: 'list';
@@ -48,6 +58,7 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
     allowPositionals: true,
     options: {
       set: { type: 'string' },
+      lane: { type: 'string' },
       'update-gaps': { type: 'boolean' },
       'accept-worse': { type: 'boolean' },
       list: { type: 'string' },
@@ -62,6 +73,7 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
   if (v.help) return { mode: 'help' };
   if (v.list !== undefined) {
     if (v.set !== undefined) throw new Error('--set does not go with --list');
+    if (v.lane !== undefined) throw new Error('--lane does not go with --list');
     if (v['update-gaps']) throw new Error('--update-gaps does not go with --list');
     if (v['accept-worse']) throw new Error('--accept-worse does not go with --list');
     if (positionals.length) throw new Error('deck names do not go with --list');
@@ -88,11 +100,14 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
     throw new Error('--update-gaps goes only with the fixtures');
   if (v['accept-worse'] && !v['update-gaps'])
     throw new Error('--accept-worse goes only with --update-gaps');
+  if (v.lane !== undefined && !LANES.includes(v.lane as Lane))
+    throw new Error(`--lane must be ${LANES.join(' or ')}, not ${v.lane}`);
   return {
     mode: 'set',
     set,
     decks: positionals,
     updateGaps: v['update-gaps'] ?? false,
     acceptWorse: v['accept-worse'] ?? false,
+    lanes: v.lane ? [v.lane as Lane] : set === 'fixtures' ? LANES : ['editor'],
   };
 }

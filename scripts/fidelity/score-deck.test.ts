@@ -152,6 +152,39 @@ describe('scoreDeck', () => {
     expect(r.slides[0].pixelMismatch).toBe(0);
   });
 
+  test('the export lane scores the exportPdf PDF of the visible slides, with no save check', async () => {
+    // The page only draws PDFs: it must not open, print, or reopen the deck.
+    const page = fakePage(3, undefined, undefined, new Uint8Array());
+    const opened: string[] = [];
+    const evaluate = page.evaluate.bind(page);
+    page.evaluate = (async (fn: unknown, arg?: unknown) => {
+      const code = String(fn);
+      if (!code.includes('.rasterPdf(')) opened.push(code);
+      return evaluate(fn as never, arg as never);
+    }) as Page['evaluate'];
+    const r = await scoreDeck(page, {
+      file: deck,
+      name: 'd',
+      pdf: TWO_PAGES,
+      fontSet: 'fixtures',
+      lane: 'export',
+    });
+    expect(opened).toEqual([]);
+    expect(r.error).toBeUndefined();
+    expect(r.reference).toBe('pdf');
+    expect(r.foreignFonts).toEqual([]);
+    expect(r.foreignReferenceFonts).toBeUndefined();
+    // The export of the empty slides lacks the text of the reference pages.
+    expect(r.slides.map((s) => [s.index, s.page, s.hidden, s.status])).toEqual([
+      [1, 1, false, 'fail'],
+      [2, undefined, true, 'no-reference'],
+      [3, 2, false, 'fail'],
+    ]);
+    expect(r.slides[0].linesMatched).toBe(0);
+    expect(r.slides[0].missingLines?.length).toBeGreaterThan(0);
+    expect(r.slides.every((s) => s.selfConsistent === undefined)).toBe(true);
+  });
+
   test('fonts of our PDF that the harness did not load are listed', async () => {
     // Open Arabic fixture fonts are absent from this empty deck and its loaded fonts.
     const pdf = join(import.meta.dir, '../../fixtures/rtl-text.pdf'); // four pages

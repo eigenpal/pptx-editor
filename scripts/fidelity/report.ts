@@ -136,6 +136,12 @@ export interface ReportContext {
   readonly tools: string;
   /** The fixture gate, when this run is gated. */
   readonly gate?: { readonly problems: readonly string[]; readonly next: string };
+  /** The lane of the report (`editor print` when absent). */
+  readonly lane?: string;
+  /** How our PDF is made (the editor's print when absent). */
+  readonly method?: string;
+  /** The reports of the other lanes of the run, relative to this report. */
+  readonly links?: readonly { readonly label: string; readonly href: string }[];
 }
 
 const esc = (s: string): string =>
@@ -204,6 +210,11 @@ export function writeReport(
       return `<section><h2>${esc(d.name)} <small>${reference}</small></h2>${fonts}${d.slides.map((s) => slideHtml(out, s)).join('')}</section>`;
     })
     .join('');
+  const lane = context.lane ?? 'editor print';
+  const others = context.links?.length
+    ? `<p class="summary">Other lanes: ${context.links.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`).join(' · ')}</p>`
+    : '';
+  const method = context.method ?? "Our PDF is printed with the editor's own paint.";
   const gate = context.gate
     ? `<section class="gate"><h2>Gate: ${context.gate.problems.length ? 'fails' : 'passes'}</h2>${
         context.gate.problems.length
@@ -211,7 +222,7 @@ export function writeReport(
           : ''
       }<p>${esc(context.gate.next)}</p></section>`
     : '';
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fidelity report: ${esc(set)}</title>
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fidelity report: ${esc(set)}, ${esc(lane)}</title>
 <style>
 body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:24px;color:#1b1a19;background:#f4f3f0}
 h1{font-size:20px}h2{font-size:16px;margin-top:32px}small{color:#75716b;font-weight:400}
@@ -225,9 +236,10 @@ article header span{margin-left:12px;color:#44413d}
 .imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}figure{margin:0}img{width:100%;border:1px solid #e7e4df}
 figcaption{font-size:12px;color:#75716b}.empty div{aspect-ratio:16/9;display:grid;place-items:center;border:1px dashed #d9d5ce;color:#a29e97}
 @media (max-width:800px){.imgs{grid-template-columns:1fr}}
-</style></head><body><h1>Fidelity report: ${esc(set)}</h1>
+</style></head><body><h1>Fidelity report: ${esc(set)}, ${esc(lane)}</h1>
+${others}
 <p class="summary"><span>Slides: ${all.length}</span><span>Pass: ${count('pass')}</span><span>Fail: ${count('fail')} (known gaps: ${all.filter((x) => x.knownGap).length})</span><span>No reference: ${count('no-reference')}</span><span>Stale reference: ${count('stale')}</span><span>Hidden: ${hidden}</span></p>
-<p class="diag">Our PDF is printed with the editor's own paint. pdf.js draws and reads both PDFs. Thresholds: pixels ≤ ${pct(THRESHOLDS.maxPixelMismatch)}, every reference line, no extra lines, baseline ≤ ${THRESHOLDS.maxBaselineDeltaPt} pt, line position ≤ ${THRESHOLDS.maxLineShiftPt} pt (<code>scripts/fidelity/thresholds.ts</code>). ${esc(context.tools)}. Rotated, vertical, and right-to-left text is checked by pixels only.</p>
+<p class="diag">${esc(method)} pdf.js draws and reads both PDFs. Thresholds: pixels ≤ ${pct(THRESHOLDS.maxPixelMismatch)}, every reference line, no extra lines, baseline ≤ ${THRESHOLDS.maxBaselineDeltaPt} pt, line position ≤ ${THRESHOLDS.maxLineShiftPt} pt (<code>scripts/fidelity/thresholds.ts</code>). ${esc(context.tools)}. Lines of one letter or digit, and rotated, vertical, and right-to-left text, are checked by pixels only.</p>
 ${gate}
 ${rows}</body></html>`;
   writeFileSync(join(out, 'index.html'), html);
