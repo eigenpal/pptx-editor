@@ -18,9 +18,9 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
-import { findDocxCheckout } from './docx-checkout.ts';
 
 const ROOT = resolve(import.meta.dir, '../..');
 const CORE = join(ROOT, 'packages/ooxml-core/src');
@@ -96,15 +96,18 @@ for (let at = 2; at < process.argv.length; at += 1) {
   }
 }
 
-function docxCheckout(): string {
-  const found = findDocxCheckout(option('--docx'));
-  if (found.kind === 'found') return found.dir;
-  console.error(
-    found.kind === 'invalid'
-      ? found.message
-      : 'No DOCX Editor checkout found. Pass --docx <path> or set DOCX_EDITOR_DIR.'
-  );
-  process.exit(2);
+/** The PPTX Editor main checkout, also when this script runs in a worktree of it. */
+function mainCheckout(): string {
+  try {
+    const common = execFileSync(
+      'git',
+      ['-C', ROOT, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    return dirname(common);
+  } catch {
+    return ROOT;
+  }
 }
 
 function option(name: string): string | undefined {
@@ -116,6 +119,30 @@ function option(name: string): string | undefined {
     process.exit(2);
   }
   return value;
+}
+
+function docxCheckout(): string {
+  const isCheckout = (dir: string): boolean => existsSync(join(dir, `${STORE}/package/zip.ts`));
+  // A named checkout, from the option or the environment, must exist: no silent fallback.
+  for (const [named, from] of [
+    [option('--docx'), '--docx'],
+    [process.env.DOCX_EDITOR_DIR || undefined, 'DOCX_EDITOR_DIR'],
+  ] as const) {
+    if (named === undefined) continue;
+    if (!isCheckout(named)) {
+      console.error(`${from}: ${named} is not a DOCX Editor checkout.`);
+      process.exit(2);
+    }
+    return resolve(named);
+  }
+  const candidates = [
+    join(homedir(), 'Developer/docx-editor'),
+    join(homedir(), 'docx-editor'),
+    join(mainCheckout(), '../docx-editor'),
+  ];
+  for (const dir of candidates) if (isCheckout(dir)) return resolve(dir);
+  console.error('No DOCX Editor checkout found. Pass --docx <path> or set DOCX_EDITOR_DIR.');
+  process.exit(2);
 }
 
 const docx = docxCheckout();
