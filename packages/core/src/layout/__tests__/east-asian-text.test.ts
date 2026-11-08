@@ -149,16 +149,18 @@ describe('font slots', () => {
     expect(fontSlotPieces('“引用”', props({ lang: 'ja-JP' })).map((p) => p.slot)).toEqual(['ea']);
   });
 
-  test('digits and punctuation take the complex-script slot in complex-script text', () => {
-    // Reference PDF of `rtl-text`, slide 2: the digits, full stops, and percent signs of an
-    // Arabic run draw in its `a:cs` face; its Latin letters keep the Latin face.
-    const arabic = props({ lang: 'ar-SA' });
-    expect(fontSlotPieces('عدد 45.5% Latin.', arabic).map((p) => p.slot)).toEqual([
-      'cs',
-      'latin',
-      'cs',
-    ]);
-    expect(fontSlotPieces('عدد 45.5%.', props()).map((p) => p.slot)).toEqual(['cs', 'latin']);
+  test('digits and punctuation between complex-script characters take their slot', () => {
+    // Reference PDF of `rtl-text`, slide 2: the digits, full stops, and percent signs in
+    // Arabic text draw in the run's `a:cs` face.
+    const slotsOf = (t: string): string[] =>
+      fontSlotPieces(t, props({ lang: 'ar-SA' })).map(
+        (p) => `${p.slot}:${t.slice(p.start, p.end)}`
+      );
+    expect(slotsOf('عدد 45.5% من.')).toEqual(['cs:عدد 45.5% من.']);
+    // Next to Latin letters they stay Latin, also in an Arabic run.
+    expect(slotsOf('Q4 2024 (est.)')).toEqual(['latin:Q4 2024 (est.)']);
+    expect(slotsOf('عدد COVID-19.')).toEqual(['cs:عدد', 'latin: COVID-19.']);
+    expect(slotsOf('1.')).toEqual(['latin:1.']);
   });
 
   test('a surrogate pair stays whole and a combining mark keeps its base slot', () => {

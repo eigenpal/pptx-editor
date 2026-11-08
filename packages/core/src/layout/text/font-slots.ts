@@ -4,14 +4,13 @@
 // scripts) with its `a:cs` face, symbol characters (U+F000 to U+F0FF) with its `a:sym` face,
 // and every other character with its `a:latin` face. Characters that both East Asian and
 // Latin text use (curly quotes, the ellipsis, arrows) take the East Asian face in a run whose
-// language is Chinese, Japanese, or Korean. Digits, punctuation, and symbols take the
-// complex-script face in a run whose language is written in a complex script (reference PDF
-// of `rtl-text`: the digits, full stops, and percent signs of Arabic runs). A space takes the Latin font, also between East
+// language is Chinese, Japanese, or Korean. Digits, punctuation, and symbols between
+// complex-script characters take the complex-script face. A space takes the Latin font, also between East
 // Asian words; between two complex-script characters it takes the complex-script font.
 // DOM-free.
 
 import type { RunProps } from '../../cascade/index.ts';
-import { complexScriptOf, eastAsianScriptOf } from '../../cascade/script-fonts.ts';
+import { eastAsianScriptOf } from '../../cascade/script-fonts.ts';
 import { isIdeographic } from './line-break.ts';
 
 /** A run's font slot. */
@@ -66,18 +65,12 @@ const MARK = /^[\p{M}\uFE00-\uFE0F]$/u;
 const NEUTRAL = /^[\p{N}\p{P}\p{S}]$/u;
 
 /** The slot of one code point, or null for a space, which takes its neighbors' slot. */
-function strongSlot(
-  cp: number,
-  eastAsianText: boolean,
-  complexText: boolean,
-  symbol: boolean
-): FontSlot | null {
+function strongSlot(cp: number, eastAsianText: boolean, symbol: boolean): FontSlot | null {
   if (isSpace(cp)) return null;
   if (symbol && cp >= 0xf000 && cp <= 0xf0ff) return 'sym';
   if (isEastAsianChar(cp)) return 'ea';
   if (isComplexScriptChar(cp)) return 'cs';
   if (eastAsianText && isSharedSymbol(cp)) return 'ea';
-  if (complexText && NEUTRAL.test(String.fromCodePoint(cp))) return 'cs';
   return 'latin';
 }
 
@@ -109,15 +102,15 @@ const piecesOf = new WeakMap<object, { text: string; pieces: readonly SlotPiece[
 function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sym'>): SlotPiece[] {
   const eastAsianText =
     eastAsianScriptOf(props.lang) !== undefined || eastAsianScriptOf(props.altLang) !== undefined;
-  const complexText = complexScriptOf(props.lang) !== undefined;
   const symbol = props.sym !== undefined;
   // The slot of each code point, at its first UTF-16 unit.
   const slots: (FontSlot | null)[] = new Array<FontSlot | null>(text.length).fill(null);
+  const neutral: boolean[] = new Array<boolean>(text.length).fill(false);
   let last: FontSlot | null = null;
   for (let i = 0; i < text.length;) {
     const cp = text.codePointAt(i) ?? 0;
     const len = cp > 0xffff ? 2 : 1;
-    let slot = strongSlot(cp, eastAsianText, complexText, symbol);
+    let slot = strongSlot(cp, eastAsianText, symbol);
     if (
       slot === 'latin' &&
       last &&
@@ -125,9 +118,29 @@ function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sy
       (cp === 0x200d || MARK.test(String.fromCodePoint(cp)))
     )
       slot = last;
+    if (slot === 'latin' && NEUTRAL.test(String.fromCodePoint(cp))) {
+      neutral[i] = true;
+      slot = null;
+    }
     slots[i] = slot;
     if (slot) last = slot;
     i += len;
+  }
+  // Digits, punctuation, and symbols between complex-script characters, or between such a
+  // character and an edge of the run, take the complex-script slot; any other is Latin
+  // (reference PDF of `rtl-text`, slide 2: the digits, full stops, and percent signs in Arabic
+  // text). The nearest strong slot on each side skips spaces and other such characters.
+  const strongAfter: (FontSlot | null)[] = new Array<FontSlot | null>(text.length).fill(null);
+  for (let i = text.length - 1, next: FontSlot | null = null; i >= 0; i -= 1) {
+    strongAfter[i] = next;
+    if (!neutral[i] && !isSpace(text.charCodeAt(i))) next = slots[i] ?? next;
+  }
+  for (let i = 0, before: FontSlot | null = null; i < text.length; i += 1) {
+    if (neutral[i]) {
+      const next = strongAfter[i];
+      const sides = [before, next].filter((side) => side !== null);
+      slots[i] = sides.length > 0 && sides.every((side) => side === 'cs') ? 'cs' : 'latin';
+    } else if (!isSpace(text.charCodeAt(i))) before = slots[i] ?? before;
   }
   // A space between two complex-script characters takes their slot; any other space is Latin.
   // One pass each way finds the nearest slot before and after every run of spaces, so a long
