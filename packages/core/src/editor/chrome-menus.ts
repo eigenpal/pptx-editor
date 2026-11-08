@@ -132,9 +132,10 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
     id: 'view',
     labelKey: 'menu.view',
     entries: [
-      // The View menu starts with the presentation views: Normal and Slide Sorter.
+      // The View menu starts with the views: Normal, Slide Sorter, and Slide Master.
       { kind: 'item', slot: 'view.presentationView', value: 'normal' },
       { kind: 'item', slot: 'view.presentationView', value: 'slideSorter' },
+      { kind: 'item', slot: 'view.presentationView', value: 'slideMaster' },
       SEPARATOR,
       item('view.smartGuides'),
     ],
@@ -456,6 +457,13 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     SEPARATOR,
     item('slide.background', 'contextMenu.background'),
+    // Edit layout opens the slide master view on the layout of the slide.
+    {
+      kind: 'item',
+      slot: 'view.presentationView',
+      value: 'slideMaster',
+      labelKey: 'contextMenu.editLayout',
+    },
     SEPARATOR,
     { ...item('slide.add', 'contextMenu.newSlide'), direct: true },
   ],
@@ -464,15 +472,31 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
 /**
  * The rows of a canvas context menu as `editor` shows them: without the New comment row while no
  * comments pane can open a draft (`commentRowShown`), so core without the pro review pane shows
- * no dead row. Separators left alone go with it. @internal
+ * no dead row. In the slide master view, Edit layout becomes Close master and New slide goes.
+ * Separators left alone go with it. @internal
  */
 export function canvasMenuRows(
   entries: readonly ChromeMenuEntry[],
   editor: Editor | null | undefined
 ): readonly ChromeMenuEntry[] {
-  if (commentRowShown(editor)) return entries;
-  const kept = entries.filter((e) => e.kind !== 'item' || e.slot !== 'review.addComment');
-  return kept.length === entries.length ? entries : tidySeparators(kept);
+  const master = editor?.snapshot().presentationView === 'slideMaster';
+  if (!master && commentRowShown(editor)) return entries;
+  const kept: ChromeMenuEntry[] = [];
+  for (const e of entries) {
+    if (e.kind === 'item' && e.slot === 'review.addComment' && (master || !commentRowShown(editor)))
+      continue;
+    // In the slide master view, Edit layout becomes Close master, and New slide has no slide.
+    if (master && e.kind === 'item' && e.slot === 'slide.add') continue;
+    if (
+      master &&
+      e.kind === 'item' &&
+      e.slot === 'view.presentationView' &&
+      e.value === 'slideMaster'
+    )
+      kept.push({ ...e, value: 'normal', labelKey: 'masterView.close' });
+    else kept.push(e);
+  }
+  return kept.length === entries.length && !master ? entries : tidySeparators(kept);
 }
 
 /** The key that names a menu row for host overrides: the slot, and its value if any. @internal */

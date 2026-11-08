@@ -315,6 +315,12 @@ export function isStructureEdited(frame: Element_2 | undefined): boolean;
 // @internal
 export const isStructureMark: (el: Element_2) => boolean;
 
+// @public
+export const isTemplateIndex: (index: number) => boolean;
+
+// @public
+export const isTemplateRef: (ref: SlideRef | undefined) => ref is TemplateRef;
+
 // @internal
 export function isValidXmlText(value: string): boolean;
 
@@ -823,6 +829,9 @@ export interface SlideRef {
 }
 
 // @public
+export function slideRefAt(pkg: PptxPackage, index: number): SlideRef | undefined;
+
+// @public
 export function specOf(el: Element_2): NodeSpec;
 
 // @internal
@@ -932,6 +941,22 @@ export interface TableSpanTrim {
 
 // @internal
 export function tableSpanTrims<T extends TableGridCell>(cells: readonly (readonly (T | undefined)[])[], hasText: (tc: T) => boolean): TableSpanTrim[];
+
+// @public
+export const TEMPLATE_BASE: number;
+
+// @public
+export function templateIndexOf(pkg: PptxPackage, partName: string): number;
+
+// @public
+export interface TemplateRef extends SlideRef {
+    readonly name: string;
+    // (undocumented)
+    readonly template: 'master' | 'layout';
+}
+
+// @public
+export function templateRefs(pkg: PptxPackage): readonly TemplateRef[];
 
 // @public
 export interface TextEditAt {

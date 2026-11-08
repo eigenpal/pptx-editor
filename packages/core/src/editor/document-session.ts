@@ -14,6 +14,7 @@ import {
   decodeEmbeddedFont,
   fontEmbeddingPermission,
   presentationInfo,
+  slideRefAt,
   PptxDocumentStore,
   attr,
   NS,
@@ -782,21 +783,19 @@ export class DocumentSession {
   }
 
   /**
-   * Layout of slide `index` at the current revision. A slide whose part, layout, master, theme,
+   * Layout of slide `index` at the current revision, or of a template index in the slide master
+   * view (`slideRefAt`). A slide whose part, layout, master, theme,
    * and the other parts it reads are unchanged keeps its layout object across edits elsewhere
    * (`slideDependencies`), so its thumbnail and its paint are reused too.
    */
   layout(index: number): SlideLayout | undefined {
     const pkg = this.store.package;
-    let byIndex = this.#layouts.get(pkg);
-    if (!byIndex) {
-      byIndex = new Map();
-      this.#layouts.set(pkg, byIndex);
-    }
+    const byIndex = this.#layouts.get(pkg) ?? new Map<number, SlideLayout>();
+    this.#layouts.set(pkg, byIndex);
     const hit = byIndex.get(index);
     if (hit) return hit;
     const deps = slideDependencies(pkg, index);
-    const partName = presentationInfo(pkg).slides[index]?.partName;
+    const partName = slideRefAt(pkg, index)?.partName;
     if (!deps || !partName) return undefined;
     const last = this.#bySlide.get(partName);
     if (last && sameDependencies(last.deps, deps)) {

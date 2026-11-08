@@ -18,6 +18,7 @@ import {
   textOf,
   type Element,
   type PptxPackage,
+  slideRefAt,
 } from '../store/index.ts';
 import { layoutPlaceholderOf, resolveSlide } from '../cascade/index.ts';
 import {
@@ -171,7 +172,7 @@ export function withPrompts(
   editing: string | null
 ): SlideLayout | undefined {
   const index = layout.slide.index;
-  const part = presentationInfo(pkg).slides[index]?.partName;
+  const part = slideRefAt(pkg, index)?.partName;
   if (!part || part !== layout.slide.partName) return undefined;
   const batch = new OpBatch(pkg);
   const prompted = new Set<string>();

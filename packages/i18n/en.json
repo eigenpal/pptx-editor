@@ -98,6 +98,7 @@
     "link": "Insert link…",
     "clearFormatting": "Clear formatting",
     "newSlide": "New slide",
+    "editLayout": "Edit layout",
     "duplicateSlides": "Duplicate {count} slides",
     "deleteSlides": "Delete {count} slides",
     "moveUp": "Move up",
@@ -510,7 +511,8 @@
     "presentationView": "Presentation view",
     "views": {
       "normal": "Normal",
-      "slideSorter": "Slide sorter"
+      "slideSorter": "Slide sorter",
+      "slideMaster": "Slide master"
     },
     "equation": "Equation",
     "newComment": "New comment"
@@ -852,7 +854,9 @@
     "instantAnimation": "This effect is instant, so it has no duration",
     "noChart": "Select a chart",
     "noCommentPane": "This editor shows no comments pane",
-    "noDiagram": "Select a diagram"
+    "noDiagram": "Select a diagram",
+    "slideMaster": "Close the slide master first",
+    "noSlideMaster": "This presentation has no slide master"
   },
   "rail": {
     "ariaLabel": "Slides",
@@ -908,7 +912,10 @@
     "format": {
       "emptyTitle": "Nothing selected",
       "emptyBody": "Select a shape on the slide to see its position and size.",
+      "emptyBodyTemplate": "Select a shape on the canvas to see its position and size.",
       "slide": "Slide",
+      "layout": "Layout",
+      "master": "Slide master",
       "multipleTitle": "{count} shapes selected",
       "multipleBody": "Drag a handle to resize them together, or group them with Ctrl+G.",
       "position": "Position",
@@ -1159,7 +1166,9 @@
       "chart": "Chart",
       "diagram": "Diagram",
       "media": "Media"
-    }
+    },
+    "masterAriaLabel": "Master: {name}",
+    "layoutAriaLabel": "Layout: {name}"
   },
   "errors": {
     "notAPresentation": "The file is not a PPTX presentation.",
@@ -1746,5 +1755,21 @@
       "matrix": "Matrix",
       "euler": "Euler identity"
     }
+  },
+  "masterView": {
+    "title": "Slide master",
+    "close": "Close master",
+    "railLabel": "Masters and layouts",
+    "master": "Master",
+    "untitledLayout": "Untitled layout",
+    "usedBy": "Used by {count} slides",
+    "usedByOne": "Used by 1 slide",
+    "unused": "Not used by any slide",
+    "layoutHint": "Changes apply to the {count} slides that use this layout.",
+    "layoutHintOne": "Changes apply to the one slide that uses this layout.",
+    "layoutHintNone": "No slide uses this layout.",
+    "masterHint": "Changes apply to every layout of this master and to its {count} slides.",
+    "masterHintOne": "Changes apply to every layout of this master and to its one slide.",
+    "masterHintNone": "Changes apply to every layout of this master."
   }
 }

@@ -5,7 +5,7 @@
 // own group above the full list and draws each name in its own face. DOCX Editor commit adf0e178.
 
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import { xmlPartOf } from '../store/index.ts';
+import { xmlPartOf, slideRefAt } from '../store/index.ts';
 import { parseTheme } from '../cascade/index.ts';
 import { namedFamilies, type DocumentSession } from './document-session.ts';
 import { FONT_NAME, LATIN_THEME_FONTS } from '../automation/commands/font-format.ts';
@@ -87,7 +87,7 @@ export function slideThemeFonts(
   session: DocumentSession | null,
   slide: number
 ): { readonly headings: string | null; readonly body: string | null } {
-  const themePart = session?.info.slides[slide]?.themePart;
+  const themePart = session && slideRefAt(session.store.package, slide)?.themePart;
   const part = session && themePart ? xmlPartOf(session.store.package, themePart) : undefined;
   if (!part) return { headings: null, body: null };
   const theme = parseTheme(part);

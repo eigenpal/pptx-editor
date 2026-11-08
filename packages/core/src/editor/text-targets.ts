@@ -2,7 +2,7 @@
 // selected range in them, and the autofit re-fit after the edit. Split from `commands.ts`, so
 // the command table stays under the line cap; the text format commands share it.
 
-import { child, type Element } from '../store/index.ts';
+import { child, type Element, slideRefAt } from '../store/index.ts';
 import type { EditorSelection, TextPoint } from '../contracts/index.ts';
 import { refit, refitAll } from '../automation/commands/autofit.ts';
 import { tblOf } from '../automation/commands/table-model.ts';
@@ -19,7 +19,7 @@ import {
 
 /** The slide part of the current slide. */
 export function slidePart(ctx: CommandContext): string {
-  const ref = ctx.session.info.slides[ctx.slide];
+  const ref = slideRefAt(ctx.session.store.package, ctx.slide);
   if (!ref) throw new CommandRefusal('disabled.noEditor');
   return ref.partName;
 }

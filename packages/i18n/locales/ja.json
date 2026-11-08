@@ -98,6 +98,7 @@
     "link": "リンクの挿入…",
     "clearFormatting": "書式のクリア",
     "newSlide": "新しいスライド",
+    "editLayout": null,
     "duplicateSlides": "{count} 枚のスライドを複製",
     "deleteSlides": "{count} 枚のスライドを削除",
     "moveUp": "上へ移動",
@@ -510,7 +511,8 @@
     "presentationView": "表示モード",
     "views": {
       "normal": "標準",
-      "slideSorter": "スライド一覧"
+      "slideSorter": "スライド一覧",
+      "slideMaster": null
     },
     "equation": "数式",
     "newComment": "新しいコメント"
@@ -852,7 +854,9 @@
     "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません",
     "noChart": "グラフを選択してください",
     "noCommentPane": "このエディターにはコメント ウィンドウがありません",
-    "noDiagram": "図表を選択してください"
+    "noDiagram": "図表を選択してください",
+    "slideMaster": null,
+    "noSlideMaster": null
   },
   "rail": {
     "ariaLabel": "スライド",
@@ -908,7 +912,10 @@
     "format": {
       "emptyTitle": "何も選択されていません",
       "emptyBody": "スライド上の図形を選択すると、その位置とサイズが表示されます。",
+      "emptyBodyTemplate": null,
       "slide": "スライド",
+      "layout": null,
+      "master": null,
       "multipleTitle": "{count} 個の図形を選択中",
       "multipleBody": "ハンドルをドラッグしてまとめてサイズ変更するか、Ctrl+G でグループ化します。",
       "position": "位置",
@@ -1159,7 +1166,9 @@
       "chart": "グラフ",
       "diagram": "図表",
       "media": "メディア"
-    }
+    },
+    "masterAriaLabel": null,
+    "layoutAriaLabel": null
   },
   "errors": {
     "notAPresentation": "このファイルは PPTX プレゼンテーションではありません。",
@@ -1746,5 +1755,21 @@
       "matrix": "行列",
       "euler": "オイラーの等式"
     }
+  },
+  "masterView": {
+    "title": null,
+    "close": null,
+    "railLabel": null,
+    "master": null,
+    "untitledLayout": null,
+    "usedBy": null,
+    "usedByOne": null,
+    "unused": null,
+    "layoutHint": null,
+    "layoutHintOne": null,
+    "layoutHintNone": null,
+    "masterHint": null,
+    "masterHintOne": null,
+    "masterHintNone": null
   }
 }

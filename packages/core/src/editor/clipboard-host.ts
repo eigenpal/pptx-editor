@@ -17,6 +17,7 @@
 
 import type { ClipboardPayload, EditorCommand, EditorSelection } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
+import { slideRefAt } from '../store/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import {
   CLIPBOARD_MIME,
@@ -126,7 +127,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
     const session = editor.session();
     const selection = editor.selection();
     if (!session || selection.kind !== 'shapes') return null;
-    const ref = session.info.slides[editor.slide()];
+    // A slide, or a layout or master in the slide master view.
+    const ref = slideRefAt(session.store.package, editor.slide());
     if (!ref) return null;
     const payload = copySelection(
       session.store.package,
@@ -320,7 +322,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
         if (!text) return false;
         data.setData('text/plain', text);
         const session = editor.session();
-        const part = session?.info.slides[editor.slide()]?.partName;
+        const part = session && slideRefAt(session.store.package, editor.slide())?.partName;
         const item = textItemOf(editor.layout(), selection);
         if (session && part) {
           const paragraphs = copyTextParagraphs(session.probeBatch(), part, selection);

@@ -27,14 +27,18 @@ import {
   type PaintOptions,
   type ViewRect,
 } from '../output/index.ts';
-import type { PptxPackage } from '../store/index.ts';
+import { slideRefAt, type PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
 import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thumbnail-queue.ts';
 
+/** The part of slide `index`, or of a template of the slide master view (`slideRefAt`). */
+const partOf = (session: DocumentSession, index: number): string | undefined =>
+  slideRefAt(session.store.package, index)?.partName;
+
 /** The render key of slide `index`: its parts, its faces, and its converted pictures. */
 const keyOf = (session: DocumentSession, index: number): string | undefined =>
-  renderKey(session.store.package, index, session.paintKey(session.info.slides[index]?.partName));
+  renderKey(session.store.package, index, session.paintKey(partOf(session, index)));
 
 /** The slide's own rectangle: a thumbnail clips to it (`PaintOptions.view`). */
 const slideView = (lay: SlideLayout): ViewRect => ({
@@ -162,7 +166,7 @@ export class ThumbnailPainter {
     // once (no `defer`) gets the slide now: its layout parses it.
     if (defer && session.slidePending(index)) return this.#placeholder(session, index, container);
     const key = keyOf(session, index);
-    const part = session.info.slides[index]?.partName;
+    const part = partOf(session, index);
     if (!key || !part) return;
     const was = this.#painted.get(container);
     if (was?.session === session && was.key === key) {
@@ -283,7 +287,7 @@ export class ThumbnailPainter {
   #placeholder(session: DocumentSession, index: number, container: HTMLElement): void {
     this.#pending.delete(container);
     if (this.#painted.delete(container) || container.firstChild) container.replaceChildren();
-    const part = session.info.slides[index]?.partName;
+    const part = partOf(session, index);
     if (!part) return;
     // In view, it parses first; out of view, when it scrolls into view (`#paintFirst`).
     if (!this.#queue.paintNow(container, { index, part }, false)) return;
@@ -300,8 +304,9 @@ export class ThumbnailPainter {
     const session = this.#host.session();
     if (!session) return;
     const slides = session.info.slides;
+    // A template of the slide master view keeps its index while the view is open.
     const index =
-      slides[ask.index]?.partName === ask.part
+      partOf(session, ask.index) === ask.part
         ? ask.index
         : slides.findIndex((s) => s.partName === ask.part);
     if (index < 0) {
@@ -327,7 +332,7 @@ export class ThumbnailPainter {
     budget = Infinity
   ): boolean {
     const key = keyOf(session, index);
-    const part = session.info.slides[index]?.partName;
+    const part = partOf(session, index);
     const lay = session.layout(index);
     if (!key || !part || !lay) return true;
     const opts: Omit<PaintOptions, 'idPrefix'> = {

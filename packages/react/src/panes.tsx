@@ -60,6 +60,7 @@ import {
 } from './rail-parts.tsx';
 import { useSlideDrag } from './slide-drag.ts';
 import { LayoutGallery } from './SlideControls.tsx';
+import { MasterRail } from './MasterRail.tsx';
 import {
   SectionNode,
   useCollapsedSections,
@@ -293,6 +294,14 @@ function usePaneOpen(props: PaneProps) {
  * with a button that shows it again. @public
  */
 export function SlideRail(props: SlideRailProps = {}) {
+  // The slide master view lists masters and layouts instead of slides.
+  const master = useEditorState((s) => s.presentationView === 'slideMaster');
+  // The open state lives here, so a rail the user hid stays hidden after the master view.
+  const [open, onOpenChange] = usePaneOpen(props);
+  return master ? <MasterRail {...props} /> : <SlideList {...props} {...{ open, onOpenChange }} />;
+}
+
+function SlideList(props: SlideRailProps) {
   const [open, setPaneOpen] = usePaneOpen(props);
   const toggle = props.toggle !== false;
   const rail = useRef<HTMLElement>(null);

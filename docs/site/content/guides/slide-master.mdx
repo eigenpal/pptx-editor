@@ -1,0 +1,112 @@
+---
+title: 'Edit layouts and masters'
+description: 'Open the slide master view to edit slide layouts and masters, and update every slide that uses them.'
+category: 'Guides'
+---
+
+The slide master view edits the slide layouts and slide masters of a presentation. A change to a layout updates every slide that uses that layout. A change to a master updates its layouts and their slides.
+
+## Open the view
+
+Open the view in one of these ways:
+
+- Select **View** > **Slide master**.
+- Right-click an empty area of the slide and select **Edit layout**.
+- Select **Slide master**, the third button of the view switch under the canvas.
+
+The view opens on the layout of the current slide. To return to the slides, select **Close master** in the bar above the canvas, or right-click empty area of the canvas and select **Close master**. The editor goes back to the slide that was current when you opened the view, and focus moves to the canvas.
+
+To open and close the view from your own control, use the `view.presentationView` slot. This button works inside `PptxEditor.Root`:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useEditorCommand } from '@pptx-editor.dev/react';
+
+export function EditLayoutsButton() {
+  const view = useEditorCommand('view.presentationView');
+  const open = view.value === 'slideMaster';
+  return (
+    <button
+      type="button"
+      disabled={!view.isEnabled}
+      onClick={() => view.execute(open ? 'normal' : 'slideMaster')}
+    >
+      {open ? 'Close master' : 'Edit layouts'}
+    </button>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useEditorCommand } from '@pptx-editor.dev/vue';
+
+const view = useEditorCommand('view.presentationView');
+const open = computed(() => view.value.value === 'slideMaster');
+</script>
+
+<template>
+  <button
+    type="button"
+    :disabled="!view.isEnabled.value"
+    @click="view.execute(open ? 'normal' : 'slideMaster')"
+  >
+    {{ open ? 'Close master' : 'Edit layouts' }}
+  </button>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Outside an adapter, run the command on the editor: `editor.exec({ type: 'setPresentationView', view: 'slideMaster' })`. A deck without a slide master refuses it with `disabled.noSlideMaster`.
+
+## Edit a layout
+
+The slide rail lists each master, then its layouts. Each entry shows its name and how many slides use it. A layout that no slide uses is faded. Select an entry, or use the arrow keys, Home, and End, to show it on the canvas. Press Enter to move focus to the canvas.
+
+On the canvas, the layout's own shapes and placeholders are editable. You can move, resize, format, insert, and delete shapes, and type the prompt text of a placeholder. A layout also shows the shapes of its master under its own shapes.
+
+**Format Background** sets the background of the layout or master on the canvas. Undo and redo work as on slides, and collaboration peers receive layout edits.
+
+## Read the view state
+
+In the view, `snapshot().presentationView` is `'slideMaster'`, and `snapshot().slides` lists the masters and layouts instead of slides. Each entry has these fields:
+
+| Field      | Description                                             |
+| ---------- | ------------------------------------------------------- |
+| `index`    | The template index. Pass it to `goToSlide`.             |
+| `template` | `'master'` or `'layout'`.                               |
+| `name`     | The name saved in the file, if any.                     |
+| `usedBy`   | The number of slides that use the layout or the master. |
+| `masterId` | For a layout, the `id` of its master.                   |
+
+`currentSlide` is the template index of the entry on the canvas, not a position in the list, so `slides[currentSlide]` is `undefined` in the view. Read the current entry with `currentSlideSummary`:
+
+```ts
+import { currentSlideSummary } from '@pptx-editor.dev/core/editor';
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function canvasName(editor: Editor): string | undefined {
+  return currentSlideSummary(editor.snapshot())?.name;
+}
+```
+
+`currentSlideSummary` works in every view, so use it in place of `slides[currentSlide]`. `selectedSlides` is empty while the view is open, because no slide is selected.
+
+## Limits
+
+Commands that act on slides are off while the view is open. They return the `disabled.slideMaster` reason. These include adding, deleting, and moving slides, sections, speaker notes, animations, transitions, comments, Find and Replace, and the slide show. The notes pane hides in the view.
+
+The view does not add or delete layouts and masters, and it does not change the theme.
+
+## See also
+
+- [Navigate a presentation](/docs/guides/navigation)
+- [Undo history](/docs/guides/undo-history)

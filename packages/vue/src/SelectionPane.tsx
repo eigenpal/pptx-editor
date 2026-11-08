@@ -16,6 +16,7 @@ import {
   type PropType,
 } from 'vue';
 import {
+  currentSlideSummary,
   SELECTION_PANE_NAME_MAX,
   selectFromPane,
   selectionPaneAncestors,
@@ -333,7 +334,7 @@ export const PptxEditorSelectionPane = defineComponent({
   setup(props) {
     // Node ids repeat across slides: a new slide starts a new pane, so no rename, focus, or
     // open group carries over to an element of another slide.
-    const slideId = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+    const slideId = useEditorState((s) => currentSlideSummary(s)?.id ?? '');
     return () => h(SlidePane, { key: slideId.value, className: props.className });
   },
 });

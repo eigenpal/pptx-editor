@@ -5,7 +5,7 @@
 
 import type { SlideLayout } from '../layout/index.ts';
 import type { TextEditAt } from '../store/index.ts';
-import type { EditorCommand, EditorSelection } from '../contracts/index.ts';
+import type { CanResult, EditorCommand, EditorMode, EditorSelection } from '../contracts/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import { cellLayoutAt, snapCellAddress, tableItem, textItemOf } from './table-cells.ts';
 import { snapTextSelection } from './text-input.ts';
@@ -86,4 +86,14 @@ export function validSelection(
   const item = textItemOf(layout, at);
   if (at.kind !== 'text' || !item?.element.text) return none;
   return snapTextSelection(item, at);
+}
+
+/**
+ * Whether undo (`undo`) or redo can run: an edit mode, and a step to take (`available`).
+ * @internal
+ */
+export function historyAnswer(undo: boolean, available: boolean, mode: EditorMode): CanResult {
+  if (available && mode === 'edit') return { ok: true };
+  if (mode === 'view') return { ok: false, reason: 'disabled.viewing' };
+  return { ok: false, reason: undo ? 'disabled.nothingToUndo' : 'disabled.nothingToRedo' };
 }

@@ -20,10 +20,10 @@ import {
   child,
   NS,
   path,
-  presentationInfo,
   xmlPartOf,
   type Element,
   type PptxPackage,
+  slideRefAt,
 } from '../store/index.ts';
 import type { ThemeColorSlot, ThemeSwatch } from '../contracts/index.ts';
 import { hexOf } from './selection-state.ts';
@@ -101,10 +101,11 @@ export function themeColorGrid(ctx: ColorContext): ThemeColorGrid {
 
 /** The color context of slide `index`: its theme and its effective color map. */
 function slideColorContext(pkg: PptxPackage, index: number): ColorContext | null {
-  const ref = presentationInfo(pkg).slides[index];
+  const ref = slideRefAt(pkg, index);
   if (!ref) return null;
   const theme = parseTheme(xmlPartOf(pkg, ref.themePart));
-  const master = xmlPartOf(pkg, ref.masterPart)?.root;
+  // A master in the slide master view has no master part: its own color map applies.
+  const master = xmlPartOf(pkg, ref.masterPart ?? ref.partName)?.root;
   let colorMap = readColorMap(child(master, 'p:clrMap')) ?? DEFAULT_COLOR_MAP;
   for (const part of [ref.layoutPart, ref.partName]) {
     const override = readColorMap(

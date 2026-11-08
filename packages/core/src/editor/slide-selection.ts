@@ -9,6 +9,7 @@ import type { EditorSnapshot, SlideSelectMode } from '../contracts/index.ts';
 import {
   changedPartNames,
   deferredParseCount,
+  isTemplateIndex,
   presentationInfo,
   type PptxPackage,
 } from '../store/index.ts';
@@ -16,6 +17,9 @@ import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
 
 type SlideRef = { readonly partName: string };
+
+/** The selection while a template is current: none. Shared, so a snapshot keeps its identity. */
+const NO_SLIDES: number[] = [];
 
 export class SlideSelection {
   #ids = new Set<string>();
@@ -39,8 +43,10 @@ export class SlideSelection {
   /**
    * Selected slide indices, ascending. The current slide is always one of them. The same
    * array until the slide list, the current slide, or the selection changes: do not mutate it.
+   * Empty while a layout or a master is current (the slide master view): no slide is selected.
    */
   indices(slides: readonly SlideRef[], current: number): number[] {
+    if (isTemplateIndex(current)) return NO_SLIDES;
     const last = this.#last;
     if (last?.slides === slides && last.current === current && last.version === this.#version)
       return last.out as number[];

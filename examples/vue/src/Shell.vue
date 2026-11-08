@@ -3,7 +3,8 @@
 // (brand, file name, menus, Present, mode pill, theme, Open/New/Export, panel toggle) around
 // the adapter's toolbar or ribbon, slide rail or sorter, canvas, notes, panel, and zoom pill.
 // It reads the editor through composables, so it renders inside `PptxEditorRoot`.
-import { onBeforeUnmount, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
+import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
 import {
   Icon,
   PptxEditorContent,
@@ -24,6 +25,7 @@ import {
   PptxEditorZoomPill,
   StatusBarViews,
   keepFocus,
+  useEditorCommand,
   useEditorState,
   usePptxEditor,
   useSlideshow,
@@ -70,7 +72,11 @@ const editor = usePptxEditor();
 const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
 // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
 const ribbon = ribbonChrome(location.search);
-const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+// Present follows the slot's state: off with a reason in the slide master view, for one.
+const present = useEditorCommand('view.playFromStart');
+const presentOff = computed(() =>
+  present.disabledReason.value ? translateKeyOrText(t, present.disabledReason.value) : null
+);
 // With no deck to open (its fetch failed), the notice says why in place of the spinner.
 const waiting = useEditorState((s) => s.status === 'empty');
 // A phone opens with the notes closed, so the slide gets the room; one tap opens them.
@@ -228,8 +234,8 @@ function onDrop(e: DragEvent): void {
           type="button"
           class="demo-btn demo-btn--sm"
           :aria-label="t('slideshow.present')"
-          :data-pptx-tooltip="t('slideshow.presentHint')"
-          :disabled="!canPresent"
+          :data-pptx-tooltip="presentOff ?? t('slideshow.presentHint')"
+          :disabled="!present.isEnabled.value"
           @mousedown="keepFocus"
           @click="show.start('start')"
         >

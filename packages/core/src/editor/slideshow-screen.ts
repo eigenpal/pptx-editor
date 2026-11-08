@@ -128,7 +128,8 @@ export function enterSlideshowScreen(el: HTMLElement, onLeave?: () => void): () 
 
 /**
  * A new show for `editor`, from the first shown slide or from the current slide. Null without an
- * open document with slides. Viewing mode can present. @internal
+ * open document with slides, and in the slide master view, whose rail lists layouts. Viewing
+ * mode can present. @internal
  */
 export function startSlideshowController(
   editor: PptxEditorInstance | null,
@@ -136,6 +137,7 @@ export function startSlideshowController(
 ): SlideshowController | null {
   const snap = editor?.snapshot();
   if (!snap || snap.status !== 'ready' || snap.slides.length === 0) return null;
+  if (snap.presentationView === 'slideMaster') return null;
   return new SlideshowController(snap.slides, from === 'start' ? 'start' : snap.currentSlide);
 }
 

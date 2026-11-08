@@ -18,12 +18,24 @@ import {
   REL,
   relTarget,
   relTargetByType,
-  shapeTreeOf,
+  isTemplateRef,
+  slideRefAt,
   xmlPartOf,
   type Element,
   type PptxPackage,
 } from '../store/index.ts';
 import { contentElements } from './alternate-content.ts';
+import {
+  collectPlaceholders,
+  findLayoutPlaceholder,
+  findMasterPlaceholder,
+  partElementsOf,
+  placeholderOf,
+  treeOf,
+  type PlaceholderEntry,
+  type PlaceholderKey,
+} from './placeholders.ts';
+export { inheritedPlaceholders, layoutPlaceholderOf } from './placeholders.ts';
 import { resolveChartPart } from './chart-part.ts';
 import { colorChild, resolveColor, type ColorContext } from './color.ts';
 import {
@@ -73,16 +85,6 @@ import type {
   Xfrm,
 } from './types.ts';
 
-/** Placeholder identity on a shape. */
-interface PlaceholderKey {
-  readonly type: string;
-  readonly idx?: string;
-}
-
-interface PlaceholderEntry extends PlaceholderKey {
-  readonly el: Element;
-}
-
 /** Everything element resolution needs about the slide it is on. */
 interface SlideScope {
   readonly pkg: PptxPackage;
@@ -114,123 +116,6 @@ const resolvedParagraphs = new WeakMap<
 >();
 
 const MAX_GROUP_DEPTH = 32;
-
-function placeholderOf(el: Element): PlaceholderKey | undefined {
-  const nv = elements(el).find((c) => c.local.startsWith('nv') && c.ns === NS.p);
-  const ph = path(nv, 'p:nvPr', 'p:ph');
-  if (!ph) return undefined;
-  const idx = attr(ph, 'idx');
-  return { type: attr(ph, 'type') ?? 'obj', ...(idx !== undefined ? { idx } : {}) };
-}
-
-/** The shape tree of a part and the part root, where `mc:Choice` prefixes may be declared. */
-function treeOf(pkg: PptxPackage, part: string | undefined): { tree?: Element; root?: Element } {
-  if (!part) return {};
-  const tree = shapeTreeOf(pkg, part);
-  const root = xmlPartOf(pkg, part)?.root;
-  return { ...(tree ? { tree } : {}), ...(root ? { root } : {}) };
-}
-
-/** A part's content elements, split into placeholders and the rest. */
-interface PartElements {
-  readonly tree: Element;
-  readonly placeholders: readonly PlaceholderEntry[];
-  /** The content elements that are not placeholders, in document order. */
-  readonly others: readonly Element[];
-}
-
-/**
- * The content of a part by its root, which an edit of the part replaces: a layout or a master
- * splits into placeholders and content once, not on each resolution of each slide.
- */
-const partElements = new WeakMap<Element, PartElements>();
-
-function partElementsOf(pkg: PptxPackage, part: string | undefined): PartElements | undefined {
-  const { tree, root } = treeOf(pkg, part);
-  if (!tree) return undefined;
-  const hit = root ? partElements.get(root) : undefined;
-  if (hit && hit.tree === tree) return hit;
-  const placeholders: PlaceholderEntry[] = [];
-  const others: Element[] = [];
-  for (const el of contentElements(tree, root)) {
-    const key = placeholderOf(el);
-    if (key) placeholders.push({ ...key, el });
-    else others.push(el);
-  }
-  const out = { tree, placeholders, others };
-  if (root) partElements.set(root, out);
-  return out;
-}
-
-function collectPlaceholders(
-  pkg: PptxPackage,
-  part: string | undefined
-): readonly PlaceholderEntry[] {
-  return partElementsOf(pkg, part)?.placeholders ?? [];
-}
-
-/** The master placeholder type a layout/slide placeholder type falls back to. */
-function masterTypeFor(type: string): string {
-  if (type === 'ctrTitle') return 'title';
-  if (type === 'subTitle' || type === 'obj' || type === 'tbl' || type === 'chart' || type === 'pic')
-    return 'body';
-  return type;
-}
-
-/** The first entry of each idx, type, and master type of a placeholder list. */
-interface PlaceholderIndex {
-  readonly byIdx: ReadonlyMap<string, Element>;
-  readonly byType: ReadonlyMap<string, Element>;
-  readonly byMasterType: ReadonlyMap<string, Element>;
-}
-
-/**
- * Lookups by key, built once per list: a slide can hold thousands of placeholders that match
- * nothing, and a scan per placeholder made that quadratic.
- */
-const placeholderIndexes = new WeakMap<readonly PlaceholderEntry[], PlaceholderIndex>();
-
-function placeholderIndex(list: readonly PlaceholderEntry[]): PlaceholderIndex {
-  let index = placeholderIndexes.get(list);
-  if (!index) {
-    const byIdx = new Map<string, Element>();
-    const byType = new Map<string, Element>();
-    const byMasterType = new Map<string, Element>();
-    for (const p of list) {
-      if (p.idx !== undefined && !byIdx.has(p.idx)) byIdx.set(p.idx, p.el);
-      if (!byType.has(p.type)) byType.set(p.type, p.el);
-      const master = masterTypeFor(p.type);
-      if (!byMasterType.has(master)) byMasterType.set(master, p.el);
-    }
-    index = { byIdx, byType, byMasterType };
-    placeholderIndexes.set(list, index);
-  }
-  return index;
-}
-
-function findLayoutPlaceholder(
-  key: PlaceholderKey,
-  list: readonly PlaceholderEntry[]
-): Element | undefined {
-  const index = placeholderIndex(list);
-  if (key.idx !== undefined && key.idx !== '0') {
-    const byIdx = index.byIdx.get(key.idx);
-    if (byIdx) return byIdx;
-  }
-  return (
-    index.byType.get(key.type) ??
-    (key.type !== 'obj' ? index.byMasterType.get(masterTypeFor(key.type)) : undefined)
-  );
-}
-
-function findMasterPlaceholder(
-  type: string,
-  list: readonly PlaceholderEntry[]
-): Element | undefined {
-  const want = masterTypeFor(type);
-  const index = placeholderIndex(list);
-  return index.byType.get(want) ?? index.byMasterType.get(want);
-}
 
 /** The namespace of a shape's own children: `p:` on a slide, `dsp:` in a diagram drawing. */
 function ownNs(el: Element | undefined): string {
@@ -861,36 +746,10 @@ function resolveBackground(
   return { fill: { type: 'solid', color: { r: 255, g: 255, b: 255, a: 1 } }, index: -1 };
 }
 
-/**
- * The placeholders a slide element inherits from, nearest first: its layout placeholder, then
- * the master placeholder, matched as `resolveSlide` matches them. Empty for an element that is
- * not a placeholder. An edit that starts an own value from the inherited one reads these.
- */
-export function inheritedPlaceholders(pkg: PptxPackage, slidePart: string, el: Element): Element[] {
-  const ph = placeholderOf(el);
-  const ref = presentationInfo(pkg).slides.find((s) => s.partName === slidePart);
-  if (!ph || !ref) return [];
-  const layoutPh = findLayoutPlaceholder(ph, collectPlaceholders(pkg, ref.layoutPart));
-  const masterPh = findMasterPlaceholder(
-    layoutPh ? (placeholderOf(layoutPh)?.type ?? ph.type) : ph.type,
-    collectPlaceholders(pkg, ref.masterPart)
-  );
-  return [layoutPh, masterPh].filter((e): e is Element => e !== undefined);
-}
-
-/**
- * The layout placeholder that a placeholder on slide `index` inherits from (the matching rule of
- * `findLayoutPlaceholder`), or undefined. The editor reads its prompt text from it. @internal
- */
-export function layoutPlaceholderOf(
-  pkg: PptxPackage,
-  index: number,
-  el: Element
-): Element | undefined {
-  const ref = presentationInfo(pkg).slides[index];
-  const key = placeholderOf(el);
-  if (!ref || !key) return undefined;
-  return findLayoutPlaceholder(key, collectPlaceholders(pkg, ref.layoutPart));
+/** An element of the edited template, as the editable layer of the slide master view. */
+function asSlideLayer(el: ResolvedElement): ResolvedElement {
+  const children = 'children' in el ? el.children.map(asSlideLayer) : undefined;
+  return { ...el, layer: 'slide', ...(children ? { children } : {}) } as ResolvedElement;
 }
 
 /**
@@ -907,14 +766,18 @@ const resolvedByElement = new WeakMap<
 /** Resolve slide `index` (0-based, presentation order). */
 export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | undefined {
   const info = presentationInfo(pkg);
-  const ref = info.slides[index];
+  const ref = slideRefAt(pkg, index);
   if (!ref) return undefined;
+  // In the slide master view, a layout or a master is the slide: its own shapes, placeholders
+  // too, are the content, and a layout shows its master's shapes under them.
+  const template = isTemplateRef(ref) ? ref.template : undefined;
   const theme = parseTheme(xmlPartOf(pkg, ref.themePart));
-  const master = xmlPartOf(pkg, ref.masterPart)?.root;
-  const layout = xmlPartOf(pkg, ref.layoutPart)?.root;
   const slide = xmlPartOf(pkg, ref.partName)?.root;
+  // A master in the view is its own master: its color map and text styles apply.
+  const master = template === 'master' ? slide : xmlPartOf(pkg, ref.masterPart)?.root;
+  const layout = xmlPartOf(pkg, ref.layoutPart)?.root;
   let colorMap = readColorMap(child(master, 'p:clrMap')) ?? DEFAULT_COLOR_MAP;
-  for (const over of [layout, slide]) {
+  for (const over of [layout, template === 'master' ? undefined : slide]) {
     const mapping = path(over, 'p:clrMapOvr', 'a:overrideClrMapping');
     const read = readColorMap(mapping);
     if (read) colorMap = read;
@@ -925,21 +788,28 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     pkg,
     theme,
     ctx: { scheme: theme.colors, colorMap },
-    slideNumber: index + 1,
+    // A template has no slide number (0): its field shows its saved text.
+    slideNumber: template ? 0 : index + 1,
     ...(child(presentation, 'p:defaultTextStyle')
       ? { defaultTextStyle: child(presentation, 'p:defaultTextStyle') }
       : {}),
     ...(child(master, 'p:txStyles') ? { txStyles: child(master, 'p:txStyles') } : {}),
     ...(kinsoku ? { kinsoku } : {}),
     layoutPlaceholders: collectPlaceholders(pkg, ref.layoutPart),
-    masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
+    masterPlaceholders: collectPlaceholders(
+      pkg,
+      template === 'master' ? ref.partName : ref.masterPart
+    ),
     diagramShapes: { count: 0 },
-    textContext: JSON.stringify([[...colorMap], index + 1, kinsoku ?? null]),
+    textContext: JSON.stringify([[...colorMap], template ? 0 : index + 1, kinsoku ?? null]),
     presentationPart: info.presentationPart,
     ...(ref.masterPart ? { masterPart: ref.masterPart } : {}),
     ...(ref.layoutPart ? { layoutPart: ref.layoutPart } : {}),
   };
-  const bg = resolveBackground([slide, layout, master], scope);
+  const bg = resolveBackground(
+    template === 'master' ? [slide, undefined, undefined] : [slide, layout, master],
+    scope
+  );
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;
   const showMaster = (el: Element | undefined): boolean => attr(el, 'showMasterSp') !== '0';
   const out: ResolvedElement[] = [];
@@ -959,15 +829,15 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     ...relsKey(pkg, ref.layoutPart),
     ...relsKey(pkg, ref.masterPart),
   ];
-  const addLayer = (layer: Layer, partName: string | undefined): void => {
+  const addLayer = (layer: Layer, partName: string | undefined, own = layer === 'slide'): void => {
     const { tree, root } = treeOf(pkg, partName);
     if (!tree || !partName) return;
     const key = layerKey(pkg, layer, partName, root, shared);
     // Layout and master placeholders are templates, not content: they never paint on a slide.
-    const content =
-      layer === 'slide'
-        ? contentElements(tree, root)
-        : (partElementsOf(pkg, partName)?.others ?? []);
+    // The template being edited shows them, as the slide master view does.
+    const content = own
+      ? contentElements(tree, root)
+      : (partElementsOf(pkg, partName)?.others ?? []);
     for (const el of content) {
       const hit = resolvedByElement.get(el);
       if (hit && sameKey(hit.key, key)) {
@@ -975,16 +845,25 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
         continue;
       }
       const diagrams = scope.diagramShapes.count;
-      const r = resolveElement(el, layer, partName, scope, 0);
-      if (!r) continue;
+      const resolved = resolveElement(el, layer, partName, scope, 0);
+      if (!resolved) continue;
+      // The edited template's shapes resolve as their own layer (a layout placeholder inherits
+      // from the master) and are the editable layer of the view.
+      const r = own && layer !== 'slide' ? asSlideLayer(resolved) : resolved;
       out.push(r);
       // A diagram's shapes count across the slide: an element with diagrams always resolves.
       if (scope.diagramShapes.count === diagrams) resolvedByElement.set(el, { key, value: r });
     }
   };
-  if (showMaster(slide) && showMaster(layout)) addLayer('master', ref.masterPart);
-  if (showMaster(slide)) addLayer('layout', ref.layoutPart);
-  addLayer('slide', ref.partName);
+  if (template === 'master') addLayer('master', ref.partName, true);
+  else if (template === 'layout') {
+    if (showMaster(slide)) addLayer('master', ref.masterPart);
+    addLayer('layout', ref.partName, true);
+  } else {
+    if (showMaster(slide) && showMaster(layout)) addLayer('master', ref.masterPart);
+    if (showMaster(slide)) addLayer('layout', ref.layoutPart);
+    addLayer('slide', ref.partName);
+  }
   return {
     partName: ref.partName,
     index,

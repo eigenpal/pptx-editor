@@ -53,6 +53,7 @@ import { DialogProvider, type PptxEditorPopups } from './popups.tsx';
 import { ChromeActionHostProvider } from './chrome-actions.tsx';
 import { SlideSorterWatch } from './SlideSorter.tsx';
 import { ChromeTooltip } from './ChromeTooltip.tsx';
+import { MasterViewBar } from './MasterRail.tsx';
 import {
   ChromeDarkContext,
   ScopedByAncestorContext,
@@ -359,6 +360,8 @@ export function PptxEditorContent({ className }: PptxEditorContentProps) {
   }, [editor]);
   return (
     <>
+      {/* The slide master view names the template on the canvas and closes the view. */}
+      <MasterViewBar />
       <div
         ref={host}
         className={`pptx-canvas${className ? ` ${className}` : ''}`}

@@ -38,7 +38,9 @@ export const REVIEW_CHROME_GROUP: ChromeGroup = {
 export function commentRowShown(editor: Editor | null | undefined): boolean {
   if (!editor) return false;
   const snap = editor.snapshot();
-  return snap.status === 'ready' && snap.comments != null && canRequestCommentDraft(editor);
+  // Comments are on slides: the slide master view, which shows layouts, has no comment row.
+  if (snap.status !== 'ready' || snap.presentationView === 'slideMaster') return false;
+  return snap.comments != null && canRequestCommentDraft(editor);
 }
 
 /**

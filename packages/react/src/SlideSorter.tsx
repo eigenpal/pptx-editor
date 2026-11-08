@@ -220,8 +220,8 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
 }
 
 /**
- * Normal and Slide Sorter as two buttons, as in a status bar: the default editor's
- * view switch, a one-of-two choice (`radiogroup`). Hosts place the `view.presentationView` slot
+ * Normal, Slide Sorter, and Slide Master as buttons, as in a status bar: the default editor's
+ * view switch, a one-of-three choice (`radiogroup`). Hosts place the `view.presentationView` slot
  * instead. @internal
  */
 export function ViewSwitch() {

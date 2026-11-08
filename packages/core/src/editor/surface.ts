@@ -43,7 +43,7 @@ import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
 import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
-import { selectionAnnouncement } from './surface-announce.ts';
+import { selectionAnnouncement, canvasName } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
 import { boxOutline, commonOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
@@ -87,6 +87,10 @@ export interface SurfaceHost extends SurfaceInputHost {
   /** Set the zoom; `fit` follows the window. */
   setZoom(zoom: number | 'fit'): void;
   slideCount(): number;
+  /** In the slide master view, the template on the canvas: its kind and name. */
+  template?(
+    index: number
+  ): { readonly template: 'master' | 'layout'; readonly name: string } | undefined;
   /** Whether drags snap to smart guides (View > Smart guides). */
   smartGuides(): boolean;
   /** True while the format painter is on: the pointer shows the brush, and clicks never drag. */
@@ -309,10 +313,7 @@ export class SlideSurface {
     }
     this.#zoomAnchor = null;
     this.#renderedZoom = zoom;
-    const name = this.editor.label('canvas.ariaLabel', {
-      index: layout.slide.index + 1,
-      total: this.editor.slideCount(),
-    });
+    const name = canvasName(this.editor, layout.slide.index);
     if (this.root.getAttribute('aria-label') !== name) this.root.setAttribute('aria-label', name);
     const said = selectionAnnouncement(layout, this.editor);
     // A canceled drag is said in place of the selection, until the selection changes.

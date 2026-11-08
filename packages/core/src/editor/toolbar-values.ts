@@ -101,7 +101,7 @@ export interface ToolbarValueMap {
   'slide.add': string;
   /** A layout id from `snapshot().layouts`. */
   'slide.layout': string;
-  'view.presentationView': 'normal' | 'slideSorter';
+  'view.presentationView': 'normal' | 'slideSorter' | 'slideMaster';
 }
 
 /** The value a slot takes: its `ToolbarValueMap` type, or `unknown` for a slot not listed. @public */

@@ -13,7 +13,16 @@
 // while it is on turns it off. The window lives here, so a host binds `click` only. DOCX Editor
 // commit adf0e178.
 
-import { attr, child, elements, NS, specOf, type Element, type NodeSpec } from '../store/index.ts';
+import {
+  attr,
+  child,
+  elements,
+  NS,
+  specOf,
+  type Element,
+  type NodeSpec,
+  slideRefAt,
+} from '../store/index.ts';
 import type {
   EditorCommand,
   EditorSelection,
@@ -207,7 +216,7 @@ function copyShape(batch: OpBatch, part: string, ctx: CommandContext, id: string
 
 /** Copy the formatting of the selection. Throws CommandRefusal. */
 export function copyFormat(ctx: CommandContext): CopiedFormat {
-  const part = ctx.session.info.slides[ctx.slide]?.partName;
+  const part = slideRefAt(ctx.session.store.package, ctx.slide)?.partName;
   if (!part) throw new CommandRefusal('disabled.noEditor');
   const batch = ctx.session.batch();
   const sel = ctx.selection;
@@ -425,7 +434,7 @@ export class FormatPainter {
       case 'pasteFormat': {
         if (ctx.readOnly) throw new CommandRefusal('disabled.viewing');
         if (!this.#copied) throw new CommandRefusal('disabled.noFormatCopied');
-        const part = ctx.session.info.slides[ctx.slide]?.partName;
+        const part = slideRefAt(ctx.session.store.package, ctx.slide)?.partName;
         if (!part) throw new CommandRefusal('disabled.noEditor');
         const batch = ctx.session.batch();
         const painted = pasteFormat(batch, part, this.#copied, ctx.selection);

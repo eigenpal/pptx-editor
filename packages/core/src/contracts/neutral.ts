@@ -750,14 +750,29 @@ export interface SlideSummary {
    * placeholder until it is ready. Absent once it is.
    */
   readonly pending?: true;
+  /**
+   * In the slide master view, the template this entry shows: a slide master, or one of its
+   * slide layouts. Absent for a slide.
+   */
+  readonly template?: 'master' | 'layout';
+  /** In the slide master view, the template's name (`p:cSld/@name`). */
+  readonly name?: string;
+  /** In the slide master view, the master of a layout (its `id`). */
+  readonly masterId?: string;
+  /**
+   * In the slide master view, how many slides use the template: the slides on a layout, or on
+   * any layout of a master.
+   */
+  readonly usedBy?: number;
 }
 
 /**
- * How the editor shows the deck: `normal` (the slide with the rail and notes) or `slideSorter`
- * (every slide as a thumbnail, by section), as the View tab names them
- * (`ppViewNormal`, `ppViewSlideSorter`). @public
+ * How the editor shows the deck: `normal` (the slide with the rail and notes), `slideSorter`
+ * (every slide as a thumbnail, by section), or `slideMaster` (the slide masters and layouts,
+ * edited on the canvas), as the View tab names them (`ppViewNormal`, `ppViewSlideSorter`,
+ * `ppViewSlideMaster`). @public
  */
-export type PresentationView = 'normal' | 'slideSorter';
+export type PresentationView = 'normal' | 'slideSorter' | 'slideMaster';
 
 /**
  * What a person can do about a file that did not open, after DOCX Editor's reason groups:
@@ -838,10 +853,16 @@ export interface EditorSnapshot extends CommentSnapshot {
    * reads as `false`.
    */
   readonly isOpening?: boolean;
+  /**
+   * The slide on the canvas: an index into the deck's slides. In the slide master view, it is
+   * the template index of the layout or master on the canvas instead, not a position in
+   * `slides`; read the current entry with `currentSlideSummary`.
+   */
   readonly currentSlide: number;
   /**
-   * The slides selected in the slide rail, ascending. Always holds `currentSlide`. Shift+click
-   * selects a range and Ctrl/Cmd+click adds or removes one slide (`selectSlide`).
+   * The slides selected in the slide rail, ascending. Always holds `currentSlide`, except in the
+   * slide master view, where it is empty. Shift+click selects a range and Ctrl/Cmd+click adds
+   * or removes one slide (`selectSlide`).
    */
   readonly selectedSlides: readonly number[];
   /** Whether the current slide shows its slide number (Insert > Slide numbers). */

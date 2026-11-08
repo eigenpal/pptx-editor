@@ -59,6 +59,7 @@ import { provideHyperlinkPopup } from './useHyperlinkPopup.ts';
 import { useCanvasContextMenu } from './CanvasContextMenu.tsx';
 import { SlideSorterWatch } from './SlideSorter.tsx';
 import { ChromeTooltip } from './ChromeTooltip.tsx';
+import { MasterViewBar } from './MasterRail.tsx';
 
 const pptxEditorRootProps = {
   /** `.pptx` bytes. Identity change loads the new document. */
@@ -393,6 +394,8 @@ export const PptxEditorContent = defineComponent({
       attached = null;
     });
     return () => [
+      // The slide master view names the template on the canvas and closes the view.
+      h(MasterViewBar),
       // `mergeProps` keeps a host's own `@contextmenu` and `@keydown` next to the menu's.
       h(
         'div',
