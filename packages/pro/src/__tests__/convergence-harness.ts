@@ -166,7 +166,7 @@ export function differingParts(x: PptxPackage, y: PptxPackage): string[] {
 const HOW_TO = 'See CONTRIBUTING.md, "Add a collaboration fixture".';
 
 /** What a fixture prepares: the deck both peers open, and the state of peer A. */
-interface FixtureSetup {
+export interface FixtureSetup {
   /** The deck both peers open; the coverage deck when absent. */
   readonly deck?: () => Uint8Array;
   /**
@@ -219,7 +219,7 @@ async function prepare(label: string, fixture: FixtureSetup) {
  * hold the same package, and that both saves reopen to one package that a second save and
  * reopen keeps. A failure names the parts that differ.
  */
-async function convergeEdit(
+export async function convergeEdit(
   label: string,
   fixture: FixtureSetup,
   edit: (a: PptxEditorInstance) => CommandResult

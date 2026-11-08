@@ -30,8 +30,8 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
   /**
    * AutoCorrect while typing (default true): the ©, ®, and ™ signs, ellipses, fractions, and
    * lists started by typing `1.`, `1)`, `*`, or `-` and a space. Capitals, curly quotes,
-   * dashes, and spelling come from the user's system or browser when it offers them, whatever
-   * this option is.
+   * and dashes are never automatic here: keyboards and systems that offer them apply them,
+   * whatever this option is.
    */
   readonly autoCorrect?: boolean;
   /**

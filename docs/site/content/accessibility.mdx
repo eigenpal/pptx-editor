@@ -86,9 +86,9 @@ While you edit text, Tab and Shift+Tab change the list level at the start of a l
 
 In right-to-left and mixed-direction text, Left and Right move the caret one place on screen, not in reading order. Alt/Ctrl+Left and Alt/Ctrl+Right move past one word on screen. Cmd+Left and Cmd+Right move to the left or the right edge of the line. Home and End move to the start and the end of the line in reading order, wherever they show on screen. A selection holds the text between its two ends in reading order, so on a mixed-direction line it can show as several highlighted parts.
 
-Capitals, curly quotes, dashes, and spelling corrections come from the user's system or browser when it offers them. The editor applies each system replacement to the text that the system targets, and one undo removes it. Many Windows and Linux setups with a hardware keyboard offer none of these changes, and the editor then makes none of them.
+The editor makes no automatic capitals, curly quotes, dashes, or spelling corrections of its own. Mobile keyboards, and systems and browsers that offer such changes, apply them. The editor replaces the text that each change targets, and one undo removes it. Many desktop browsers make no such change while you type, so on many desktops none happens.
 
-AutoCorrect adds the changes that systems do not make:
+AutoCorrect still makes these changes:
 
 - `(c)`, `(r)`, and `(tm)` become ©, ®, and ™.
 - `...` becomes …, and `1/2`, `1/4`, and `3/4` become fractions.
@@ -150,7 +150,7 @@ The editor takes its accessible names from the locale catalog, so they change wi
 | Editor | A region "Presentation editor" that holds the chrome and the slide. |
 | Slide | The group name "Slide 3 of 12". The name changes when the slide changes. Inside it, the slide text and an image for each picture that has alt text. The image name is the alt text. A decorative picture, or a picture with no alt text, is hidden. |
 | Shape selection | A polite announcement with the kind and the name of the shape, for example "Shape Title 1, selected". For a picture with alt text, the alt text comes after the name: "Picture Logo, A green leaf, selected". It comes when Tab or a click selects one shape. |
-| Text editing | The text input "Text of the selected shape". |
+| Text editing | The text input "Text of the selected shape", with the description "Shows the text of the current paragraph up to the caret". Its value is that text. |
 | Table cell | A polite announcement, "Row 2, column 3", when the caret moves to a cell. |
 | Link in the text | A polite announcement, "Link: https://example.com. Press F6 for its actions." F6 moves focus to the link actions. |
 | Slide list | A navigation region "Slides" with a list box "Slides". With sections, the list is a tree. Items are "Slide 4", or "Slide 4 (hidden)" for a hidden slide. |
@@ -170,6 +170,7 @@ The editor takes its accessible names from the locale catalog, so they change wi
 These limits apply:
 
 - **Alt text of other objects.** Only pictures give their alt text to a screen reader on the slide. Charts, groups, and shapes do not. A picture with a title but no alt text is hidden.
+- **Text input value.** While you edit text, the text input holds only the paragraph text up to the caret, at most about 200 characters. A screen reader does not read the text after the caret from the input.
 - **Slide content structure.** The slide is drawn as SVG. A screen reader gets the slide text only as flat text, in z-order. It gets no headings, lists, or reading order. It gets the shape name only when a shape is selected. When more than one shape is selected, it hears no announcement.
 
 ## Next steps

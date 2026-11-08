@@ -1,9 +1,14 @@
-// AutoCorrect edits in a collaboration room: a list a typed marker starts, and a fraction sign
-// a space makes, reach the other peer and save the same on both.
+// AutoCorrect edits in a collaboration room: a list a typed marker starts, a fraction sign a
+// space makes, and a system replacement reach the other peer and save the same on both.
 
-import { describe, test } from 'bun:test';
-import type { PptxEditorInstance } from '@pptx-editor.dev/core';
-import { convergeInput } from './convergence-harness.ts';
+import { afterAll, describe, test } from 'bun:test';
+import { GlobalWindow } from 'happy-dom';
+import type { CommandResult, PptxEditorInstance } from '@pptx-editor.dev/core';
+import { convergeEdit, convergeInput } from './convergence-harness.ts';
+
+const win = new GlobalWindow();
+const doc = win.document as unknown as Document;
+afterAll(() => win.happyDOM.close());
 
 /** A caret at the end of shape `A` ("Hello world"), in a new paragraph holding `typed`. */
 const newParagraph =
@@ -28,14 +33,35 @@ describe('AutoCorrect in a collaboration room', () => {
   });
 
   test('a system replacement of a typed word reaches the other peer', async () => {
-    // A replacement selects its target in the model and types the text over it.
-    const arrange = (e: PptxEditorInstance): void => {
-      newParagraph('teh')(e);
-      const sel = e.snapshot().selection;
-      if (sel.kind !== 'text') throw new Error('no caret');
-      const anchor = { paragraph: 1, offset: 0 };
-      e.setSelection({ ...sel, anchor, focus: { paragraph: 1, offset: 3 } });
-    };
-    await convergeInput('text', { arrange, data: 'the' });
+    // Peer A's surface gets `insertReplacementText` over `teh` in its input, as a system
+    // correction sends it: the replacement path (`replaceText`) writes the edit.
+    const g = globalThis as { ResizeObserver?: unknown };
+    const had = 'ResizeObserver' in g;
+    g.ResizeObserver ??= (win as unknown as { ResizeObserver: unknown }).ResizeObserver;
+    try {
+      await convergeEdit(
+        'insertReplacementText',
+        { arrange: newParagraph('teh ') },
+        (a): CommandResult => {
+          const host = doc.createElement('div') as unknown as HTMLElement;
+          doc.body.append(host as unknown as Node);
+          a.attach(host);
+          const input = host.querySelector('textarea') as HTMLTextAreaElement;
+          if (input.value !== 'teh ') throw new Error(`the input holds "${input.value}"`);
+          input.setSelectionRange(0, 3);
+          const event = new win.InputEvent('beforeinput', {
+            inputType: 'insertReplacementText',
+            data: 'the',
+            bubbles: true,
+            cancelable: true,
+          });
+          input.dispatchEvent(event as unknown as Event);
+          a.detach();
+          return a.snapshot().lastRejection ? { ok: false, reason: 'refused' } : { ok: true };
+        }
+      );
+    } finally {
+      if (!had) delete g.ResizeObserver;
+    }
   });
 });

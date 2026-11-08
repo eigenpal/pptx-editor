@@ -5,8 +5,15 @@
 
 import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
-import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
-import { attr, elements, find, xmlPartOf } from '../../store/index.ts';
+import {
+  buildPptx,
+  cell,
+  para,
+  run,
+  shape,
+  table,
+} from '../../../../../scripts/fixtures/builder.ts';
+import { attr, child, elements, find, textOf, xmlPartOf } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import {
   compositionEdit,
@@ -257,6 +264,131 @@ describe('a system replacement (insertReplacementText)', () => {
     e.destroy();
   });
 
+  test('a selection that a native key left in the input is never typed over', async () => {
+    const { e, input, type, fire, beforeInput } = await open(para(''));
+    caret(e, 0, 0);
+    type('one two three');
+    // A line-wise native key (Ctrl+Shift+P) selects in the input; the model caret stays.
+    fire(
+      new win.KeyboardEvent('keydown', {
+        key: 'P',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }) as unknown as Event
+    );
+    input.setSelectionRange(12, 13);
+    fire(new win.KeyboardEvent('keydown', { key: 'X', bubbles: true }) as unknown as Event);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([13, 13]);
+    beforeInput('insertText', 'X');
+    expect(texts(e)).toEqual(['one two threeX']);
+    e.destroy();
+  });
+
+  test('an input event with no beforeinput leaves no selection to type over', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('say teh ');
+    input.setSelectionRange(4, 7);
+    fire(
+      new win.InputEvent('input', {
+        inputType: 'insertReplacementText',
+        data: 'the',
+        bubbles: true,
+      }) as unknown as Event
+    );
+    expect([input.selectionStart, input.selectionEnd]).toEqual([8, 8]);
+    type('x');
+    expect(texts(e)).toEqual(['say teh x']);
+    e.destroy();
+  });
+
+  test('a field that something else wrote goes to the model', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('say teh ');
+    // An extension writes the field and sends a plain input event.
+    input.value = 'say the ';
+    fire(
+      new win.InputEvent('input', { inputType: 'insertText', bubbles: true }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['say the ']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 8 });
+    expect(input.value).toBe('say the ');
+    e.destroy();
+  });
+
+  test('a selection over a field that is not the synced text is refused', async () => {
+    const { e, input, type, replace } = await open(para(''));
+    caret(e, 0, 0);
+    type('say teh ');
+    const revision = e.session!.store.revision;
+    input.value = 'say teh  ';
+    replace(4, 7, 'the');
+    expect(texts(e)).toEqual(['say teh ']);
+    expect(e.snapshot().lastRejection?.reason).toBe('errors.inputUnsupported');
+    expect(e.session!.store.revision).toBe(revision);
+    e.destroy();
+  });
+
+  test('a replacement in a table cell replaces the word in that cell only', async () => {
+    const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const rows = ['teh', 'teh cat']
+      .map((t) => `<a:tr h="370840">${cell(t)}${cell(t)}</a:tr>`)
+      .join('');
+    const bytes = buildPptx({
+      slides: [
+        {
+          shapes: table({
+            id: 3,
+            x: IN,
+            y: IN,
+            cx: 2 * IN,
+            cy: 741_680,
+            columns: [IN, IN],
+            tblPr: '<a:tblPr/>',
+            rows,
+          }),
+        },
+      ],
+    });
+    expect((await e.load(bytes)).ok).toBe(true);
+    const host = doc.createElement('div') as unknown as HTMLElement;
+    doc.body.append(host as unknown as Node);
+    e.attach(host);
+    const input = host.querySelector('textarea') as HTMLTextAreaElement;
+    const part = e.session!.info.slides[0].partName;
+    const tree = find(xmlPartOf(e.session!.store.package, part)!.root, 'p:spTree')!;
+    const nodeId = elements(tree).find((c) => c.local === 'graphicFrame')!.id;
+    const at = { paragraph: 0, offset: 4 };
+    e.setSelection({ kind: 'text', nodeId, cell: { row: 1, column: 1 }, anchor: at, focus: at });
+    expect(input.value).toBe('teh ');
+    input.setSelectionRange(0, 3);
+    input.dispatchEvent(
+      new win.InputEvent('beforeinput', {
+        inputType: 'insertReplacementText',
+        data: 'the',
+        bubbles: true,
+        cancelable: true,
+      }) as unknown as Event
+    );
+    const cells = (): string[] => {
+      const tbl = find(xmlPartOf(e.session!.store.package, part)!.root, 'a:tbl')!;
+      return elements(tbl)
+        .filter((r) => r.local === 'tr')
+        .flatMap((r) =>
+          elements(r)
+            .filter((c) => c.local === 'tc')
+            .map((c) => textOf(child(c, 'a:txBody')))
+        );
+    };
+    expect(cells()).toEqual(['teh', 'teh', 'teh cat', 'the cat']);
+    expect(paragraphKey(part, nodeId, { row: 1, column: 1 }, 0)).not.toBe(
+      paragraphKey(part, nodeId, { row: 1, column: 0 }, 0)
+    );
+    e.destroy();
+  });
+
   test('insertText over the text the system selected in the input replaces it', async () => {
     const { e, input, type, fire } = await open(para(''));
     caret(e, 0, 0);
@@ -284,8 +416,12 @@ describe('a system replacement (insertReplacementText)', () => {
       after: 0,
       paragraph: 'k',
     });
-    // An input that no longer holds the context names no target.
-    expect(replacementTarget(event, { ...field, value: 'other' }, context)).toBeNull();
+    // A selection over a value that is not the context cannot be used: it never matches.
+    expect(replacementTarget(event, { ...field, value: 'other' }, context)).toEqual({
+      text: '',
+      after: -1,
+      paragraph: null,
+    });
     const text = doc.createTextNode('one teh');
     const range = { startContainer: text, startOffset: 4, endContainer: text, endOffset: 7 };
     const ranged = { ...event, getTargetRanges: () => [range] } as unknown as InputEvent;

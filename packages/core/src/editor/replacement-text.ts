@@ -206,6 +206,27 @@ export interface ContextEdit {
 }
 
 /**
+ * The change from the context `before` to the field value `after`, by the characters both
+ * share at the start and the end. `before` ends at the caret, so the shared end is the
+ * target's distance to the caret.
+ */
+export function fieldEdit(before: string, after: string, key: string): ContextEdit {
+  let lead = 0;
+  const most = Math.min(before.length, after.length);
+  while (lead < most && before[lead] === after[lead]) lead += 1;
+  let trail = 0;
+  while (
+    trail < most - lead &&
+    before[before.length - 1 - trail] === after[after.length - 1 - trail]
+  )
+    trail += 1;
+  return {
+    target: { text: before.slice(lead, before.length - trail), after: trail, paragraph: key },
+    text: after.slice(lead, after.length - trail),
+  };
+}
+
+/**
  * What an IME composition changed in the mirrored context, from the field's value before the
  * composition (`before`), after it (`after`), the caret after it, and the committed text
  * (`data`). A keyboard can recompose a word that is already in the field, so the committed

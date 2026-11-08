@@ -19,7 +19,12 @@ import type {
 } from '../contracts/index.ts';
 import type { TextInputKind } from './text-input.ts';
 import { bindEditorClipboard } from './editor-clipboard.ts';
-import { compositionEdit, type ReplacementTarget, type TypingContext } from './replacement-text.ts';
+import {
+  compositionEdit,
+  fieldEdit,
+  type ReplacementTarget,
+  type TypingContext,
+} from './replacement-text.ts';
 
 /** What the input wiring asks of the editor. */
 export interface SurfaceInputHost {
@@ -143,12 +148,22 @@ function contextTarget(
 }
 
 /**
+ * A selection in the input that does not lie over the synced context: it never matches the
+ * model text (`after` is negative), so the editor refuses the input and changes nothing.
+ */
+const UNUSABLE: ReplacementTarget = { text: '', after: -1, paragraph: null };
+
+/**
  * The text the system selected in the input over the mirrored `context`, or null when the
  * input selection is collapsed. Some systems select the text they correct, then send
- * `insertText`: that text is a target too.
+ * `insertText`: that text is a target too. The input selection is only the system's own:
+ * the binding collapses it before each key (`bindSurfaceInput`). A selection over a value
+ * that is not the synced context cannot be used (`UNUSABLE`).
  */
 export function inputTarget(input: InputField, context: TypingContext | null) {
-  return contextTarget(context, input.value, input.selectionStart, input.selectionEnd);
+  const { value, selectionStart: start, selectionEnd: end } = input;
+  if (end <= start) return null;
+  return contextTarget(context, value, start, end) ?? UNUSABLE;
 }
 
 /**
@@ -217,6 +232,25 @@ export function isCompositionKey(e: KeyboardEvent): boolean {
   return e.isComposing || e.keyCode === 229;
 }
 
+/**
+ * The width of a text in the input's font, in CSS pixels, or 0 where no canvas measures it
+ * (then the composing overlay keeps its plain placement).
+ */
+function measurer(input: HTMLTextAreaElement): (text: string) => number {
+  let context: CanvasRenderingContext2D | null | undefined;
+  return (text) => {
+    try {
+      context ??= input.ownerDocument.createElement('canvas').getContext('2d');
+      const view = input.ownerDocument.defaultView;
+      if (!context || !view) return 0;
+      context.font = view.getComputedStyle(input).font;
+      return context.measureText(text).width;
+    } catch {
+      return 0;
+    }
+  };
+}
+
 /** The surface's input binding. */
 export interface SurfaceInputBinding {
   /** Put the caret's context in the input (`TypingContext`); none while an IME composes. */
@@ -251,12 +285,37 @@ export function bindSurfaceInput(
     if (focused && (input.selectionStart !== end || input.selectionEnd !== end))
       input.setSelectionRange(end, end);
   };
+  /**
+   * Collapse a selection in the input that nothing synced to the model: a native key the
+   * editor does not handle (a line-wise selection move) can make one. The user sees no
+   * selection on the slide, so no input may replace it. Not during a composition.
+   */
+  const collapse = (): void => {
+    if (composing || input.selectionStart === input.selectionEnd) return;
+    input.setSelectionRange(input.value.length, input.value.length);
+  };
+  const width = measurer(input);
   // The input grows with the text being composed, so the text shows at the caret while the
   // IME composes it (the slide shows the text only once the composition ends). The context
-  // before it scrolls out of view.
+  // before it scrolls out of view. A keyboard that composes the word before the caret again
+  // (`compositionEdit`) moves the input left over that word, so the composed text covers it.
   const fit = (): void => {
     input.style.width = '';
+    input.style.marginLeft = '';
     if (!composing || input.value === composeFrom.value) return;
+    const from = composeFrom.value;
+    const value = input.value;
+    let shared = 0;
+    while (shared < from.length && shared < value.length && from[shared] === value[shared])
+      shared += 1;
+    const back = shared < from.length ? width(from.slice(shared)) : 0;
+    const shown = back > 0 ? width(value.slice(shared)) : 0;
+    if (back > 0 && shown > 0) {
+      input.style.marginLeft = `${-back}px`;
+      input.style.width = `${Math.ceil(shown) + 1}px`;
+      input.scrollLeft = input.scrollWidth;
+      return;
+    }
     input.style.width = `${Math.max(1, input.scrollWidth - composeFrom.width) + 1}px`;
     input.scrollLeft = input.scrollWidth;
   };
@@ -280,12 +339,23 @@ export function bindSurfaceInput(
     sync();
   };
   const onInput = (): void => {
-    if (composing) fit();
+    if (composing) return fit();
+    // An input that no `beforeinput` announced, or one that could not be prevented, changed
+    // the field itself (an extension that writes the field, for example): its change goes
+    // to the model, so the field and the model agree again.
+    const before = context?.text ?? '';
+    const edit =
+      context && input.value !== before ? fieldEdit(before, input.value, context.key) : null;
+    if (edit && host.replaceText) host.replaceText(edit.target, edit.text);
+    collapse();
+    sync();
   };
   const onCompositionStart = (): void => {
     composing = true;
     input.classList.add(COMPOSING_CLASS);
     composeFrom = { value: input.value, width: input.value ? input.scrollWidth : 0 };
+    // The candidate window opens at the caret: the end of a long context.
+    input.scrollLeft = input.scrollWidth;
   };
   const onCompositionEnd = (e: CompositionEvent): void => {
     const before = composeFrom.value;
@@ -307,6 +377,9 @@ export function bindSurfaceInput(
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     if (isCompositionKey(e)) return;
+    // Before the key acts: a selection that a native key left in the input is not the
+    // system's target. The system makes its own selection after this, for its own input.
+    if (e.target === input) collapse();
     if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {
       e.preventDefault();

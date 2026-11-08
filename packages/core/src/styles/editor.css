@@ -2196,6 +2196,9 @@
   opacity: 0;
   resize: none;
   overflow: hidden;
+  /* One line: the 1px input does not wrap each character onto a line of its own. A selection
+     that a native key makes in it is collapsed before the next key (`surface-input.ts`). */
+  white-space: pre;
   pointer-events: none;
   caret-color: transparent;
 }
