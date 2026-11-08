@@ -77,7 +77,7 @@ The command writes `generated/conformance.generated.ts` from `manifest.json` and
 
 `IsExact` checks both directions, so a narrower or a wider type fails. A reference type names the package export of the same name, so a missing export fails as a compiler error. The file depends only on committed compat data, never on the package sources, so an API change never makes the file stale. The compiler finds the drift.
 
-There is no hand-written declaration file, unlike DOCX Editor's `compat/docxeditor/declarations.ts`. The assertions import the shipped types, so the check cannot drift from the API.
+There is no hand-written declaration file, unlike DOCX Editor's `packages/editor-api/compat/docxeditor/declarations.ts`. The assertions import the shipped types, so the check cannot drift from the API.
 
 A selected member that cannot match exactly goes in `manifest.conformanceExceptions`, with its reason. The generated file names the entry and its reason in place of the assertion. The generator refuses an exception that names a member the manifest does not select. Add an exception only for a deliberate difference, never to make the check pass.
 

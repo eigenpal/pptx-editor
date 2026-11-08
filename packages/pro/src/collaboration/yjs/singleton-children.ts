@@ -254,7 +254,7 @@ function positionOf(groups: readonly Group[], child: Name): number {
 }
 
 /**
- * The property containers whose concurrent copies merge child by child, after DOCX Editor's
+ * The property containers whose concurrent versions merge child by child, after DOCX Editor's
  * `MERGED_KINDS` (`w:pPr`, `w:rPr`, `w:tblPr`): paragraph, run, and text body properties,
  * table and cell properties, and line properties.
  */
@@ -317,7 +317,7 @@ const KEYED: Readonly<Record<string, Readonly<Record<string, EntryKey>>>> = Obje
   }
 );
 
-/** How concurrent copies of a child group (DOCX Editor's `groupKey`). */
+/** How concurrent versions of a child group resolve (DOCX Editor's `groupKey`). */
 export interface ChildGroup {
   /** The group's name among its siblings. */
   readonly slot: string;
@@ -394,8 +394,8 @@ export const fromSeed = (key: string): boolean =>
   key.slice(key.indexOf('.') + 1).startsWith(SEED_MARK);
 
 /**
- * How a replica shows the copy that won a concurrent group (DOCX Editor's companions): the
- * copies it hides, which stay in the room, and, for a property container, the companion that
+ * How a replica shows the version that won a concurrent group (DOCX Editor's companions): the
+ * versions it hides, which stay in the room, and, for a property container, the companion that
  * holds each attribute or child it shows from a copy.
  */
 export interface MergeView {
@@ -432,8 +432,8 @@ const attrValue = (spec: Spec, local: string): string | undefined =>
   spec.attrs?.find((a) => a.ns === '' && a.local === local)?.value;
 
 /**
- * Every concurrent copy of one property container as one (after DOCX Editor's
- * `MERGED_KINDS`): the first copy's attributes and children, then each attribute and child
+ * Every concurrent version of one property container as one (after DOCX Editor's
+ * `MERGED_KINDS`): the first version's attributes and children, then each attribute and child
  * position that only a later copy has, in copy order. A child container that two copies hold
  * merges the same way. One pass over all copies, so the cost grows with their size, not with
  * its square. Returns null when a nested group holds too many copies (`withCompanions`).
@@ -495,7 +495,7 @@ function mergeCopies(
 }
 
 /**
- * `kids` as a replica shows them, after DOCX Editor's `partitionWithMerges`: the first copy
+ * `kids` as a replica shows them, after DOCX Editor's `partitionWithMerges`: the first version
  * of each group shows, and the later copies stay in the room as its companions. A property
  * container merges its companions; an OPC entry or another singleton shows the first whole.
  * Copies that the seed wrote are the opened file's own duplicates and stay as loaded, as in

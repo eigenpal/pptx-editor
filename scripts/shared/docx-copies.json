@@ -518,6 +518,12 @@
     "commit": "adf0e178"
   },
   {
+    "file": "packages/core/src/editor/text-input.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/surface-selection-collapse.ts"],
+    "commit": "adf0e178"
+  },
+  {
     "file": "packages/core/src/editor/toolbar-controls.ts",
     "kind": "reference",
     "source": ["packages/core/src/editor/toolbar-measure.ts"],
@@ -530,6 +536,12 @@
       "docs/site/content/customization/toolbar.mdx",
       "packages/core/src/editor/toolbar-item-fit.ts"
     ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/toolbar-layout.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/toolbar-fit.ts"],
     "commit": "adf0e178"
   },
   {
@@ -690,17 +702,19 @@
     "kind": "adapted",
     "source": [
       "packages/core/src/layout/rtl-paragraph.ts",
-      "packages/core/src/layout/arabic-script-language.ts",
-      "packages/core/src/layout/line-end-whitespace.ts"
+      "packages/core/src/layout/arabic-script-language.ts"
     ],
     "commit": "adf0e178"
   },
   {
     "file": "packages/core/src/layout/text/rtl-paragraph.ts",
     "kind": "reference",
-    "source": ["packages/core/src/layout/rtl-letter.ts"],
+    "source": [
+      "packages/core/src/layout/rtl-letter.ts",
+      "packages/core/src/layout/line-end-whitespace.ts"
+    ],
     "commit": "adf0e178",
-    "reason": "The strong right-to-left letter test is written again over UTF-16 units, with no shared line."
+    "reason": "The right-to-left letter test and the line-end whitespace rule are written again here, with few shared lines."
   },
   {
     "file": "packages/core/src/layout/text/run-kerning.ts",
@@ -1057,6 +1071,15 @@
     "reason": "The guide describes the modules of this package that are copies of DOCX Editor files."
   },
   {
+    "file": "packages/ooxml-core/README.md",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/store/package/drawing-geometry-engine.ts",
+      "packages/core/src/store/package/drawing-geometry-formula.ts"
+    ],
+    "commit": "5993bd223"
+  },
+  {
     "file": "packages/ooxml-core/src/__tests__/caret-word.test.ts",
     "kind": "reference",
     "source": ["packages/core/src/layout/caret-word.ts"],
@@ -1229,6 +1252,12 @@
     "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
   },
   {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/README.md",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/scripts/pdf-visual-diff.py"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
     "file": "packages/pptx-to-pdf/scripts/evaluation/export.test.ts",
     "kind": "reference",
     "source": [
@@ -1377,11 +1406,16 @@
     "commit": "adf0e178"
   },
   {
+    "file": "packages/pro/src/__tests__/fuzz-shrink.ts",
+    "kind": "adapted",
+    "source": ["packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts"],
+    "commit": "5993bd223"
+  },
+  {
     "file": "packages/pro/src/__tests__/fuzz-support.ts",
     "kind": "reference",
     "source": ["packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts"],
-    "commit": "5993bd223",
-    "reason": "Two small functions, seededRandom and shrink, are copies; the rest of the harness is its own code."
+    "commit": "5993bd223"
   },
   {
     "file": "packages/pro/src/__tests__/singleton-children.test.ts",
@@ -1432,8 +1466,7 @@
     "file": "packages/pro/src/collaboration/yjs/singleton-children.ts",
     "kind": "reference",
     "source": ["packages/pro/src/collaboration/document/singleton-children.ts"],
-    "commit": "5ffe967",
-    "reason": "In this module, a copy is one concurrent version of a group in a room, not code from DOCX Editor."
+    "commit": "5ffe967"
   },
   {
     "file": "packages/pro/src/collaboration/yjs/text-identity.ts",
@@ -1923,7 +1956,8 @@
     "file": "reference/README.md",
     "kind": "reference",
     "source": ["reference/ecma-376/part1/schemas"],
-    "commit": "adf0e178"
+    "commit": "adf0e178",
+    "reason": "The guide lists the reference files, and the schemas folder is a copy of the DOCX Editor one."
   },
   {
     "file": "reference/quick-ref/themes-colors.md",

@@ -5,9 +5,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The shared harness of the seeded collaboration fuzzers (`*-fuzz.test.ts`). After DOCX Editor
 // `packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts` (commit 5993bd223):
-// `seededRandom` is a copy, `shrink` is a copy that takes `replay` as an argument, and the
-// environment knobs, the trail, and `kindOf` keep its shape. The peer harness is PPTX-only: N
-// editors on N Y.Docs (`openPeer` in `lineage-support.ts`) and a relay that holds every update back
+// the environment knobs and the trail keep its shape, and `fuzz-shrink.ts` holds the generator
+// and the shrink. The peer harness is PPTX-only: N editors on N Y.Docs (`openPeer` in `lineage-support.ts`) and a relay that holds every update back
 // until an action delivers it. The text conservation oracle is `fuzz-ledger.ts`.
 //
 // A fuzzer records each step as a plain action in deck coordinates (a paragraph and an offset,
@@ -36,19 +35,10 @@ import {
 } from '@pptx-editor.dev/core/store';
 import { packageViolations } from '../../../core/src/store/store/part-checks.ts';
 import { differingParts } from './convergence-harness.ts';
+import { kindOf, seededRandom, shrink } from './fuzz-shrink.ts';
 import { openPeer, sessionsOf } from './lineage-support.ts';
 
-/** A small deterministic generator (mulberry32), so a failure names its seed. */
-export function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
+export { kindOf, seededRandom, shrink } from './fuzz-shrink.ts';
 
 /** The environment knobs of one fuzzer. */
 export interface FuzzKnobs {
@@ -320,43 +310,8 @@ export function convergenceProblems(editors: readonly PptxEditorInstance[]): {
   return { problems, saved };
 }
 
-/** The kind of a problem, without its trail and values, to keep a shrink on one defect. */
-export function kindOf(problem: string): string {
-  return problem
-    .replace(/^seed \d+: /, '')
-    .replace(/\n[\s\S]*$/, '')
-    .replace(/:.*$/, '')
-    .replace(/\d+/g, '#')
-    .slice(0, 60);
-}
-
 /** The first line of a problem, without its trail: what a known failure pins. */
 export const headOf = (problem: string): string => problem.replace(/\n[\s\S]*$/, '');
-
-/** Remove actions while the same kind of problem persists (delta debugging, as DOCX Editor). */
-export async function shrink<A>(
-  actions: readonly A[],
-  kind: string,
-  replay: (actions: readonly A[]) => Promise<string[]>
-): Promise<A[]> {
-  let current = [...actions];
-  for (let size = Math.ceil(current.length / 2); size >= 1; size = Math.floor(size / 2)) {
-    let removed = true;
-    while (removed) {
-      removed = false;
-      for (let start = 0; start < current.length; start += size) {
-        const candidate = [...current.slice(0, start), ...current.slice(start + size)];
-        const problems = await replay(candidate);
-        if (problems.some((problem) => kindOf(problem) === kind)) {
-          current = candidate;
-          removed = true;
-          break;
-        }
-      }
-    }
-  }
-  return current;
-}
 
 /** A fixed action list that once failed, or that an older test ran, kept as a regression. */
 export interface FuzzRegression<A> {

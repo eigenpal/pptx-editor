@@ -143,7 +143,8 @@ export function typedCaret(item: ShapeItem, typedIn: number, at: TextPoint): Tex
  * Collapse a horizontal selection without stepping past its edge, in either selection direction.
  * With the shape's layout, a range on one line in visual order collapses to the outermost edge
  * of its selected bands in the key's direction, and a range over several lines to the end that
- * the paragraph's reading direction puts on that side (DOCX Editor `surface-selection-collapse.ts`).
+ * the paragraph's reading direction puts on that side (DOCX Editor
+ * `packages/core/src/editor/surface-selection-collapse.ts` at adf0e178).
  */
 export function collapseTextRange(
   sel: TextSelection,

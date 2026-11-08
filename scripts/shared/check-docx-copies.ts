@@ -1,15 +1,17 @@
 // Drift guard for the files that this repository takes from DOCX Editor. The record is the
 // manifest `docx-copies.json`: entries with a file, its kind (`copied`, `adapted`, or
 // `reference`), its DOCX Editor sources, and the DOCX Editor commit (`docx-copies.ts`). The
-// check verifies the manifest:
+// checks catch honest drift and honest labeling mistakes, not deliberate evasion. The check
+// verifies the manifest:
 //
 // 1. Each entry has a valid shape, and each manifest file is a tracked file on disk.
 // 2. One comment paragraph of each file names the kind, DOCX Editor, each source, and the
-//    commit of each entry, each as a whole word, and names no foreign file that no entry of
-//    the file lists (`headerProblems`). A file without a `copied` entry puts no copy word near
-//    a mention of DOCX Editor, unless its entry gives a `reason`.
-// 3. Each tracked text file (`git ls-files --eol`), of any type, with a copy signal has an
-//    entry, or is in `MENTIONS_ALLOWED` with a reason (`copySignals`). A signal is a
+//    commit of each entry, each as a whole word (`headerProblems`). No paragraph that mentions
+//    DOCX Editor names a foreign file that no entry of the file lists. A file without a
+//    `copied` entry puts no copy word near a mention of DOCX Editor, unless it is a Markdown
+//    guide whose entry gives a `reason`. Elsewhere a `reason` is a note for reviewers.
+// 3. Each tracked file whose bytes are UTF-8 once the NUL bytes go, of any type, with a copy
+//    signal has an entry, or is in `MENTIONS_ALLOWED` with a reason (`copySignals`). A signal is a
 //    `docx-editor/` path, or a paragraph that mentions DOCX Editor and names a commit, a path
 //    that is not in this repository, or a path right after the mention, or has a copy verb in
 //    it or a copy word near the mention. A commit or a foreign path in the next two comment
@@ -22,10 +24,10 @@
 //    does not parse fails. `RENAMED_MODULES` maps each DOCX Editor module that a copy imports
 //    from another path here. Any other difference is drift.
 // 6. With a checkout: an `adapted` or `reference` file must not equal any source. An `adapted`
-//    file must keep `ADAPTED_FLOOR` of its source lines together, and each of its sources must
-//    share a line with it unless the entry gives a `reason`. A `reference` file must share at
-//    most `REFERENCE_CEILING` of its lines with each source (`kindProblems`). An `adapted`
-//    source that the check cannot compare fails.
+//    file must keep `ADAPTED_FLOOR` of the lines of its sources together and of each source on
+//    its own. A `reference` file must share at most `REFERENCE_CEILING` of its lines with each
+//    source (`kindProblems`). A folder source counts as each file in it that the check can
+//    compare (`folderProblems`). An `adapted` source that the check cannot compare fails.
 //
 // Usage:
 //   bun run check:docx-copies [--docx <path>] [--ref <commit>] [--write] [--diff] [--report]
@@ -55,9 +57,10 @@ import {
   comparable,
   comparablePair,
   copySignals,
+  folderProblems,
   headerOf,
   headerProblems,
-  textFiles,
+  textOf,
   kindProblems,
   lineOverlap,
   localPaths,
@@ -198,6 +201,7 @@ if (parsed.entries.length === 0)
 const entries = parsed.entries.filter((entry) => only === undefined || entry.file === only);
 
 const isLocal = localPaths(tracked);
+const recorded = parsed.entries.flatMap((entry) => entry.source);
 const texts = new Map<string, string>();
 const broken = new Set<CopyEntry>();
 for (const entry of entries) {
@@ -213,21 +217,21 @@ for (const entry of entries) {
     isLocal,
     sources: siblings.flatMap((other) => other.source),
     copied: siblings.some((other) => other.kind === 'copied'),
+    noted: siblings.some((other) => other.reason !== undefined),
+    recorded,
   };
   for (const problem of headerProblems(entry, texts.get(entry.file)!, entry.file, options))
     fail(entry.file, `${problem} (${entry.kind} entry)`);
 }
 
-// Text files as git reads them, so a NUL byte cannot hide a file.
-const textSet = new Set(textFiles(git(['ls-files', '--eol', '-z'], ROOT) ?? ''));
 const signals = new Map<string, readonly string[]>();
 let mentioning = 0;
 for (const path of only === undefined ? tracked : [only]) {
   const file = join(ROOT, path);
   if (!existsSync(file)) continue;
-  if (!textSet.has(path)) continue;
-  const body = readFileSync(file, 'utf8');
-  if (!MENTION.test(body)) continue;
+  // Every file whose bytes are UTF-8 apart from NUL bytes, whatever git calls it.
+  const body = textOf(readFileSync(file));
+  if (body === null || !MENTION.test(body)) continue;
   mentioning += 1;
   signals.set(path, copySignals(body, path, isLocal));
 }
@@ -357,7 +361,18 @@ for (const entry of entries) {
   const files = entry.source.map(
     (source) => comparablePair(entry.file, source) && types.get(`${commit}:${source}`) === 'blob'
   );
-  if (!comparable(entry.file) || !files.some(Boolean)) {
+  // The files of each folder source that the check can compare, as [folder, file].
+  const inFolders = !comparable(entry.file)
+    ? []
+    : entry.source
+        .filter((source) => types.get(`${commit}:${source}`) === 'tree')
+        .flatMap((folder) =>
+          (git(['ls-tree', '-r', '--name-only', commit, '--', `${folder}/`], docx) ?? '')
+            .split('\n')
+            .filter((path) => path !== '' && comparablePair(entry.file, path))
+            .map((path) => [folder, path] as const)
+        );
+  if (!comparable(entry.file) || (!files.some(Boolean) && inFolders.length === 0)) {
     if (entry.kind === 'adapted')
       fail(entry.file, 'an adapted entry needs source files that the check can compare');
     if (report) console.log(`  report ${entry.file} (${entry.kind}): not compared`);
@@ -378,21 +393,46 @@ for (const entry of entries) {
       fail(entry.file, `cannot be compared: ${(error as Error).message}`);
     continue;
   }
-  for (const problem of kindProblems(entry, ours, theirs))
-    fail(entry.file, `${problem} (${entry.kind} entry)`);
+  if (entry.kind === 'adapted' && !files.some(Boolean))
+    fail(entry.file, 'an adapted entry needs source files that the check can compare');
+  else
+    for (const problem of kindProblems(entry, ours, theirs))
+      fail(entry.file, `${problem} (${entry.kind} entry)`);
+  const folderOverlaps: string[] = [];
+  for (const folder of new Set(inFolders.map(([name]) => name))) {
+    const pairs: [string, string][] = [];
+    for (const [, path] of inFolders.filter(([name]) => name === folder)) {
+      try {
+        pairs.push([
+          path,
+          await body(git(['show', `${commit}:${path}`], docx) ?? '', path, entry.file),
+        ]);
+      } catch {
+        // A folder file that does not parse is not compared.
+      }
+    }
+    for (const problem of folderProblems(entry, folder, ours, pairs))
+      fail(entry.file, `${problem} (${entry.kind} entry)`);
+    for (const [path, other] of pairs) {
+      const overlap = lineOverlap(other, ours);
+      folderOverlaps.push(`${path} ${overlap.toFixed(3)}`);
+      if (entry.kind === 'reference') highestReference = Math.max(highestReference, overlap);
+    }
+  }
   const overlaps = theirs.map((other) => (other === null ? null : lineOverlap(other, ours)));
   if (report)
     console.log(
       `  report ${entry.file} (${entry.kind}): ` +
         entry.source
           .map((source, at) => `${source} ${overlaps[at]?.toFixed(3) ?? 'not compared'}`)
+          .concat(folderOverlaps)
           .join(', ')
     );
-  if (entry.kind === 'adapted') {
+  if (entry.kind === 'adapted' && files.some(Boolean)) {
     measured += 1;
     const joined = theirs.filter((other): other is string => other !== null).join('\n');
     lowest = Math.min(lowest, lineOverlap(joined, ours));
-  } else
+  } else if (entry.kind === 'reference')
     for (const overlap of overlaps)
       if (overlap !== null) highestReference = Math.max(highestReference, overlap);
 }

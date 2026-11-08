@@ -10,7 +10,10 @@
 // - `reference`: the file follows a DOCX Editor design, and its code is its own: it shares at
 //   most `REFERENCE_CEILING` of its lines with each source.
 // The sources of each entry must exist at its commit. A file can have more than one entry. An
-// optional `reason` says why a source shares no line with the file (`kindProblems`).
+// optional `reason` is a note for reviewers. It changes one check only: a Markdown guide with a
+// reason can describe the copies in other files (`headerProblems`).
+//
+// The checks catch honest drift and honest labeling mistakes, not deliberate evasion.
 
 /** The kinds of manifest entries. */
 export const KINDS = ['copied', 'adapted', 'reference'] as const;
@@ -122,17 +125,17 @@ export function parseManifest(text: string): { entries: CopyEntry[]; problems: s
 }
 
 /**
- * The text files of `git ls-files --eol -z` output: every tracked file whose index content git
- * does not read as binary (`i/-text`). A NUL byte cannot hide a text file this way.
+ * The text of a file: its bytes without NUL bytes, decoded as UTF-8, or null when they are not
+ * UTF-8. Git calls a file with a NUL byte binary (`i/-text`), so the check reads the bytes
+ * itself, and a NUL byte cannot hide a text file.
  */
-export function textFiles(lsFilesEol: string): string[] {
-  return lsFilesEol
-    .split('\0')
-    .filter(Boolean)
-    .flatMap((record) => {
-      const tab = record.indexOf('\t');
-      return tab < 0 || record.startsWith('i/-text') ? [] : [record.slice(tab + 1)];
-    });
+export function textOf(bytes: Uint8Array): string | null {
+  const kept = bytes.includes(0) ? bytes.filter((byte) => byte !== 0) : bytes;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(kept);
+  } catch {
+    return null;
+  }
 }
 
 /** What `sourceProblems` reads from a DOCX Editor checkout. */
@@ -178,7 +181,7 @@ export function sourceProblems(
 
 /** A copy verb: a paragraph with one and a mention claims a copy. */
 const COPY_VERB =
-  /\b(?:copied|copying|adapted|adapts|ported|ports? from|based on|derived from|taken from|forked|lifted|borrowed|cloned|verbatim|line for line|same code)\b/i;
+  /\b(?:copied|copying|adapted|adapts|ported|ports? from|port of|based on|derived from|taken from|forked|lifted|borrowed|cloned|verbatim|line for line|same code|duplicat\w*|reuses?|carried over|identical to|mirrors?)\b/i;
 
 /** A copy word, which a file without a `copied` entry must not put near a mention. */
 const COPY_WORD = /\bcop(?:y|ied|ies|ying)\b/i;
@@ -326,8 +329,11 @@ export function headerOf(entry: CopyEntry, text: string, path: string): Paragrap
 /**
  * How the text of a manifest file disagrees with its entry. One comment paragraph must name
  * the kind, DOCX Editor, each source, and the commit (`headerOf`). A file whose entries are
- * not `copied` must not claim a copy of DOCX Editor in any paragraph, in any case, unless the
- * entry gives a `reason`: a guide can describe the copies in other files.
+ * not `copied` must not claim a copy of DOCX Editor in any paragraph, in any case, unless it
+ * is a Markdown guide whose entry gives a `reason`: a guide can describe the copies in other
+ * files (`options.noted`: an entry of the file gives a reason). No paragraph that mentions
+ * DOCX Editor may name a foreign file that no entry of the file lists (with `options.isLocal`),
+ * or, in a Markdown guide, that no manifest entry lists (`options.recorded`).
  */
 export function headerProblems(
   entry: CopyEntry,
@@ -337,22 +343,38 @@ export function headerProblems(
     isLocal?: (token: string) => boolean;
     sources?: readonly string[];
     copied?: boolean;
+    noted?: boolean;
+    recorded?: readonly string[];
   } = {}
 ): string[] {
   const problems: string[] = [];
   const found = paragraphs(text, path);
-  const header = found.find((p) => p.comment && lacks(entry, p.text).length === 0);
-  if (header !== undefined && options.isLocal !== undefined) {
-    const named = options.sources ?? entry.source;
-    const extra = [...header.text.matchAll(PATH_TOKEN)]
-      .map(([token]) => token.replace(/^docx-editor\//, ''))
-      .filter((token) => fileLike(token) && !options.isLocal!(token))
-      .find((token) => {
-        const bare = token.replace(/\/$/, '');
-        return !named.some((s) => s === bare || s.endsWith(`/${bare}`) || s.startsWith(`${bare}/`));
-      });
-    if (extra !== undefined)
-      problems.push(`the header at line ${header.first + 1} names ${extra}, which no entry lists`);
+  const markdown = /\.mdx?$/.test(path);
+  if (options.isLocal !== undefined) {
+    // A guide may also name any source that the manifest records for another file.
+    const named = [
+      ...(options.sources ?? entry.source),
+      ...(markdown ? (options.recorded ?? []) : []),
+    ];
+    for (const p of found.filter((paragraph) => MENTION.test(paragraph.text))) {
+      const extra = [...p.text.matchAll(PATH_TOKEN)]
+        .map(([token]) => token.replace(/^docx-editor\//, ''))
+        .filter((token) => fileLike(token) && !options.isLocal!(token))
+        .find((token) => {
+          const bare = token.replace(/\/$/, '');
+          return !named.some(
+            (s) =>
+              s === bare ||
+              s.endsWith(`/${bare}`) ||
+              s.startsWith(`${bare}/`) ||
+              bare.startsWith(`${s}/`)
+          );
+        });
+      if (extra !== undefined) {
+        problems.push(`line ${p.first + 1} names ${extra}, which no entry of the file lists`);
+        break;
+      }
+    }
   }
   if (!found.some((p) => p.comment && lacks(entry, p.text).length === 0)) {
     const near = found
@@ -366,7 +388,8 @@ export function headerProblems(
             `lacks ${near.missing.join(', ')}`
     );
   }
-  if (entry.kind !== 'copied' && options.copied !== true && entry.reason === undefined) {
+  const guide = markdown && (options.noted ?? entry.reason !== undefined);
+  if (entry.kind !== 'copied' && options.copied !== true && !guide) {
     const claim = found.find((p) => claimsCopy(p.text));
     if (claim !== undefined)
       problems.push(
@@ -496,9 +519,8 @@ export function localPaths(tracked: readonly string[]): (token: string) => boole
 }
 
 /**
- * The least line overlap (`lineOverlap`) of an `adapted` file with its sources together.
- * `kindProblems` also fails a source that shares no line with the file, unless the entry has
- * a `reason`. When the floor was set, the lowest overlap of an adapted file was 0.190. The
+ * The least line overlap (`lineOverlap`) of an `adapted` file with its sources together, and
+ * with each source on its own (`kindProblems`). When the floor was set, the lowest overlap of an adapted file was 0.190. The
  * check prints the current lowest.
  */
 export const ADAPTED_FLOOR = 0.1;
@@ -510,6 +532,34 @@ export const ADAPTED_FLOOR = 0.1;
  * highest (`--report` prints each overlap).
  */
 export const REFERENCE_CEILING = 0.5;
+
+/**
+ * How the code of a manifest file disagrees with the files of a folder source, as
+ * [path, normalized body] pairs that the check can compare: no file may equal the code, and a
+ * `reference` must share at most `REFERENCE_CEILING` with each.
+ */
+export function folderProblems(
+  entry: CopyEntry,
+  folder: string,
+  ours: string,
+  files: readonly (readonly [string, string])[]
+): string[] {
+  if (entry.kind === 'copied') return [];
+  const problems: string[] = [];
+  for (const [path, body] of files) {
+    if (body === ours) {
+      problems.push(`the code equals ${path} in ${folder}: mark the entry as copied`);
+      continue;
+    }
+    const overlap = lineOverlap(body, ours);
+    if (entry.kind === 'reference' && overlap > REFERENCE_CEILING)
+      problems.push(
+        `the code shares ${overlap.toFixed(3)} of its lines with ${path} in ${folder}, over ` +
+          `${REFERENCE_CEILING}: mark the entry as adapted`
+      );
+  }
+  return problems;
+}
 
 /** The extensions whose bodies `normalizedBody` compares. A file without one is a hash file. */
 const COMPARED_EXTENSIONS = new Set([
@@ -549,9 +599,8 @@ export const comparablePair = (file: string, source: string): boolean =>
  * for a source that the check cannot compare, such as a folder):
  * - An `adapted` or `reference` file must not equal any of its sources: it is a copy.
  * - An `adapted` file must keep `ADAPTED_FLOOR` of the lines of its sources together.
- * - Each source of an `adapted` entry must share a line with the file, and the check must be
- *   able to compare it, unless the entry gives a `reason`. A reference may share none: it
- *   follows a design.
+ * - Each source of an `adapted` entry must reach `ADAPTED_FLOOR` on its own, and the check
+ *   must be able to compare it. A reference may share none: it follows a design.
  * - A `reference` must share at most `REFERENCE_CEILING` with each source.
  */
 export function kindProblems(
@@ -573,17 +622,17 @@ export function kindProblems(
           `${ADAPTED_FLOOR}: name the right source, or mark the entry as a reference`
       );
   }
-  if (entry.reason === undefined && entry.kind === 'adapted')
+  if (entry.kind === 'adapted')
     overlaps.forEach((overlap, at) => {
-      if (overlap === 0)
+      if (overlap !== null && overlap < ADAPTED_FLOOR)
         problems.push(
-          `the code shares no line with ${entry.source[at]}: fix the source, or move it to ` +
-            'a reference entry with a `reason`'
+          `the code shares ${overlap.toFixed(3)} of its lines with ${entry.source[at]}, under ` +
+            `${ADAPTED_FLOOR}: fix the source, or move it to a reference entry`
         );
       else if (overlap === null && bodies.length > 0)
         problems.push(
           `the check cannot compare ${entry.source[at]} with the code: name a file in the same ` +
-            'language, or move it to a reference entry with a `reason`'
+            'language, or move it to a reference entry'
         );
     });
   if (entry.kind === 'reference')

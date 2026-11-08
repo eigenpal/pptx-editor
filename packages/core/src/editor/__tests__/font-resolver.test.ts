@@ -29,7 +29,7 @@ import {
   createFontResourceSnapshot,
 } from '../../layout/font-resource.ts';
 
-// PPTX Editor has no `layout/layout-shaping.ts`: the same admission runs through the font
+// PPTX Editor has no layout shaping module: the same admission runs through the font
 // resource snapshot, which throws where DOCX Editor's `prepareLayoutFontConfiguration` throws.
 const prepareLayoutFontConfiguration = (
   configuration: FontConfigurationFragment & {
