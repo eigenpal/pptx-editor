@@ -289,6 +289,8 @@ const SHAPED_PARTS: Partial<Record<ChromeSlotId, SlotPart>> = {
   'shape.fill': FillControl,
   'shape.lineStart': LineMenuControl,
   'shape.lineEnd': LineMenuControl,
+  'shape.lineDash': LineMenuControl,
+  'table.borderStyle': LineMenuControl,
   'shape.styles': ShapeStyleGalleryControl,
   'shape.effects': EffectMenuControl,
   'shape.textEffects': TextEffectsMenuControl,

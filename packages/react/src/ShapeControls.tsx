@@ -21,7 +21,9 @@ import {
   lineGlyphParts,
   lineGlyphTransform,
   lineSlotEnd,
+  lineSlotShown,
   shapePreview,
+  toolbarDropdownRow,
   translateKeyOrText,
   type ChromeControl,
   type ChromeSlotId,
@@ -30,6 +32,7 @@ import {
   type PatternFill,
 } from '@pptx-editor.dev/core/editor';
 import { PatternDialog } from './PatternDialog.tsx';
+import { useChromeActionHost } from './chrome-actions.tsx';
 import {
   Icon,
   MenuItem,
@@ -541,13 +544,13 @@ export function GradientDialog({ open, initial, onClose, onApply }: GradientDial
 
 /** The props of `LineGlyph`. @public */
 export interface LineGlyphProps {
-  /** The line kind or line end to draw, as the line menus give it. */
+  /** The line kind, line end, or preset dash to draw, as the line menus give it. */
   value: string;
   /** Draw the end at the start of the line (mirrored), for the line start menu. */
   start?: boolean;
 }
 
-/** Glyphs for line kinds and line ends, drawn at the right of a 48×24 box. @public */
+/** Glyphs for line kinds, line ends, and preset dashes, drawn in a 48×24 box. @public */
 export function LineGlyph({ value, start }: LineGlyphProps) {
   const solid = { fill: 'currentColor', stroke: 'none' } as const;
   return (
@@ -564,6 +567,7 @@ export function LineGlyph({ value, start }: LineGlyphProps) {
               d={p.d}
               {...LINE_GLYPH_STROKE}
               {...(p.join ? { strokeLinejoin: 'round' as const } : {})}
+              {...(p.dash ? { strokeDasharray: p.dash } : {})}
             />
           )
         )}
@@ -580,18 +584,22 @@ export interface LineMenuControlProps {
   control: ChromeControl;
 }
 
-/** The line tool and the line start and end menus, with each option drawn. @public */
+/**
+ * The line tool, the line start and end menus, and the dash menus, with each option drawn.
+ * @public
+ */
 export function LineMenuControl({ slot, control }: LineMenuControlProps) {
   const { cmd, label, reason, tip } = useSlot(slot, control);
   const off = useAriaDisabled(!cmd.isEnabled, reason);
   const editor = usePptxEditor();
+  const host = useChromeActionHost();
   const { t } = useTranslation();
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const isLine = useEditorState((s) => s.geometry?.lineHead !== undefined);
-  // Line ends draw on the side they belong to; the line tool shows its kinds.
+  // Line ends draw on the side they belong to; the line tool and dash menus show their options.
   const start = lineSlotEnd(slot);
-  const shown = String(cmd.value ?? (start === undefined ? 'line' : 'none'));
+  const shown = lineSlotShown(slot, cmd.value);
   const trigger = useTriggerAttributes(slot, 'pptx-toolbar__button pptx-toolbar__button--wide', {
     disabled: !cmd.isEnabled,
   });
@@ -618,21 +626,31 @@ export function LineMenuControl({ slot, control }: LineMenuControlProps) {
       {off.note}
       {open ? (
         <Popover anchor={anchor.current} onClose={() => setOpen(false)}>
-          {control.options?.map((o) => (
-            <MenuItem
-              key={o.value}
-              // Line ends are a choice with a current value; the line tool inserts a kind.
-              {...(control.toggle === 'choice' ? { checked: o.value === cmd.value } : {})}
-              onSelect={() => (
-                cmd.execute(o.value),
-                focusText(editor, anchor.current),
-                setOpen(false)
-              )}
-            >
-              <LineGlyph value={o.value} {...(start !== undefined ? { start } : {})} />
-              {t(o.labelKey)}
-            </MenuItem>
-          ))}
+          {control.options?.map((o) => {
+            // Line ends and dashes are a choice with a current value; the line tool inserts a
+            // kind. Core's rule says which rows are checked or off, with the reason.
+            const row = toolbarDropdownRow(editor, host, slot, control, o, cmd.value);
+            return (
+              <MenuItem
+                key={o.value}
+                {...(row.checked !== undefined ? { checked: row.checked } : {})}
+                {...(row.refused
+                  ? {
+                      disabled: true,
+                      ...(row.reason ? { reason: translateKeyOrText(t, row.reason) } : {}),
+                    }
+                  : {})}
+                onSelect={() => (
+                  cmd.execute(o.value),
+                  focusText(editor, anchor.current),
+                  setOpen(false)
+                )}
+              >
+                <LineGlyph value={o.value} {...(start !== undefined ? { start } : {})} />
+                {t(o.labelKey)}
+              </MenuItem>
+            );
+          })}
         </Popover>
       ) : null}
     </>

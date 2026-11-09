@@ -286,6 +286,49 @@ describe('Vue toolbar controls run their commands', () => {
     expect(checked.textContent).toBe(label);
   });
 
+  test('the dash menu draws each dash, checks the current one, and applies a pick', async () => {
+    const { host, editor } = await selectedBar();
+    // The deck's text box has no outline; a dash shows on an outline only.
+    expect(editor.exec({ type: 'setLineColor', color: '#000000' }).ok).toBe(true);
+    await flush();
+    const trigger = host.querySelector<HTMLElement>('[data-slot="shape.lineDash"]')!;
+    const dashOf = (el: Element): string | null =>
+      el.querySelector('.pptx-line-glyph path')!.getAttribute('stroke-dasharray');
+    expect(trigger.getAttribute('aria-disabled')).not.toBe('true');
+    expect(dashOf(trigger)).toBe(null);
+    trigger.click();
+    await flush();
+    const rows = [...document.querySelectorAll<HTMLElement>('.pptx-menu [role="menuitemradio"]')];
+    expect(rows.length).toBe(7);
+    expect(rows.every((r) => r.querySelector('.pptx-line-glyph') !== null)).toBe(true);
+    expect(dashOf(rows[1]!)).toBe('0 5');
+    rows.find((r) => r.textContent === 'Dash dot')!.click();
+    await flush();
+    expect(editor.snapshot().geometry?.lineDash).toBe('dashDot');
+    expect(dashOf(trigger)).toBe('6 5 0 5');
+    trigger.click();
+    await flush();
+    const checked = [...document.querySelectorAll('.pptx-menu [aria-checked="true"]')];
+    expect(checked.map((r) => r.textContent)).toEqual(['Dash dot']);
+  });
+
+  test('the table border style draws its dash the same in React and Vue', async () => {
+    restore = fixWidths(() => 100_000);
+    const editor = await openTableDeck();
+    // Border style is out of the default bar; a composed slot renders it.
+    const react = renderReact(
+      editor,
+      createElement(Toolbar, null, createElement(Toolbar.Slot, { slotId: 'table.borderStyle' }))
+    );
+    const host = await vue(editor, () =>
+      h(PptxEditorToolbar, null, () => [h(T.Slot!, { slotId: 'table.borderStyle' })])
+    );
+    const style = (root: Element): Element =>
+      root.querySelector('[data-slot="table.borderStyle"]')!;
+    expect(style(host).querySelector('.pptx-line-glyph') !== null).toBe(true);
+    expect(canonical(style(host))).toBe(canonical(style(react)));
+  });
+
   test('the color split applies its default color, and the arrow opens the swatches', async () => {
     const { host } = await selectedBar();
     expect(undoOn(host)).toBe(false);

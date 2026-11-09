@@ -12,11 +12,11 @@ import { presetGradient } from './palette.ts';
 // Line glyphs
 
 /**
- * One drawn part of a line glyph: a stroked path (`join` adds a round line join), a solid
- * arrowhead, or a solid dot. @internal
+ * One drawn part of a line glyph: a stroked path (`join` adds a round line join, `dash` a
+ * dash array), a solid arrowhead, or a solid dot. @internal
  */
 export type LineGlyphPart =
-  | { readonly kind: 'stroke'; readonly d: string; readonly join?: true }
+  | { readonly kind: 'stroke'; readonly d: string; readonly join?: true; readonly dash?: string }
   | { readonly kind: 'solid'; readonly d: string }
   | { readonly kind: 'dot'; readonly cx: number; readonly cy: number; readonly r: number };
 
@@ -29,10 +29,31 @@ export const LINE_GLYPH_STROKE = {
 } as const;
 
 /**
- * The parts of a line kind's or a line end's glyph, drawn at the right of a 48×24 box. An
- * `arrow` without `start` is a line kind (an arrow); with `start`, an open arrowhead. @internal
+ * Dash arrays of the preset dashes (ECMA-376 `ST_PresetLineDashVal`) on a glyph's 2-unit
+ * round-capped stroke. Each cap adds one unit at both ends of a dash, so a `0` dash draws a
+ * round dot. The gaps are wider than the spec ratios, so dots stay apart at toolbar size.
+ */
+const GLYPH_DASHES: Readonly<Record<string, string>> = {
+  sysDot: '0 5',
+  dot: '0 7',
+  sysDash: '2 5',
+  dash: '6 5',
+  sysDashDot: '3 5 0 5',
+  sysDashDotDot: '3 5 0 5 0 5',
+  dashDot: '6 5 0 5',
+  lgDash: '12 5',
+  lgDashDot: '12 5 0 5',
+  lgDashDotDot: '10 5 0 5 0 5',
+};
+
+/**
+ * The parts of a line kind's, a line end's, or a preset dash's glyph, drawn at the right of a
+ * 48×24 box. An `arrow` without `start` is a line kind (an arrow); with `start`, an open
+ * arrowhead. @internal
  */
 export function lineGlyphParts(value: string, start?: boolean): readonly LineGlyphPart[] {
+  const dash = GLYPH_DASHES[value];
+  if (dash !== undefined) return [{ kind: 'stroke', d: 'M8 12H40', dash }];
   switch (value) {
     case 'line':
       return [{ kind: 'stroke', d: 'M8 18 40 6' }];
@@ -82,10 +103,25 @@ export function lineGlyphTransform(start?: boolean): string | undefined {
 
 /**
  * Which end a line slot draws: `true` for the line start, `false` for the line end, and
- * `undefined` for the line tool, which shows its kinds. @internal
+ * `undefined` for the line tool and the dash menus, which show their options. @internal
  */
 export function lineSlotEnd(slot: string): boolean | undefined {
   return slot === 'shape.lineStart' ? true : slot === 'shape.lineEnd' ? false : undefined;
+}
+
+/**
+ * The option a line slot's trigger draws: the current value, else the slot's default (no
+ * line end, a solid dash, or a straight line for the line tool). A dash with no glyph of its
+ * own draws as a plain dash, never as a solid line. @internal
+ */
+export function lineSlotShown(slot: string, value: unknown): string {
+  const dashSlot = slot === 'shape.lineDash' || slot === 'table.borderStyle';
+  if (value === undefined || value === null) {
+    if (lineSlotEnd(slot) !== undefined) return 'none';
+    return dashSlot ? 'solid' : 'line';
+  }
+  const shown = String(value);
+  return dashSlot && shown !== 'solid' && GLYPH_DASHES[shown] === undefined ? 'dash' : shown;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -157,6 +157,9 @@ describe('shape parts', () => {
       'oval',
       'diamond',
       'none',
+      'sysDot',
+      'dashDot',
+      'lgDash',
     ])
       for (const start of [undefined, true, false])
         await same(
