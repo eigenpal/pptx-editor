@@ -112,6 +112,53 @@ describe('menu registry', () => {
   });
 });
 
+describe('controls off the default bar', () => {
+  test('each one keeps a row in the menu bar or a canvas context menu', () => {
+    const rows = new Set(
+      items([
+        ...CHROME_MENUS.flatMap((m) => m.entries),
+        ...Object.values(CANVAS_CONTEXT_MENUS).flat(),
+      ]).flatMap((e) => (e.kind === 'item' ? [e.slot] : []))
+    );
+    for (const slot of [
+      'insert.equation',
+      'slide.layout',
+      'slide.background',
+      'find.replace',
+      'text.link',
+      'text.changeCase',
+      'paragraph.textDirection',
+      'paragraph.autofit',
+      'arrange.group',
+      'arrange.ungroup',
+      'image.color',
+      'image.transparency',
+      'image.reset',
+      'image.cropToShape',
+      'image.cropFit',
+      'table.select',
+      'table.splitCell',
+    ])
+      expect(rows.has(slot as never)).toBe(true);
+  });
+
+  test('the picture context menu and Format > Picture hold the same picture rows', () => {
+    const format = CHROME_MENUS.find((m) => m.id === 'format')!.entries;
+    const picture = format.find((e) => e.kind === 'submenu' && e.id === 'picture');
+    const slots = (entries: readonly ChromeMenuEntry[]) =>
+      entries.flatMap((e) => (e.kind === 'item' ? [e.slot] : []));
+    const sub = picture?.kind === 'submenu' ? slots(picture.items) : [];
+    expect(sub).toEqual([
+      'image.color',
+      'image.transparency',
+      'image.cropToShape',
+      'image.cropFit',
+      'image.reset',
+    ]);
+    for (const slot of sub) expect(slots(CANVAS_CONTEXT_MENUS.picture)).toContain(slot);
+  });
+});
+
 describe('Format menu labels', () => {
   test('the Format menu names the picture row for what it does: Format picture', () => {
     const format = CHROME_MENUS.find((m) => m.id === 'format')!;

@@ -97,6 +97,35 @@ const ALIGN_ROWS: readonly ChromeMenuItemEntry[] = (
   labelKey: `toolbar.objectAlign.${v}` as const,
 }));
 
+/**
+ * The picture rows that leave the default bar: Color, Transparency, Crop to shape, Crop fit, and
+ * Reset. Format > Picture and the picture context menu hold them.
+ */
+const PICTURE_ROWS: readonly ChromeMenuItemEntry[] = [
+  item('image.color'),
+  item('image.transparency'),
+  item('image.cropToShape'),
+  item('image.cropFit'),
+  item('image.reset'),
+];
+
+const PICTURE_SUBMENU: ChromeMenuSubmenuEntry = {
+  kind: 'submenu',
+  id: 'picture',
+  labelKey: 'toolbar.groups.image',
+  paths: ICON_PATHS['image'] ?? null,
+  items: PICTURE_ROWS,
+};
+
+/**
+ * The slots whose menu row cascades the shape grid (`SHAPE_GALLERY`), one grid per category:
+ * Insert > Shape and Crop to shape. @internal
+ */
+export const SHAPE_GRID_MENU_SLOTS: ReadonlySet<ChromeSlotId> = new Set<ChromeSlotId>([
+  'insert.shape',
+  'image.cropToShape',
+]);
+
 /** The menu bar, in this order: File, Edit, View, Insert, Format, Arrange, Slide Show. @public */
 export const CHROME_MENUS: readonly ChromeMenu[] = [
   { id: 'file', labelKey: 'menu.file', entries: [item('file.pageSetup')] },
@@ -178,11 +207,15 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
         labelKey: 'toolbar.bulletsAndNumbering',
       },
       { kind: 'item', slot: 'paragraph.columns', value: 'dialog', labelKey: 'menu.columns' },
+      // Text direction and Autofit leave the default bar for these rows.
+      item('paragraph.textDirection'),
+      item('paragraph.autofit'),
       SEPARATOR,
       item('text.bold', 'contextMenu.bold', 'contextMenu.shortcuts.bold'),
       item('text.italic', 'contextMenu.italic', 'contextMenu.shortcuts.italic'),
       item('text.underline', 'contextMenu.underline', 'contextMenu.shortcuts.underline'),
       item('text.strike'),
+      item('text.changeCase'),
       SEPARATOR,
       item('list.bullet'),
       item('list.numbered'),
@@ -193,6 +226,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
       // The Format menu names it Slide Background; the context menus keep the dialog's name.
       item('slide.background', 'menu.slideBackground'),
       item('image.crop'),
+      PICTURE_SUBMENU,
       // Format picture: it formats pictures only, so the row says so in both menus.
       item('image.properties'),
     ],
@@ -416,6 +450,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     SEPARATOR,
     item('format.painter', 'contextMenu.formatPainter', 'contextMenu.shortcuts.formatPainter'),
     SEPARATOR,
+    ...PICTURE_ROWS,
+    SEPARATOR,
     item('image.altText', 'contextMenu.altText'),
     item('image.properties'),
   ],
@@ -458,6 +494,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     SEPARATOR,
     item('slide.background', 'contextMenu.background'),
+    // Layout: the deck's layout gallery, off the default bar since this row holds it.
+    item('slide.layout', 'contextMenu.layout'),
     // Edit layout opens the slide master view on the layout of the slide.
     {
       kind: 'item',
@@ -473,7 +511,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
 /**
  * The rows of a canvas context menu as `editor` shows them: without the New comment row while no
  * comments pane can open a draft (`commentRowShown`), so core without the pro review pane shows
- * no dead row. In the slide master view, Edit layout becomes Close master and New slide goes.
+ * no dead row. In the slide master view, Edit layout becomes Close master, and New slide and
+ * Layout go.
  * Separators left alone go with it. @internal
  */
 export function canvasMenuRows(
@@ -486,8 +525,10 @@ export function canvasMenuRows(
   for (const e of entries) {
     if (e.kind === 'item' && e.slot === 'review.addComment' && (master || !commentRowShown(editor)))
       continue;
-    // In the slide master view, Edit layout becomes Close master, and New slide has no slide.
-    if (master && e.kind === 'item' && e.slot === 'slide.add') continue;
+    // In the slide master view, Edit layout becomes Close master; New slide and Layout have no
+    // slide.
+    if (master && e.kind === 'item' && (e.slot === 'slide.add' || e.slot === 'slide.layout'))
+      continue;
     if (
       master &&
       e.kind === 'item' &&

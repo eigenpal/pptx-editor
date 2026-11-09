@@ -5540,6 +5540,9 @@ export type ShadowPreset = 'outerBottomRight' | 'outerBottom' | 'outerBottomLeft
 export const SHAPE_GALLERY: readonly ShapeCategory[];
 
 // @internal
+export const SHAPE_GRID_MENU_SLOTS: ReadonlySet<ChromeSlotId>;
+
+// @internal
 export const SHAPE_STYLE_GALLERY: readonly {
     readonly row: ShapeStyleRow;
     readonly cells: readonly ShapeStyleChoice[];
@@ -6099,6 +6102,9 @@ export function startSlideDrag(editor: PptxEditorInstance | null, selected: read
 
 // @internal
 export function startSlideshowController(editor: PptxEditorInstance | null, from: 'start' | 'current'): SlideshowController | null;
+
+// @internal
+export const STATUS_BAR_VIEW_OPTIONS: NonNullable<ChromeControl['options']>;
 
 // @internal
 export function stepCommand(selected: readonly number[], to: SlideStep | null): EditorCommand | null;

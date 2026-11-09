@@ -319,9 +319,10 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
         state: { kind: 'value' },
       },
       {
-        // A link popover: the URL, apply, remove, and open.
+        // A link popover: the URL, apply, remove, and open. Off the bar: Insert > Link, Ctrl/Cmd+K.
         id: 'link',
         labelKey: 'toolbar.link',
+        defaultToolbar: false,
         paths: icon('link'),
         state: { kind: 'value' },
       },
@@ -526,12 +527,14 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
       {
         id: 'group',
         labelKey: 'toolbar.group',
+        defaultToolbar: false,
         paths: icon('call_merge'),
         state: { kind: 'command' },
       },
       {
         id: 'ungroup',
         labelKey: 'toolbar.ungroup',
+        defaultToolbar: false,
         paths: icon('call_split'),
         state: { kind: 'command' },
       },
@@ -564,6 +567,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
       {
         id: 'replace',
         labelKey: 'toolbar.replace',
+        defaultToolbar: false,
         paths: icon('swap_horiz'),
         state: { kind: 'panel' },
       },
@@ -674,12 +678,14 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
   REVIEW_CHROME_GROUP,
 ];
 
-// A group with no control left on the bar (`script`) is left out.
-const BAR_GROUPS: readonly ChromeGroup[] = CHROME_GROUPS.filter((g) => !g.contextual)
-  .map((g) => ({ ...g, controls: g.controls.filter((c) => c.defaultToolbar !== false) }))
-  .filter((g) => g.controls.length > 0);
+// The bar's groups: no `defaultToolbar: false` control, and no group left empty (`script`).
+const barGroups = (groups: readonly ChromeGroup[]): readonly ChromeGroup[] =>
+  groups
+    .map((g) => ({ ...g, controls: g.controls.filter((c) => c.defaultToolbar !== false) }))
+    .filter((g) => g.controls.length > 0);
+const BAR_GROUPS = barGroups(CHROME_GROUPS.filter((g) => !g.contextual));
 /** The formatting bar while pictures are selected. Not exported from the package. @internal */
-export const PICTURE_BAR_GROUPS: readonly ChromeGroup[] = [...BAR_GROUPS, IMAGE_CHROME_GROUP];
+export const PICTURE_BAR_GROUPS = [...BAR_GROUPS, ...barGroups([IMAGE_CHROME_GROUP])];
 
 /**
  * The groups the formatting bar shows: every group that is not `contextual`, without the

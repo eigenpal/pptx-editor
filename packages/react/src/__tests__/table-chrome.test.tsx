@@ -621,7 +621,10 @@ describe('table toolbar', () => {
     expect(editor.exec({ type: 'mergeCells' }).ok).toBe(true);
     const { container } = render(
       <PptxEditorContext.Provider value={editor}>
-        <Toolbar />
+        <Toolbar>
+          {/* Off the default bar (the cell context menu has Split); a host adds it back. */}
+          <ToolbarSlot slotId="table.splitCell" />
+        </Toolbar>
       </PptxEditorContext.Provider>
     );
     act(() =>

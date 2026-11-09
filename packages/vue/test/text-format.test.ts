@@ -85,12 +85,10 @@ test('superscript and subscript toggle and show their state in the Vue toolbar',
   expect(button('script.super').getAttribute('aria-pressed')).toBe('false');
   expect(button('script.sub').getAttribute('aria-pressed')).toBe('true');
   // Menus draw in Vue, as in React. (The Font and Paragraph dialog launchers, Character
-  // Spacing, and Columns are not on the preset bar in either adapter.)
-  for (const slot of [
-    'text.changeCase',
-    'paragraph.textDirection',
-    'list.bulletStyle',
-    'list.numberStyle',
-  ])
+  // Spacing, Change Case, Text Direction, and Columns are not on the preset bar in either
+  // adapter: the Format menu places them.)
+  for (const slot of ['list.bulletStyle', 'list.numberStyle'])
     expect(el.querySelector(`[data-slot="${slot}"]`) !== null).toBe(true);
+  for (const slot of ['text.changeCase', 'paragraph.textDirection'])
+    expect(el.querySelector(`[data-slot="${slot}"]`) === null).toBe(true);
 });

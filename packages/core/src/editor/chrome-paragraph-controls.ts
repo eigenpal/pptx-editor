@@ -28,6 +28,8 @@ export const TEXT_DIRECTION_CONTROL: ChromeControl = {
   // Asian text.
   id: 'textDirection',
   shape: 'dropdown',
+  // Off the default bar: the Format menu places it.
+  defaultToolbar: false,
   labelKey: 'toolbar.textDirection',
   toggle: 'choice',
   paths: icon('text_rotate_vertical'),
@@ -46,6 +48,8 @@ export const AUTOFIT_CONTROL: ChromeControl = {
   // `a:normAutofit` (shrink text on overflow), or `a:spAutoFit` (resize shape to fit text).
   id: 'autofit',
   shape: 'dropdown',
+  // Off the default bar: the Format menu and the Format pane place it.
+  defaultToolbar: false,
   labelKey: 'panel.format.textFitting',
   toggle: 'choice',
   paths: icon('text_fields'),

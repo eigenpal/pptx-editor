@@ -17,6 +17,7 @@ import {
   resolveChromeMenuRow,
   runChromeRow,
   sameChromeCommandState,
+  SHAPE_GRID_MENU_SLOTS,
   surfaceInputIn,
   tidySeparators,
   translateKeyOrText,
@@ -136,9 +137,10 @@ export function SlotMenuRow({
   if (entry.value === undefined && control.state.kind === 'value' && !entry.direct) {
     if (entry.slot === 'slide.add' || entry.slot === 'slide.layout')
       return <LayoutSubmenu slot={entry.slot} {...common} />;
-    // Insert > Shape cascades its shape grid. Quick Styles is a gallery with no menu form yet,
-    // so its row falls through to the disabled "pick in the toolbar" row below.
-    if (entry.slot === 'insert.shape') return <GallerySubmenu slot={entry.slot} {...common} />;
+    // Insert > Shape and Crop to shape cascade the shape grid. Quick Styles is a gallery with no
+    // menu form yet, so its row falls through to the disabled "pick in the toolbar" row below.
+    if (SHAPE_GRID_MENU_SLOTS.has(entry.slot))
+      return <GallerySubmenu slot={entry.slot} {...common} />;
     // Insert > Table: the size grid, as DOCX Editor's `Menu.TableGrid`.
     if (control.shape === 'tableGrid')
       return (

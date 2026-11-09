@@ -5,10 +5,11 @@
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 
-import type { ChromeGroup, ChromeSlotId } from './chrome-controls.ts';
+import type { ChromeControl, ChromeGroup, ChromeSlotId } from './chrome-controls.ts';
 import {
   CHROME_GROUPS,
   PICTURE_BAR_GROUPS,
+  chromeControlForSlot,
   commandForSlotValue,
   formattingBarChromeGroups,
   optionRefusal,
@@ -169,14 +170,12 @@ const BAR_TABLE_CONTROLS: ReadonlySet<string> = new Set([
   'borderTarget',
   'borderColor',
   'borderWidth',
-  'select',
   'delete',
   'insertRowAbove',
   'insertRowBelow',
   'insertColumnLeft',
   'insertColumnRight',
   'mergeCells',
-  'splitCell',
 ]);
 
 /**
@@ -194,13 +193,13 @@ export const TOOLBAR_CONTEXT_GROUPS: readonly ChromeGroup[] = CHROME_GROUPS.filt
 }));
 
 /**
- * The slide controls the bar shows while nothing is selected: Format Background and Layout,
- * the two slide tasks of an empty selection.
+ * The options of the status bar's view switch: Normal and Slide Sorter. View > Slide Master
+ * opens the slide master view, which has its own Close button, so the switch leaves it out.
+ * In that view, no option is checked. @internal
  */
-const TOOLBAR_SLIDE_GROUP: ChromeGroup = ((g) => ({
-  ...g,
-  controls: g.controls.filter((c) => c.id === 'background' || c.id === 'layout'),
-}))(CHROME_GROUPS.find((g) => g.id === 'slide')!);
+export const STATUS_BAR_VIEW_OPTIONS: NonNullable<ChromeControl['options']> = (
+  chromeControlForSlot('view.presentationView')?.options ?? []
+).filter((o) => o.value !== 'slideMaster');
 
 /**
  * What the selection is, for the groups the preset toolbar shows: nothing (or only slides in
@@ -236,7 +235,8 @@ export function toolbarContextOf(
  * (`Toolbar.Slot`, `preset={false}`, menus, the ribbon); only the preset bar leaves it out.
  */
 const CONTEXT_GROUP_IDS: Readonly<Record<ToolbarContext, readonly string[]>> = {
-  none: ['history', 'insert', 'slide', 'find'],
+  // Format > Background, the rail menu, and Insert > Layout place the slide controls.
+  none: ['history', 'insert', 'find'],
   text: ['history', 'font', 'text', 'paragraph', 'list', 'insert', 'format'],
   shape: ['history', 'font', 'text', 'paragraph', 'insert', 'shape', 'format', 'arrange', 'more'],
   picture: ['history', 'insert', 'image', 'arrange', 'more'],
@@ -261,7 +261,6 @@ const CONTEXT_GROUP_IDS: Readonly<Record<ToolbarContext, readonly string[]>> = {
 const CONTEXT_GROUPS: ReadonlyMap<string, ChromeGroup> = new Map(
   [
     ...TOOLBAR_BAR_GROUPS,
-    TOOLBAR_SLIDE_GROUP,
     ...TOOLBAR_PICTURE_GROUPS.filter((g) => g.id === 'image'),
     CHART_CHROME_GROUP,
     DIAGRAM_CHROME_GROUP,
@@ -447,7 +446,8 @@ export function placeToolbarGroups(
  * line, and arrange groups; a picture shows the picture group; a table adds the table group
  * after the text groups, and a table selected as an object keeps Arrange, Duplicate, and
  * Delete too; a focused notes field shows the four notes formats and Find; an empty selection
- * shows Insert and the slide's Background and Layout. Undo and Redo stay first in each. With `contextual: false`, every bar group shows
+ * shows Insert and Find. Undo and Redo stay first in each. With `contextual: false`, every bar
+ * group shows
  * for every selection, and the picture or table group joins after them. The same array comes
  * back for the same arguments. @internal
  */

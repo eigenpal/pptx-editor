@@ -68,7 +68,9 @@ const OFF_BAR = [
   'script.super',
   'script.sub',
   'text.characterSpacing',
+  'text.changeCase',
   'paragraph.columns',
+  'paragraph.textDirection',
 ] as const;
 
 async function mount(

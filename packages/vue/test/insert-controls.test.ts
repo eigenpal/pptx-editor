@@ -541,6 +541,18 @@ describe('menu rows', () => {
     }
   });
 
+  test('Crop to shape cascades the shape grid as Insert > Shape does, as in React', async () => {
+    const editor = await deck();
+    const crop: ChromeMenuEntry[] = [{ kind: 'item', slot: 'image.cropToShape' }];
+    const out = await same(
+      createElement(RMenuEntries, { entries: crop }),
+      () => h(MenuEntries, { entries: crop }),
+      editor
+    );
+    // A submenu row, not the disabled "pick in the toolbar" row of a picker with no menu form.
+    expect(out).toContain('aria-haspopup="menu"');
+  });
+
   test('a New Slide row pick adds a slide on the picked layout', async () => {
     const editor = await deck();
     const el = await mountVue(
