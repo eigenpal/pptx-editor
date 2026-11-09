@@ -283,3 +283,47 @@ describe('an undo that names a removed paragraph again keeps the text a peer typ
       expect(converged(a, b, c).join('')).toBe('xAyEFGH');
     });
 });
+
+describe("a redo of a delete reaches a peer's copy of the deleted text", () => {
+  // The redo deletes the characters that the undo put back. Its delete stands for the
+  // characters they stand for too, so it reaches a peer's copy of either (`deletedByStep`).
+  for (const ids of ORDERS)
+    for (const stage of ['redo first', 'format first', 'at once'] as const)
+      test(`a format made before the undo, ${stage} (client ids ${ids.join(', ')})`, async () => {
+        const { editors, sync, docs } = await peers(deck(), ids);
+        const [, b, c] = editors as Three;
+        sync.pause();
+        selectIn(b, 0, 2, 4);
+        ok(b.exec({ type: 'toggleItalic' }));
+        if (stage === 'format first') sync.deliverTo(docs[2]!);
+        selectIn(c, 0, 3, 4);
+        ok(c.input('deleteBackward'));
+        ok(c.exec({ type: 'undo' }));
+        ok(c.exec({ type: 'redo' }));
+        if (stage === 'redo first') sync.deliverTo(docs[1]!);
+        sync.flush();
+        expect(converged(...editors)).toEqual(['ABCEFGH', 'IJKL']);
+      });
+  for (const ids of ORDERS)
+    for (const stage of ['redo first', 'format first', 'at once'] as const)
+      test(`a format of the text the undo put back, ${stage} (client ids ${ids.join(', ')})`, async () => {
+        const { editors, sync, docs } = await peers(deck(), ids);
+        const [a, b] = editors as Three;
+        sync.pause();
+        selectIn(b, 0, 1, 3);
+        ok(b.input('deleteBackward'));
+        ok(b.exec({ type: 'undo' }));
+        sync.flush();
+        sync.pause();
+        expect(converged(...editors)).toEqual(['ABCDEFGH', 'IJKL']);
+        selectIn(a, 0, 1, 3);
+        ok(a.exec({ type: 'setTextColor', color: { theme: 'accent1' } }));
+        if (stage === 'format first') sync.deliverTo(docs[1]!);
+        // The format took the text first: the redo finds nothing of its own to delete.
+        const redone = b.exec({ type: 'redo' }).ok;
+        expect(redone).toBe(stage !== 'format first');
+        if (stage === 'redo first') sync.deliverTo(docs[0]!);
+        sync.flush();
+        expect(converged(...editors)).toEqual(redone ? ['ADEFGH', 'IJKL'] : ['ABCDEFGH', 'IJKL']);
+      });
+});

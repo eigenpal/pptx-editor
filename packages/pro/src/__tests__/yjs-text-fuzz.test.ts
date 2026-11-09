@@ -609,6 +609,17 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
         { kind: 'edit', peer: 0, edit: 'undo', paragraph: 3, offset: 5, length: 1 },
       ],
     },
+    {
+      name: "a redo of a delete across paragraphs reaches a peer's Enter copy of the text",
+      seed: 637,
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 1, length: 2 },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 0, length: 2 },
+        { kind: 'edit', peer: 0, edit: 'redo', paragraph: 0, offset: 1, length: 2 },
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 3, offset: 1, length: 2 },
+        { kind: 'flush' },
+      ],
+    },
   ],
   format: [
     {
@@ -721,6 +732,36 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
         { kind: 'flush' },
         { kind: 'edit', peer: 1, edit: 'undo', paragraph: 1, offset: 3, length: 2 },
         { kind: 'edit', peer: 1, edit: 'undo', paragraph: 0, offset: 0, length: 0 },
+      ],
+    },
+    {
+      name: "a redo of a delete reaches a peer's format of the deleted text",
+      seed: 237,
+      actions: [
+        { kind: 'edit', peer: 1, edit: 'italic', paragraph: 0, offset: 2, length: 2 },
+        { kind: 'edit', peer: 2, edit: 'delete', paragraph: 0, offset: 3, length: 1 },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 8, length: 0 },
+        { kind: 'edit', peer: 2, edit: 'redo', paragraph: 0, offset: 5, length: 3 },
+        { kind: 'flush' },
+      ],
+    },
+    {
+      name: "a redo of a delete across paragraphs reaches a peer's format of the text",
+      seed: 1885,
+      actions: [
+        {
+          kind: 'edit',
+          peer: 2,
+          edit: 'color',
+          paragraph: 0,
+          offset: 1,
+          length: 1,
+          color: 'accent2',
+        },
+        { kind: 'edit', peer: 1, edit: 'deleteAcross', paragraph: 0, offset: 1, length: 2 },
+        { kind: 'edit', peer: 1, edit: 'undo', paragraph: 0, offset: 2, length: 1 },
+        { kind: 'edit', peer: 1, edit: 'redo', paragraph: 1, offset: 2, length: 0 },
+        { kind: 'flush' },
       ],
     },
   ],

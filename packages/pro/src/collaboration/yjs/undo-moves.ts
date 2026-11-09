@@ -327,10 +327,11 @@ export function liveInserted(room: Room, insertions: IdSet): Set<string> | null 
 
 /**
  * After an undo or a redo of a step that inserted `insertions` and deleted `deletions`: the
- * roots (`rootOf` through copies only) of the characters the step deleted that were live before
- * it (`before`, from `liveInserted`). A character of a split's copy, and a character whose
- * identity the step put back (it moved the text back), do not count. This replica's delete then reaches a peer's copy of them, as a
- * delete that this replica typed does (`text-repair.ts`).
+ * roots (`rootOf`, through copies only and through restores too) of the characters the step
+ * deleted that were live before it (`before`, from `liveInserted`). A redo that deletes a
+ * character an undo put back deletes the character it stands for too. A character of a split's copy, and a character whose identity the step put back
+ * (it moved the text back), do not count. This replica's delete then reaches a peer's copy of
+ * them, as a delete that this replica typed does (`text-repair.ts`).
  */
 export function deletedByStep(
   room: Room,
@@ -364,8 +365,10 @@ export function deletedByStep(
       }
       const r = rootOf(doc, id, full);
       if (putBack.has(idKey(r.client, r.clock))) continue;
+      // A peer's copy can copy the character itself or the character it stands for.
       const root = rootOf(doc, id, copies, false);
       out.add(idKey(root.client, root.clock));
+      out.add(idKey(r.client, r.clock));
     }
   });
   return out;
