@@ -24,8 +24,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import * as Y from 'yjs';
 import type { ReplicaElementSpec, ReplicaTextSpec } from '@pptx-editor.dev/core/store';
-import { F, type Room } from './schema.ts';
-import { IDENTITY } from './text-identity.ts';
+import { F, partEntryOf, type Room } from './schema.ts';
+import { IDENTITY, itemOf } from './text-identity.ts';
 import { isRemoved } from './text-lineage.ts';
 import { forEachItem, holderItem, mapItems, sequenceItems, type StepRanges } from './yjs-items.ts';
 
@@ -80,6 +80,17 @@ function entryOf(key: string, value: unknown, partName?: string): UndoneEntry | 
   return { key, parent: v.u, after: v.a, before, client: v.c as number, clock, shownIn };
 }
 
+/** The deepest chain of entries put back again that `liveRedone` follows. */
+const MAX_REDONE = 64;
+
+/** `item`, or the live item that an undo or a redo put back for it, or null. */
+function liveRedone(doc: Y.Doc, item: Y.Item): Y.Item | null {
+  let at: Y.Item | null = item;
+  for (let depth = 0; at && at.deleted && depth < MAX_REDONE; depth += 1)
+    at = at.redone ? itemOf(doc, at.redone) : null;
+  return at && !at.deleted ? at : null;
+}
+
 /**
  * Whether an undo took the node `key` out of the document without seeing the write of `item`:
  * an undo recorded where it listed the node (not a tidied listing), and another client wrote
@@ -110,9 +121,12 @@ export function noteUndoneListings(
     if (item.parent === (room.parts as unknown) && item.parentSub !== null && !item.deleted)
       created.add(item.parentSub);
   });
-  forEachItem(room.doc, step.insertions, (item) => {
-    const list = item.parent;
-    if (item.deleted || !(list instanceof Y.Array)) return;
+  forEachItem(room.doc, step.insertions, (inserted) => {
+    // An entry that a later undo or redo put back (a peer's join, then its undo) is the entry
+    // the undo deletes, as Yjs follows it (`Item.redone`).
+    const item = liveRedone(room.doc, inserted);
+    const list = item?.parent;
+    if (!item || !(list instanceof Y.Array)) return;
     const record = list.parent;
     if (!(record instanceof Y.Map) || holderItem(record)?.parent !== nodes) return;
     if (record.get(F.children) !== list) return;
@@ -216,8 +230,9 @@ export function forgetUndoneListings(
  * repair that moved it) stays listed, by the peer's entry, though the undo took all of its
  * content. Such a node that holds nothing now leaves every list of its part, as the undo meant.
  * Only an element record with no attribute and no child that the read still shows (`shows`)
- * counts, so the search runs only then. Call inside a transaction; returns whether it wrote
- * anything.
+ * counts, so the search runs only then. A node whose undone child shows again (a run whose text
+ * a peer typed into) is not empty: it stays. Call inside a transaction; returns whether it
+ * wrote anything.
  */
 export function unlistEmptied(
   room: Room,
@@ -225,6 +240,14 @@ export function unlistEmptied(
   shows: (part: string, key: string) => boolean
 ): boolean {
   const emptied = new Map<string, Set<string>>();
+  const listings = new Map<string, UndoneListings | null>();
+  const listingsOf = (part: string): UndoneListings | null => {
+    if (!listings.has(part)) {
+      const entry = partEntryOf(room.parts.get(part));
+      listings.set(part, entry?.kind === 'xml' ? UndoneListings.of(room, part, entry.root) : null);
+    }
+    return listings.get(part)!;
+  };
   forEachItem(room.doc, step.insertions, (item) => {
     if ((item.parent as unknown) !== room.nodes || item.parentSub === null) return;
     if (!(item.content instanceof Y.ContentType) || !(item.content.type instanceof Y.Map)) return;
@@ -236,6 +259,8 @@ export function unlistEmptied(
     if (typeof part !== 'string' || !(attrs instanceof Y.Map) || !(children instanceof Y.Array))
       return;
     if (attrs.size > 0 || children.length > 0 || !shows(part, item.parentSub)) return;
+    // A node whose undone child shows again (a peer typed into the run's text) is not empty.
+    if (listingsOf(part)?.showsUnder(item.parentSub)) return;
     let keys = emptied.get(part);
     if (!keys) emptied.set(part, (keys = new Set()));
     keys.add(item.parentSub);
@@ -421,6 +446,14 @@ export class UndoneListings {
     for (const field of runs.sort().slice(0, MAX_PLACED))
       if (this.#holdsForeign(field.slice(IDENTITY.removedRun.length), e, depth + 1)) return true;
     return this.#shown(key).some((child) => this.#holdsForeign(child.key, child, depth + 1));
+  }
+
+  /**
+   * Whether an undone listing under `parent` shows again: a node an undo took out of it that
+   * holds another client's content.
+   */
+  showsUnder(parent: string): boolean {
+    return this.#shown(parent).some((child) => this.#holdsForeign(child.key, child, 1));
   }
 
   /** The undone listings under `parent` that may show: no list holds them, none was removed. */

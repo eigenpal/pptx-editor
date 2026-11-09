@@ -18,6 +18,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   `withSlideListsRepaired` removes the entry and its section entry.
 // - A relationship to a slide that a peer deleted (a copy of a slide jump): the delete wins, and
 //   the hyperlinks that use it go, so no slide part comes back without its content type.
+// - Text that the step moved (a format or an Enter splits a run) and that a peer deleted, before
+//   the step or at the same time: it stays deleted (`undo-moves.ts`). Text that a peer typed into
+//   a run or a paragraph that the step created stays (`undo-unlisted.ts`).
 
 import * as Y from 'yjs';
 import {

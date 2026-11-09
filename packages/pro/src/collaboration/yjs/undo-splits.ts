@@ -28,6 +28,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import * as Y from 'yjs';
 import { F, partEntryOf, type Room } from './schema.ts';
 import { lineageOf, LINEAGE, partLineage, winners } from './text-lineage.ts';
+import { rootOf } from './text-identity.ts';
 import { forEachItem, holderItem, withoutItems, type StepRanges } from './yjs-items.ts';
 
 /** The `Y.Text` of each text node under a run's `a:t` children. */
@@ -102,12 +103,25 @@ export function withoutLoserRestores(room: Room, step: StepRanges): StepRanges['
 export function withoutTakenRedo(room: Room, step: StepRanges): StepRanges {
   // The texts whose characters the undo put back, and whether a peer took any of them since.
   const restored = new Map<Y.Text, boolean>();
-  forEachItem(room.doc, step.insertions, (item) => {
+  // A character that the undo's own repair moved on (a "Follow" move of `undo-restore.ts`: the
+  // step inserted a new character of the same identity, and the redo deletes both) was not taken.
+  const doc = room.doc;
+  const memo = new Map<string, Y.ID>();
+  const live = new Set<string>();
+  const deleted: [Y.Text, string][] = [];
+  forEachItem(doc, step.insertions, (item) => {
     const text = item.parent;
     if (!(text instanceof Y.Text) || !item.countable) return;
     if (!recordOf(room, text.parent)) return;
-    restored.set(text, (restored.get(text) ?? false) || item.deleted);
+    if (!restored.has(text)) restored.set(text, false);
+    for (let j = 0; j < item.length; j += 1) {
+      const root = rootOf(doc, Y.createID(item.id.client, item.id.clock + j), memo);
+      const key = `${root.client}:${root.clock}`;
+      if (item.deleted) deleted.push([text, key]);
+      else live.add(key);
+    }
   });
+  for (const [text, key] of deleted) if (!live.has(key)) restored.set(text, true);
   if (![...restored.values()].some(Boolean)) return step;
   // The pieces the undo took out: their `sf` entry, deleted by the undo, names their run.
   const pieces = new Map<Y.Map<unknown>, string>();

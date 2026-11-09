@@ -371,11 +371,11 @@ export class PackageMirror {
     );
     const removed = markRemoved(this.#room, root, write.before, write.ids.keyOf);
     const doc = this.#room.doc;
-    const memo = new Map<string, Y.ID>();
+    const [memo, full] = [new Map<string, Y.ID>(), new Map<string, Y.ID>()];
     const note = (id: Y.ID) => {
       if (this.#deleted.size >= MAX_DELETED || moved.has(idKey(id.client, id.clock))) return;
-      const r = rootOf(doc, id, memo, false);
-      this.#deleted.add(idKey(r.client, r.clock));
+      const [r, s] = [rootOf(doc, id, memo, false), rootOf(doc, id, full)];
+      this.#deleted.add(idKey(r.client, r.clock)).add(idKey(s.client, s.clock));
     };
     for (const t of write.texts.values()) for (const id of t.deleted) note(id);
     for (const id of removed) note(id);
@@ -399,11 +399,12 @@ export class PackageMirror {
   }
 
   /**
-   * Root characters this replica's undo or redo put back: its delete no longer reaches a peer's
-   * copy of them.
+   * After this replica's undo or redo: its delete no longer reaches a peer's copy of the root
+   * characters it put back (`restored`), and reaches a copy of those it deleted (`deleted`).
    */
-  forgetDeleted(roots: Iterable<string>): void {
-    for (const r of roots) this.#deleted.delete(r);
+  noteStep(restored: Iterable<string>, deleted: Iterable<string>): void {
+    for (const r of restored) this.#deleted.delete(r);
+    for (const r of deleted) if (this.#deleted.size < MAX_DELETED) this.#deleted.add(r);
   }
 
   /**

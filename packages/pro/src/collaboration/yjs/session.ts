@@ -76,6 +76,14 @@ import {
   restoredTextsOf,
   textsOfMarks,
 } from './undo-restore.ts';
+import {
+  deletedByStep,
+  dropDeadMoves,
+  dropDeletedRestores,
+  liveInserted,
+  liveRoots,
+  movedRoots,
+} from './undo-moves.ts';
 import { withoutLoserRestores, withoutTakenRedo } from './undo-splits.ts';
 import { forgetUndoneListings, noteUndoneListings, unlistEmptied } from './undo-unlisted.ts';
 import {
@@ -265,6 +273,23 @@ export function createYjsCollaborationSession(
     // Yjs skips each item it cannot apply and takes the next one in the same call, so the item
     // it applied (`popped`) can differ from the one on top before the call, and none may apply.
     const top = stack[stack.length - 1]!;
+    // The text the step moves back, and which of it a character still holds (`undo-moves.ts`),
+    // read before the rules below take items out of the step.
+    const moved = movedRoots(room, (top as unknown as StepRanges).insertions);
+    // Yjs can apply the step below the top in its place (see below): read its moves too.
+    const below = undo && stack.length > 1 ? stack[stack.length - 2]! : null;
+    const movedBelow = below ? movedRoots(room, (below as unknown as StepRanges).insertions) : null;
+    // The characters the step may delete, live before it: a delete of them reaches a peer's copy.
+    const inserted = liveInserted(room, (top as unknown as StepRanges).insertions);
+    const reader = mirror;
+    const alive =
+      moved && reader
+        ? liveRoots(
+            room,
+            movedBelow ? new Set([...moved, ...movedBelow]) : moved,
+            (part, key) => reader.idOf(part, key) !== undefined
+          )
+        : null;
     // What the step must not take from a peer or put back twice (`undo-unlisted.ts`,
     // `undo-splits.ts`), set on the step before Yjs applies it.
     if (undo) {
@@ -303,7 +328,15 @@ export function createYjsCollaborationSession(
     if (undo && applied && applied !== top) {
       // Yjs could not undo the top step (a peer took its values) and undid an older one in the
       // same call. Undo stays one step: the older step comes back, and the call reports that
-      // it changed nothing, so the next undo takes the older step.
+      // it changed nothing, so the next undo takes the older step. Before the older step comes
+      // back, the moved text it put back that a peer deleted goes again: the redo then does not
+      // take it into the older step, and the next undo does not put it back.
+      if (applied === below && movedBelow && alive)
+        doc.transact(
+          () =>
+            dropDeadMoves(room, (applied as unknown as StepRanges).deletions, movedBelow, alive),
+          TEXT_REPAIR_ORIGIN
+        );
       popped = null;
       manager.redo();
       compensated = popped;
@@ -338,6 +371,10 @@ export function createYjsCollaborationSession(
       const ranges = done as unknown as StepRanges;
       const shows = (part: string, key: string) => reading.idOf(part, key) !== undefined;
       let roots: ReadonlySet<string> = new Set();
+      // Moved text that a peer deleted before the step stays deleted. The delete is not part of
+      // the step: a later redo or undo reads it as the peer's (`withoutTakenRedo`).
+      if (done === top && moved && alive)
+        doc.transact(() => dropDeadMoves(room, ranges.deletions, moved, alive), TEXT_REPAIR_ORIGIN);
       stepRepair(manager, undo, () => {
         const restored = noteRestored(room, ranges.deletions);
         roots = restored.roots;
@@ -346,8 +383,9 @@ export function createYjsCollaborationSession(
         // A peer that put back the same characters before shows them once.
         dropRestoredTwins(room, restored.texts, shows);
       });
-      // This replica's delete of a character the step put back no longer reaches its copies.
-      reading.forgetDeleted(roots);
+      // This replica's delete of a character the step put back no longer reaches its copies,
+      // and its delete of a character the step deleted reaches a peer's copy made at once.
+      reading.noteStep(roots, inserted ? deletedByStep(room, ranges, inserted) : []);
     }
     // What the step took that a peer's write or content still needs comes back, read
     // after the redo bookkeeping above, so the repair writes over the current package.
@@ -616,6 +654,12 @@ export function createYjsCollaborationSession(
         // A character put back twice, by two peers' undos or beside a peer's copy of it, shows
         // once (`dropRestoredTwins`): when the marks or the copy arrive.
         const marks = transaction.changed.get(restoredMarks);
+        // A peer's undo of a split puts back text that this replica deleted at the same time.
+        if (marks && attachedMirror.deletedText.size > 0)
+          doc.transact(
+            () => dropDeletedRestores(room, marks, attachedMirror.deletedText),
+            TEXT_REPAIR_ORIGIN
+          );
         const texts = marks ? textsOfMarks(room, marks) : new Set<Y.Text>();
         if (fresh.size > 0 && room.doc.getMap(RESTORED_KEY).size > 0)
           for (const t of restoredTextsOf(room, new Set(fresh.keys()))) texts.add(t);
