@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/pro",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module with the comments pane and review hooks for React and Vue, realtime collaboration, and advanced drawing rendering (charts, glow, inner shadow, reflection, and soft edge).",
   "type": "module",
   "sideEffects": false,

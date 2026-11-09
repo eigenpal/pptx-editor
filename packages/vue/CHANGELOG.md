@@ -1,5 +1,12 @@
 # @pptx-editor.dev/vue
 
+## 0.3.1
+
+### Patch Changes
+
+- 8fc9345: Draw each dash style in the outline dash and table border style menus, and show the current dash on the button.
+- Updated dependencies: @pptx-editor.dev/i18n@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes
