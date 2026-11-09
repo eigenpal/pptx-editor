@@ -1,5 +1,23 @@
 # @pptx-editor.dev/pro
 
+## 0.3.0
+
+### Minor Changes
+
+- 9d7d60b: Keep text that peers type at the same time as deletes, joins, and formats. The room format is now 6, so update every peer of a room together. Older replicas refuse the room with `schema-version-mismatch`.
+- 9d7d60b: Add **New comment** to the canvas context menus, with `registerCommentDraft` and `requestCommentDraft`. Comment commands take `expect` and can fail with `errors.commentChanged`, `errors.commentAmbiguous`, or `errors.noComment`. Threads report `identity`; send it in `expect`. Ids of repeated comments, comments with `~`, and some legacy comments change, so read ids from the current snapshot.
+- d3545c2: Highlight commented text and elements in each author's color. Add text comments (`range` on `addComment`, the `text` anchor), `getReviewAuthors()`, and `useReviewAuthors()`. Remove `commentAuthorSlot` and `COMMENT_AUTHOR_SLOTS`.
+- 9d7d60b: Add slide comments with the comment commands, `readCommentThreads`, the `pane` option of `reviewModule`, and `PptxEditorReview`, `useReview`, `useReviewOf`, `useReviewItem`, and `useReviewAuthor` from `@pptx-editor.dev/pro/react` and `@pptx-editor.dev/pro/vue`. The room format is now 7, so update every peer of a room together.
+- 9d7d60b: Draw 3-D shapes with `drawingModule` from `@pptx-editor.dev/pro/drawing`, and preset shadows in every edition. Set bevels, 3-D rotation, and blur with `setShapeEffect` or the Shape Effects menu.
+
+### Patch Changes
+
+- f448820: Decks with hostile SVG pictures, very large glow or soft-edge effects, and very long text no longer freeze the editor. Complex SVG pictures draw their raster alternative.
+- 9d7d60b: Bound the Yjs session's reads of removed text, and refuse a room format that arrives after attach with `schema-version-mismatch`.
+- 9d7d60b: Read removed runs and paragraphs the same way on every Yjs peer, with a step limit.
+- 9d7d60b: Fix 3-D shapes with zero height, turned faces, and inherited cameras.
+- Updated dependencies: @pptx-editor.dev/core@0.3.0, @pptx-editor.dev/react@0.3.0, @pptx-editor.dev/vue@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

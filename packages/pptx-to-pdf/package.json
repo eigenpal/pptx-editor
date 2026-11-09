@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/pptx-to-pdf",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Convert PPTX to PDF on Node.js with searchable text and embedded fonts, through the PPTX Editor layout engine.",
   "type": "module",
   "sideEffects": false,
@@ -30,7 +30,7 @@
   "peerDependencies": {
     "@docx-editor.dev/fonts-cjk": "^2.34.0",
     "@napi-rs/canvas": "^1.0.9",
-    "@pptx-editor.dev/core": "~0.2.0"
+    "@pptx-editor.dev/core": "~0.3.0"
   },
   "peerDependenciesMeta": {
     "@docx-editor.dev/fonts-cjk": {
@@ -41,7 +41,7 @@
     }
   },
   "dependencies": {
-    "@pptx-editor.dev/pro": "~0.2.0",
+    "@pptx-editor.dev/pro": "~0.3.0",
     "fontkit": "2.0.4",
     "pdf-lib": "1.17.1"
   },
