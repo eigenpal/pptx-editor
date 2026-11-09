@@ -1,5 +1,25 @@
 # @pptx-editor.dev/pptx-to-pdf
 
+## 0.3.0
+
+### Minor Changes
+
+- dfb5df0: Draw EMF and WMF pictures. Add `session.picturesReady`, `session.pictureStatus`, and the `picturesTimeoutMs` option of PNG and ZIP export. Call `session.picturesReady` before `exportSlideSvg()`. On Node.js, PDF export uses `@napi-rs/canvas` when installed. Open and save damaged files more safely.
+- 9d7d60b: Draw equations on the canvas and in the PDF export. Insert and edit them with `insertEquation`, `setEquation`, and the Equation dialog.
+- 9d7d60b: Draw picture bullets, and set them with `setBulletFormat`. `setLink` links to custom shows and to relative file paths. Add `EditorSnapshot.customShows`.
+- 9d7d60b: Draw warped text in the editor and the PDF export. Set it with `setTextWarp` or `Toolbar.TextEffects`.
+- 9d7d60b: Draw 3-D shapes with `drawingModule` from `@pptx-editor.dev/pro/drawing`, and preset shadows in every edition. Set bevels, 3-D rotation, and blur with `setShapeEffect` or the Shape Effects menu.
+
+### Patch Changes
+
+- f448820: Draw outlines and borders that need more than 100,000 dash segments as solid lines. Save keeps the pattern.
+- b0c181d: Improve rendering fidelity: selectable glow text in printed PDFs, measured pattern fills and compound lines, Arabic baselines, vertical and stacked text, and text warp sizes. A path that starts without a move draws nothing, and the PDF export draws pattern fills, compound lines, and smooth enlarged pictures.
+- 9d7d60b: Take strikethrough position and thickness from the font, and measure missing characters more accurately.
+- 9d7d60b: Place and mirror right-to-left glyphs in reading order in `runGlyphs`, warped text, and the PDF export.
+- 9d7d60b: Draw more warp shapes correctly, and draw text flat when its warp is too complex. Removing an inherited warp writes `textNoShape`.
+- 9d7d60b: Fix 3-D shapes with zero height, turned faces, and inherited cameras.
+- Updated dependencies: @pptx-editor.dev/core@0.3.0, @pptx-editor.dev/pro@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,5 +1,37 @@
 # @pptx-editor.dev/i18n
 
+## 0.3.0
+
+### Minor Changes
+
+- 8253ddb: Drag the adjust handles of a preset shape, or set adjust values with `setAdjustments`.
+- 9d7d60b: Add animation and transition editing with `addAnimation`, `removeAnimation`, `moveAnimation`, `setAnimationTiming`, `setTransition`, `EditorSnapshot.animations`, `showAnimationOrder`, and the **Animations** side panel tab. The editor does not play effects or transitions.
+- 9d7d60b: Edit the data of bar, column, line, area, pie, doughnut, radar, and scatter charts with `editor.chartData()`, `setChartData`, and the **Chart Data** side panel tab.
+- 9d7d60b: Add **New comment** to the canvas context menus, with `registerCommentDraft` and `requestCommentDraft`. Comment commands take `expect` and can fail with `errors.commentChanged`, `errors.commentAmbiguous`, or `errors.noComment`. Threads report `identity`; send it in `expect`. Ids of repeated comments, comments with `~`, and some legacy comments change, so read ids from the current snapshot.
+- 4ae229f: Drag a segment handle of an elbow or curved connector to move the segment. On an end segment, the drag adds a bend.
+- 9d7d60b: Type in diagram shapes, and add or delete diagram nodes with `addDiagramShape` and `deleteDiagramShape`. Add `EditorSnapshot.diagram`.
+- 7046dbf: Edit diagram text in the **Diagram** side panel tab, opened with **Edit text…**. Add `setDiagramText`, and fix context menu rows that open a side panel tab.
+- 9d7d60b: Draw equations on the canvas and in the PDF export. Insert and edit them with `insertEquation`, `setEquation`, and the Equation dialog.
+- c47f5ce: Decks no longer stay on the loading spinner: the open waits at most 2 seconds for fonts. Add `editor.fontMeasurement()`, `openFailureReport()`, and the `showCopy` prop of `PptxEditorOpenFailure`. `DocumentOpenFailureReason` adds `blocked`, so update exhaustive maps of it. Large and damaged decks open faster and more safely.
+- fef01c9: Insert a chart with **Insert** > **Chart** or `insertChart`. Change its type, title, legend, labels, axes, gridlines, and colors in the **Chart** tab or with `setChartType`, `setChartFormat`, and `setChartColor`, and read them with `editor.chartFormat()`. `requestPane` takes `{ focus: false }`.
+- 8253ddb: Fill shapes with preset patterns or pictures with `setShapePattern` and `setShapePicture`, and set pattern or tiled picture slide backgrounds. Add `PatternDialog`.
+- 9d7d60b: Draw picture bullets, and set them with `setBulletFormat`. `setLink` links to custom shows and to relative file paths. Add `EditorSnapshot.customShows`.
+- 8253ddb: Add the selection pane: the **Selection** side panel tab and the `SelectionPane` component. `SidePanel` takes `tab` and `onTabChange` (`v-model:tab` in Vue). Add `requestPane` and `listenPaneRequests`. The Vue adapter requires Vue 3.5 or later.
+- 9d7d60b: Add slide comments with the comment commands, `readCommentThreads`, the `pane` option of `reviewModule`, and `PptxEditorReview`, `useReview`, `useReviewOf`, `useReviewItem`, and `useReviewAuthor` from `@pptx-editor.dev/pro/react` and `@pptx-editor.dev/pro/vue`. The room format is now 7, so update every peer of a room together.
+- 8253ddb: Link text to a slide or an email address. `setLink` takes `#slide-<n>`, `#first-slide`, `#last-slide`, `#next-slide`, and `#previous-slide`. `HyperLink.Fields` renders a wrapper, so its `className` goes on that wrapper.
+- 3d5112e: Add the slide master view (`setPresentationView` with `slideMaster`): edit the shapes, placeholders, and background of layouts and masters, and every slide on them updates. Open it from **View**, the status bar, or **Edit layout** on the slide. `SlideSummary` gains `template`, `name`, `usedBy`, and `masterId`.
+- 8253ddb: Change the slide size with `setSlideSize` or **Page setup**.
+- 9d7d60b: Draw warped text in the editor and the PDF export. Set it with `setTextWarp` or `Toolbar.TextEffects`.
+- 9d7d60b: Draw 3-D shapes with `drawingModule` from `@pptx-editor.dev/pro/drawing`, and preset shadows in every edition. Set bevels, 3-D rotation, and blur with `setShapeEffect` or the Shape Effects menu.
+
+### Patch Changes
+
+- 9d7d60b: Keep more of the file and converge in collaboration when you edit animations and transitions. `setTransition` refuses unknown kinds. Add `animationStartLabel`.
+- 9d7d60b: Check file links more strictly, keep safe file links through copy and paste, and refuse picture bullets over 25 million pixels.
+- 30dc48e: Add the `setFooter` and `setDateTime` commands, and `EditorSnapshot.footer` and `EditorSnapshot.dateTime`. `setSlideNumbers` takes `indices` and `hideOnTitleSlides`, and refuses `show: false` when no slide can have a slide number.
+- 9d3e18e: Keep the editor responsive on slides with thousands of shapes. On selections of more than 250 shapes, `can()` checks only the editing mode for some commands, and `exec()` makes the full check.
+- 39dc46e: Add the `app.sheetGrip` label for the grip of a side panel shown as a sheet on a narrow screen.
+
 ## 0.2.0
 
 ### Patch Changes

@@ -1,5 +1,85 @@
 # @pptx-editor.dev/core
 
+## 0.3.0
+
+### Minor Changes
+
+- 8253ddb: Drag the adjust handles of a preset shape, or set adjust values with `setAdjustments`.
+- 9d7d60b: Add animation and transition editing with `addAnimation`, `removeAnimation`, `moveAnimation`, `setAnimationTiming`, `setTransition`, `EditorSnapshot.animations`, `showAnimationOrder`, and the **Animations** side panel tab. The editor does not play effects or transitions.
+- 9d7d60b: Draw every `a:buAutoNum` numbering scheme, including Hebrew, Arabic, Thai, Hindi, East Asian, and circled numbers.
+- 9d7d60b: Move the caret and draw selections correctly in right-to-left and mixed-direction text. Add `TextPoint.affinity` and `Line.bidi`.
+- 9d7d60b: Lay out right-to-left and mixed-direction text with the Unicode Bidirectional Algorithm. Add `GlyphRun.rtl`.
+- 9d7d60b: Edit the data of bar, column, line, area, pie, doughnut, radar, and scatter charts with `editor.chartData()`, `setChartData`, and the **Chart Data** side panel tab.
+- a90b74e: Copy and paste text, pictures, shapes, and slides between the editor and other applications. Add `pasteText`, `textClipboardParagraphs`, and `pasteSlides`.
+- 9d7d60b: Add **New comment** to the canvas context menus, with `registerCommentDraft` and `requestCommentDraft`. Comment commands take `expect` and can fail with `errors.commentChanged`, `errors.commentAmbiguous`, or `errors.noComment`. Threads report `identity`; send it in `expect`. Ids of repeated comments, comments with `~`, and some legacy comments change, so read ids from the current snapshot.
+- d3545c2: Highlight commented text and elements in each author's color. Add text comments (`range` on `addComment`, the `text` anchor), `getReviewAuthors()`, and `useReviewAuthors()`. Remove `commentAuthorSlot` and `COMMENT_AUTHOR_SLOTS`.
+- a90b74e: Glue connector ends to shape connection sites. Glued connectors follow their shapes. Add `connectionSites` and the `connector` route of `TransformItem`.
+- 4ae229f: Drag a segment handle of an elbow or curved connector to move the segment. On an end segment, the drag adds a bend.
+- 9d7d60b: Type in diagram shapes, and add or delete diagram nodes with `addDiagramShape` and `deleteDiagramShape`. Add `EditorSnapshot.diagram`.
+- 7046dbf: Edit diagram text in the **Diagram** side panel tab, opened with **Edit text…**. Add `setDiagramText`, and fix context menu rows that open a side panel tab.
+- dfb5df0: Draw EMF and WMF pictures. Add `session.picturesReady`, `session.pictureStatus`, and the `picturesTimeoutMs` option of PNG and ZIP export. Call `session.picturesReady` before `exportSlideSvg()`. On Node.js, PDF export uses `@napi-rs/canvas` when installed. Open and save damaged files more safely.
+- 9d7d60b: Draw equations on the canvas and in the PDF export. Insert and edit them with `insertEquation`, `setEquation`, and the Equation dialog.
+- c47f5ce: Decks no longer stay on the loading spinner: the open waits at most 2 seconds for fonts. Add `editor.fontMeasurement()`, `openFailureReport()`, and the `showCopy` prop of `PptxEditorOpenFailure`. `DocumentOpenFailureReason` adds `blocked`, so update exhaustive maps of it. Large and damaged decks open faster and more safely.
+- 30dc48e: Add the `setFooter` and `setDateTime` commands, and `EditorSnapshot.footer` and `EditorSnapshot.dateTime`. `setSlideNumbers` takes `indices` and `hideOnTitleSlides`, and refuses `show: false` when no slide can have a slide number.
+- 8253ddb: Add **Lock aspect ratio** to the Format tab.
+- fef01c9: Insert a chart with **Insert** > **Chart** or `insertChart`. Change its type, title, legend, labels, axes, gridlines, and colors in the **Chart** tab or with `setChartType`, `setChartFormat`, and `setChartColor`, and read them with `editor.chartFormat()`. `requestPane` takes `{ focus: false }`.
+- 9d7d60b: Copy and paste charts, diagrams, embedded objects, and equations with their parts. `ClipboardRelationship` adds optional `target` and `relationships`. Animation ranges follow text edits.
+- 09ddfcc: Show only frequent tasks on the default toolbar. Equation, Layout, picture color and crop options, text direction, and similar controls move to the menus and context menus, and `Toolbar.Slot` still places them. The view switch shows Normal and Slide Sorter; open the slide master view from View > Slide Master.
+- 58e17f1: Paste shapes from other presentation applications as editable shapes in desktop hosts with `readClipboardDrawing`. Add `drawingClipboardPayload` and `DRAWING_CLIPBOARD_TYPES`.
+- 8253ddb: Fill shapes with preset patterns or pictures with `setShapePattern` and `setShapePicture`, and set pattern or tiled picture slide backgrounds. Add `PatternDialog`.
+- 9d7d60b: Draw picture bullets, and set them with `setBulletFormat`. `setLink` links to custom shows and to relative file paths. Add `EditorSnapshot.customShows`.
+- 9d7d60b: Place and mirror right-to-left glyphs in reading order in `runGlyphs`, warped text, and the PDF export.
+- 8253ddb: Add the selection pane: the **Selection** side panel tab and the `SelectionPane` component. `SidePanel` takes `tab` and `onTabChange` (`v-model:tab` in Vue). Add `requestPane` and `listenPaneRequests`. The Vue adapter requires Vue 3.5 or later.
+- 9d7d60b: Add slide comments with the comment commands, `readCommentThreads`, the `pane` option of `reviewModule`, and `PptxEditorReview`, `useReview`, `useReviewOf`, `useReviewItem`, and `useReviewAuthor` from `@pptx-editor.dev/pro/react` and `@pptx-editor.dev/pro/vue`. The room format is now 7, so update every peer of a room together.
+- 8253ddb: Link text to a slide or an email address. `setLink` takes `#slide-<n>`, `#first-slide`, `#last-slide`, `#next-slide`, and `#previous-slide`. `HyperLink.Fields` renders a wrapper, so its `className` goes on that wrapper.
+- 3d5112e: Add the slide master view (`setPresentationView` with `slideMaster`): edit the shapes, placeholders, and background of layouts and masters, and every slide on them updates. Open it from **View**, the status bar, or **Edit layout** on the slide. `SlideSummary` gains `template`, `name`, `usedBy`, and `masterId`.
+- 8253ddb: Change the slide size with `setSlideSize` or **Page setup**.
+- 6ddad03: Typing makes no automatic capitals, curly quotes, or dashes of its own, applies the changes of mobile keyboards and systems that offer them, and keeps AutoCorrect for symbols, the ellipsis, fractions, and typed list starts. A peer edit before an input method composition ends it, and its unfinished text is refused with a message.
+- 8253ddb: A new table or picture fills an empty placeholder. Empty placeholders show **Table** and **Picture** buttons.
+- 9d7d60b: Draw warped text in the editor and the PDF export. Set it with `setTextWarp` or `Toolbar.TextEffects`.
+- 9d7d60b: Draw 3-D shapes with `drawingModule` from `@pptx-editor.dev/pro/drawing`, and preset shadows in every edition. Set bevels, 3-D rotation, and blur with `setShapeEffect` or the Shape Effects menu.
+
+### Patch Changes
+
+- f448820: Decks with hostile SVG pictures, very large glow or soft-edge effects, and very long text no longer freeze the editor. Complex SVG pictures draw their raster alternative.
+- 30dc48e: Align text on centered, right, and decimal tab stops in the editor and the PDF export.
+- 9d7d60b: Keep more of the file and converge in collaboration when you edit animations and transitions. `setTransition` refuses unknown kinds. Add `animationStartLabel`.
+- f448820: A font that never loads no longer blocks the page or a PNG or ZIP export for more than 2 seconds.
+- f448820: Paint oversized grapheme clusters in bounded pieces so text paint never blocks input.
+- f448820: Keep memory level in long sessions: thumbnails and text measurements are bounded.
+- f448820: Draw outlines and borders that need more than 100,000 dash segments as solid lines. Save keeps the pattern.
+- f448820: Prevent pauses on paragraphs with many tab characters and tab stops.
+- a90b74e: Open the Bullets and Numbering dialog on the tab of the selected list. Add `SelectionFormat.bulletFormatMixed`.
+- 9d7d60b: Check file links more strictly, keep safe file links through copy and paste, and refuse picture bullets over 25 million pixels.
+- 7566504: A click selects the slide shape, not a layout or master shape at the same position in its part. A drag on the canvas around the slide selects the shapes it encloses, and a click or right-click there clears the selection. Each shape's outline shows over the dashed box of a multiple selection.
+- 5c0bcca: Clear stale chart drafts without moving focus, and preserve drafts when categories or series are appended. Hide placeholder insert buttons while another object is selected or edited. Show keyboard tooltips immediately and skip entry animation when moving between nearby controls in React and Vue.
+- f448820: Paste HTML that contains angle brackets faster.
+- f448820: Fix **Copy** in the slide list. A slide copy holds only the selected slides and the parts they use.
+- 9d7d60b: Size equation scripts and equation lines more accurately.
+- 9d7d60b: Draw normal text in equation scripts at the run's size.
+- b0c181d: Improve rendering fidelity: selectable glow text in printed PDFs, measured pattern fills and compound lines, Arabic baselines, vertical and stacked text, and text warp sizes. A path that starts without a move draws nothing, and the PDF export draws pattern fills, compound lines, and smooth enlarged pictures.
+- 8253ddb: Fix focus in the pattern and gradient dialogs. `setShapePicture` takes `mime`, and `slideBackground.tile` reports tiled backgrounds.
+- 9d7d60b: Keep emoji sequences, flags, combining marks, and Hangul jamo whole at line breaks.
+- a90b74e: Highlight every selected line of justified text.
+- f448820: Set borders on large tables faster.
+- f448820: Delete, duplicate, hide, and show thousands of slides at once without freezing the page.
+- 9d7d60b: Take strikethrough position and thickness from the font, and measure missing characters more accurately.
+- 5b6ead8: Drag from anywhere on a shape of a multiple selection, including its text, to move all selected shapes.
+- a90b74e: Outline each shape of a multiple selection outside its text. Add the `--doc-selection-mark` color. Selection marks no longer use `--doc-primary`.
+- f448820: `usePptxSource` stops stalled downloads with a `TimeoutError` and oversized downloads with a `RangeError`. Fonts hold the open for at most 2 seconds, and `registerFontFaces` takes `waitMs`.
+- f448820: Open large slides without long main-thread tasks. Add `PaintOptions.view`.
+- f448820: Run **Replace All** on long decks in about half the time.
+- 9d3e18e: Keep the editor responsive on slides with thousands of shapes. On selections of more than 250 shapes, `can()` checks only the editing mode for some commands, and `exec()` makes the full check.
+- f448820: Paste tens of thousands of lines into a text box in about a second.
+- 7666155: Show a rotate pointer on the rotation handle.
+- f448820: Scale down large pictures on screen so slides with many large pictures no longer freeze the editor. Export and save use the stored pictures.
+- cbee759: Show only the dragged slides in the slide drag image.
+- 9c48ff4: End the slide show when the browser leaves full screen, so one Escape closes the show.
+- 9d7d60b: Draw more warp shapes correctly, and draw text flat when its warp is too complex. Removing an inherited warp writes `textNoShape`.
+- 9d7d60b: Fix 3-D shapes with zero height, turned faces, and inherited cameras.
+- 30dc48e: Document that `rot` of `setTransform` and `setTransforms` is in degrees.
+- Updated dependencies: @pptx-editor.dev/i18n@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
