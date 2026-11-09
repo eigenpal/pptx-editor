@@ -38,7 +38,7 @@
  *   repair prompt (`SAVE_VERIFIED_FEATURE_EDITS`). A `preserved` recipe edits next to the kept
  *   content and checks that the content is as it was.
  *
- * Notes rule: notes render inside a table cell, so keep them short. Write Simplified Technical
+ * Notes rule: notes render inside a table cell, so use at most three sentences. Link to a guide for details. Write Simplified Technical
  * English: active voice, one idea per sentence, 20 words or fewer per sentence. Name the
  * observable behavior, not the internal module or change proposal. The notes of a `premium` row
  * name the EigenPal Pro License, as in DOCX Editor.
@@ -106,10 +106,6 @@ export const FEATURE_CATEGORY_LABELS: Record<FeatureCategory, string> = {
   export: 'Export & print',
 };
 
-const SAVE_CHECKED = 'Saved files pass schema validation and open with no repair prompt.';
-
-const TABLE_SAVE = 'A saved copy, before and after table edits, opens with no repair prompt.';
-
 export const pptxFeatures: PptxFeature[] = [
   // --- Text & formatting -----------------------------------------------
   {
@@ -120,7 +116,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Strikethrough uses the strikeout position and thickness of the font, and a double strikethrough draws two bars one thickness apart. Underline styles other than single are approximate. The Font dialog sets the underline color (a:uFill). ${SAVE_CHECKED}`,
+    notes:
+      'Apply bold, italic, underline, and strikethrough, including underline colors. Underline styles other than single are approximate.',
   },
   {
     id: 'text.font-family-size',
@@ -131,7 +128,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      "Theme fonts (+mj-lt, +mn-lt) resolve through the theme; the font picker's Headings and Body rows write these references. Missing fonts use metric-compatible substitutes. Embedded fonts decode in memory. Only installable and editable embedded faces enter the session. Other embedded faces use available host faces or substitutes; save preserves their original bytes. Hosts supply more faces through the `fonts` option and `setFonts` (the font configuration API of DOCX Editor); host faces rank after embedded faces and before the substitutes. A host face changes measurement only, and its fidelity is not measured.",
+      'Choose theme fonts, embedded fonts, or fonts supplied by your application. Missing fonts use substitutes, and embedding permissions control which embedded faces load. Font substitutions can affect fidelity.',
     docsLink: '/docs/customization/fonts',
   },
   {
@@ -176,7 +173,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Five modes rewrite the letters and keep the formatting; at a caret, the word around it. Shift+F3 steps through Capitalize Each Word, UPPER CASE, and lower case. A letter whose other case has a different length (ß) stays, and the run language is not used.',
+      'Change case while keeping formatting, or cycle through three modes with Shift+F3. Letters whose case conversion changes their length stay unchanged. Conversion does not use the run language.',
   },
   {
     id: 'text.hyperlinks',
@@ -187,7 +184,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Link selected text to a web address, an email address with a subject, a slide, a custom show, or another file. A slide link goes to a slide number, or the first, last, next, or previous slide. A custom show link can return to its slide after the show. A file link takes a checked relative path, and the editor never opens it. A click into a link shows its target with Copy, Edit, and Remove, and a slide link shows a button that goes to its slide. In the slide show, a slide link moves the show; custom show and file links do nothing. A slide link follows its slide when slides move. Links to programs are kept but never written or run, as a security limit. URLs pass an allowlist. Hyperlink text color is approximate.',
+      'Link text to websites, email addresses, slides, custom shows, or files. The slide show follows slide links but does not open custom show or file links. Program links never run, and link colors are approximate.',
     docsLink: '/docs/recipes/slide-email-links',
   },
   {
@@ -199,7 +196,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Typing re-lays out with HarfBuzz. The caret steps and deletes by grapheme cluster. Left and Right collapse a selected range to its start or end before typing. Alt or Ctrl with Left and Right steps by word, Ctrl or Cmd with Home and End goes to the start or end of the text, and a double-click or a format painter click takes a word (Unicode word boundaries) and a triple-click the paragraph; a drag after a double-click or triple-click extends by whole words or paragraphs. Home and End go to the edges of the laid-out line. An input method composes at the caret: the text being composed shows there underlined, and the result goes in once at composition end as one undo step. Keys during a composition, and the key that ends it, run no shortcut. A click, a tap, an undo, or a slide change ends a composition, and its text goes in at its own place. A peer edit after a composition, or in another paragraph, keeps the composition at its place. A peer edit before or over its place ends the composition, and its unfinished text is refused with a message. The system settings for automatic text changes apply: the editor makes no automatic capitals, curly quotes, dashes, or spelling corrections of its own. AutoCorrect adds the ©, ®, and ™ signs, the ellipsis, fractions, and typed list starts. Validate your target input methods.',
+      'Type and compose text at the caret, with selection and deletion by grapheme cluster. Composition commits as one undo step, but conflicting peer edits can cancel unfinished text. Validate your target input methods.',
   },
   {
     id: 'text.complex-scripts',
@@ -210,7 +207,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      "East Asian characters measure and draw with the run's ea font, complex-script characters with its cs font, and symbol characters with its sym font. A theme with an empty ea or cs font uses its script font (a:font) for the run's language (lang, altLang). Chinese and Japanese text breaks between characters and Korean text at spaces. eaLnBrk, latinLnBrk, hangingPunct, the presentation kinsoku lists (p:kinsoku), and justified and distributed East Asian lines follow the reference rules. A missing East Asian font falls back to a host CJK face, such as Noto Sans CJK JP from @docx-editor.dev/fonts-cjk, and a character that the run's face lacks uses another loaded face. Right-to-left and mixed-direction text lays out with the Unicode Bidirectional Algorithm in the editor, in warped text, and in the PDF export (approximate). Arabic letters join in the editor's paint but not in the PDF export. In right-to-left and mixed-direction text, the caret, the arrow keys, Cmd with an arrow, and clicks work on screen, Home and End go to the line's start and end in reading order, and a selection shows one highlight for each part of the line it covers. Line breaks never split a grapheme cluster. Caret steps keep combining marks and clusters whole, and word steps use dictionary words in Thai, Lao, Khmer, Myanmar, and CJK text.",
+      'Edit East Asian, right-to-left, and mixed-direction text with script-specific fonts and navigation. Line layout remains approximate. Arabic letters join in the editor but remain separate in PDF export.',
     docsLink: '/docs/guides/east-asian-text',
   },
   {
@@ -232,7 +229,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Copy and paste text, shapes, and slides in the editor and between editors. Text from other applications pastes as HTML with its formatting, list levels, and bullets; a picture pastes at the size its resolution gives. Copied text leaves as HTML, and copied shapes as a picture, or as text for text boxes. Shapes copied in another application paste as a picture in a browser, which cannot read their shape format; a desktop host that reads the system clipboard pastes them as editable shapes.',
+      'Copy text, shapes, and slides between editors, or paste formatted HTML from other applications. In browsers, shapes from other applications paste as pictures. Desktop hosts can provide editable shapes through system clipboard access.',
+    docsLink: '/docs/guides/copy-and-paste',
   },
   {
     id: 'text.format-painter',
@@ -263,7 +261,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Line heights and baselines follow measured rules, and each baseline rounds to a whole point from the top of the text. Glyph advances are approximate. The Paragraph dialog sets space before and after in points or lines, and line spacing, on mixed selections too.',
+      'Set line spacing and paragraph spacing in the Paragraph dialog. Line heights, baselines, and glyph advances are approximate.',
   },
   {
     id: 'paragraphs.indent-tabs',
@@ -274,7 +272,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Text at a tab stop aligns left, centered, right, or on its decimal point. Tab stops are not editable. No ruler.',
+      'Set first-line and hanging indents, or change list levels. Existing tab stops align text, but you cannot edit them. The editor has no ruler.',
   },
   {
     id: 'paragraphs.autofit',
@@ -285,7 +283,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Stored font scale and line spacing reduction render with whole-point sizes and a subtracted reduction, as measured. Refit after an edit starts from 100 %, not from the last state: a title shrinks to 90 % at most and then overflows, as measured; other text uses the measured step order down to a 55 % font scale, and estimated steps below it. Empty paragraphs at the end of the text do not count, as measured. The font size box shows the size the text is drawn at; the Font dialog shows and sets the size the text asks for. Increase steps up from that size, and Decrease on whole selected shapes steps down from the drawn size. The toolbar and the Format panel switch between no autofit, shrink text on overflow, and resize shape to fit text. Overflowing centered text is approximate. Resize to fit text across rotated text, several columns, or a shape that is not a rectangle is approximate.',
+      'Choose no autofit, shrink text on overflow, or resize the shape to fit. Autofit recalculates after edits, with approximate results for rotated text, multiple columns, and nonrectangular shapes. Titles shrink to 90% at most, then overflow.',
   },
   {
     id: 'paragraphs.text-direction-columns',
@@ -296,7 +294,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Text Direction and Columns menus set horizontal, rotated, stacked, and upright East Asian text, and one to three columns. More Columns sets up to 16 columns and the spacing. Mongolian and right-to-left stacked text are refused and approximate. Upright East Asian text has no vertical metrics.',
+      'Set horizontal, rotated, stacked, or upright East Asian text, with up to 16 columns. Upright East Asian text does not use vertical font metrics. Mongolian and right-to-left stacked text render approximately and cannot be selected through editing commands.',
   },
   {
     id: 'paragraphs.text-warp',
@@ -307,7 +305,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Text effects > Transform sets or removes a preset warp. Adjust values are set by command only. Glyphs bend into the warp. The caret and the selection use flat text. Lines in some multi-band warps sit lower. Warped glyphs are not shaped, so ligatures and complex scripts lose their forms. Vertical, rotated, and diagram text draws flat.',
+      'Apply preset text warps, with adjustment values available through commands. Warped glyphs lose ligatures and complex-script forms, while the caret and selection follow flat text. Vertical, rotated, and diagram text stay flat.',
+    docsLink: '/docs/guides/text-warp',
   },
 
   // --- Bullets & numbering ---------------------------------------------
@@ -320,7 +319,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Every a:buAutoNum scheme draws its own counter and punctuation, and a number in Arabic, Hebrew, or East Asian characters draws in the font of the run for that script (approximate past the measured items). The dialog sets a picture bullet from a PNG, JPEG, or GIF file. A picture bullet draws 0.7 times the bullet size high, on the baseline. A missing or unreadable bullet picture draws no bullet.',
+      'Set bullet characters, pictures, numbering schemes, colors, sizes, and starting numbers. Keyboard controls continue lists and change levels. Symbol substitutions, picture bullet sizing, and some numbering schemes are approximate.',
   },
 
   // --- Shapes, groups & connectors -------------------------------------
@@ -365,7 +364,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Drag a connector end near a shape to glue it to a connection site. Glued connectors follow a shape that moves or resizes, and elbow and curved connectors route again. Drag the handle on a segment of an elbow or curved connector to move that segment. On an end segment, the drag adds a bend, up to five segments. A connector that moves on its own lets go of its ends. Deleting a shape unglues the connector ends attached to it.',
+      'Attach connector ends to shapes so they follow moves and resizes. Drag elbow or curved connector segments to adjust their route. Moving a connector independently or deleting its attached shape releases the connection.',
   },
   {
     id: 'shapes.arrange',
@@ -376,7 +375,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Smart guides show while you drag. Distribute needs three objects. Align and distribute use the unrotated box of a turned object. There is no Align to Slide setting.',
+      'Align, order, and nudge objects, or distribute three or more objects. Alignment and distribution use unrotated boxes. Smart guides appear during dragging, but there is no Align to Slide setting.',
   },
   {
     id: 'shapes.flip-rotate',
@@ -387,7 +386,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Rotate control flips and turns 90° on the slide, also inside groups. Every resize handle of one object keeps a locked ratio; a resize of several objects ignores it. The Format tab of the side panel has a Lock aspect ratio check box, and a typed width or height of a locked object sizes the other side too. `setLockAspectRatio` sets the lock.',
+      'Flip, rotate, or set exact object dimensions from the controls. Aspect locks preserve proportions when you resize one object. Resizing several objects ignores individual aspect locks.',
   },
   {
     id: 'shapes.selection-pane',
@@ -398,7 +397,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them with the eye button or the H key, renames them, and moves them forward or backward. The toolbar Selection pane button turns a mounted side panel to that tab, and a host can listen to show a closed panel. The commands also work inside mc:AlternateContent. There, a move, a resize, a rotation, or a flip changes the copies in the other branches too. Other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation.',
+      'Select, rename, hide, show, and reorder objects in the Selection pane, including objects inside groups. Some edits to markup-compatibility content remove alternate copies. See the editing approximations below.',
     docsLink: '/docs/customization/layout#open-the-selection-pane',
   },
   {
@@ -409,8 +408,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes:
-      'The six theme style rows in seven colors. The cells get the same p:style that the table style defines for them. No preset (transparent) styles.',
+    notes: 'Apply six theme style rows in seven colors. Transparent preset styles are unavailable.',
   },
 
   // --- Fills & lines ---------------------------------------------------
@@ -423,7 +421,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Linear and circle path gradients are measured. Two-stop gradient colors (a measured rule that the specification does not state), rectangle path gradients (seams at the joins), shape path gradients (bands), a rectangle or shape gradient focus outside the shape, gradient tile rectangles on linear, rectangle, and shape gradients and inside the shape on circle gradients, gradient flips, and fill rotation are approximate.',
+      'Apply solid colors or gradients. Gradient colors, focus, tiling, and rotation can differ from the reference. Rectangle and shape gradients can show seams or bands.',
   },
   {
     id: 'fills-lines.pattern-picture',
@@ -434,7 +432,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The fill menu sets a preset pattern with two colors (`setShapePattern`), or a stretched picture (`setShapePicture`, which can also tile). Picture crop, offset, scale, and transparency of a fill are not editable. Tiles use the image resolution, or 72 DPI when it states none, and keep their recolor; the 72 DPI rule is measured on PNG only, and the tile size of a PNG that states no resolution is approximate. Pattern tiles are 8 × 8 pt on the slide grid and stay square to the slide when the shape turns or flips; all 54 preset bitmaps are measured. Tiles in scaled groups, text, lines, table cells, and backgrounds are approximate.',
+      'Apply preset patterns or stretched picture fills, with tiling available through commands. Picture fill crop, offset, scale, and transparency are not editable. Tile sizing and placement are approximate in some contexts.',
     docsLink: '/docs/recipes/pattern-picture-fills',
   },
   {
@@ -446,7 +444,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Dashes and line ends draw at measured sizes. Shape and picture outlines and table borders draw solid when their estimated dash count exceeds 100,000. Save preserves the original pattern. Compound line bands are measured on closed paths and straight lines; curved open paths, counterclockwise paths, and dashes on curves are approximate.',
+      'Set line colors, widths, dashes, and arrowheads. Compound lines and dashes on curves are approximate. Excessively complex dash patterns display as solid lines but remain unchanged on save.',
   },
   {
     id: 'fills-lines.theme-colors',
@@ -469,7 +467,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Gallery presets set and clear the shadow. Inherited and theme effects stay. Groups, tables, and charts are refused, and so is a theme effect style with a:effectDag. No perspective shadows. The shadow blur is measured for small radii.',
+      'Apply or clear shadow presets on supported shapes and pictures. Groups, tables, charts, and theme effect graphs reject these edits. Perspective shadows are unavailable, and blur is measured only for small radii.',
   },
   {
     id: 'effects.glow-reflection',
@@ -480,7 +478,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro paints these effects and uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer the choices that add these effects. It still offers No reflection, No glow, and No soft edges when the selection has that effect, and No shadow also removes an inner shadow. The commands still set and clear each effect. Save keeps them in every edition. The menu has no Preset gallery. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
+      'Display and edit these effects with @pptx-editor.dev/pro under the EigenPal Pro License. Without the drawing module, the editor omits these effects but preserves them on save. Blur remains approximate, especially for reflections.',
+    docsLink: '/docs/pro/drawing',
   },
   {
     id: 'effects.fill-overlay',
@@ -502,7 +501,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro paints bevels, contours, extrusion, camera rotation, and blur. It uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, these shapes paint flat in the editor, and save keeps their properties in every edition. PDF export always paints them, except blur. Preset shadows paint in every edition, with or without the module. The Shape Effects menu sets and clears 12 bevel presets and 9 3-D Rotation presets. A command sets and clears blur. No command sets a preset shadow. Bevel light is measured for the circle and angle presets only. Perspective cameras draw as parallel views. Bottom bevels are not drawn. Text effects are not drawn: 3-D text paints flat, and save keeps it. No command sets a text effect.',
+      'Display approximate 3-D shapes and blur with @pptx-editor.dev/pro under the EigenPal Pro License. Preset shadows display without the module, but bottom bevels and text effects do not render. PDF export omits blur.',
+    docsLink: '/docs/guides/3d-effects',
   },
 
   // --- Pictures --------------------------------------------------------
@@ -515,7 +515,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG. An SVG picture draws as vector art when it is a plain icon: at most 256 KB, with a root `viewBox` or a size in pixels, solid colors, and only shapes, paths, groups, `<use>`, `<symbol>`, clip paths, and simple style sheets, within 1,000 shapes and 4,000 path vertices. Otherwise, for example with text, gradients, filters, masks, markers, or animation, it draws its PNG fallback. When the raster pictures of one slide, layout, or master hold more than about 105 million decoded pixels, each one draws scaled down on screen, decoded off the main thread, and the placeholder shows until it is ready. After an edit, scaled sizes stay until the share of a picture moves by more than 25%; an animated GIF then shows its first frame. Export and save use the stored pictures.',
+      'Insert and transform pictures, or replace them with PNG, JPEG, or GIF files. Simple SVG pictures render as vectors; other SVG pictures use their PNG fallback. Large raster pictures can display at reduced resolution without changing stored images.',
+    docsLink: '/docs/guides/images',
   },
   {
     id: 'pictures.adjustments',
@@ -526,7 +527,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Corrections, Recolor, Transparency, and Reset Picture in the `image` group. Reset and Corrections refuse a picture with `a14:imgProps` picture effects. Saturation, color tone, and artistic effects are not built. Luminance, recolor, and picture shape fills are approximate.',
+      'Apply correction, recolor, and transparency presets, or reset a picture. Saturation, color tone, and artistic effects are unavailable. Rendering is approximate, and some existing picture effects prevent corrections or reset.',
   },
   {
     id: 'pictures.crop',
@@ -537,7 +538,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Crop mode with crop handles, crop to a preset shape, Fill, Fit, aspect ratios, and crop position in Format Picture. A picture locked against cropping (`a:picLocks/@noCrop`) refuses crop mode, crops, the Format Picture crop fields, and Reset Picture & Size of a cropped picture; `noResize` also refuses a crop that changes the frame size (Fill and Fit pass); `noResize`, `noRot`, and `noChangeShapeType` refuse a new size, rotation, or shape (Crop to Shape, Picture Styles, Reset Picture) in the commands, and Change Picture honors them, but the canvas handles still resize and rotate. A tiled or inset picture fill (`a:tile`, an inset `a:fillRect`) refuses crop mode and crops. Fill, Fit, and aspect ratio centering are not measured. The editor ignores the EXIF orientation of a JPEG and draws and sizes the stored pixels, as measured.',
+      'Crop with handles, preset shapes, aspect ratios, Fill, or Fit. Crop commands respect picture locks, but canvas handles can still resize and rotate locked pictures. Tiled or inset fills reject cropping, and JPEG orientation metadata is ignored.',
+    docsLink: '/docs/guides/images',
   },
   {
     id: 'pictures.styles-border',
@@ -548,7 +550,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Five of the gallery styles, and border color, weight, and dashes. The written style XML is not measured. Dashes on a picture border are not measured, and round dots draw as squares.',
+      'Apply five picture styles and set border color, weight, and dashes. Style and border fidelity remains approximate. Round border dots display as squares.',
   },
   {
     id: 'pictures.alt-text',
@@ -559,7 +561,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Description, title, and "Mark as decorative" for one selected object. On the slide and in the slide show, a screen reader reads the description of a picture. It skips a decorative picture and a picture with no description. When Tab selects an object, the screen reader also hears its description. Automatic descriptions are not built.',
+      'Set a description, title, or decorative status for a selected object. Screen readers announce picture descriptions and skip decorative pictures. The editor does not generate descriptions.',
   },
   {
     id: 'pictures.emf-wmf',
@@ -594,7 +596,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. Shift+Arrow at a cell's edge selects a cell range. Copy, cut, and paste a cell range as tab-separated text; a paste larger than the table adds rows and columns. ${TABLE_SAVE}`,
+    notes:
+      'Edit text and formatting in cells, cell ranges, or the whole table. Tab moves between cells and adds a row after the last cell. Paste tab-separated text into a range, expanding the table when needed.',
     docsLink: '/docs/guides/tables',
   },
   {
@@ -605,7 +608,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Insert a table from a grid. Insert and delete rows and columns, and select a row, a column, or the table. A new table fills an empty content or table placeholder: the selected one, or else the first on the slide. Deleting the table does not bring the empty placeholder back. ${TABLE_SAVE}`,
+    notes:
+      'Insert tables and add or delete rows and columns. New tables fill an available content or table placeholder. Deleting a table does not restore its placeholder.',
     docsLink: '/docs/guides/tables',
   },
   {
@@ -616,7 +620,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Merge keeps the text of every cell. Split works on one cell. A merged cell splits only along even grid lines. A table whose merge markup disagrees with itself follows the inconsistent cell merges rule under Approximations. When peers in a collaboration session change the rows, columns, or merged cells of one table at once, the canvas draws the table as a save writes it, with valid merge markers. ${TABLE_SAVE}`,
+    notes:
+      'Merge cells while keeping their text, or split one cell at a time. Merged cells split only along even grid lines. Inconsistent merge markup follows the approximation rules below.',
     docsLink: '/docs/guides/tables',
   },
   {
@@ -627,7 +632,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Toggle Header Row, Total Row, Banded Rows and Columns, and First and Last Column. The gallery lists the deck's styles and the default style only. ${TABLE_SAVE}`,
+    notes:
+      "Toggle header, total, banding, and first or last column options. The gallery contains the presentation's styles and the default style only.",
     docsLink: '/docs/guides/tables',
   },
   {
@@ -638,7 +644,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Shading takes a color or No Fill. Borders draw with a pen of a color, a preset dash, and a weight. Diagonal borders and cell effects are not editable. ${TABLE_SAVE}`,
+    notes:
+      'Set cell shading and border color, dash, and weight. Diagonal borders and cell effects are not editable.',
     docsLink: '/docs/guides/tables',
   },
   {
@@ -649,7 +656,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes: `Drag a grid line (the line under the pointer is marked), distribute rows and columns, type a row height or column width in the Format panel, or resize the frame by its handles (the columns and rows scale; the share of each column and row in that edit is not measured). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
+    notes:
+      'Drag grid lines, enter dimensions, distribute rows and columns, or resize the table frame. Row heights are minimums, so rows grow to fit text.',
     docsLink: '/docs/guides/tables',
   },
 
@@ -663,7 +671,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. Insert > Chart and the insertChart command add a column, bar, line, area, pie, doughnut, radar, or scatter chart with an embedded workbook. The Chart tab of the side panel and the setChartType, setChartFormat, and setChartColor commands change the chart type, the title, the legend position, data labels, axes, gridlines, axis titles, and the color of each series or pie slice. The tab and the setChartData command change series names, category labels, and values, and add or remove series and categories. They edit bar, column, line, area, pie, doughnut, radar, and scatter charts. Bubble, stock, surface, of-pie, and combination charts, and filtered or multi-level data, stay read-only. The embedded workbook gets the same cells. A workbook with formulas, filters, or merged cells keeps its old cells. A linked workbook is never opened, and its automatic update is turned off. Dates show as serial numbers. Chart styles, fonts, number formats, axis scales, and single data labels are not editable. The module uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'Insert and edit common chart types, data, and formatting with @pptx-editor.dev/pro under the EigenPal Pro License. Unsupported chart types or features show placeholders or remain read-only. Linked workbooks never open automatically.',
     docsLink: '/docs/guides/charts',
   },
   {
@@ -673,7 +681,7 @@ export const pptxFeatures: PptxFeature[] = [
     editing: 'partial',
     rendering: 'partial',
     notes:
-      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. You can type in a diagram shape. The edit writes the shape and its node in the data model. The Diagram tab of the side panel lists the nodes and edits their text (setDiagramText). The context menu and the toolbar open it with Edit text. The addDiagramShape and deleteDiagramShape commands add and delete nodes. They work when the drawing is one line of shapes, with up to one level of children. After such an edit, the editor spaces the shapes evenly on the line. Text formatting, diagram colors, diagram styles, and layout changes are not editable. A shape that shows the text of more than one node is read-only.',
+      'Display diagrams from their saved drawings and edit supported node text. Add or remove nodes in simple, single-line diagrams with one child level. Missing drawings show placeholders, and formatting and layout changes are unavailable.',
     roundTrip: 'full',
     tier: 'community',
     docsLink: '/docs/guides/diagrams',
@@ -687,7 +695,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'preserved',
     tier: 'community',
     notes:
-      'Video and audio show their poster picture. An OLE object shows the PNG, JPEG, GIF, or BMP picture that its p:oleObj/p:pic stores, or a labeled placeholder when it has none. Nothing plays or runs. In mc:AlternateContent, a choice that requires only p14 and holds shapes draws; otherwise the fallback draws.',
+      'Audio, video, and OLE objects show a stored poster picture or a labeled placeholder. They remain in the file but never play or run.',
   },
   {
     id: 'objects.equations',
@@ -698,8 +706,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Equations draw with STIX Two Math. Baselines and positions can differ by up to 2.2 pt. N-ary operators, accents, and skewed fractions have no reference check. Insert Equation and Edit Equation take a linear form. Math that the linear form cannot write stays as it is, and you cannot edit it. You cannot type in an equation, and font commands do not change it. The plain-text fallback is removed on edit. ' +
-      SAVE_CHECKED,
+      'Insert and edit equations through a linear text form. Unsupported equations remain unchanged and read-only. Equations use STIX Two Math, with approximate spacing and positioning.',
     docsLink: '/docs/guides/equations',
   },
 
@@ -735,7 +742,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Empty placeholders show their prompt and a dotted outline in the editor only. A click in an empty text placeholder or text box places the caret. Empty content and table placeholders show a Table button, and empty content and picture placeholders show a Picture button. The new object goes in place of the placeholder. The buttons cover tables and pictures only, and a keyboard user inserts from the Insert menu, which fills the placeholder too.',
+      'Empty placeholders show prompts and dotted outlines only in the editor. Insert tables or pictures through placeholder buttons or the Insert menu. The inserted object replaces the placeholder.',
     docsLink: '/docs/guides/images#fill-an-empty-placeholder',
   },
   {
@@ -747,7 +754,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Edit notes text, bold, italic, underline, and strikethrough, from the notes pane or the toolbar. A format at a caret outside a word does not carry to the next typed text. Other notes formatting is kept but not editable.',
+      'Edit speaker notes and apply bold, italic, underline, or strikethrough. Other formatting stays in the file but is not editable. Formatting at a caret outside a word does not carry into new text.',
   },
   {
     id: 'slides.header-footer',
@@ -758,7 +765,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Turn slide numbers, the footer, and the date on or off (`setSlideNumbers`, `setFooter`, `setDateTime`), through the placeholders of each layout or its master. The commands act on all slides or on `indices`, and `hideOnTitleSlides` leaves title slides out. Turning one on without `text` keeps what the slides show. A slide that shows a footer or a date keeps its box and format. New date text is a `datetime1` field, or fixed text with `fixed: true`. Editing is partial: a new date field always has the `datetime1` format.',
+      'Show or hide slide numbers, dates, and footers through layout or master placeholders. Apply changes to selected slides or all slides, optionally excluding title slides. New date fields use the datetime1 format only.',
   },
   {
     id: 'slides.size',
@@ -769,7 +776,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Pick Widescreen, Standard, A4, Letter, or a custom size from 1 to 56 inches, in either orientation, in **Page setup** (`setSlideSize`). The content scales to fit by default: boxes, tables, chart text, and the text sizes, spacing, and insets that the file sets scale by one factor and stay centered. Editing is partial: line widths, effect distances, and values left to their defaults keep their values, diagram text keeps its size, and the notes pages and drawing guides keep their old layout. Rendering is measured on 16:9, ISO A4 (842 × 595.5 pt), and 400.25 × 300.5 pt slides, which export to PDF pages rounded to whole points. Rendering is partial: portrait and very wide slides are not measured, and the strip past a rounded-down page is not compared.',
+      'Choose a preset or custom slide size from 1 to 56 inches in either orientation. Content scales to fit by default, but some effects, diagram text, and default values keep their sizes. Portrait and very wide slide fidelity is unmeasured, and PDF page dimensions round to whole points.',
   },
   {
     id: 'slides.sections',
@@ -780,7 +787,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Add, rename, remove, move, and collapse sections from the section header menu in the rail and the slide sorter, and from the toolbar section parts (`section.*` slots). The default editor has no Section menu. Sections cannot be dragged.',
+      'Add, rename, remove, move, and collapse sections through section headers or custom toolbar controls. The default editor has no Section menu. Sections cannot be dragged.',
   },
   {
     id: 'slides.sorter',
@@ -824,7 +831,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Change layout and reset slide work. The slide master view edits the shapes, placeholders, and background of layouts and masters, and every slide that uses them updates. Placeholders without a place, animated empty placeholders, and placeholders in mc:AlternateContent keep their box: an approximation. The placeholder match order is not measured. Layouts, masters, and themes cannot be added, deleted, or switched.',
+      'Change or reset slide layouts, and edit shapes, placeholders, and backgrounds in the slide master view. Placeholder matching and placement have known approximations. You cannot add, delete, or switch layouts, masters, or themes through the master view.',
+    docsLink: '/docs/guides/slide-master',
   },
 
   // --- Presenting ------------------------------------------------------
@@ -849,7 +857,7 @@ export const pptxFeatures: PptxFeature[] = [
     tier: 'community',
     docsLink: '/docs/guides/animations',
     notes:
-      'You can add, reorder, time, and remove the entrance, emphasis, and exit effects of the main sequence, from 13 presets. You can set fade, push, wipe, split, and cut transitions with a duration and advance timing. Motion paths and interactive sequences are listed, and you cannot add them. Timing in markup-compatibility content is read-only. The editor does not play effects or transitions. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too. Between paragraphs with the same text, an edit in the editor keeps each effect with its own paragraph. An automation edit that names no selection decides by the text, so an effect can stay with the wrong one of two identical paragraphs.',
+      'Configure 13 animation presets and five transition types, including timing and order. Motion paths and interactive sequences cannot be added, and markup-compatibility timing remains read-only. The editor preserves effects but does not play them.',
   },
 
   // --- Comments & review -----------------------------------------------
@@ -862,7 +870,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'You can add, reply to, edit, and delete comments, and resolve or reopen threads, with editor commands or in the comments pane (PptxEditorReview from @pptx-editor.dev/pro/react or /vue). A new comment uses the threaded format, except in a deck that has only legacy comments; legacy comments stay in their own format. A comment points at the slide, at an element on the top level of the slide, or at a range of the text of such a shape; a range follows its text through edits and undo, and only threaded comments hold ranges. Each editor moves a range for its own edits, so concurrent edits by two collaborators to the same text can leave a range a few characters off. The canvas draws a band over commented text and a ring around a commented element, in the color of the author who started the thread. Legacy comments have no resolved state, so you cannot resolve them. Mentions, reactions, and other content of threaded comments are kept but not shown, and the edit of a comment with such content is refused. The pane lists threads in file order, not by their position on the slide. The markers, bands, and rings on the canvas are editing chrome: they do not print or export. Two peers who add comments at once keep both, and a save joins the author lists and comment lists that they made. The import of a slide with threaded comments from another presentation is refused. Each author keeps one color for the session, by order of first appearance in the deck; authors who join during a session can take other colors on each peer. The comments pane and the comment list of the snapshot need the review module of @pptx-editor.dev/pro, which uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'Add, edit, reply to, and resolve comments with @pptx-editor.dev/pro under the EigenPal Pro License. Legacy comments cannot resolve, and unsupported thread content remains preserved but read-only. Concurrent edits can shift text anchors, and importing slides with threaded comments is refused.',
+    docsLink: '/docs/pro/comments',
   },
 
   // --- Collaboration & automation --------------------------------------
@@ -875,7 +884,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The Yjs session of @pptx-editor.dev/pro syncs edits and concurrent typing. Undo reverts your own changes and keeps what a peer wrote into an element you created: the attributes, children, and text that the peer wrote stay, without yours. Text a peer typed into a run whose format you undo stays, and a paragraph you add keeps what a peer typed in it. Text a peer typed into a shape, a table row, or a cell that you add goes with your undo and comes back with your redo. Two property elements written at once (a:pPr, a:rPr, a:tcPr, a:ln) merge; for a fill or effects, one version shows and the other comes back when the winner undoes. A first line width also writes a default line color, which can show instead of the line color that a peer sets at the same time. One attribute written by two peers at once keeps one value. Slides, pictures, links, shapes, tables, and comments that two peers add or copy at once keep separate ids; one notes slide or slide-number placeholder that two peers add first can still show twice. Two peers who format one run at once keep the text once with the format of one peer; when one of them changed the text of the run first, the two formats do not count as one split, so the text can show twice, and a piece the losing peer edited shows twice. Text that a peer types, deletes, or splits with Enter while a format of another peer moves it goes with the moved text. Two peers who press Enter in one paragraph at once keep the text of each paragraph once. A run that a peer deletes keeps the text another peer types into it at the same time, also when an Enter moved the run and a peer typed into it at once. Text typed into a paragraph that a peer removes at the same time (a delete across paragraphs, a join) stays, in a shape, a table cell, or the notes: the paragraph shows again at its old place with only that text, and an undo of the removal puts the rest back. When the remover undoes before the typed text arrives, that text can show at another place in the paragraph. When a third peer joins that paragraph to its neighbor at the same time, the text shows in the joined paragraph. Each read of a slide has a step limit, so after about 25,000 removed paragraphs of 10 runs each on one slide, or about 100,000 of one run each, a removed paragraph can stay removed with that text. Two peers who type at once into a table cell that holds no text body yet both keep their text in the cell, in the same order for every peer, and each undo removes only the text of its own peer. An undo or a redo after a peer formatted, split, or pressed Enter in the same text shows each character once, next to the characters around it, and two peers who undo their delete of one character show it once; a run that the split of the peer made keeps the format it copied, so the undo of a format can leave it on that run. Three peers whose undo, redo, and Enter meet over the same text show each character once, but such edits can rarely lose a character that a peer typed beside them. A format and an Enter of a peer at once inside the same text keep the text in order, and so does an undo of either one, also after a peer moved the formatted text on with another Enter; an undo of the format and then of the Enter can show the text out of order. An undo of an Enter brings back text that a peer deleted from the new paragraph after the Enter. When a peer pressed Enter in the new paragraph of your Enter and then took back all of your later edit, an undo of your Enter can show part of the text twice. Content moved into content that a peer deletes at once goes back to its old place in the file. Two peers who join neighboring paragraphs at once keep the text of all of them, and an undo of one join puts the text back in its paragraphs, also after a third peer typed into the joined paragraph. A paragraph that two peers move at once shows in one place, and a later delete of that place removes it for every peer. Text in a cell that a peer merges shows once in the merged cell, also when another peer types into that cell or inserts, deletes, splits, or merges rows and columns across it at the same time; some sequences of several such edits can still lose text, for example a merge and deletes of two of its rows by two peers at once. When peers delete every row of a merged cell at once, the merged text goes with the rows. After a vertical merge and a concurrent delete of one of its covered rows, the merged cell ends at its last row, and the next row shows on every replica and in the saved file. The canvas shows the selections of peers with name and color. No provider entries yet. The session uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'Synchronize edits, typing, and peer selections through Yjs with @pptx-editor.dev/pro under the EigenPal Pro License. Undo applies to your own changes, with limits when peers edit the same content. Some concurrent text and table edits can duplicate, reorder, or lose content; see the collaboration guide.',
+    docsLink: '/docs/pro/collaboration',
   },
   {
     id: 'collaboration.automation-api',
@@ -886,7 +896,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      '@pptx-editor.dev/editor-api edits slides, shapes, fill and line, text, tables, hyperlinks of slides and text ranges, tags, document properties and custom document properties, custom XML parts, slides imported from another presentation, slide, layout, and master backgrounds, theme colors, table cell borders and margins, table style options, merged areas, and preset adjust values on a server or in an open editor, and binds shapes by id in memory for the lifetime of a runtime, never in the file. The request context gives sync pass-through values, loadRecursive, trace, and debugInfo. Every editing method and property write of the selected Office.js subset has its exact signature. Slide and shape pictures are drawn in a browser, or on a server through a rasterizer that the host supplies, and a shape picture is cut to the shape box; an imported slide with threaded comments is refused, while other comments come along; a background picture is stretched, never tiled, and ShadeFromTitle is a read state; a table style must be defined in the presentation, except the built-in default. The package uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application.',
+    docsLink: '/docs/editor-api',
   },
 
   // --- Export & print --------------------------------------------------
@@ -909,7 +920,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'none',
     tier: 'premium',
     notes:
-      '@pptx-editor.dev/pptx-to-pdf uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. The PDF export draws shapes, solid, gradient, and pattern fills, cropped PNG and JPEG pictures, tables, shadows, glow, inner shadows, reflections, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. The React and Vue demos export through a server function: Export > Presentation as PDF. It draws dashes and line ends with the same geometry as the editor. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, reflection blur, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, dashed compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: patterns on text and lines, picture fills on text, text outlines, other picture formats, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. Charts draw through the drawing module of @pptx-editor.dev/pro, which the export always installs; chart types outside that module show a placeholder with the frame.chart code. Export fidelity is measured, and some known gaps remain, so rendering stays planned. The export writes a PDF, not the presentation, so round trip does not apply.',
+      'Export PDFs with @pptx-editor.dev/pptx-to-pdf under the EigenPal Pro License. Hidden slides are omitted, and approximated or unsupported content produces diagnostics. Fidelity gaps remain, so the rendering status stays planned.',
+    docsLink: '/docs/export/pdf',
   },
 ];
 
