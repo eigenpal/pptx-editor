@@ -17,27 +17,48 @@ const CHUNK_BYTES = 16 * 1024;
 /** A peer that sends more than this in one message is dropped. */
 const MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
 
+/** The `simple-peer` instance of one `y-webrtc` connection. */
 interface PeerLike {
   send(data: Uint8Array): void;
+  /** The stream write: queued, and held while the channel's send buffer is full. */
+  write(data: Uint8Array): boolean;
+  _write(chunk: Uint8Array, encoding: string, done: (error?: Error | null) => void): void;
   emit(event: string | symbol, ...args: unknown[]): boolean;
   destroy(): void;
 }
 
 function chunkPeer(peer: PeerLike): void {
-  const send = peer.send.bind(peer);
-  peer.send = (data) => {
+  // Frames go through the stream's write queue, not straight to the channel: a large deck is
+  // many frames, and a browser refuses a send while its buffer is full (about 16 MiB).
+  const rawSend = peer.send.bind(peer);
+  const chunkedSend = (data: Uint8Array) => {
     for (let start = 0; start < data.length || start === 0; start += CHUNK_BYTES) {
       const part = data.subarray(start, start + CHUNK_BYTES);
       const frame = new Uint8Array(part.length + 1);
       frame[0] = start + CHUNK_BYTES >= data.length ? 1 : 0;
       frame.set(part, 1);
-      send(frame);
+      peer.write(frame);
+    }
+  };
+  peer.send = chunkedSend;
+  // The queue sends each frame with `this.send`: give it the raw send for that call.
+  const rawWrite = peer._write.bind(peer);
+  peer._write = (chunk, encoding, done) => {
+    peer.send = rawSend;
+    try {
+      rawWrite(chunk, encoding, done);
+    } finally {
+      peer.send = chunkedSend;
     }
   };
   let parts: Uint8Array[] = [];
   let size = 0;
   const emit = peer.emit.bind(peer);
   peer.emit = (event, ...args) => {
+    if (event === 'close' || event === 'error') {
+      parts = [];
+      size = 0;
+    }
     if (event !== 'data') return emit(event, ...args);
     const frame = args[0];
     if (!(frame instanceof Uint8Array) || frame.length === 0) return false;

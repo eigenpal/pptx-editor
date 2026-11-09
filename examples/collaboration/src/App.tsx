@@ -14,6 +14,7 @@ import { createYjsCollaborationSession, type YjsCollaborationSession } from '@pp
 import { usePptxSource } from '@pptx-editor.dev/react';
 import {
   actorIdFor,
+  holdsRoom,
   createRoomId,
   randomHex,
   roomFromUrl,
@@ -103,9 +104,8 @@ export function App() {
       }
       report();
     });
-    // An empty Y.Doc has a one-byte state vector. More means a peer sent the room.
     const roomArrived = () => {
-      if (Y.encodeStateVector(doc).length > 1) start();
+      if (holdsRoom(doc)) start();
     };
     if (creating) start();
     else doc.on('update', roomArrived);

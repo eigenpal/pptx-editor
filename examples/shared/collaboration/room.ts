@@ -1,5 +1,7 @@
 // The room helpers that both collaboration examples share: the people you can sign in as, a
-// per-tab actor id, room ids, and invite links. Framework-free.
+// per-tab actor id, room ids, invite links, and the room check. Framework-free.
+
+import { CollaborationSchemaError, readCollaborationFormatVersion } from '@pptx-editor.dev/pro';
 
 /** One person the examples let you sign in as. */
 export interface Person {
@@ -60,4 +62,18 @@ export function roomUrl(roomId: string, fragment = '', href: string = location.h
 /** A room id short enough to compare across two windows. */
 export function shortRoomId(roomId: string): string {
   return `${roomId.slice(0, 6)}…${roomId.slice(-4)}`;
+}
+
+/**
+ * Whether `doc` holds a room that a peer or the server sent. A tab that joins waits for this
+ * before it creates its session, so it adopts the room and never seeds a second copy. A room in
+ * another format counts: the session then reports `schema-version-mismatch`.
+ */
+export function holdsRoom(doc: Parameters<typeof readCollaborationFormatVersion>[0]): boolean {
+  try {
+    readCollaborationFormatVersion(doc);
+    return true;
+  } catch (error) {
+    return !(error instanceof CollaborationSchemaError && error.code === 'not-initialized');
+  }
 }

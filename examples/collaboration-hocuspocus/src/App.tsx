@@ -13,6 +13,7 @@ import { createYjsCollaborationSession, type YjsCollaborationSession } from '@pp
 import { usePptxSource } from '@pptx-editor.dev/react';
 import {
   actorIdFor,
+  holdsRoom,
   createRoomId,
   roomFromUrl,
   roomUrl,
@@ -61,9 +62,8 @@ export function App() {
       // The room exists now: a reload or a copied address joins it.
       history.replaceState(null, '', roomUrl(roomId));
     };
-    // An empty Y.Doc has a one-byte state vector. More means the room holds a deck.
     const roomArrived = () => {
-      if (Y.encodeStateVector(doc).length > 1) start();
+      if (holdsRoom(doc)) start();
     };
     const provider = new HocuspocusProvider({
       url: SERVER_URL,
@@ -88,6 +88,7 @@ export function App() {
       setSession(null);
       setRefused(null);
       setEmpty(false);
+      setOffline(false);
       // After the editor unmounts and detaches from it.
       setTimeout(() => {
         created?.destroy();

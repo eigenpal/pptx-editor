@@ -40,5 +40,9 @@ export {
   type YjsCollaborationSessionOptions,
 } from './collaboration/yjs/session.ts';
 export { CollaborationSchemaError } from './collaboration/errors.ts';
+export {
+  COLLABORATION_FORMAT_VERSION,
+  readCollaborationFormatVersion,
+} from './collaboration/yjs/format.ts';
 export { type AwarenessLike } from './collaboration/yjs/presence.ts';
 export { type ProLicenseOptions } from './license.ts';
