@@ -398,10 +398,7 @@ export class PackageMirror {
     );
   }
 
-  /**
-   * After this replica's undo or redo: its delete no longer reaches a peer's copy of the root
-   * characters it put back (`restored`), and reaches a copy of those it deleted (`deleted`).
-   */
+  /** After an undo or redo: a delete spares copies of `restored` roots and reaches `deleted`. */
   noteStep(restored: Iterable<string>, deleted: Iterable<string>): void {
     for (const r of restored) this.#deleted.delete(r);
     for (const r of deleted) if (this.#deleted.size < MAX_DELETED) this.#deleted.add(r);

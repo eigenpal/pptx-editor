@@ -182,9 +182,8 @@ export type Listings = () => ReadonlyMap<string, readonly string[]>;
 
 /**
  * The listings of every part of the room, built on first use with one walk over the room's
- * records: one read pass shares them (`Mirror.rebuild`). A record that a removal took does not
- * count: an undo can name a removed paragraph in a move mark again (`movedFrom`), and the node
- * did not go there.
+ * records: one read pass shares them (`Mirror.rebuild`). Removed records count: the move rescue
+ * climbs through them (`move-rescue.ts`).
  */
 export function roomListings(room: Room): (partName: string) => Listings {
   let index: Map<string, Map<string, string[]>> | undefined;
@@ -196,8 +195,6 @@ export function roomListings(room: Room): (partName: string) => Listings {
       const part: unknown = rec.get(F.part);
       const list: unknown = rec.get(F.children);
       if (typeof part !== 'string' || !(list instanceof Y.Array)) continue;
-      // A removed record keeps its list, but it is no place a node went to (`movedAway`).
-      if (isRemoved(rec as Y.Map<unknown>)) continue;
       let byKey = out.get(part);
       if (!byKey) out.set(part, (byKey = new Map()));
       for (const c of list.toArray() as unknown[]) {
@@ -243,11 +240,21 @@ interface Rescue {
  * Whether a write moved the node `key` out of the record `self` to a place the room still
  * lists: its move mark names `self` as the parent it left, and another record lists it. A mark
  * alone is not enough: an undo of a peer's move can take the node back while the mark of an
- * earlier move names the parent again, and a later delete there leaves it listed nowhere.
+ * earlier move names the parent again, and a later delete there leaves it listed nowhere. A
+ * removed record that lists it is no such place: an undo can name it in a move mark again.
  */
-function movedAway(child: Y.Map<unknown>, key: string, self: unknown, listings: Listings): boolean {
+function movedAway(
+  room: Room,
+  child: Y.Map<unknown>,
+  key: string,
+  self: unknown,
+  listings: Listings
+): boolean {
   if (child.get(LINEAGE.movedFrom) !== self) return false;
-  return (listings().get(key) ?? []).some((parent) => parent !== self);
+  return (listings().get(key) ?? []).some((parent) => {
+    const rec = room.nodes.get(parent);
+    return parent !== self && !(rec instanceof Y.Map && isRemoved(rec as Y.Map<unknown>));
+  });
 }
 
 /**
@@ -257,6 +264,7 @@ function movedAway(child: Y.Map<unknown>, key: string, self: unknown, listings: 
  * when the remover did not see it.
  */
 function peerChild(
+  room: Room,
   child: Y.Map<unknown>,
   key: string,
   self: unknown,
@@ -265,7 +273,7 @@ function peerChild(
 ): 'br' | 'run' | null {
   const shell = child.get(F.shell) as { ns?: unknown; local?: unknown } | undefined;
   if (shell?.ns !== NS_A) return null;
-  if (movedAway(child, key, self, rescue.listings)) return null;
+  if (movedAway(room, child, key, self, rescue.listings)) return null;
   const from: unknown = child.get(LINEAGE.movedFrom);
   // A node moved in, or a split piece made, without the remover seeing it: its text goes with
   // the move or the split (`move-rescue.ts`, `placeEditedPieces` in `text-lineage.ts`), unless
@@ -294,7 +302,7 @@ function paragraphSpecHoldsText(
     if ('text' in c) continue;
     if (!step(rescue.walk)) return false;
     const child = room.nodes.get(c.key);
-    const kind = child instanceof Y.Map ? peerChild(child, c.key, self, seen, rescue) : null;
+    const kind = child instanceof Y.Map ? peerChild(room, child, c.key, self, seen, rescue) : null;
     if (kind === 'br' || (kind === 'run' && specHoldsText(c))) return true;
   }
   return false;
@@ -314,7 +322,7 @@ function paragraphHoldsText(room: Room, key: string, rec: Y.Map<unknown>, rescue
     if (!step(rescue.walk)) return false;
     const c = room.nodes.get(k);
     if (!(c instanceof Y.Map)) return false;
-    const kind = peerChild(c as Y.Map<unknown>, k, self, seen, rescue);
+    const kind = peerChild(room, c as Y.Map<unknown>, k, self, seen, rescue);
     if (kind === 'br') return true;
     // A removed run counts as `withRemovedRuns` puts it back: not one a peer moved away.
     const away = removed.has(k) && !fieldsOf(c as Y.Map<unknown>, rescue.walk, true).removed;
@@ -384,7 +392,7 @@ export function withRemovedRuns(
     if (shell?.ns !== NS_A || shell.local !== kind) continue;
     // A run a peer moved out of this paragraph shows where it went.
     if (!fieldsOf(rec as Y.Map<unknown>, walk, true).removed) continue;
-    if (movedAway(rec, key, self, rescue.listings)) continue;
+    if (movedAway(room, rec, key, self, rescue.listings)) continue;
     if (body) {
       // A paragraph is read only when its records hold a peer's text, and the read decides.
       const one = { stranded: rescue.stranded.has(key), listings: rescue.listings, walk };
