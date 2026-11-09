@@ -136,10 +136,10 @@
     },
     "packages/core": {
       "name": "@pptx-editor.dev/core",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@docx-editor.dev/fonts": "^2.34.0",
-        "@pptx-editor.dev/i18n": "^0.3.0",
+        "@pptx-editor.dev/i18n": "^0.3.1",
         "bidi-js": "1.1.0",
         "emf-converter": "4.28.0",
         "fast-xml-parser": "^5.10.1",
@@ -158,7 +158,7 @@
     },
     "packages/editor-api": {
       "name": "@pptx-editor.dev/editor-api",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "devDependencies": {
         "@pptx-editor.dev/core": "workspace:*",
       },
@@ -168,7 +168,7 @@
     },
     "packages/i18n": {
       "name": "@pptx-editor.dev/i18n",
-      "version": "0.3.0",
+      "version": "0.3.1",
     },
     "packages/ooxml-core": {
       "name": "@eigenpal/ooxml-core",
@@ -180,9 +180,9 @@
     },
     "packages/pptx-to-pdf": {
       "name": "@pptx-editor.dev/pptx-to-pdf",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
-        "@pptx-editor.dev/pro": "~0.3.0",
+        "@pptx-editor.dev/pro": "~0.3.1",
         "fontkit": "2.0.4",
         "pdf-lib": "1.17.1",
       },
@@ -204,7 +204,7 @@
     },
     "packages/pro": {
       "name": "@pptx-editor.dev/pro",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "y-protocols": "^1.0.7",
         "yjs": "^13.6.32",
@@ -232,9 +232,9 @@
     },
     "packages/react": {
       "name": "@pptx-editor.dev/react",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
-        "@pptx-editor.dev/i18n": "^0.3.0",
+        "@pptx-editor.dev/i18n": "^0.3.1",
       },
       "devDependencies": {
         "@pptx-editor.dev/core": "workspace:*",
@@ -247,9 +247,9 @@
     },
     "packages/vue": {
       "name": "@pptx-editor.dev/vue",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
-        "@pptx-editor.dev/i18n": "^0.3.0",
+        "@pptx-editor.dev/i18n": "^0.3.1",
       },
       "devDependencies": {
         "@pptx-editor.dev/core": "workspace:*",

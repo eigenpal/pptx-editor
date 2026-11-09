@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/i18n",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Shared user-facing strings for the PPTX Editor chrome. English is the source of truth.",
   "type": "module",
   "sideEffects": false,

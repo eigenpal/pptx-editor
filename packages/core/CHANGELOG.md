@@ -1,5 +1,13 @@
 # @pptx-editor.dev/core
 
+## 0.3.1
+
+### Patch Changes
+
+- 8fc9345: Draw each dash style in the outline dash and table border style menus, and show the current dash on the button.
+- 7a0d4fd: Show real fonts sooner on a slow network. The packaged substitute fonts now download next to the text engine, not after it. The publish that reports a deck as ready now reports late fonts as `resolving`, so a host can keep its loading screen until the text is measured with the real fonts.
+- Updated dependencies: @pptx-editor.dev/i18n@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

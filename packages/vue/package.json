@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/vue",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Vue 3 adapter for PPTX Editor: a provider, composables, and chrome components over the @pptx-editor.dev/core editor contract.",
   "type": "module",
   "sideEffects": [
@@ -28,7 +28,7 @@
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/vue"
   },
   "dependencies": {
-    "@pptx-editor.dev/i18n": "^0.3.0"
+    "@pptx-editor.dev/i18n": "^0.3.1"
   },
   "peerDependencies": {
     "@pptx-editor.dev/core": "~0.3.0",
