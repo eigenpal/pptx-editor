@@ -97,7 +97,7 @@ export function BrandLogo({ name }: { name: string }) {
   return (
     <a
       className="demo-brand"
-      href="https://eigenpal.com"
+      href="https://www.pptx-editor.dev"
       target="_blank"
       rel="noopener noreferrer"
       title={`${name} by EigenPal`}

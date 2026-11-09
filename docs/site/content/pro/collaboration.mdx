@@ -8,6 +8,15 @@ Use `createYjsCollaborationSession()` with a Yjs document and your network provi
 
 For support status, see <FeatureBadge id="collaboration.realtime" />. Review [concurrent editing limits](#concurrent-editing-limits) before enabling shared editing.
 
+## Run the examples
+
+The repository has two runnable rooms. Each one opens the sample deck in two browsers:
+
+- `examples/collaboration` connects browsers directly with `y-webrtc`. Run `bun run dev:collaboration:signal` and `bun run dev:collaboration`, then open `http://localhost:5277`.
+- `examples/collaboration-hocuspocus` stores rooms on a Hocuspocus server. Run `bun run dev:collaboration-hocuspocus:server` and `bun run dev:collaboration-hocuspocus`, then open `http://localhost:5278`.
+
+Run each command in its own terminal from a clone with `bun install` done. Pick a person, copy the invite link, and open it in another browser as a different person.
+
 ## Install the dependencies
 
 Install the session package and the Yjs dependencies that your host imports:
@@ -68,6 +77,8 @@ In React or Vue, pass `[collaborationModule({ session })]` through the adapterâ€
 ## Connect your provider
 
 The session does not open a network connection. Your provider synchronizes Yjs document updates and awareness messages. Reuse the providerâ€™s awareness instance so remote names, colors, and selections reach the editor. Without awareness, the session lists only the local participant.
+
+Some transports limit message size. A browser refuses a WebRTC data channel message over about 256 KiB, and the first sync of a presentation room is larger. With `y-webrtc`, split messages into chunks, as `examples/collaboration/src/webrtc-chunks.ts` does.
 
 Report connection changes through `setConnected()`:
 

@@ -35,18 +35,19 @@ function label(doc: Document, name: string, x: number, y: number, px: number): S
   const text = name.length > MAX_LABEL ? `${name.slice(0, MAX_LABEL - 1)}…` : name;
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('class', 'pptx-surface__remote-label');
-  const height = px * 16;
+  // Drawn in screen pixels: the group scales them to slide units. A font size in slide units
+  // (EMU) is past what a browser draws, as in surface-animation-marks.ts.
+  g.setAttribute('transform', `translate(${x} ${y}) scale(${px})`);
   const box = doc.createElementNS(SVG_NS, 'rect');
-  box.setAttribute('x', String(x));
-  box.setAttribute('y', String(y - height));
+  box.setAttribute('y', '-16');
   // No layout pass is available here; 7 px per character fits the 11 px UI font.
-  box.setAttribute('width', String(px * (text.length * 7 + 10)));
-  box.setAttribute('height', String(height));
-  box.setAttribute('rx', String(px * 3));
+  box.setAttribute('width', String(text.length * 7 + 10));
+  box.setAttribute('height', '16');
+  box.setAttribute('rx', '3');
   const t = doc.createElementNS(SVG_NS, 'text');
-  t.setAttribute('x', String(x + px * 5));
-  t.setAttribute('y', String(y - px * 4));
-  t.setAttribute('font-size', String(px * 11));
+  t.setAttribute('x', '5');
+  t.setAttribute('y', '-4');
+  t.setAttribute('font-size', '11');
   t.textContent = text;
   g.append(box, t);
   return g;

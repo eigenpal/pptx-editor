@@ -1,0 +1,197 @@
+/* The collaboration examples: a seat picker, full-page messages, and a room bar above the
+   editor. Light and dark follow the system, as the editor's `colorMode="system"` does. */
+
+:root {
+  --room-bg: #f7f7f8;
+  --room-surface: #ffffff;
+  --room-text: #1d1d1f;
+  --room-muted: #5f6368;
+  --room-border: #dadce0;
+  --room-live: #137333;
+  --room-bad: #b3261e;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --room-bg: #18181b;
+    --room-surface: #232327;
+    --room-text: #ececef;
+    --room-muted: #a1a1aa;
+    --room-border: #3f3f46;
+    --room-live: #6dd58c;
+    --room-bad: #f2b8b5;
+  }
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--room-bg);
+  color: var(--room-text);
+  font:
+    14px/1.45 system-ui,
+    sans-serif;
+}
+
+.room-stage {
+  box-sizing: border-box;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12vh 16px 32px;
+}
+
+.room-stage h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.room-stage p {
+  margin: 0 0 12px;
+  color: var(--room-muted);
+}
+
+.room-stage code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--room-surface);
+  border: 1px solid var(--room-border);
+  color: var(--room-text);
+}
+
+.room-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--room-border);
+  border-radius: 8px;
+  background: var(--room-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.room-seat:hover {
+  border-color: var(--room-muted);
+}
+
+.room-seat:focus-visible,
+.room-invite:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.room-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.room-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.room-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--room-border);
+  background: var(--room-surface);
+}
+
+.room-status {
+  font-weight: 600;
+}
+
+.room-status.is-live {
+  color: var(--room-live);
+}
+
+.room-status.is-bad {
+  color: var(--room-bad);
+}
+
+.room-transport {
+  color: var(--room-muted);
+}
+
+.room-invite {
+  display: inline-flex;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--room-border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.room-invite span {
+  color: var(--room-muted);
+}
+
+.room-spacer {
+  flex: 1;
+}
+
+.room-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-people li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-alert {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--room-bad);
+  border-bottom: 1px solid var(--room-border);
+}
+
+.room-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 640px) {
+  .room-transport,
+  .room-people__name {
+    display: none;
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@pptx-editor.dev/example-collaboration-hocuspocus",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5278 --strictPort",
+    "server": "node server/server.ts",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@docx-editor.dev/fonts": "^2.34.0",
+    "@hocuspocus/provider": "^4.8.0",
+    "@pptx-editor.dev/core": "workspace:*",
+    "@pptx-editor.dev/i18n": "workspace:*",
+    "@pptx-editor.dev/pro": "workspace:*",
+    "@pptx-editor.dev/react": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "yjs": "^13.6.32"
+  },
+  "devDependencies": {
+    "@hocuspocus/server": "^4.8.0"
+  }
+}

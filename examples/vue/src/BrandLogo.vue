@@ -7,7 +7,7 @@ defineProps<{ name: string }>();
 <template>
   <a
     class="demo-brand"
-    href="https://eigenpal.com"
+    href="https://www.pptx-editor.dev"
     target="_blank"
     rel="noopener noreferrer"
     :title="`${name} by EigenPal`"
