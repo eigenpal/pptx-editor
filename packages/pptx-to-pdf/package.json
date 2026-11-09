@@ -49,7 +49,7 @@
     "@docx-editor.dev/fonts-cjk": "^2.34.0",
     "@pptx-editor.dev/core": "workspace:*",
     "@pptx-editor.dev/pro": "workspace:*",
-    "pdfjs-dist": "6.4.299"
+    "pdfjs-dist": "6.5.438"
   },
   "license": "LicenseRef-EigenPal-Pro-Evaluation-1.0",
   "repository": {
