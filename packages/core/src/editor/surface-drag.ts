@@ -13,7 +13,7 @@
 
 import type { TransformItem } from '../contracts/index.ts';
 import type { ResolvedElement } from '../cascade/index.ts';
-import type { LayoutItem, SlideLayout } from '../layout/index.ts';
+import { apply, type LayoutItem, type SlideLayout } from '../layout/index.ts';
 import type { PaintOptions } from '../output/index.ts';
 import { PaintedPreview, preview, previewLayout, type Relayout } from './drag-preview.ts';
 import {
@@ -33,7 +33,10 @@ import {
   byDrawingId,
   connectorRoute,
   gluedSite,
+  elbowCorners,
   isConnector,
+  moveElbowSegment,
+  segmentAxis,
   sitesNear,
   type RouteEnd,
 } from '../automation/commands/connectors.ts';
@@ -48,8 +51,21 @@ import type { SnapGuide } from './snapping.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
 import { clampTableResize } from './surface-table.ts';
 
-export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end';
-export type BoxHandle = Exclude<Handle, 'start' | 'end'>;
+/** A segment of an elbow or curve connector's route, by its index from the start. */
+export type SegmentHandle = `segment${0 | 1 | 2 | 3 | 4}`;
+export type Handle =
+  'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end' | SegmentHandle;
+export type BoxHandle = Exclude<Handle, 'start' | 'end' | SegmentHandle>;
+
+/** The index of the segment a segment handle moves. */
+export function segmentIndex(handle: SegmentHandle): number {
+  return Number(handle.slice('segment'.length));
+}
+
+/** Whether a handle moves a segment of a connector's route. */
+export function isSegment(handle: Handle | 'move'): handle is SegmentHandle {
+  return /^segment\d$/.test(handle);
+}
 export const HANDLES: readonly BoxHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rot'];
 export const HANDLE_POS: Record<BoxHandle, [number, number]> = {
   nw: [0, 0],
@@ -124,6 +140,11 @@ export interface StepInput {
   readonly aspectLocked: (nodeId: string) => boolean;
   /** How near a connection site a connector end glues to it, in EMU; null or absent: never. */
   readonly glueTo?: number | null;
+  /**
+   * How near a connector segment comes in line with another before it snaps to it, when smart
+   * guides are off, in EMU; null or absent: never. Without it, a bend is hard to take out.
+   */
+  readonly mergeTo?: number | null;
 }
 
 /** The boxes after the pointer moved to `p`, and the smart guides they snapped to. */
@@ -148,6 +169,14 @@ export function dragStep(
     return moveConnectorEnd(d, d.handle, p, input);
   if (d.handle === 'start' || d.handle === 'end')
     return { items: [moveLineEnd(d, p, input.shift)], guides };
+  if (isSegment(d.handle)) {
+    const snap = input.snapTo ?? input.mergeTo ?? null;
+    const t = moveElbowSegment(d.items[0].item, segmentIndex(d.handle), d.start, p, snap);
+    // Back where it started: nothing to write. A route the presets cannot draw keeps the last
+    // route the drag showed.
+    if (t === 'same') return { items: [], guides };
+    return { items: t ? [t] : [...(d.pending ?? [])], guides };
+  }
   const [hx, hy] = HANDLE_POS[d.handle];
   // A resize snaps its dragged edges.
   if (d.handle !== 'rot') {
@@ -297,6 +326,30 @@ export class ShapeDrag {
     return this.#drag?.handle === 'rot';
   }
 
+  /**
+   * Keep the drag's pointer on the whole surface, off the handle too: the rotate pointer
+   * (`pptx-surface--rotating`), or a segment's resize pointer (`pptx-surface--segment-x`, `-y`).
+   */
+  pointer(classes: DOMTokenList): void {
+    classes.toggle('pptx-surface--rotating', this.rotating);
+    const axis = this.segmentAxis;
+    classes.toggle('pptx-surface--segment-x', axis === 'x');
+    classes.toggle('pptx-surface--segment-y', axis === 'y');
+  }
+
+  /** The axis a connector segment drag moves along, or null for another drag. */
+  get segmentAxis(): 'x' | 'y' | null {
+    const d = this.#drag;
+    if (!d || !isSegment(d.handle)) return null;
+    const { item } = d.items[0];
+    const corners = elbowCorners(item);
+    const i = segmentIndex(d.handle);
+    const [a, b] = [corners?.[i], corners?.[i + 1]];
+    // On the slide, as the handle's own pointer: a turned group turns the segment too.
+    const slide = (q: Point): Point => apply(item.parentMatrix, q.x, q.y);
+    return a && b ? segmentAxis(slide(a), slide(b)) : null;
+  }
+
   /** The smart guides of the last pointer move. */
   get guides(): readonly DragGuide[] {
     return this.#guides;
@@ -362,7 +415,7 @@ export class ShapeDrag {
     // The preview goes first: a refused edit repaints nothing, and the shapes must not stay
     // where the preview put them.
     this.#end();
-    if (d.pending) this.host.transform(d.pending, d.gesture);
+    if (d.pending?.length) this.host.transform(d.pending, d.gesture);
     const guides = this.#guides.length > 0;
     this.#guides = [];
     if (guides || d.pending) this.host.repaint();

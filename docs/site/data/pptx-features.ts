@@ -365,7 +365,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Drag a connector end near a shape to glue it to a connection site. Glued connectors follow a shape that moves or resizes, and elbow and curved connectors route again. A connector that moves on its own lets go of its ends. Deleting a shape unglues the connector ends attached to it.',
+      'Drag a connector end near a shape to glue it to a connection site. Glued connectors follow a shape that moves or resizes, and elbow and curved connectors route again. Drag the handle on a segment of an elbow or curved connector to move that segment. On an end segment, the drag adds a bend, up to five segments. A connector that moves on its own lets go of its ends. Deleting a shape unglues the connector ends attached to it.',
   },
   {
     id: 'shapes.arrange',

@@ -8,6 +8,7 @@
 import { apply, type LayoutItem, type Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { rotationHandle, unionBounds } from '../automation/commands/placement.ts';
+import { elbowCorners, segmentAxis, segmentMovable } from '../automation/commands/connectors.ts';
 import { HANDLE_POS, HANDLES } from './surface-drag.ts';
 
 /** A table frame: it has a grid, and no rotation handle. */
@@ -15,16 +16,19 @@ const isTable = (item: LayoutItem): boolean => item.kind === 'frame' && !!item.t
 
 /**
  * The handles of `selected`, in slide units (`px` is one CSS pixel): the end points of `line`
- * when one line is selected, else the box handles.
+ * when one line is selected, with a handle on each segment of an elbow or curve connector
+ * (titled `segmentLabel`), else the box handles.
  */
 export function handleElements(
   doc: Document,
   selected: readonly LayoutItem[],
   line: { readonly start: { x: number; y: number }; readonly end: { x: number; y: number } } | null,
-  px: number
+  px: number,
+  segmentLabel = ''
 ): Element[] {
   const parts: Element[] = [];
   if (line) {
+    if (selected.length === 1) parts.push(...segmentHandles(doc, selected[0], px, segmentLabel));
     for (const [handle, p] of [
       ['start', line.start],
       ['end', line.end],
@@ -72,6 +76,106 @@ export function handleElements(
     parts.push(node);
   }
   return parts;
+}
+
+/** Segments shorter than this, in CSS pixels, show no handle: it would cover the ends. */
+const SHORTEST_SEGMENT = 24;
+
+/** Handles nearer than this, in CSS pixels, would cover each other: only the first shows. */
+const HANDLE_GAP = 16;
+
+type Point = { readonly x: number; readonly y: number };
+
+/** Points along an item's first drawn path on the slide, 32 for each curve. */
+function drawnPoints(item: LayoutItem): Point[] {
+  if (item.kind !== 'shape') return [];
+  const out: Point[] = [];
+  let at: Point = { x: 0, y: 0 };
+  for (const c of item.geometry.paths[0]?.commands ?? []) {
+    if (c.op === 'Z') continue;
+    if (c.op === 'C' || c.op === 'Q') {
+      // A quadratic as the cubic that draws it: each control two thirds of the way to its one.
+      const q = (s: number, k: number): number => s + ((k - s) * 2) / 3;
+      const a = c.op === 'C' ? { x: c.x1, y: c.y1 } : { x: q(at.x, c.x1), y: q(at.y, c.y1) };
+      const b = c.op === 'C' ? { x: c.x2, y: c.y2 } : { x: q(c.x, c.x1), y: q(c.y, c.y1) };
+      for (let k = 1; k <= 32; k += 1) {
+        const t = k / 32;
+        const u = 1 - t;
+        const f = (s: number, p: number, r: number, e: number): number =>
+          u * u * u * s + 3 * u * u * t * p + 3 * u * t * t * r + t * t * t * e;
+        out.push(apply(item.matrix, f(at.x, a.x, b.x, c.x), f(at.y, a.y, b.y, c.y)));
+      }
+    } else out.push(apply(item.matrix, c.x, c.y));
+    at = { x: c.x, y: c.y };
+  }
+  return out;
+}
+
+/** The point of `points` nearest `p`, or undefined when there is none. */
+function nearest(points: readonly Point[], p: Point): Point | undefined {
+  let best: Point | undefined;
+  for (const q of points)
+    if (!best || Math.hypot(q.x - p.x, q.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y))
+      best = q;
+  return best;
+}
+
+/**
+ * A diamond at the middle of each segment of an elbow or curve connector. A drag moves the
+ * segment across (`moveElbowSegment`); on an end segment it adds a bend.
+ */
+function segmentHandles(doc: Document, item: LayoutItem, px: number, label: string): Element[] {
+  const corners = elbowCorners(item);
+  if (!corners) return [];
+  // A curve bends between the corners: its handles sit on the drawn curve, nearest each middle.
+  const curve = item.kind === 'shape' && item.geometry.paths[0]?.commands.some((c) => c.op === 'C');
+  const drawn = curve ? drawnPoints(item) : [];
+  const hits: Element[] = [];
+  const diamonds: Element[] = [];
+  // The end points count as placed: a handle near one would hide under its circle.
+  const ends = [corners[0], corners[corners.length - 1]];
+  const placed: Point[] = ends.map((q) => apply(item.parentMatrix, q.x, q.y));
+  for (let i = 0; i < corners.length - 1; i += 1) {
+    const a = apply(item.parentMatrix, corners[i].x, corners[i].y);
+    const b = apply(item.parentMatrix, corners[i + 1].x, corners[i + 1].y);
+    if (Math.hypot(b.x - a.x, b.y - a.y) < SHORTEST_SEGMENT * px) continue;
+    // A segment whose drag would need more segments than a preset draws shows no handle.
+    if (!segmentMovable(item, corners, i)) continue;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const m = nearest(drawn, mid) ?? mid;
+    // Handles this near would cover each other (on a curve they can meet): keep the first.
+    if (placed.some((q) => Math.hypot(q.x - m.x, q.y - m.y) < HANDLE_GAP * px)) continue;
+    placed.push(m);
+    const r = px * 5;
+    const axis = segmentAxis(a, b);
+    const titled = (node: Element): Element => {
+      node.setAttribute('data-handle', `segment${i}`);
+      const title = doc.createElementNS(SVG_NS, 'title');
+      title.textContent = label;
+      node.append(title);
+      return node;
+    };
+    // A wider, unseen hit area, so a finger or a quick pointer finds the small diamond.
+    const hit = doc.createElementNS(SVG_NS, 'circle');
+    hit.setAttribute('class', `pptx-surface__handle-hit pptx-surface__handle--segment-${axis}`);
+    hit.setAttribute('cx', String(m.x));
+    hit.setAttribute('cy', String(m.y));
+    hit.setAttribute('r', String(px * 11));
+    const node = doc.createElementNS(SVG_NS, 'path');
+    node.setAttribute(
+      'class',
+      `pptx-surface__handle pptx-surface__handle--adjust pptx-surface__handle--segment-${axis}`
+    );
+    node.setAttribute(
+      'd',
+      `M${m.x} ${m.y - r}L${m.x + r} ${m.y}L${m.x} ${m.y + r}L${m.x - r} ${m.y}Z`
+    );
+    node.setAttribute('stroke-width', String(px));
+    hits.push(titled(hit));
+    diamonds.push(titled(node));
+  }
+  // Every hit area under every diamond, so no hit area covers a neighbor's diamond.
+  return [...hits, ...diamonds];
 }
 
 /**

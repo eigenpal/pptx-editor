@@ -1147,6 +1147,7 @@
     "inputAriaLabel": "所选形状的文本",
     "inputDescription": "显示当前段落中光标之前的文本",
     "adjustHandle": "拖动以更改形状",
+    "segmentHandle": "拖动以移动此线段",
     "placeholderTable": "在此处插入表格",
     "placeholderChart": "在此处插入图表",
     "placeholderPicture": "在此处插入图片",

@@ -19,13 +19,23 @@ import {
   apply,
   boxMatrix,
   connectionSites,
+  evaluateGeometry,
+  invert,
   multiply,
   type LayoutItem,
   type Matrix,
 } from '../../layout/index.ts';
 import type { GeometrySpec, Xfrm } from '../../cascade/index.ts';
 import type { ConnectionTarget, ConnectorRoute, TransformItem } from '../../contracts/neutral.ts';
-import { lineEnds, lineTransform, toFile, toParent, unionBounds, type Box } from './placement.ts';
+import {
+  deltaToParent,
+  lineEnds,
+  lineTransform,
+  toFile,
+  toParent,
+  unionBounds,
+  type Box,
+} from './placement.ts';
 
 type Point = { readonly x: number; readonly y: number };
 
@@ -384,4 +394,184 @@ export function followingConnectors(
     out.push(connectorRoute(item, endOf('start'), endOf('end')));
   }
   return out;
+}
+
+/** The most segments a connector preset draws (`bentConnector5`). */
+const MOST_SEGMENTS = 5;
+
+/**
+ * The corners of an elbow or curve connector in its parent space, from its start to its end,
+ * with no segment of zero length, or null for any other item. A curve has the corners of the elbow with the same values: its
+ * segments bend between them.
+ */
+export function elbowCorners(item: LayoutItem): Point[] | null {
+  const family = familyOf(item);
+  if (item.kind !== 'shape' || item.element.geometry.kind !== 'preset') return null;
+  if (family !== 'bentConnector' && family !== 'curvedConnector') return null;
+  const { preset, adjust } = item.element.geometry;
+  const { cx, cy } = item.element.xfrm;
+  const spec: GeometrySpec = { kind: 'preset', preset: `bentConnector${preset.slice(-1)}`, adjust };
+  const cmds = evaluateGeometry(spec, cx, cy).paths[0]?.commands ?? [];
+  // The item's own box to its parent's space: the item matrix, then out of the parent.
+  const own = multiply(invert(item.parentMatrix), item.matrix);
+  const pts: Point[] = [];
+  for (const c of cmds) if (c.op === 'M' || c.op === 'L') pts.push(apply(own, c.x, c.y));
+  // Adjust values can put a corner on an end or on another corner: those segments have no
+  // length, so the route is the corners without them. A straight route keeps one segment.
+  const route = simplified(pts);
+  // A connector turned off the axes (say 45°) has slanted segments: no segment drag fits it.
+  const square = route.every(
+    (q, i) => i === 0 || Math.abs(q.x - route[i - 1].x) < 1 || Math.abs(q.y - route[i - 1].y) < 1
+  );
+  return route.length >= 2 && square ? route : null;
+}
+
+/** The corners without repeated points and without corners on a straight run. */
+function simplified(pts: readonly Point[]): Point[] {
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 1;
+  const out: Point[] = [];
+  for (const p of pts) {
+    const q = out[out.length - 1];
+    if (!q || !near(q.x, p.x) || !near(q.y, p.y)) out.push(p);
+  }
+  for (let i = 1; i < out.length - 1;) {
+    const [a, b, c] = [out[i - 1], out[i], out[i + 1]];
+    const straight = (near(a.x, b.x) && near(b.x, c.x)) || (near(a.y, b.y) && near(b.y, c.y));
+    if (straight) out.splice(i, 1);
+    else i += 1;
+  }
+  return out;
+}
+
+/** The axis a segment of a route moves along: `y` for a horizontal segment, `x` for a vertical. */
+export function segmentAxis(a: Point, b: Point): 'x' | 'y' {
+  return Math.abs(a.y - b.y) < Math.abs(a.x - b.x) ? 'y' : 'x';
+}
+
+/**
+ * The route after segment `index` of `corners` moves across to the line `value`. A middle
+ * segment moves with its two corners. An end segment keeps its end and gains a bend there; a
+ * glued end keeps a short run in its site's direction before the bend, so the connector still
+ * meets the shape square. Segments that come in line merge.
+ */
+function segmentRoute(
+  item: LayoutItem,
+  corners: readonly Point[],
+  index: number,
+  value: number
+): Point[] {
+  const a = corners[index];
+  const b = corners[index + 1];
+  const across = segmentAxis(a, b);
+  const moved = (q: Point): Point => ({ ...q, [across]: value });
+  const last = corners.length - 2;
+  const glue = item.kind === 'shape' ? item.element.connections : undefined;
+  // The point on the segment a short run from end `q`, toward `to`.
+  const stub = (q: Point, to: Point): Point => {
+    const len = Math.hypot(to.x - q.x, to.y - q.y);
+    const k = len > 0 ? Math.min(STUB, len / 2) / len : 0;
+    return { x: q.x + (to.x - q.x) * k, y: q.y + (to.y - q.y) * k };
+  };
+  // An end segment: the end, its run out of a glued site, then the moved segment.
+  const head = (end: Point, other: Point, glued: boolean): Point[] =>
+    glued ? [end, stub(end, other), moved(stub(end, other))] : [end, moved(end)];
+  return simplified([
+    ...corners.slice(0, index),
+    ...(index === 0 ? head(a, b, !!glue?.start) : [moved(a)]),
+    ...(index === last ? head(b, a, !!glue?.end).reverse() : [moved(b)]),
+    ...corners.slice(index + 2),
+  ]);
+}
+
+/** Whether a preset draws a route: two to five segments. */
+const drawable = (route: readonly Point[]): boolean =>
+  route.length >= 3 && route.length - 1 <= MOST_SEGMENTS;
+
+/** The unit axis direction from `a` to `b`. */
+const heading = (a: Point, b: Point): string =>
+  `${Math.sign(Math.round(b.x - a.x))},${Math.sign(Math.round(b.y - a.y))}`;
+
+/**
+ * Whether `route` can replace `corners`: a preset draws it, and each glued end still leaves
+ * its site in the same direction, so a merge never runs the connector along the shape's side.
+ */
+function routeFits(item: LayoutItem, corners: readonly Point[], route: readonly Point[]): boolean {
+  if (!drawable(route)) return false;
+  const glue = item.kind === 'shape' ? item.element.connections : undefined;
+  const [n, m] = [route.length - 1, corners.length - 1];
+  if (glue?.start && heading(route[0], route[1]) !== heading(corners[0], corners[1])) return false;
+  return !glue?.end || heading(route[n - 1], route[n]) === heading(corners[m - 1], corners[m]);
+}
+
+/**
+ * Whether segment `index` of `corners` has a place to move to that a preset draws. An end
+ * segment adds a bend, or two at a glued end, unless it comes in line with another segment.
+ */
+export function segmentMovable(
+  item: LayoutItem,
+  corners: readonly Point[],
+  index: number
+): boolean {
+  const a = corners[index];
+  const b = corners[index + 1];
+  if (!a || !b) return false;
+  const across = segmentAxis(a, b);
+  // A free place beside the segment, and each other corner's line, where segments merge.
+  const span = Math.hypot(b.x - a.x, b.y - a.y);
+  const lines = [a[across] + span, ...corners.map((q) => q[across])];
+  return lines.some(
+    (v) => v !== a[across] && routeFits(item, corners, segmentRoute(item, corners, index, v))
+  );
+}
+
+/**
+ * The transform of an elbow or curve connector after segment `index` of its route moves across
+ * as far as the pointer moved from slide point `from` to `to` (see `segmentRoute`). Within
+ * `snap` (slide units) of another corner's line or of its own first line, the segment snaps to
+ * it, so a bend is easy to take out and a slip is easy to undo. The ends and their glue stay.
+ * `same` when the route is back where it started. Null when the route would need more
+ * segments than a preset draws, or when the item is no elbow or curve.
+ */
+export function moveElbowSegment(
+  item: LayoutItem,
+  index: number,
+  from: Point,
+  to: Point,
+  snap: number | null = null
+): TransformItem | 'same' | null {
+  const corners = elbowCorners(item);
+  const family = familyOf(item);
+  if (!corners || index < 0 || index >= corners.length - 1) return null;
+  const a = corners[index];
+  const across = segmentAxis(a, corners[index + 1]);
+  // The segment moves by the pointer's move, so a press beside the handle does not jump it.
+  const p0 = toParent(item, from.x, from.y);
+  const p1 = toParent(item, to.x, to.y);
+  let value = a[across] + p1[across] - p0[across];
+  if (snap !== null) {
+    const d = deltaToParent(item, snap, 0);
+    const reach = Math.hypot(d.x, d.y);
+    const lines = [a, ...corners.filter((_, i) => i !== index && i !== index + 1)];
+    const off = (q: Point): number => Math.abs(q[across] - value);
+    // The nearest line in reach where the route still fits (`routeFits`).
+    const fits = lines
+      .filter((q) => off(q) <= reach)
+      .sort((u, v) => off(u) - off(v))
+      .find(
+        (q) => q === a || routeFits(item, corners, segmentRoute(item, corners, index, q[across]))
+      );
+    if (fits) value = fits[across];
+  }
+  const route = segmentRoute(item, corners, index, value);
+  // Back on its first route (a straight elbow back in line too): nothing to write.
+  const same =
+    route.length === corners.length &&
+    route.every((q, i) => Math.abs(q.x - corners[i].x) < 1 && Math.abs(q.y - corners[i].y) < 1);
+  if (same || route.length < 3) return 'same';
+  if (!routeFits(item, corners, route)) return null;
+  const n = route.length - 1;
+  const vertical = Math.abs(route[1].x - route[0].x) < 1;
+  const fit = fitElbow(route, vertical);
+  const connector: ConnectorRoute = { preset: `${family}${n}`, adjust: fit.adjust };
+  return { ...toFile(item, fit.box), flipH: fit.flipH, flipV: fit.flipV, connector };
 }
