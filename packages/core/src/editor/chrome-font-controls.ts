@@ -48,6 +48,8 @@ export const CHANGE_CASE_CONTROL: ChromeControl = {
   // Home > Change Case: rewrites the letters, keeps the formatting.
   id: 'changeCase',
   shape: 'dropdown',
+  // Off the default bar: the Format menu places it.
+  defaultToolbar: false,
   labelKey: 'toolbar.changeCase',
   paths: icon('match_case'),
   options: TEXT_CASES.map((c) => ({ value: c, labelKey: `toolbar.cases.${c}` as const })),

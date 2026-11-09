@@ -528,7 +528,6 @@ describe('the preset toolbar while the notes field has focus', () => {
       'text.underline',
       'text.strike',
       'find.find',
-      'find.replace',
     ]);
     fireEvent.click(container.querySelector<HTMLElement>('[data-slot="text.strike"]')!);
     expect(

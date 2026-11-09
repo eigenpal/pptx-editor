@@ -47,7 +47,10 @@ const correctionValue = (b: number, c: number): string => `${b},${c}`;
 /** A percent as the gallery labels it: `+20`, `0`, `-40`. */
 const signed = (v: number): string => (v > 0 ? `+${v}` : String(v));
 
-/** The `image` group. @internal */
+/**
+ * The `image` group. Color, Transparency, Reset, Crop to shape, and Crop fit stay off the default
+ * bar: Format > Picture and the picture context menu place them. @internal
+ */
 export const IMAGE_CHROME_GROUP: ChromeGroup = {
   id: 'image',
   labelKey: 'toolbar.groups.image',
@@ -68,6 +71,7 @@ export const IMAGE_CHROME_GROUP: ChromeGroup = {
     },
     {
       id: 'color',
+      defaultToolbar: false,
       shape: 'dropdown',
       labelKey: 'pictureFormat.color',
       toggle: 'choice',
@@ -80,6 +84,7 @@ export const IMAGE_CHROME_GROUP: ChromeGroup = {
     },
     {
       id: 'transparency',
+      defaultToolbar: false,
       shape: 'dropdown',
       labelKey: 'pictureFormat.transparency',
       toggle: 'choice',
@@ -99,6 +104,7 @@ export const IMAGE_CHROME_GROUP: ChromeGroup = {
     },
     {
       id: 'reset',
+      defaultToolbar: false,
       shape: 'dropdown',
       labelKey: 'pictureFormat.reset',
       paths: icon('restart_alt'),
@@ -135,6 +141,7 @@ export const IMAGE_CHROME_GROUP: ChromeGroup = {
     },
     {
       id: 'cropToShape',
+      defaultToolbar: false,
       shape: 'gallery',
       labelKey: 'pictureFormat.cropToShape',
       paths: icon('shapes'),
@@ -142,6 +149,7 @@ export const IMAGE_CHROME_GROUP: ChromeGroup = {
     },
     {
       id: 'cropFit',
+      defaultToolbar: false,
       shape: 'dropdown',
       labelKey: 'pictureFormat.cropFit',
       paths: icon('frame_person'),

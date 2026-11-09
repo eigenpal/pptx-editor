@@ -88,6 +88,8 @@ describe('the React and Vue toolbars draw the same contextual groups and menus',
   test('on a narrow bar: the same groups leave for More, and the open panel matches', async () => {
     restore = fixWidths(() => 60);
     const editor = await openDeck();
+    // A selected shape fills the bar: the empty selection's short bar fits even this width.
+    selectShape(editor);
     const react = renderReact(editor, createElement(Toolbar));
     const reactMore = react.querySelector<HTMLElement>('[aria-label="More"]')!;
     expect(reactMore !== null).toBe(true);
@@ -360,6 +362,7 @@ describe('the Vue More menu', () => {
   test('overflow false wraps the bar, and turning it off brings collapsed groups back', async () => {
     restore = fixWidths(() => 60);
     const editor = await openDeck();
+    selectShape(editor);
     const state = { overflow: true };
     const { reactive } = await import('vue');
     const live = reactive(state);
@@ -371,7 +374,8 @@ describe('the Vue More menu', () => {
     // The built-in More group keeps its label; only the overflow button goes away.
     expect(moreButtons()).toBe(0);
     expect(bar(host).classList.contains('pptx-toolbar--wrap')).toBe(true);
-    expect(bar(host).querySelector(':scope > [data-group="find"]') !== null).toBe(true);
+    // `more` is among the first shape groups to leave the bar; it is back now.
+    expect(bar(host).querySelector(':scope > [data-group="more"]') !== null).toBe(true);
   });
 });
 

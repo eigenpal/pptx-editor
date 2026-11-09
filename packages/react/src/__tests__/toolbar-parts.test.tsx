@@ -92,11 +92,19 @@ describe('named parts', () => {
     expect(container.querySelector('[data-slot="text.strike"]') === null).toBe(true);
   });
 
-  test('Toolbar.Autofit is the Text fitting picker, and hidden removes it', async () => {
+  test('Toolbar.Autofit places the Text fitting picker, and hidden removes it', async () => {
     const editor = await open();
-    const { container } = renderToolbar(editor, <Toolbar />);
-    const fit = container.querySelector<HTMLElement>('[data-slot="paragraph.autofit"]')!;
-    expect(fit.closest('[data-group]')!.getAttribute('data-group')).toBe('paragraph');
+    // The default bar leaves it to the Format menu and the Format pane.
+    const preset = renderToolbar(editor, <Toolbar />);
+    expect(preset.container.querySelector('[data-slot="paragraph.autofit"]') === null).toBe(true);
+    cleanup();
+    const { container } = renderToolbar(
+      editor,
+      <Toolbar>
+        <Toolbar.Autofit />
+      </Toolbar>
+    );
+    expect(container.querySelector('[data-slot="paragraph.autofit"]') !== null).toBe(true);
     cleanup();
     const hidden = renderToolbar(
       editor,
@@ -718,7 +726,7 @@ describe('the bar for the selection', () => {
     act(() => remove.focus());
     act(() => void fireEvent.click(remove));
     // Nothing is selected now: the shape and arrange groups left with the Delete button.
-    expect(barGroups(container)).toEqual(['history', 'insert', 'slide', 'find']);
+    expect(barGroups(container)).toEqual(['history', 'insert', 'find']);
     expect(container.querySelector('.pptx-toolbar')!.contains(document.activeElement)).toBe(true);
   });
 

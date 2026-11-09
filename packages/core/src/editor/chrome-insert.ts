@@ -8,10 +8,14 @@ import type { ChromeControl, ChromeGroup } from './chrome-controls.ts';
 import { LINE_KINDS } from './chrome-slot-commands.ts';
 import { ICON_PATHS } from './icon-paths.ts';
 
-/** The Equation control of the `insert` group. @internal */
+/**
+ * The Equation control of the `insert` group. Insert > Equation places it; the default bar
+ * leaves it out, as it is not a frequent task. @internal
+ */
 const EQUATION_CONTROL: ChromeControl = {
   id: 'equation',
   labelKey: 'toolbar.equation',
+  defaultToolbar: false,
   paths: ICON_PATHS['functions'] ?? [],
   state: { kind: 'dialog', dialog: 'equation' },
 };

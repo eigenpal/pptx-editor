@@ -159,9 +159,14 @@ describe('toolbar review fixes (Vue)', () => {
     expect(fixed.textContent).toBe('Send');
   });
 
-  test('PptxEditorToolbar.Autofit is the Text fitting picker, and hidden removes it', async () => {
+  test('PptxEditorToolbar.Autofit places the Text fitting picker, and hidden removes it', async () => {
     const editor = await open();
-    const full = await mount(editor, () => h(PptxEditorToolbar));
+    // The default bar leaves it to the Format menu and the Format pane, as in React.
+    const preset = await mount(editor, () => h(PptxEditorToolbar));
+    expect(preset.querySelector('[data-slot="paragraph.autofit"]') === null).toBe(true);
+    const full = await mount(editor, () =>
+      h(PptxEditorToolbar, null, () => [h(PptxEditorToolbar.Autofit)])
+    );
     expect(full.querySelector('[data-slot="paragraph.autofit"]') !== null).toBe(true);
     const root = await mount(editor, () =>
       h(PptxEditorToolbar, null, () => [h(PptxEditorToolbar.Autofit, { hidden: true })])
@@ -380,7 +385,8 @@ describe('Vue bar groups', () => {
     const el = await mount(editor, () => h(PptxEditorToolbar));
     const find = el.querySelector('[data-group="find"]')!;
     expect(find.querySelector('[data-slot="find.find"]') !== null).toBe(true);
-    expect(find.querySelector('[data-slot="find.replace"]') !== null).toBe(true);
+    // Replace opens from the find bar, Edit > Replace, and Ctrl/Cmd+H: the bar shows Find only.
+    expect(find.querySelector('[data-slot="find.replace"]') === null).toBe(true);
     const seps = el.querySelectorAll('.pptx-toolbar > .pptx-toolbar__sep').length;
     const groups = el.querySelectorAll('.pptx-toolbar > [data-group]').length;
     expect(seps).toBe(Math.max(0, groups - 1));
@@ -396,9 +402,8 @@ describe('Vue bar groups', () => {
     const el2 = await mount(editor, () =>
       h(PptxEditorToolbar, null, () => [h(T.Slot!, { slotId: 'find.find' }, () => [])])
     );
-    // As React: slot content (even none) replaces the control; the group keeps Replace.
+    // As React: slot content (even none) replaces the control.
     expect(el2.querySelector('[data-slot="find.find"]') === null).toBe(true);
-    expect(el2.querySelector('[data-group="find"] [data-slot="find.replace"]') !== null).toBe(true);
   });
 });
 
@@ -552,7 +557,7 @@ describe('the Vue bar for the selection', () => {
     remove.click();
     await nextTick();
     await nextTick();
-    expect(groups(el)).toEqual(['history', 'insert', 'slide', 'find']);
+    expect(groups(el)).toEqual(['history', 'insert', 'find']);
     expect(el.querySelector('.pptx-toolbar')!.contains(document.activeElement)).toBe(true);
   });
 
@@ -603,7 +608,6 @@ describe('the Vue bar for the selection', () => {
         'text.underline',
         'text.strike',
         'find.find',
-        'find.replace',
       ]);
       el.querySelector<HTMLElement>('[data-slot="text.strike"]')!.click();
       expect(applied).toEqual(['strike']);

@@ -8,13 +8,13 @@ This page lists the toolbar identifiers and rules. For the tasks, see [Toolbar](
 
 ## Registered groups and slots
 
-These identifiers come from the shared chrome registry (`CHROME_GROUPS`). A registered operation can stay disabled with the engine's refusal reason. The preset toolbar never shows the slots marked with an asterisk (\*); see [Place the shape format controls](/docs/customization/toolbar#place-the-shape-format-controls). The contextual groups (`view`, `file`, `edit`, `slide`, and `section`) belong to the menus, the slide rail, and the slide sorter. A named part or `Toolbar.Slot` can still place one of their slots. The toolbar shows the `slide.background` and `slide.layout` controls while nothing is selected.
+These identifiers come from the shared chrome registry (`CHROME_GROUPS`). A registered operation can stay disabled with the engine's refusal reason. The preset toolbar never shows the slots marked with an asterisk (\*); see [Place the shape format controls](/docs/customization/toolbar#place-the-shape-format-controls). The contextual groups (`view`, `file`, `edit`, `slide`, and `section`) belong to the menus, the slide rail, and the slide sorter. A named part or `Toolbar.Slot` can still place one of their slots.
 
 The toolbar shows only the groups that act on the selection:
 
 | Selection | Groups on the toolbar |
 | --- | --- |
-| Nothing, or slides in the slide rail | `history`, `insert`, `slide` (`slide.background` and `slide.layout` only), `find` |
+| Nothing, or slides in the slide rail | `history`, `insert`, `find` |
 | Text with the caret or a text range in it | `history`, `font`, `text`, `paragraph`, `list`, `insert`, `format` |
 | One or more shapes | `history`, `font`, `text`, `paragraph`, `insert`, `shape`, `format`, `arrange`, `more` |
 | Pictures only | `history`, `insert`, `image`, `arrange`, `more` |
@@ -29,23 +29,23 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 - A `Toolbar.Slot` or named part for a slot of these groups changes that control. It shows while its group shows.
 - A `Toolbar.Slot` for a slot that no context shows, such as a slot marked with an asterisk, goes after the groups and shows for every selection.
 - An application group with `after` follows its anchor. When the selection does not show the anchor, the group follows the nearest shown group before the anchor, in this order: `history`, `font`, `text`, `script`, `paragraph`, `list`, `insert`, `image`, `chart`, `diagram`, `shape`, `format`, `arrange`, `more`, `slide`, `find`, `table`. With `contextual={false}`, it follows the order of that bar: its groups, then `image`, `chart`, `diagram`, and `table`.
-- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image`, `chart`, `diagram`, and `table` groups join after the other groups. The bar then has no `slide` group, so a placed `slide.background` or `slide.layout` goes after the groups. The slots marked with an asterisk stay off the bar in both modes.
+- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image`, `chart`, `diagram`, and `table` groups join after the other groups. The slots marked with an asterisk stay off the bar in both modes.
 - A `preset={false}` bar shows the slots you place for every selection.
 
 | Group identifier | Slot identifiers |
 | --- | --- |
 | `history` | `history.undo`, `history.redo` |
 | `font` | `font.family`, `font.size` |
-| `text` | `text.bold`, `text.italic`, `text.underline`, `text.strike`, `text.characterSpacing`\*, `text.changeCase`, `text.color`, `text.highlight`, `text.link`, `text.dialog` (contextual) |
+| `text` | `text.bold`, `text.italic`, `text.underline`, `text.strike`, `text.characterSpacing`\*, `text.changeCase`\*, `text.color`, `text.highlight`, `text.link`\*, `text.dialog` (contextual) |
 | `script` | `script.super`\*, `script.sub`\* |
-| `paragraph` | `paragraph.align`, `paragraph.textDirection`, `paragraph.valign`, `paragraph.columns`\*, `paragraph.dialog` (contextual) |
+| `paragraph` | `paragraph.align`, `paragraph.textDirection`\*, `paragraph.valign`, `paragraph.autofit`\*, `paragraph.columns`\*, `paragraph.dialog` (contextual) |
 | `list` | `list.bullet`, `list.bulletStyle`, `list.numbered`, `list.numberStyle`, `list.outdent`, `list.indent`, `list.lineSpacing` |
-| `insert` | `insert.textBox`, `insert.line`, `insert.shape`, `insert.image`, `insert.chart`, `insert.equation` |
+| `insert` | `insert.textBox`, `insert.line`, `insert.shape`, `insert.image`, `insert.chart`, `insert.equation`\* |
 | `shape` | `shape.styles`\*, `shape.fill`, `shape.lineColor`, `shape.lineWidth`, `shape.lineStart`, `shape.lineEnd`, `shape.lineDash`, `shape.effects`\*, `shape.textEffects`\*, `shape.properties`\* |
 | `format` | `format.painter`, `format.clear` |
-| `arrange` | `arrange.order`, `arrange.align`, `arrange.rotate`\*, `arrange.group`, `arrange.ungroup`, `arrange.selectionPane`\* |
+| `arrange` | `arrange.order`, `arrange.align`, `arrange.rotate`\*, `arrange.group`\*, `arrange.ungroup`\*, `arrange.selectionPane`\* |
 | `more` | `more.duplicate`, `more.delete` |
-| `find` | `find.find`, `find.replace` |
+| `find` | `find.find`, `find.replace`\* |
 | `view` (contextual) | `view.presentationView`, `view.smartGuides`, `view.playFromStart`, `view.playFromCurrent` |
 | `file` (contextual) | `file.pageSetup` |
 | `edit` (contextual) | `edit.cut`, `edit.copy`, `edit.paste`, `edit.selectAll` |
@@ -55,7 +55,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `chart` (contextual, shown for one chart) | `chart.editData` (opens the **Chart** tab of the side panel) |
 | `diagram` (contextual, shown for one diagram) | `diagram.addAfter`, `diagram.addBefore`, `diagram.addBelow`, `diagram.delete` |
 | `review` (contextual) | `review.addComment` (opens a new comment draft in the comments pane of `@pptx-editor.dev/pro`) |
-| `image` (contextual) | `image.corrections`, `image.color`, `image.transparency`, `image.change`, `image.reset`, `image.styles`, `image.altText`, `image.crop`, `image.cropToShape`, `image.cropFit`, `image.properties` |
+| `image` (contextual) | `image.corrections`, `image.color`\*, `image.transparency`\*, `image.change`, `image.reset`\*, `image.styles`, `image.altText`, `image.crop`, `image.cropToShape`\*, `image.cropFit`\*, `image.properties` |
 
 ## Named parts
 

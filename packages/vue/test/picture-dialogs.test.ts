@@ -113,21 +113,17 @@ describe('the image group on the Vue toolbar', () => {
       );
     // A picture shows the picture tools and none of the text or shape groups, as in React.
     expect(groups()).toEqual(['history', 'insert', 'image', 'arrange', 'more']);
-    // Every control of the picture group, as in React.
+    // The picture group's bar controls, as in React. Format > Picture and the picture context
+    // menu hold Color, Transparency, Reset, Crop to shape, and Crop fit.
     const slots = [...document.querySelectorAll('[data-group="image"] [data-slot]')].map((e) =>
       e.getAttribute('data-slot')
     );
     expect(slots).toEqual([
       'image.corrections',
-      'image.color',
-      'image.transparency',
       'image.change',
-      'image.reset',
       'image.styles',
       'image.altText',
       'image.crop',
-      'image.cropToShape',
-      'image.cropFit',
       'image.properties',
     ]);
     editor.setSelection({ kind: 'none' });

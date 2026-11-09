@@ -92,8 +92,11 @@ describe('the image group on the toolbar', () => {
     act(() => editor.setSelection({ kind: 'shapes', nodeIds: [nodeAt(editor, 0)] }));
     // A picture shows the picture tools and none of the text or shape groups.
     expect(barGroups()).toEqual(['history', 'insert', 'image', 'arrange', 'more']);
-    for (const id of ['image.crop', 'image.change', 'image.altText', 'image.transparency'])
+    for (const id of ['image.crop', 'image.change', 'image.altText', 'image.styles'])
       expect(slot(id) !== null).toBe(true);
+    // Format > Picture and the picture context menu hold the rest.
+    for (const id of ['image.color', 'image.transparency', 'image.reset', 'image.cropFit'])
+      expect(slot(id) === null).toBe(true);
     // Two pictures keep the group: the Picture Format tab stays.
     act(() =>
       editor.setSelection({ kind: 'shapes', nodeIds: [nodeAt(editor, 0), nodeAt(editor, 2)] })
@@ -111,7 +114,10 @@ describe('the image group on the toolbar', () => {
     const editor = await open();
     render(
       <PptxEditorContext.Provider value={editor}>
-        <PptxEditor.Toolbar />
+        <PptxEditor.Toolbar>
+          {/* Off the default bar; a host adds it back. */}
+          <PptxEditor.Toolbar.ImageTransparency />
+        </PptxEditor.Toolbar>
       </PptxEditorContext.Provider>
     );
     act(() => editor.setSelection({ kind: 'shapes', nodeIds: [nodeAt(editor, 0)] }));

@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  chromeControlForSlot,
+  STATUS_BAR_VIEW_OPTIONS,
   focusSorterOnShow,
   tooltipAttributes,
   groupSlideSections,
@@ -220,14 +220,14 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
 }
 
 /**
- * Normal, Slide Sorter, and Slide Master as buttons, as in a status bar: the default editor's
- * view switch, a one-of-three choice (`radiogroup`). Hosts place the `view.presentationView` slot
- * instead. @internal
+ * Normal and Slide Sorter as buttons, as in a status bar: the default editor's view switch, a
+ * one-of-two choice (`radiogroup`). View > Slide Master opens the slide master view. Hosts
+ * place the `view.presentationView` slot instead. @internal
  */
 export function ViewSwitch() {
   const { t } = useTranslation();
   const cmd = useEditorCommand('view.presentationView');
-  const options = chromeControlForSlot('view.presentationView')?.options ?? [];
+  const options = STATUS_BAR_VIEW_OPTIONS;
   const off = !cmd.isEnabled;
   const reason = cmd.disabledReason ? translateKeyOrText(t, cmd.disabledReason) : null;
   // Off stays focusable, with the reason as its description.
@@ -248,8 +248,10 @@ export function ViewSwitch() {
       aria-label={t('toolbar.presentationView')}
       onMouseDown={keepFocus}
     >
-      {options.map((o) => {
+      {options.map((o, i) => {
         const on = cmd.value === o.value;
+        // In the slide master view no option is checked: the first one keeps the tab stop.
+        const tabStop = on || (i === 0 && !options.some((x) => x.value === cmd.value));
         const label = t(o.labelKey);
         return (
           <button
@@ -260,7 +262,7 @@ export function ViewSwitch() {
             aria-label={label}
             {...offAttrs.attrs}
             {...tooltipAttributes(label, off, reason)}
-            tabIndex={on ? 0 : -1}
+            tabIndex={tabStop ? 0 : -1}
             className="pptx-toolbar__button pptx-view-switch__option"
             data-active={on ? '' : undefined}
             data-disabled={off ? '' : undefined}

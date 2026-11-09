@@ -19,7 +19,7 @@ import {
   type VNodeChild,
 } from 'vue';
 import {
-  chromeControlForSlot,
+  STATUS_BAR_VIEW_OPTIONS,
   focusSorterOnShow,
   tooltipAttributes,
   groupSlideSections,
@@ -277,16 +277,16 @@ export const ReadOnlyBadge = defineComponent({
 });
 
 /**
- * Normal, Slide Sorter, and Slide Master as buttons, as in a status bar: the default editor's
- * view switch, a one-of-three choice (`radiogroup`). Hosts place the `view.presentationView` slot instead. The
- * twin of React's `ViewSwitch`. @internal
+ * Normal and Slide Sorter as buttons, as in a status bar: the default editor's view switch, a
+ * one-of-two choice (`radiogroup`). View > Slide Master opens the slide master view. Hosts
+ * place the `view.presentationView` slot instead. The twin of React's `ViewSwitch`. @internal
  */
 export const ViewSwitch = defineComponent({
   name: 'PptxViewSwitch',
   setup() {
     const { t } = useTranslation();
     const cmd = useEditorCommand('view.presentationView');
-    const options = chromeControlForSlot('view.presentationView')?.options ?? [];
+    const options = STATUS_BAR_VIEW_OPTIONS;
     const off = computed(() => !cmd.isEnabled.value);
     const reason = computed(() =>
       cmd.disabledReason.value ? translateKeyOrText(t, cmd.disabledReason.value) : null
@@ -317,8 +317,10 @@ export const ViewSwitch = defineComponent({
         aria-label={t('toolbar.presentationView')}
         onMousedown={keepFocus}
       >
-        {options.map((o) => {
+        {options.map((o, i) => {
           const on = cmd.value.value === o.value;
+          // In the slide master view no option is checked: the first one keeps the tab stop.
+          const tabStop = on || (i === 0 && !options.some((x) => x.value === cmd.value.value));
           const label = t(o.labelKey);
           return (
             <button
@@ -329,7 +331,7 @@ export const ViewSwitch = defineComponent({
               aria-label={label}
               {...offAttrs.attrs.value}
               {...tooltipAttributes(label, off.value, reason.value)}
-              tabindex={on ? 0 : -1}
+              tabindex={tabStop ? 0 : -1}
               class="pptx-toolbar__button pptx-view-switch__option"
               data-active={on ? '' : undefined}
               data-disabled={off.value ? '' : undefined}

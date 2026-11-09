@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   EMPTY_EDITOR_SNAPSHOT,
+  STATUS_BAR_VIEW_OPTIONS,
   TOOLBAR_BAR_GROUPS,
   TOOLBAR_PICTURE_GROUPS,
   arrangeToolbarGroups,
@@ -51,12 +52,17 @@ describe('toolbarContextOf', () => {
 });
 
 describe('toolbarGroupsFor', () => {
-  test('nothing selected: Insert, the slide, and Find', () => {
-    expect(ids('none')).toEqual(['history', 'insert', 'slide', 'find']);
-    expect(slots('none').filter((s) => s.startsWith('slide.'))).toEqual([
-      'slide.background',
-      'slide.layout',
-    ]);
+  test('nothing selected: Insert and Find', () => {
+    expect(ids('none')).toEqual(['history', 'insert', 'find']);
+    // Menus and shortcuts place the less frequent tasks; the bar leaves them out.
+    for (const slot of ['insert.equation', 'slide.layout', 'slide.background', 'find.replace'])
+      expect(slots('none')).not.toContain(slot);
+  });
+
+  test('a selected shape leaves Group, Ungroup, and Link to menus and shortcuts', () => {
+    for (const slot of ['arrange.group', 'arrange.ungroup', 'text.link'])
+      expect(slots('shape')).not.toContain(slot);
+    expect(slots('shape')).toContain('arrange.order');
   });
 
   test('text shows the text groups and none of the shape, arrange, or picture groups', () => {
@@ -116,7 +122,6 @@ describe('toolbarGroupsFor', () => {
       'text.underline',
       'text.strike',
       'find.find',
-      'find.replace',
     ]);
   });
 
@@ -131,7 +136,8 @@ describe('toolbarGroupsFor', () => {
       for (const slot of off) expect(slots(context)).not.toContain(slot);
     // A host still places them: they go after the groups, not into a hidden group.
     expect(isToolbarBarSlot('script.super')).toBe(false);
-    expect(isToolbarBarSlot('slide.background')).toBe(true);
+    expect(isToolbarBarSlot('slide.background')).toBe(false);
+    expect(isToolbarBarSlot('find.find')).toBe(true);
   });
 
   test('the same array comes back for the same context', () => {
@@ -185,4 +191,8 @@ describe('the bar across selections', () => {
     for (const g of formattingBarChromeGroups()) expect(g.controls.length).toBeGreaterThan(0);
     expect(formattingBarChromeGroups().map((g) => g.id)).not.toContain('script');
   });
+});
+
+test('the status bar view switch shows Normal and Slide Sorter; View > Slide Master opens the third view', () => {
+  expect(STATUS_BAR_VIEW_OPTIONS.map((o) => o.value)).toEqual(['normal', 'slideSorter']);
 });

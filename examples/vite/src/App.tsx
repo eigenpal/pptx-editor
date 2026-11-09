@@ -342,16 +342,7 @@ function Shell({
       </header>
       <main className="demo-main">
         <h1 className="demo-sr-only">{t('app.productName')}</h1>
-        <div className="demo-dock">
-          {ribbon ? (
-            <PptxEditor.Ribbon />
-          ) : (
-            <PptxEditor.Toolbar>
-              <PptxEditor.Toolbar.ChangeCase hidden />
-              <PptxEditor.Toolbar.Link hidden />
-            </PptxEditor.Toolbar>
-          )}
-        </div>
+        <div className="demo-dock">{ribbon ? <PptxEditor.Ribbon /> : <PptxEditor.Toolbar />}</div>
         <div
           className={rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'}
           {...fileDrop}
