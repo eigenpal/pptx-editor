@@ -788,11 +788,12 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       views.reset();
       painter.reset(true);
       groups.closeAll();
+      // Late shaping counts in `resolving` before the ready publish, for a listener that reads it.
+      hostFonts.awaitShaping(opened);
       emit();
       opening.start(opened);
-      // Register faces that arrived before the mount. Shaped measurement can still be late.
+      // Register faces that arrived before the mount.
       if (opened.fontGeneration !== r.generation) void refreshFaces(opened);
-      hostFonts.awaitShaping(opened);
       return { ok: true };
     } catch (cause) {
       console.error(`[pptx-editor] The open failed (${phase})`, cause);

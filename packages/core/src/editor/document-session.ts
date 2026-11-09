@@ -926,9 +926,9 @@ export async function openPresentation(
   if (options.fixedMeasurer) return { ok: true, session: make({ ...base, fixed: true }) };
   const families = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
   const parsedAt = performance.now();
-  const shaping = initializeHarfBuzz().then(() =>
-    families ? substituteFonts(families) : { sources: [], failures: [] }
-  );
+  // The substitutes download next to the text engine, not after it: the two waits do not add up.
+  const subs = families ? substituteFonts(families) : { sources: [], failures: [] };
+  const shaping = Promise.all([initializeHarfBuzz(), subs]).then(([, loaded]) => loaded);
   const shaped = (loaded: SubstituteLoad): FontSet => ({
     ...base,
     substitutes: loaded.sources,
