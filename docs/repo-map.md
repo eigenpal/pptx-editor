@@ -44,7 +44,7 @@ Read these in order before you change anything:
 | `docs/site/data/` | The feature matrix (`pptx-features.ts`, synced to the docs site), the evidence of each row (`pptx-feature-evidence.ts`: fixtures and approximation ids), the saved fixtures and feature edits that opened with no repair prompt (`save-verified-fixtures.ts`), and the evidence and approximation tests (`pptx-features.test.ts`). `navigation.test.ts` checks page metadata, sidebar coverage, and internal page links. `fidelity-page.test.ts` checks the `<FeatureMatrix>` and `<FeatureBadge>` tags and the `docsLink` of each row. `docs/site/README.md` says what the docs site provides |
 | `openspec/` | Maintained specifications in `specs/`. |
 | `.changeset/` | Pending release notes, one per code change |
-| `.github/` | CI (`ci.yml`), release and nightly canary (`release.yml`), post-release comments (`post-release.yml`), the CLA check (`cla.yml`, logic and tests in `.github/cla/`), Dependabot |
+| `.github/` | CI (`ci.yml`), release and nightly canary (`release.yml`), post-release comments and the website update (`post-release.yml`), the CLA check (`cla.yml`, logic and tests in `.github/cla/`), Dependabot |
 | `signatures/` | Signed CLA records, written by the CLA check (`signatures/version1/cla.json`) |
 
 Never commit, and never read into committed files:

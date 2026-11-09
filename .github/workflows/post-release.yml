@@ -2,9 +2,9 @@ name: Post-release updates
 
 # Adapted from DOCX Editor's post-release workflow (docx-editor/.github/workflows/post-release.yml).
 # When a Release run publishes, comment "Released in vX.Y.Z" on every shipped PR and every
-# issue it closed. When PPTX_ROADMAP_PROJECT_NUMBER is set, stamp that project's "Shipped in" field. DOCX Editor also
-# verifies the published packages and updates its sites here; PPTX Editor has no such
-# steps yet. DOCX Editor commit adf0e178.
+# issue it closed. When PPTX_ROADMAP_PROJECT_NUMBER is set, stamp that project's "Shipped in" field.
+# Send pptx-editor.dev an `upstream-release` dispatch, so the site moves to the new version
+# and regenerates its docs the same day. DOCX Editor commit adf0e178.
 
 on:
   workflow_run:
@@ -111,9 +111,8 @@ jobs:
         run: |
           # `|| true` throughout: the shell runs with -e, so a grep no-match
           # (first-ever release, a tag with no closed issues) or a failed
-          # best-effort API call would otherwise abort this step — which, via
-          # the implicit success() gate, would skip the landing-notify
-          # dispatch below.
+          # best-effort API call would otherwise abort this step and fail
+          # the run.
           version="$VERSION"
           OWNER="${REPO%%/*}"
           NAME="${REPO#*/}"
@@ -301,9 +300,50 @@ jobs:
           fi
           sync_version "v$version" 1
 
+  site:
+    name: Update pptx-editor.dev
+    needs: source
+    if: needs.source.outputs.published == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Mint release-pal App token
+        id: pal-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.RELEASE_PAL_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PAL_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: pptx-editor.dev
+
+      # The site's sync-upstream-api.yml listens for this event. It bumps the
+      # pin and every @pptx-editor.dev/* dependency, regenerates the docs and
+      # API reference, and merges only after its checks pass. Its daily
+      # schedule stays as the fallback when this dispatch fails.
+      - name: Dispatch upstream-release
+        env:
+          GH_TOKEN: ${{ steps.pal-token.outputs.token }}
+          VERSION: ${{ needs.source.outputs.version }}
+          SITE: ${{ github.repository_owner }}/pptx-editor.dev
+        run: |
+          body=$(jq -n --arg version "$VERSION" \
+            '{event_type: "upstream-release", client_payload: {version: $version}}')
+          # Retry a short API error before the run fails and reports to Slack.
+          for i in 1 2 3; do
+            if gh api "repos/$SITE/dispatches" --method POST --input - <<<"$body"; then
+              echo "Asked $SITE to sync to $VERSION."
+              exit 0
+            fi
+            echo "Dispatch attempt $i failed; retrying in 20 seconds."
+            sleep 20
+          done
+          echo "::error::Could not dispatch to $SITE. Its daily schedule syncs $VERSION instead."
+          exit 1
+
   report:
     name: Report a failure
-    needs: [source, announcements]
+    needs: [source, announcements, site]
     if: failure()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
