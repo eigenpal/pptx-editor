@@ -303,7 +303,7 @@ jobs:
   site:
     name: Update pptx-editor.dev
     needs: source
-    if: needs.source.outputs.published == 'true' && github.ref == 'refs/heads/main'
+    if: needs.source.outputs.published == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -325,11 +325,21 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.pal-token.outputs.token }}
           VERSION: ${{ needs.source.outputs.version }}
+          SITE: ${{ github.repository_owner }}/pptx-editor.dev
         run: |
-          jq -n --arg version "$VERSION" \
-            '{event_type: "upstream-release", client_payload: {version: $version}}' \
-            | gh api repos/eigenpal/pptx-editor.dev/dispatches --method POST --input -
-          echo "Asked pptx-editor.dev to sync to $VERSION."
+          body=$(jq -n --arg version "$VERSION" \
+            '{event_type: "upstream-release", client_payload: {version: $version}}')
+          # Retry a short API error before the run fails and reports to Slack.
+          for i in 1 2 3; do
+            if gh api "repos/$SITE/dispatches" --method POST --input - <<<"$body"; then
+              echo "Asked $SITE to sync to $VERSION."
+              exit 0
+            fi
+            echo "Dispatch attempt $i failed; retrying in 20 seconds."
+            sleep 20
+          done
+          echo "::error::Could not dispatch to $SITE. Its daily schedule syncs $VERSION instead."
+          exit 1
 
   report:
     name: Report a failure
