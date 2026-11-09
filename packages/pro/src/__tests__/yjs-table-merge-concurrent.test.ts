@@ -24,8 +24,11 @@ import { packageViolations } from '../../../core/src/store/store/part-checks.ts'
 import { buildPptx, cell, table } from '../../../../scripts/fixtures/builder.ts';
 import { IN, all, kids, peers, root, sessionsOf } from './lineage-support.ts';
 
-/** A 3 x 3 table, one letter per cell; `blank` empties the cells it names ("row,column"). */
-const deck = (blank: readonly string[] = []): Uint8Array =>
+/**
+ * A 3 x 3 table, one letter per cell; `blank` empties the cells it names ("row,column"), and
+ * `bodiless` gives the cells it names no text body.
+ */
+const deck = (blank: readonly string[] = [], bodiless: readonly string[] = []): Uint8Array =>
   buildPptx({
     slides: [
       {
@@ -42,7 +45,11 @@ const deck = (blank: readonly string[] = []): Uint8Array =>
             .map(
               (r, i) =>
                 `<a:tr h="370840">${[...r]
-                  .map((c, j) => cell(blank.includes(`${i},${j}`) ? '' : c))
+                  .map((c, j) =>
+                    bodiless.includes(`${i},${j}`)
+                      ? '<a:tc><a:tcPr/></a:tc>'
+                      : cell(blank.includes(`${i},${j}`) ? '' : c)
+                  )
                   .join('')}</a:tr>`
             )
             .join(''),
@@ -193,6 +200,109 @@ describe('a merge and a concurrent delete of its first cell keep the merged text
     });
 
   for (const ids of THREE)
+    test(`a merge, a delete of the merged cell's row, and a delete of a column the merged text left (client order ${named(ids)})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // A merges "D", "E", "G", and "H", then deletes the first column: the merged cell keeps
+      // its text. B deletes the row of "D", "E", and "F" without seeing the merge.
+      merge(a, 1, 0, 2, 1);
+      run(b, 1, 0, { type: 'deleteRow' });
+      run(a, 0, 0, { type: 'deleteColumn' });
+      sync.flush();
+      // "G" left its cell before A deleted that cell, so it goes with "H".
+      expect(settled(editors, 'BCGHI')).toEqual(['B|C', 'GH|I']);
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'BCDEGHFI');
+      expect(b.exec({ type: 'redo' }).ok).toBe(true);
+      expect(settled(editors, 'BCGHI')).toEqual(['B|C', 'GH|I']);
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCGHI');
+      expect(a.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'BCGHI');
+    });
+
+  for (const ids of THREE)
+    test(`a merge, a delete of the merged cell's row, and a concurrent delete of a column of the merge (client order ${named(ids)})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b, c] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // B deletes the row of "D", and C deletes the column of "A", "D", and "G": neither sees
+      // A's merge, so "G" goes with C's column.
+      merge(a, 1, 0, 2, 1);
+      run(b, 1, 0, { type: 'deleteRow' });
+      run(c, 0, 0, { type: 'deleteColumn' });
+      sync.flush();
+      expect(settled(editors, 'BCHI')).toEqual(['B|C', 'H|I']);
+      expect(c.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCGHI');
+    });
+
+  for (const ids of THREE)
+    test(`a merge into a new row and a concurrent undo of the row insert (client order ${named(ids)})`, async () => {
+      const { editors, sync, docs } = await peers(deck(), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // A inserts a row above the first row, and B sees it. A undoes the insert while B merges
+      // the first column, from the new row down: the merge moves "A", "D", and "G" into the
+      // new row's cell, which A's undo takes out of the table.
+      run(a, 0, 0, { type: 'insertRow', where: 'above' });
+      sync.deliverTo(docs[1]!);
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      merge(b, 0, 0, 3, 0);
+      sync.flush();
+      // The undo did not see the merge, so the merged text goes back to its cells.
+      settled(editors, 'ABCDEFGHI');
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+      expect(b.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+      expect(a.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+    });
+
+  for (const ids of THREE)
+    test(`a merge whose first cell a peer deletes, over a cell with no text body (client order ${named(ids)})`, async () => {
+      const { editors, sync } = await peers(deck([], ['1,1']), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // A merges "D", the cell with no text body, "G", and "H". B deletes the first column
+      // without seeing the merge, so the cell with no text body becomes the merged cell.
+      merge(a, 1, 0, 2, 1);
+      run(b, 0, 0, { type: 'deleteColumn' });
+      sync.flush();
+      // That cell takes the text body that holds "H", so "H" shows.
+      expect(settled(editors, 'BCFHI')).toEqual(['B|C', 'H[2x1]|F', '·|I']);
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCDFGHI');
+      expect(b.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'BCFHI');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      expect(settled(editors, 'BCFHI')).toEqual(['B|C', '|F', 'H|I']);
+      expect(a.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'BCFHI');
+    });
+
+  for (const ids of TWO)
+    test(`a staged merge over a cell with no text body and a delete of its first column (client order ${named(ids)})`, async () => {
+      const { editors, sync, docs } = await peers(deck([], ['1,1']), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      merge(a, 1, 0, 2, 1);
+      run(b, 0, 0, { type: 'deleteColumn' });
+      // B gets the merge first, and types into the merged cell before A gets the delete.
+      sync.deliverTo(docs[1]!);
+      at(b, 1, 0);
+      expect(b.input('text', 'x').ok).toBe(true);
+      sync.flush();
+      settled(editors, 'BCFHIx');
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'BCFHI');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'BCFHI');
+    });
+
+  for (const ids of THREE)
     test(`two overlapping merges and a split show every letter once (client order ${named(ids)})`, async () => {
       const { editors, sync } = await peers(deck(), ids);
       const [, b, c] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
@@ -252,6 +362,50 @@ describe('a merge and a concurrent structure change inside it show merged text o
     });
 
   for (const ids of TWO)
+    test(`two merges whose spans together cover cells that neither merged (client order ${named(ids)})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // A merges the first two rows, and B merges the first column. Together their spans
+      // can cover "H" and "I", which neither moved (the client order picks the spans): the
+      // merged cell then shows them.
+      merge(a, 0, 0, 1, 2);
+      merge(b, 0, 0, 2, 0);
+      sync.flush();
+      settled(editors, 'ABCDEFGHI');
+      // A later edit keeps the text in the merged cell, also after an undo uncovers the cells.
+      at(a, 0, 0, 1);
+      expect(a.input('text', 'x').ok).toBe(true);
+      sync.flush();
+      settled(editors, 'AxBCDEFGHI');
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'AxBCDEFGHI');
+      expect(b.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'AxBCDEFGHI');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+    });
+
+  for (const ids of THREE)
+    test(`two staged merges whose spans together cover a cell (client order ${named(ids)})`, async () => {
+      const { editors, sync, docs } = await peers(deck(), ids);
+      const [a, b, c] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // C sees A's merge, then B's, before A and B see each other's.
+      merge(a, 0, 0, 1, 2);
+      sync.deliverTo(docs[2]!);
+      merge(b, 0, 0, 2, 0);
+      sync.deliverTo(docs[2]!);
+      expect([...shown(c)].sort().join('')).toBe('ABCDEFGHI');
+      sync.flush();
+      settled(editors, 'ABCDEFGHI');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+      expect(a.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+    });
+
+  for (const ids of TWO)
     test(`two overlapping merges (client order ${named(ids)})`, async () => {
       const { editors, sync } = await peers(deck(), ids);
       const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
@@ -306,6 +460,32 @@ describe('text typed into a cell that a peer merges at the same time is kept (#2
       settled(editors, 'ABxDEFGHI');
       expect(c.exec({ type: 'undo' }).ok).toBe(true);
       expect(settled(editors, 'ABxDEFGHI')[0]).toBe('A|B|x');
+    });
+
+  for (const ids of THREE)
+    test(`typing into a cell that a split uncovered and a peer merges again (client order ${named(ids)})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b, c] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
+      // A merges the first two rows, and B splits the merged cell into its two rows again. The
+      // second row's cell is empty: A's merge saw its empty paragraph hidden there.
+      merge(a, 0, 0, 1, 2);
+      sync.flush();
+      run(b, 0, 0, { type: 'splitCell', rows: 2, cols: 1 });
+      sync.flush();
+      sync.pause();
+      // A merges the two rows again while C types into the second row's cell.
+      merge(a, 1, 1, 0, 2);
+      at(c, 1, 0);
+      expect(c.input('text', 'x').ok).toBe(true);
+      sync.flush();
+      // The merged cell shows "x" with the other text.
+      settled(editors, 'ABCDEFGHIx');
+      expect(c.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHI');
+      expect(c.exec({ type: 'redo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHIx');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      settled(editors, 'ABCDEFGHIx');
     });
 
   for (const ids of THREE)
