@@ -7,7 +7,9 @@
 // and the tilde peer ranges (`~0.1.0`, as DOCX Editor) keep 0.x minors as minors.
 import { afterEach, expect, test } from 'bun:test';
 import getReleasePlanModule from '@changesets/get-release-plan';
+import { execFileSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -18,6 +20,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const getReleasePlan =
   (getReleasePlanModule as unknown as { default?: typeof getReleasePlanModule }).default ??
@@ -42,6 +45,10 @@ function fixture(version?: string): { directory: string; publicPackages: string[
     writeFileSync(destination, typeof value === 'string' ? value : JSON.stringify(value));
   };
   write('.changeset/config.json', read('.changeset/config.json'));
+  // The config names the repository changelog generator by relative path.
+  const generator = 'scripts/changesets/changelog.mjs';
+  mkdirSync(join(directory, dirname(generator)), { recursive: true });
+  copyFileSync(join(root, generator), join(directory, generator));
   // Workspace discovery uses the lockfile to identify Bun projects.
   write('bun.lock', {});
   write('package.json', read('package.json'));
@@ -135,4 +142,25 @@ test('a minor change after 0.1.0 releases 0.2.0, not 1.0.0', async () => {
     expect(release.type).toBe('minor');
     expect(release.newVersion).toBe('0.2.0');
   }
+});
+
+test('a dependent package gets one dependency line, not one per changeset', () => {
+  // At 0.1.0 the real `~0.2.0` peer ranges are out of range, so dependents get a
+  // dependency line. An in-range patch writes no dependency line at all.
+  const { directory } = fixture('0.1.0');
+  for (const name of ['first', 'second'])
+    writeFileSync(
+      join(directory, '.changeset', `core-${name}.md`),
+      `---\n"@pptx-editor.dev/core": patch\n---\nFix the ${name} thing.\n`
+    );
+  execFileSync(
+    process.execPath,
+    [fileURLToPath(import.meta.resolve('@changesets/cli/bin.js')), 'version'],
+    { cwd: directory, timeout: 30_000, stdio: 'pipe' }
+  );
+  const changelog = readFileSync(join(directory, 'packages/react/CHANGELOG.md'), 'utf8');
+  const lines = changelog.split('\n').filter((line) => line.startsWith('- Updated dependencies'));
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toContain('@pptx-editor.dev/core@0.1.1');
+  expect(changelog).not.toContain('Updated dependencies [');
 });
