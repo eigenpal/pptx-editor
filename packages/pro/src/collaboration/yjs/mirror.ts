@@ -140,7 +140,7 @@ export class PackageMirror {
   readonly #viewsOfPart = new Map<string, Set<string>>();
   /** Every hidden copy: it stays listed in its parent and in its own record. */
   readonly #hidden = new Set<string>();
-  /** Per part, the split pieces the last read dropped (`text-lineage.ts`); a write keeps them. */
+  /** Per part, the split pieces and cell bodies its last read dropped; a write keeps them. */
   readonly #dropped = new Map<string, Set<string>>();
   /** Per part, the text bodies whose merged text its last read moved (`merged-cells.ts`). */
   readonly #mergedBodies = new Map<string, Set<string>>();
@@ -344,7 +344,7 @@ export class PackageMirror {
     };
     const root = this.#syncNode(part.xml.root, write);
     // A read moved merged text, and the room lists it where it was: the room takes the child
-    // lists of those text bodies as this store holds them, so a structure edit that uncovers
+    // lists of those text bodies and cells as this store holds them, so an edit that uncovers
     // that place shows it once everywhere. Only the lists: other nodes keep the room's content.
     const moved = this.#mergedBodies.get(part.partName);
     this.#mergedBodies.delete(part.partName);
@@ -813,15 +813,15 @@ export class PackageMirror {
       // Nodes a peer moved into a subtree another peer removed without seeing them go back.
       const readRecord = (key: string, seen: Set<string>, depth: number) =>
         this.#readElement(key, name, seen, depth, views);
-      let cameBack = new Set<string>();
-      let stranded = new Set<string>();
+      let [cameBack, stranded] = [new Set<string>(), new Set<string>()];
       const listings = listingsOfPart(name);
       const readPart = (strandedBefore: ReadonlySet<string> = new Set()) => {
-        cameBack = new Set();
-        stranded = new Set();
+        [cameBack, stranded] = [new Set(), new Set()];
         this.#rescue = newParagraphRescue(strandedBefore, listings);
         const read = this.#readElement(entry.root, name, new Set(), 0, views);
-        return read && rescueMoved(this.#room, name, read, readRecord, cameBack, stranded);
+        return (
+          read && rescueMoved(this.#room, name, read, readRecord, cameBack, stranded, listings)
+        );
       };
       let rescued = readPart();
       // Split pieces inside a node the rescue put back are not lost: read once more with them.
@@ -853,9 +853,10 @@ export class PackageMirror {
       );
       // A record that a rescue or a placement read refused refuses the part, as the main read.
       if (this.#readRefusal) return { ok: false, reason: `${this.#readRefusal} in ${name}` };
-      // Rescued text shows in the drawn cell over the cell it came from (`merged-cells.ts`).
+      // Rescued text, and removed paragraphs that came back, show in the drawn cell over them.
       const moved = new Set<string>();
-      const spec = withMergedText(this.#room, placed, cameBack, moved);
+      const back = new Set([...cameBack, ...this.#rescue!.rescued]);
+      const spec = withMergedText(this.#room, placed, back, moved, this.#reading);
       nextMerged.set(name, moved);
       const known = fresh ? undefined : this.#ids.get(name);
       const current = local.parts.get(name);

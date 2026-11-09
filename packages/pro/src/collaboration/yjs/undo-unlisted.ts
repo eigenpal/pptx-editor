@@ -81,6 +81,18 @@ function entryOf(key: string, value: unknown, partName?: string): UndoneEntry | 
 }
 
 /**
+ * Whether an undo took the node `key` out of the document without seeing the write of `item`:
+ * an undo recorded where it listed the node (not a tidied listing), and another client wrote
+ * `item`, or the undoing client wrote it after the undo. The move rescue reads a move into such a
+ * node as a move into a node a peer removed without seeing it (`move-rescue.ts`).
+ */
+export function undoneWithout(room: Room, key: string, item: Y.Item | undefined): boolean {
+  if (!item) return false;
+  const e = entryOf(key, room.doc.getMap(UNDONE_KEY).get(key));
+  return e !== null && e.shownIn === null && isForeign(item, e);
+}
+
+/**
  * Before an undo of `step` runs: record, for each key the step listed in a node's children,
  * where it was listed. `transact` runs the write under an origin no history tracks.
  */
