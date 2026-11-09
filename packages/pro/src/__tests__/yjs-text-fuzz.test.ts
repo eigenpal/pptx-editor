@@ -728,7 +728,44 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
 
 /** Histories that fail today, each with its issue and the problem it pins. */
 const KNOWN_FAILURES: Readonly<Record<Mode, readonly FuzzKnownFailure<TextAction>[]>> = {
-  text: [],
+  text: [
+    {
+      name: 'an undo of a delete across a run that peers moved keeps text it did not delete',
+      issue: '#3',
+      seed: 1185,
+      problem: 'p0 undo removed characters it may not remove: "L"',
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'type', paragraph: 0, offset: 2, length: 0, letter: 'Ă' },
+        {
+          kind: 'edit',
+          peer: 0,
+          edit: 'type',
+          paragraph: 0,
+          offset: 9,
+          length: 1,
+          over: true,
+          letter: 'ă',
+        },
+        { kind: 'deliver', from: 0, to: 1, count: 1 },
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 15, length: 2 },
+        { kind: 'deliver', from: 0, to: 1, count: 1 },
+        { kind: 'edit', peer: 1, edit: 'join', paragraph: 0, offset: 14, length: 0 },
+        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 10, length: 2 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 1, edit: 'join', paragraph: 2, offset: 3, length: 0 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 1, edit: 'join', paragraph: 0, offset: 10, length: 1 },
+        { kind: 'edit', peer: 2, edit: 'deleteAcross', paragraph: 0, offset: 6, length: 1 },
+        { kind: 'edit', peer: 0, edit: 'type', paragraph: 1, offset: 1, length: 1, letter: 'ć' },
+        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 3 },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 13, length: 3 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 1, edit: 'delete', paragraph: 0, offset: 1, length: 2 },
+        { kind: 'deliver', from: 1, to: 0, count: 3 },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 2, length: 3 },
+      ],
+    },
+  ],
   format: [
     {
       name: 'two formats of one run after a peer typed into it show each character once',
@@ -761,6 +798,20 @@ const KNOWN_FAILURES: Readonly<Record<Mode, readonly FuzzKnownFailure<TextAction
           color: 'accent6',
         },
         { kind: 'flush' },
+      ],
+    },
+    {
+      name: 'an undo of a format keeps text that a peer formatted at the same time',
+      issue: '#3',
+      seed: 1178,
+      problem: 'characters that no peer removed are lost: "C" in ["A","BKL"]',
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'deleteAcross', paragraph: 0, offset: 3, length: 2 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'bold', paragraph: 1, offset: 2, length: 1 },
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 1, offset: 1, length: 2 },
+        { kind: 'edit', peer: 0, edit: 'bold', paragraph: 1, offset: 1, length: 3 },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 2, offset: 0, length: 0 },
       ],
     },
   ],
