@@ -145,6 +145,8 @@ test('a minor change after 0.1.0 releases 0.2.0, not 1.0.0', async () => {
 });
 
 test('a dependent package gets one dependency line, not one per changeset', () => {
+  // At 0.1.0 the real `~0.2.0` peer ranges are out of range, so dependents get a
+  // dependency line. An in-range patch writes no dependency line at all.
   const { directory } = fixture('0.1.0');
   for (const name of ['first', 'second'])
     writeFileSync(
