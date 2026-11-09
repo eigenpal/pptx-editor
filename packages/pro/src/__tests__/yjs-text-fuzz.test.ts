@@ -620,6 +620,26 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
         { kind: 'flush' },
       ],
     },
+    {
+      name: "a delete of text an undo put back reaches a peer's Enter copy of the text",
+      seed: 1767,
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 1, length: 0 },
+        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 3, length: 3 },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 1, length: 2 },
+        {
+          kind: 'edit',
+          peer: 0,
+          edit: 'type',
+          paragraph: 0,
+          offset: 3,
+          length: 1,
+          over: true,
+          letter: 'ā',
+        },
+        { kind: 'flush' },
+      ],
+    },
   ],
   format: [
     {
@@ -761,6 +781,26 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
         { kind: 'edit', peer: 1, edit: 'deleteAcross', paragraph: 0, offset: 1, length: 2 },
         { kind: 'edit', peer: 1, edit: 'undo', paragraph: 0, offset: 2, length: 1 },
         { kind: 'edit', peer: 1, edit: 'redo', paragraph: 1, offset: 2, length: 0 },
+        { kind: 'flush' },
+      ],
+    },
+    {
+      name: "a delete of text an undo put back reaches a peer's format of the text",
+      seed: 1919,
+      actions: [
+        { kind: 'edit', peer: 1, edit: 'delete', paragraph: 0, offset: 3, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'undo', paragraph: 0, offset: 0, length: 3 },
+        {
+          kind: 'edit',
+          peer: 1,
+          edit: 'type',
+          paragraph: 0,
+          offset: 1,
+          length: 3,
+          over: true,
+          letter: 'ă',
+        },
+        { kind: 'edit', peer: 0, edit: 'italic', paragraph: 0, offset: 1, length: 1 },
         { kind: 'flush' },
       ],
     },

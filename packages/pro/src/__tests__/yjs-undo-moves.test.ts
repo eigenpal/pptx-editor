@@ -327,3 +327,27 @@ describe("a redo of a delete reaches a peer's copy of the deleted text", () => {
         expect(converged(...editors)).toEqual(redone ? ['ADEFGH', 'IJKL'] : ['ABCDEFGH', 'IJKL']);
       });
 });
+
+describe("a delete of text an undo put back reaches a peer's copy of the text", () => {
+  // The undo puts the deleted character back as a new character, which stands for the old
+  // one. A delete of it deletes the old one too, so it reaches a peer's format of the old one
+  // made at the same time (`Mirror` notes both identities).
+  for (const ids of ORDERS)
+    for (const stage of ['delete first', 'format first', 'at once'] as const)
+      test(`a format made before the undo, ${stage} (client ids ${ids.join(', ')})`, async () => {
+        const { editors, sync, docs } = await peers(deck(), ids);
+        const [, b, c] = editors as Three;
+        sync.pause();
+        selectIn(b, 0, 2, 4);
+        ok(b.exec({ type: 'toggleItalic' }));
+        if (stage === 'format first') sync.deliverTo(docs[2]!);
+        selectIn(c, 0, 3, 4);
+        ok(c.input('deleteBackward'));
+        ok(c.exec({ type: 'undo' }));
+        selectIn(c, 0, 3, 4);
+        ok(c.input('deleteBackward'));
+        if (stage === 'delete first') sync.deliverTo(docs[1]!);
+        sync.flush();
+        expect(converged(...editors)).toEqual(['ABCEFGH', 'IJKL']);
+      });
+});
