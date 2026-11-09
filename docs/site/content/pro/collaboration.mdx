@@ -6,7 +6,7 @@ category: 'Pro'
 
 Use `createYjsCollaborationSession()` with a Yjs document and your network provider. Register the session through `collaborationModule()` when you create the editor. Your application owns transport, authentication, authorization, and persistence.
 
-For supported edits and concurrent editing limits, see <FeatureBadge id="collaboration.realtime" />.
+For support status, see <FeatureBadge id="collaboration.realtime" />. Review [concurrent editing limits](#concurrent-editing-limits) before enabling shared editing.
 
 ## Install the dependencies
 
@@ -107,9 +107,16 @@ Destroy the editor before its session. Then disconnect and destroy provider reso
 
 ## Handle history and access
 
-Undo and redo operate on the local participant’s changes through the collaboration session. Concurrent changes can affect what an undo retains. Check the feature matrix for the precise supported cases.
+Undo and redo operate on the local participant’s changes through the collaboration session. Concurrent changes can affect what an undo retains. Review the concurrent editing limits below.
 
 Authenticate users before connecting them to a room. Authorize document access and enforce write permissions in your provider or server. A `documentId` is an identifier, not an access token. Use encrypted transport and disconnect participants when access ends.
+
+## Concurrent editing limits
+
+- **Undo and redo.** Undo can remove peer text inside a shape, row, or cell that you created. Redo restores that content.
+- **Text conflicts.** Concurrent formatting, paragraph splits, and undo can duplicate or reorder text. Some sequences involving three participants can lose characters.
+- **Table conflicts.** Concurrent cell merges and row or column changes can lose text in some sequences. For example, merging cells while two peers delete covered rows can lose merged text.
+- **Property conflicts.** Concurrent writes to one attribute keep one value. Overlapping fills or effects can reveal the other version when the winning edit is undone.
 
 ## Upgrade the room format
 
