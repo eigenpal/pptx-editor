@@ -34,6 +34,32 @@ function keyFromUrl(): string | null {
   return key && /^[0-9a-f]{32}$/.test(key) ? key : null;
 }
 
+/** How long a found peer may take to connect before the waiting screen says why it may fail. */
+const STUCK_MS = 10_000;
+
+/** How far this tab got in finding and reaching a peer. */
+interface Link {
+  /** The signaling server answers. */
+  readonly signaling: boolean;
+  /** Peers found through signaling or the BroadcastChannel. */
+  readonly found: number;
+  /** Peers with an open channel. */
+  readonly linked: number;
+  /** A peer was found but has not connected for `STUCK_MS`. */
+  readonly stuck: boolean;
+}
+
+/** The waiting screen's explanation of `link`. */
+function waitingText(link: Link): string {
+  if (link.linked > 0) return 'Connected to a peer. Receiving the presentation…';
+  if (link.stuck)
+    return 'A peer was found, but WebRTC could not connect to it. A browser setting or extension that blocks WebRTC or hides local addresses can cause this. Try a private window, where extensions are off.';
+  if (link.found > 0) return 'Found a peer. Connecting over WebRTC…';
+  if (!link.signaling)
+    return `The signaling server at ${SIGNALING_URL} does not answer. Start it with bun run dev:collaboration:signal.`;
+  return 'No other tab of this room is open. Open the room in the tab that started it, or start a new room.';
+}
+
 interface Joined {
   readonly person: Person;
   readonly roomId: string;
@@ -46,6 +72,7 @@ export function App() {
   const [joined, setJoined] = useState<Joined | null>(null);
   const [session, setSession] = useState<YjsCollaborationSession | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [link, setLink] = useState<Link>({ signaling: false, found: 0, linked: 0, stuck: false });
   const source = usePptxSource('/sample.pptx', { fonts: packagedFonts() });
   // Rooms this tab seeded. A remount (Fast Refresh, for one) then joins instead of seeding the
   // room a second time from a new, empty Y.Doc.
@@ -56,26 +83,44 @@ export function App() {
     const { person, roomId, key } = joined;
     const creating = joined.creating && !seeded.current.has(roomId);
     const doc = new Y.Doc();
-    // `password` encrypts every message between peers, and the signaling topic is hashed. No
-    // ICE servers: browsers on one machine or one network connect with no third-party STUN.
+    // `password` encrypts every message between peers, and the signaling topic is hashed. The
+    // peers use y-webrtc's default public STUN servers to find a route. A browser that hides its
+    // local addresses, as some privacy settings and extensions do, needs one.
     const provider = new WebrtcProvider(`pptx-editor-${roomId}`, doc, {
       signaling: [SIGNALING_URL],
       password: key,
-      peerOpts: { config: { iceServers: [] } },
     });
     // A deck room is larger than one data channel message.
     chunkWebrtcMessages(provider);
     let created: YjsCollaborationSession | null = null;
     // Connected while the signaling server answers or a peer is linked. Edits continue offline
     // and merge when the peers meet again.
+    let foundAt = 0;
     const report = () => {
       const room = provider.room;
-      const peers = room ? room.webrtcConns.size + room.bcConns.size : 0;
+      const found = room ? room.webrtcConns.size + room.bcConns.size : 0;
+      const linked = room
+        ? [...room.webrtcConns.values()].filter((conn) => conn.connected).length + room.bcConns.size
+        : 0;
       const signaling = provider.signalingConns.some(
         (conn: { connected: boolean }) => conn.connected
       );
-      created?.setConnected(signaling || peers > 0);
+      created?.setConnected(signaling || linked > 0);
+      // What the waiting screen says: how far the search for a peer got.
+      if (found === 0) foundAt = 0;
+      else if (foundAt === 0) foundAt = Date.now();
+      const stuck = found > 0 && linked === 0 && Date.now() - foundAt > STUCK_MS;
+      setLink((was) =>
+        was.signaling === signaling &&
+        was.found === found &&
+        was.linked === linked &&
+        was.stuck === stuck
+          ? was
+          : { signaling, found, linked, stuck }
+      );
     };
+    // A peer link opens without an event that this example hears, so look again each second.
+    const poll = setInterval(report, 1000);
     const start = () => {
       if (created) return;
       try {
@@ -117,6 +162,7 @@ export function App() {
     if (creating) start();
     else doc.on('update', roomArrived);
     return () => {
+      clearInterval(poll);
       doc.off('update', roomArrived);
       for (const socket of sockets) {
         socket.off('connect', report);
@@ -176,10 +222,7 @@ export function App() {
   if (!session) {
     return (
       <RoomMessage title={`Waiting for a peer in room ${shortRoomId(joined.roomId)}`}>
-        <p>
-          A peer-to-peer room lives only in its open tabs. Another tab of this room must be open,
-          and the signaling server must run: <code>bun run dev:collaboration:signal</code>.
-        </p>
+        <p>{waitingText(link)}</p>
         <p>
           If every tab of this room closed, the room is gone.{' '}
           <a href={location.pathname}>Start a new room</a>.

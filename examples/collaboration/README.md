@@ -36,6 +36,6 @@ The invite key needs `crypto.subtle`, which browsers offer on `localhost` and on
 
 `src/App.tsx` connects a `Y.Doc` with `WebrtcProvider`, then creates a session with `createYjsCollaborationSession()` and passes `collaborationModule({ session })` to the editor. The tab that starts a room seeds it from the sample deck. A tab from an invite link waits for the room from a peer, so it never seeds a second copy.
 
-A deck room is larger than one WebRTC data channel message, so `src/webrtc-chunks.ts` splits each message into chunks. The `#key=` fragment of the invite link encrypts the room; anyone with the full link can join. The example uses no STUN or TURN servers, so peers must reach each other directly.
+A deck room is larger than one WebRTC data channel message, so `src/webrtc-chunks.ts` splits each message into chunks. The `#key=` fragment of the invite link encrypts the room; anyone with the full link can join. Peers find a route through y-webrtc's default public STUN servers. Some networks also need a TURN server. If the page finds a peer but cannot connect, it says so; a browser extension that blocks WebRTC is a common cause.
 
 For more information, see [Collaboration](../../docs/site/content/pro/collaboration.mdx).
