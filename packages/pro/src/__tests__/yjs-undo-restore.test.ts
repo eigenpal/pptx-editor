@@ -166,8 +166,9 @@ describe('a character two undos put back shows once', () => {
       expect(converged(...editors)).toEqual(['A', 'BCDEFGH']);
     });
 
-  // One undo puts the character back in the run the Enter cut, the other in the Enter's copy:
-  // two texts hold it, and the twin with the smallest id stays.
+  // The undo of the Enter does not put back the character that the peer deleted at the same
+  // time (`undo-moves.ts`). The peer's undo of its delete then puts it back in the Enter's
+  // copy, and it shows once.
   for (const ids of FOUR)
     test(`an undo of an Enter and an undo of a delete of its copy show it once (client ids ${ids.join(', ')})`, async () => {
       const { editors, sync } = await peers(oneRun('ABCDEFGH'), ids);
@@ -179,7 +180,7 @@ describe('a character two undos put back shows once', () => {
       ok(a.input('deleteBackward'));
       ok(c.exec({ type: 'undo' }));
       sync.flush();
-      expect(converged(...editors)).toEqual(['ABCDEFGH']);
+      expect(converged(...editors)).toEqual(['ABDEFGH']);
       ok(a.exec({ type: 'undo' }));
       const text = converged(...editors).join('');
       expect([...text].sort().join('')).toBe('ABCDEFGH');

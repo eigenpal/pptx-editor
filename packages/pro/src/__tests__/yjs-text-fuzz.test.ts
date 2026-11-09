@@ -55,12 +55,9 @@ import {
 import { IN, paragraphs, selectIn } from './lineage-support.ts';
 import {
   FORMAT_HISTORIES,
-  FORMAT_HISTORY_FAILURES,
   LONG_FORMAT_HISTORIES,
-  LONG_FORMAT_HISTORY_FAILURES,
   TEXT_HISTORIES,
   UNDO_HISTORIES,
-  UNDO_HISTORY_FAILURES,
 } from './yjs-text-fuzz-regressions.ts';
 
 const FILE = 'packages/pro/src/__tests__/yjs-text-fuzz.test.ts';
@@ -517,8 +514,150 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
         { kind: 'flush' },
       ],
     },
+    {
+      name: 'an undo of Enter keeps the text that a peer typed and joined back',
+      seed: 99,
+      actions: [
+        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 5, length: 3 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'type', paragraph: 1, offset: 1, length: 3, letter: 'Ā' },
+        { kind: 'edit', peer: 0, edit: 'join', paragraph: 1, offset: 4, length: 1 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 1, edit: 'undo', paragraph: 0, offset: 1, length: 0 },
+      ],
+    },
+    {
+      name: 'an undo of Enter after an undo of a join keeps the text a peer typed over',
+      seed: 1263,
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 2, length: 0 },
+        { kind: 'edit', peer: 0, edit: 'join', paragraph: 1, offset: 6, length: 0 },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 4, length: 1 },
+        { kind: 'flush' },
+        {
+          kind: 'edit',
+          peer: 2,
+          edit: 'type',
+          paragraph: 1,
+          offset: 1,
+          length: 3,
+          over: true,
+          letter: 'ć',
+        },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 5, length: 3 },
+      ],
+    },
+    {
+      name: "an undo of typing reaches a peer's Enter that copies the text at the same time",
+      seed: 61,
+      actions: [
+        { kind: 'edit', peer: 1, edit: 'deleteAcross', paragraph: 0, offset: 4, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'delete', paragraph: 0, offset: 2, length: 3 },
+        {
+          kind: 'edit',
+          peer: 2,
+          edit: 'type',
+          paragraph: 1,
+          offset: 3,
+          length: 3,
+          over: true,
+          letter: 'ā',
+        },
+        { kind: 'edit', peer: 0, edit: 'type', paragraph: 1, offset: 4, length: 0, letter: 'Ă' },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 1, length: 2 },
+        { kind: 'edit', peer: 1, edit: 'undo', paragraph: 0, offset: 2, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 6, length: 0 },
+      ],
+    },
   ],
-  format: [],
+  format: [
+    {
+      name: 'an undo of a format keeps the text that a peer typed over the formatted text deleted',
+      seed: 20,
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'bold', paragraph: 1, offset: 2, length: 3 },
+        {
+          kind: 'edit',
+          peer: 1,
+          edit: 'type',
+          paragraph: 1,
+          offset: 1,
+          length: 3,
+          over: true,
+          letter: 'Ĉ',
+        },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 2, offset: 6, length: 2 },
+      ],
+    },
+    {
+      name: 'an undo of a format keeps the text that a peer deletes at the same time deleted',
+      seed: 9,
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'italic', paragraph: 0, offset: 2, length: 3 },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 1, offset: 4, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'delete', paragraph: 0, offset: 2, length: 2 },
+      ],
+    },
+    {
+      name: 'a redo of a format keeps the text that a peer deleted before the undo deleted',
+      seed: 425,
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'delete', paragraph: 1, offset: 1, length: 2 },
+        { kind: 'edit', peer: 2, edit: 'bold', paragraph: 1, offset: 2, length: 2 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 1, offset: 1, length: 1 },
+        { kind: 'edit', peer: 2, edit: 'redo', paragraph: 0, offset: 3, length: 0 },
+      ],
+    },
+    {
+      name: "an undo of a format keeps a peer's delete when a losing split holds a hidden copy",
+      seed: 1913,
+      actions: [
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 0, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'italic', paragraph: 0, offset: 2, length: 2 },
+        { kind: 'edit', peer: 0, edit: 'bold', paragraph: 1, offset: 3, length: 1 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'delete', paragraph: 0, offset: 2, length: 1 },
+        { kind: 'deliver', from: 2, to: 1, count: 1 },
+        { kind: 'edit', peer: 1, edit: 'undo', paragraph: 2, offset: 0, length: 3 },
+      ],
+    },
+    {
+      name: 'a redo of a format after its undo moved the text keeps the text',
+      seed: 1359,
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'type', paragraph: 1, offset: 3, length: 0, letter: 'Ā' },
+        { kind: 'edit', peer: 2, edit: 'type', paragraph: 0, offset: 4, length: 0, letter: 'ā' },
+        {
+          kind: 'edit',
+          peer: 2,
+          edit: 'color',
+          paragraph: 1,
+          offset: 4,
+          length: 1,
+          color: 'accent2',
+        },
+        { kind: 'edit', peer: 1, edit: 'join', paragraph: 0, offset: 7, length: 0 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'type', paragraph: 0, offset: 6, length: 2, letter: 'Ą' },
+        {
+          kind: 'edit',
+          peer: 0,
+          edit: 'color',
+          paragraph: 0,
+          offset: 13,
+          length: 3,
+          color: 'accent1',
+        },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 6, length: 0 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'redo', paragraph: 0, offset: 0, length: 2 },
+      ],
+    },
+  ],
 };
 
 /** Histories that fail today, each with its issue and the problem it pins. */
@@ -601,38 +740,6 @@ const KNOWN_FAILURES: Readonly<Record<Mode, readonly FuzzKnownFailure<TextAction
         { kind: 'flush' },
       ],
     },
-    {
-      name: 'an undo of a format keeps the text that a peer typed over the formatted text deleted',
-      issue: '#3',
-      seed: 20,
-      problem: 'p0 undo added characters it may not add: "KL"',
-      actions: [
-        { kind: 'edit', peer: 0, edit: 'bold', paragraph: 1, offset: 2, length: 3 },
-        {
-          kind: 'edit',
-          peer: 1,
-          edit: 'type',
-          paragraph: 1,
-          offset: 1,
-          length: 3,
-          over: true,
-          letter: 'Ĉ',
-        },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 2, offset: 6, length: 2 },
-      ],
-    },
-    {
-      name: 'an undo of a format keeps the text that a peer deletes at the same time deleted',
-      issue: '#3',
-      seed: 9,
-      problem: 'removed characters show again: "CD" in ["ABCDEFGH","IJKL"]',
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'italic', paragraph: 0, offset: 2, length: 3 },
-        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 1, offset: 4, length: 3 },
-        { kind: 'edit', peer: 1, edit: 'delete', paragraph: 0, offset: 2, length: 2 },
-      ],
-    },
   ],
 };
 
@@ -682,10 +789,7 @@ for (const mode of ['text', 'format'] as const)
         : [...FORMAT_HISTORIES, ...LONG_FORMAT_HISTORIES]),
       ...FIXED[mode],
     ],
-    knownFailures:
-      mode === 'text'
-        ? [...KNOWN_FAILURES.text, ...UNDO_HISTORY_FAILURES]
-        : [...KNOWN_FAILURES.format, ...FORMAT_HISTORY_FAILURES, ...LONG_FORMAT_HISTORY_FAILURES],
+    knownFailures: mode === 'text' ? KNOWN_FAILURES.text : KNOWN_FAILURES.format,
     knownSeeds: KNOWN_SEEDS[mode],
     summary: () => `${mode} fuzz checks: ${JSON.stringify(STATS[mode])}`,
   });
