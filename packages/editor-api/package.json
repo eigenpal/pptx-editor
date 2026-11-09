@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/editor-api",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Presentation automation for PPTX: an Office.js-shaped batching object model that drives a deck on a server or in an editor already open in a page.",
   "type": "module",
   "sideEffects": false,
