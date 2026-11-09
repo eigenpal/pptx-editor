@@ -975,6 +975,7 @@ export {
   lineGlyphParts,
   lineGlyphTransform,
   lineSlotEnd,
+  lineSlotShown,
   tableGridKeyStep,
   tableGridMove,
   type GlowGridRow,

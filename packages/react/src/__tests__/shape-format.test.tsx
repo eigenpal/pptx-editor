@@ -203,6 +203,36 @@ describe('Shape Format controls', () => {
   });
 });
 
+describe('Dash menu', () => {
+  test('draws each dash, checks the current one, and applies a pick', async () => {
+    const editor = await open();
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <PptxEditor.Toolbar preset={false}>
+          <Toolbar.Slot slotId="shape.lineDash" />
+        </PptxEditor.Toolbar>
+      </PptxEditorContext.Provider>
+    );
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [firstId(editor)] }));
+    // The fixture boxes have no outline; a dash shows on an outline only.
+    act(() => void editor.exec({ type: 'setLineColor', color: '#000000' }));
+    const trigger = screen.getByRole('button', { name: 'Border dash' });
+    const dashOf = (el: Element): string | null =>
+      el.querySelector('.pptx-line-glyph path')!.getAttribute('stroke-dasharray');
+    expect(dashOf(trigger)).toBe(null);
+    act(() => void fireEvent.click(trigger));
+    const rows = screen.getAllByRole('menuitemradio');
+    expect(rows).toHaveLength(7);
+    expect(dashOf(screen.getByRole('menuitemradio', { name: 'Dotted' }))).toBe('0 5');
+    act(() => void fireEvent.click(screen.getByRole('menuitemradio', { name: 'Dash dot' })));
+    expect(editor.snapshot().geometry?.lineDash).toBe('dashDot');
+    expect(dashOf(trigger)).toBe('6 5 0 5');
+    act(() => void fireEvent.click(trigger));
+    const checked = screen.getByRole('menuitemradio', { name: 'Dash dot' });
+    expect(checked.getAttribute('aria-checked')).toBe('true');
+  });
+});
+
 describe('Align menu', () => {
   test('Distribute with two objects shows as disabled with the reason', async () => {
     const editor = await open();

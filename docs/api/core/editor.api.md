@@ -3719,6 +3719,7 @@ export type LineGlyphPart = {
     readonly kind: 'stroke';
     readonly d: string;
     readonly join?: true;
+    readonly dash?: string;
 } | {
     readonly kind: 'solid';
     readonly d: string;
@@ -3743,6 +3744,9 @@ export type LineRule = 'single' | 'onePointFive' | 'double' | 'exact' | 'multipl
 
 // @internal
 export function lineSlotEnd(slot: string): boolean | undefined;
+
+// @internal
+export function lineSlotShown(slot: string, value: unknown): string;
 
 // @internal
 export const LINK_KINDS: readonly LinkKind[];

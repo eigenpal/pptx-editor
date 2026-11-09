@@ -8,6 +8,7 @@
 import {
   computed,
   defineComponent,
+  inject,
   onMounted,
   ref,
   shallowRef,
@@ -35,8 +36,10 @@ import {
   lineGlyphParts,
   lineGlyphTransform,
   lineSlotEnd,
+  lineSlotShown,
   presetGradient,
   shapePreview,
+  toolbarDropdownRow,
   translateKeyOrText,
   type ChromeControl,
   type ChromeSlotId,
@@ -56,7 +59,12 @@ import {
   keepFocus,
   useAriaDisabled,
 } from './chrome.tsx';
-import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import {
+  chromeActionHostKey,
+  useEditorState,
+  usePptxEditor,
+  useTranslation,
+} from './composables.ts';
 import { useSlot } from './slot.ts';
 import { useTriggerAttributes } from './slot-override.ts';
 import { ColorSwatches, Swatch, SwatchGroup, useThemeBases } from './ColorSwatches.tsx';
@@ -630,7 +638,7 @@ const lineGlyphProps = {
 /** The props of `LineGlyph`, the twin of React's `LineGlyphProps`. @public */
 export type LineGlyphProps = ExtractPublicPropTypes<typeof lineGlyphProps>;
 
-/** Glyphs for line kinds and line ends, drawn at the right of a 48×24 box. @public */
+/** Glyphs for line kinds, line ends, and preset dashes, drawn in a 48×24 box. @public */
 export const LineGlyph = defineComponent({
   name: 'LineGlyph',
   props: lineGlyphProps,
@@ -656,6 +664,7 @@ export const LineGlyph = defineComponent({
                 d={p.d}
                 {...stroke}
                 {...(p.join ? { 'stroke-linejoin': 'round' } : {})}
+                {...(p.dash ? { 'stroke-dasharray': p.dash } : {})}
               />
             )
           )}
@@ -668,7 +677,10 @@ export const LineGlyph = defineComponent({
 /** The props of `LineMenuControl`, the twin of React's `LineMenuControlProps`. @public */
 export type LineMenuControlProps = ExtractPublicPropTypes<typeof slotPartProps>;
 
-/** The line tool and the line start and end menus, with each option drawn. @public */
+/**
+ * The line tool, the line start and end menus, and the dash menus, with each option drawn.
+ * @public
+ */
 export const LineMenuControl = defineComponent({
   name: 'LineMenuControl',
   props: slotPartProps,
@@ -679,6 +691,7 @@ export const LineMenuControl = defineComponent({
     );
     const off = useAriaDisabled(() => !cmd.isEnabled.value, reason);
     const editor = usePptxEditor();
+    const host = inject(chromeActionHostKey, null);
     const { t } = useTranslation();
     const anchor = ref<HTMLButtonElement | null>(null);
     const open = ref(false);
@@ -689,9 +702,10 @@ export const LineMenuControl = defineComponent({
       () => ({ disabled: !cmd.isEnabled.value })
     );
     return () => {
-      // Line ends draw on the side they belong to; the line tool shows its kinds.
+      // Line ends draw on the side they belong to; the line tool and dash menus show their
+      // options.
       const start = lineSlotEnd(props.slot);
-      const shown = String(cmd.value.value ?? (start === undefined ? 'line' : 'none'));
+      const shown = lineSlotShown(props.slot, cmd.value.value);
       // Line ends are contextual: they show only while a line is selected.
       if (start !== undefined && !isLine.value) return null;
       const end = start !== undefined ? { start } : {};
@@ -718,29 +732,45 @@ export const LineMenuControl = defineComponent({
             {{
               default: () => (
                 <>
-                  {props.control.options?.map((o) => (
-                    <MenuItem
-                      key={o.value}
-                      // Line ends are a choice with a current value; the line tool inserts a kind.
-                      {...(props.control.toggle === 'choice'
-                        ? { checked: o.value === cmd.value.value }
-                        : {})}
-                      onSelect={() => {
-                        cmd.execute(o.value);
-                        focusText(editor.value, anchor.value);
-                        open.value = false;
-                      }}
-                    >
-                      {{
-                        default: () => (
-                          <>
-                            <LineGlyph value={o.value} {...end} />
-                            {t(o.labelKey as TranslationKey)}
-                          </>
-                        ),
-                      }}
-                    </MenuItem>
-                  ))}
+                  {props.control.options?.map((o) => {
+                    // Line ends and dashes are a choice with a current value; the line tool
+                    // inserts a kind. Core's rule says which rows are checked or off, with the
+                    // reason.
+                    const row = toolbarDropdownRow(
+                      editor.value,
+                      host,
+                      props.slot,
+                      props.control,
+                      o,
+                      cmd.value.value
+                    );
+                    return (
+                      <MenuItem
+                        key={o.value}
+                        {...(row.checked !== undefined ? { checked: row.checked } : {})}
+                        {...(row.refused
+                          ? {
+                              disabled: true,
+                              ...(row.reason ? { reason: translateKeyOrText(t, row.reason) } : {}),
+                            }
+                          : {})}
+                        onSelect={() => {
+                          cmd.execute(o.value);
+                          focusText(editor.value, anchor.value);
+                          open.value = false;
+                        }}
+                      >
+                        {{
+                          default: () => (
+                            <>
+                              <LineGlyph value={o.value} {...end} />
+                              {t(o.labelKey as TranslationKey)}
+                            </>
+                          ),
+                        }}
+                      </MenuItem>
+                    );
+                  })}
                 </>
               ),
             }}
