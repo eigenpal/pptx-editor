@@ -32,7 +32,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import * as Y from 'yjs';
 import type { ReplicaElementSpec, ReplicaTextSpec } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
-import { isRemovalField, LINEAGE, MAX_REMOVERS, MAX_SNAPSHOT } from './text-lineage.ts';
+import { isRemovalField, isRemoved, LINEAGE, MAX_REMOVERS, MAX_SNAPSHOT } from './text-lineage.ts';
 import { IDENTITY } from './text-identity.ts';
 
 /** The children of a removed node, and of its `a:t`, that a look for its text reads. */
@@ -182,7 +182,9 @@ export type Listings = () => ReadonlyMap<string, readonly string[]>;
 
 /**
  * The listings of every part of the room, built on first use with one walk over the room's
- * records: one read pass shares them (`Mirror.rebuild`).
+ * records: one read pass shares them (`Mirror.rebuild`). A record that a removal took does not
+ * count: an undo can name a removed paragraph in a move mark again (`movedFrom`), and the node
+ * did not go there.
  */
 export function roomListings(room: Room): (partName: string) => Listings {
   let index: Map<string, Map<string, string[]>> | undefined;
@@ -194,6 +196,8 @@ export function roomListings(room: Room): (partName: string) => Listings {
       const part: unknown = rec.get(F.part);
       const list: unknown = rec.get(F.children);
       if (typeof part !== 'string' || !(list instanceof Y.Array)) continue;
+      // A removed record keeps its list, but it is no place a node went to (`movedAway`).
+      if (isRemoved(rec as Y.Map<unknown>)) continue;
       let byKey = out.get(part);
       if (!byKey) out.set(part, (byKey = new Map()));
       for (const c of list.toArray() as unknown[]) {

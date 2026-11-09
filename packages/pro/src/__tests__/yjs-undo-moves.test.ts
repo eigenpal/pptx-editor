@@ -239,3 +239,47 @@ describe("an undo's delete reaches a peer's copy made at the same time", () => {
         expect(converged(a, b, c).join('')).toBe('ABCDEFGHIJKLxy');
       });
 });
+
+describe('an undo that names a removed paragraph again keeps the text a peer typed', () => {
+  // A redo of a join removes the second paragraph again, and a peer then deletes across the
+  // paragraphs. The undo of an Enter names the removed paragraph as the place of its runs. The
+  // rescue of removed runs does not count a removed paragraph as a place (`roomListings`).
+  for (const ids of ORDERS)
+    test(`an undo of Enter after a redo of a join (client ids ${ids.join(', ')})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b, c] = editors as Three;
+      sync.pause();
+      selectIn(c, 1, 0);
+      ok(c.input('deleteBackward'));
+      sync.flush();
+      sync.pause();
+      selectIn(a, 0, 1, 4);
+      ok(a.input('paragraph'));
+      ok(c.exec({ type: 'undo' }));
+      ok(c.exec({ type: 'redo' }));
+      selectIn(a, 1, 0);
+      ok(a.input('paragraph'));
+      sync.flush();
+      expect(converged(a, b, c)).toEqual(['AIJKL', '', 'EFGH']);
+      sync.pause();
+      selectIn(c, 0, 0);
+      ok(c.input('text', 'x'));
+      const nodeId = c.session!.layout(0)!.items[0]!.element.nodeId;
+      c.setSelection({
+        kind: 'text',
+        nodeId,
+        anchor: { paragraph: 0, offset: 2 },
+        focus: { paragraph: 1, offset: 0 },
+      });
+      ok(c.input('deleteBackward'));
+      selectIn(b, 0, 2, 3);
+      ok(b.input('text', 'y'));
+      sync.flush();
+      expect(converged(a, b, c)).toEqual(['xAy', 'EFGH']);
+      ok(a.exec({ type: 'undo' }));
+      expect(paragraphs(a)).toEqual(['xAEFGHy']);
+      expect(converged(a, b, c)).toEqual(['xAEFGHy']);
+      ok(a.exec({ type: 'redo' }));
+      expect(converged(a, b, c).join('')).toBe('xAyEFGH');
+    });
+});
