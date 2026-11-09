@@ -276,12 +276,19 @@ export function createYjsCollaborationSession(
     // The text the step moves back, and which of it a character still holds (`undo-moves.ts`),
     // read before the rules below take items out of the step.
     const moved = movedRoots(room, (top as unknown as StepRanges).insertions);
+    // Yjs can apply the step below the top in its place (see below): read its moves too.
+    const below = undo && stack.length > 1 ? stack[stack.length - 2]! : null;
+    const movedBelow = below ? movedRoots(room, (below as unknown as StepRanges).insertions) : null;
     // The characters the step may delete, live before it: a delete of them reaches a peer's copy.
     const inserted = liveInserted(room, (top as unknown as StepRanges).insertions);
     const reader = mirror;
     const alive =
       moved && reader
-        ? liveRoots(room, moved, (part, key) => reader.idOf(part, key) !== undefined)
+        ? liveRoots(
+            room,
+            movedBelow ? new Set([...moved, ...movedBelow]) : moved,
+            (part, key) => reader.idOf(part, key) !== undefined
+          )
         : null;
     // What the step must not take from a peer or put back twice (`undo-unlisted.ts`,
     // `undo-splits.ts`), set on the step before Yjs applies it.
@@ -321,7 +328,15 @@ export function createYjsCollaborationSession(
     if (undo && applied && applied !== top) {
       // Yjs could not undo the top step (a peer took its values) and undid an older one in the
       // same call. Undo stays one step: the older step comes back, and the call reports that
-      // it changed nothing, so the next undo takes the older step.
+      // it changed nothing, so the next undo takes the older step. Before the older step comes
+      // back, the moved text it put back that a peer deleted goes again: the redo then does not
+      // take it into the older step, and the next undo does not put it back.
+      if (applied === below && movedBelow && alive)
+        doc.transact(
+          () =>
+            dropDeadMoves(room, (applied as unknown as StepRanges).deletions, movedBelow, alive),
+          TEXT_REPAIR_ORIGIN
+        );
       popped = null;
       manager.redo();
       compensated = popped;
