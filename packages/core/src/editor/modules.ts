@@ -50,7 +50,9 @@ export type CollaborationFailureCode =
   /** The store refused a rebuilt part name. Terminal for this room. */
   | 'unsafe-part-name'
   /** The host reported that the provider lost its connection. Recovers on its own. */
-  | 'transport-disconnected';
+  | 'transport-disconnected'
+  /** The Y.Doc holds no room yet. Wait for the provider to sync, or seed the room. */
+  | 'not-initialized';
 
 /** One collaboration failure: a typed code plus optional free-form detail. @public */
 export interface CollaborationFailure {

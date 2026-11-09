@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "bun"],
+    "paths": {
+      "@pptx-editor.dev/core": ["../../packages/core/src/index.ts"],
+      "@pptx-editor.dev/core/*": ["../../packages/core/src/*/index.ts"],
+      "@pptx-editor.dev/react": ["../../packages/react/src/index.ts"],
+      "@pptx-editor.dev/i18n": ["../../packages/i18n/src/index.ts"],
+      "@pptx-editor.dev/pro": ["../../packages/pro/src/index.ts"],
+      "@pptx-editor.dev/pro/drawing": ["../../packages/pro/src/drawing/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "../shared/collaboration"]
+}

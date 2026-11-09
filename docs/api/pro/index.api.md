@@ -26,6 +26,9 @@ export interface AwarenessLike {
 }
 
 // @public
+export const COLLABORATION_FORMAT_VERSION: string;
+
+// @public
 export function collaborationModule(options: CollaborationModuleOptions): EditorModule;
 
 // @public
@@ -54,6 +57,9 @@ export function legacyComments(pkg: PptxPackage): ReviewItem[];
 export interface ProLicenseOptions {
     readonly licenseKey?: string;
 }
+
+// @public
+export function readCollaborationFormatVersion(doc: Y.Doc): string;
 
 // @public
 export function reviewModule(options?: ReviewModuleOptions): EditorModule;

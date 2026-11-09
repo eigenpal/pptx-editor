@@ -7,7 +7,9 @@
     "examples/vite",
     "examples/vue",
     "examples/nextjs",
-    "examples/chat"
+    "examples/chat",
+    "examples/collaboration",
+    "examples/collaboration-hocuspocus"
   ],
   "type": "module",
   "scripts": {
@@ -15,6 +17,10 @@
     "dev:vue": "bun run --filter './examples/vue' dev",
     "dev:nextjs": "bun run --filter './examples/nextjs' dev",
     "dev:chat": "bun run --filter './examples/chat' dev",
+    "dev:collaboration": "bun run --filter './examples/collaboration' dev",
+    "dev:collaboration:signal": "bun run --filter './examples/collaboration' signal",
+    "dev:collaboration-hocuspocus": "bun run --filter './examples/collaboration-hocuspocus' dev",
+    "dev:collaboration-hocuspocus:server": "bun run --filter './examples/collaboration-hocuspocus' server",
     "dev:all": "bun run --filter './examples/vite' --filter './examples/vue' dev",
     "build": "bun run build:packages && bun run --filter './examples/vite' build",
     "build:react:source": "cd examples/vite && VITE_ENABLE_FRAMEWORK_SWITCHER=true VITE_BASE_PATH=/react/ vite build",

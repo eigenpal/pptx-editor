@@ -252,6 +252,13 @@ describe('painting', () => {
     expect(
       peers.map((p) => p.querySelector('.pptx-surface__remote-label text')?.textContent)
     ).toEqual(['Ada', 'Grace']);
+    // The label is drawn in screen pixels and scaled to slide units. A font size in EMU is
+    // past the largest size a browser draws, so the name would show as a speck.
+    for (const p of peers) {
+      const tag = p.querySelector('.pptx-surface__remote-label')!;
+      expect(tag.getAttribute('transform')).toMatch(/^translate\([^)]+\) scale\([^)]+\)$/);
+      expect(tag.querySelector('text')!.getAttribute('font-size')).toBe('11');
+    }
     const slide = host.querySelector('.pptx-surface__slide')!;
     expect(slide.querySelector('.pptx-surface__presence')).toBeNull();
 

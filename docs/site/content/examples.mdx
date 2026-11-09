@@ -30,11 +30,15 @@ bun run dev
 
 The React demo opens at `http://localhost:5274`. Run one of these commands for another example:
 
-| Command                                             | Application              |
-| --------------------------------------------------- | ------------------------ |
-| `bun run dev:vue`                                   | Vue at port 5275.        |
-| `bun run dev:chat`                                  | Chat panel at port 5276. |
-| `bun run build:packages`, then `bun run dev:nextjs` | Next.js at port 3000.    |
+| Command                                             | Application                               |
+| --------------------------------------------------- | ----------------------------------------- |
+| `bun run dev:vue`                                   | Vue at port 5275.                         |
+| `bun run dev:chat`                                  | Chat panel at port 5276.                  |
+| `bun run dev:collaboration`                         | Peer-to-peer collaboration at port 5277.  |
+| `bun run dev:collaboration-hocuspocus`              | Server-backed collaboration at port 5278. |
+| `bun run build:packages`, then `bun run dev:nextjs` | Next.js at port 3000.                     |
+
+Each collaboration example also needs a second process: `bun run dev:collaboration:signal` starts the signaling server, and `bun run dev:collaboration-hocuspocus:server` starts the room server. For the steps, see [Collaboration](/docs/pro/collaboration#run-the-examples).
 
 ## Adapt an example
 

@@ -19,6 +19,7 @@ const FAILURE_CODES: { readonly [K in CollaborationFailureCode]: true } = {
   'remote-apply-failed': true,
   'unsafe-part-name': true,
   'transport-disconnected': true,
+  'not-initialized': true,
 };
 
 /** True when `value` is a {@link CollaborationFailureCode} member. @public */
