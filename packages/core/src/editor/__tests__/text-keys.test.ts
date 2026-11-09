@@ -7,7 +7,7 @@ import { GlobalWindow } from 'happy-dom';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { attr, elements, find, xmlPartOf, type Element } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
-import { corrections, smartQuote } from '../autocorrect.ts';
+import { corrections } from '../autocorrect.ts';
 import { nextCase } from '../format-keys.ts';
 import { dispatchBeforeInput } from '../surface-input.ts';
 import type { TextInputKind } from '../text-input.ts';
@@ -149,54 +149,34 @@ describe('keys on a selected shape and word deletion', () => {
 
 describe('AutoCorrect while typing', () => {
   test('the rules, one key at a time', () => {
-    expect(smartQuote('', '"')).toBe('“');
-    expect(smartQuote('say', '"')).toBe('”');
-    expect(smartQuote('it', "'")).toBe('’');
     expect(corrections('x (c', ')')).toEqual({ edits: [{ from: 2, to: 4, text: '' }], typed: '©' });
+    expect(corrections('x (R', ')').typed).toBe('®');
     expect(corrections('wait..', '.').typed).toBe('…');
     expect(corrections('a 1/2', ' ').edits).toEqual([{ from: 2, to: 5, text: '½' }]);
-    expect(corrections('a --', ' ').edits).toEqual([{ from: 2, to: 4, text: '–' }]);
-    expect(corrections('hello', ' ').edits).toEqual([{ from: 0, to: 1, text: 'H' }]);
-    expect(corrections('Use e.g. this', ' ').edits).toEqual([]);
-    expect(corrections('Done. next', '.').edits).toEqual([{ from: 6, to: 7, text: 'N' }]);
-    expect(corrections('see https://x.io', ' ').edits).toEqual([]);
-    expect(corrections('so iPhone', ' ').edits).toEqual([]);
-    // A lone i takes a capital only where a word ends: i.e. and (i) stay.
-    expect(corrections('this, i', '.').edits).toEqual([]);
-    expect(corrections('(i', ')').edits).toEqual([]);
-    expect(corrections('so i', ' ').edits).toEqual([{ from: 3, to: 4, text: 'I' }]);
-    // An abbreviation or a number with a full stop does not end a sentence.
-    expect(corrections('About approx. value', ' ').edits).toEqual([]);
-    expect(corrections('See Step 3. item', ' ').edits).toEqual([]);
+    expect(corrections('a 3/4', ',').edits).toEqual([{ from: 2, to: 5, text: '¾' }]);
+    // Capitals, quotes, and dashes follow the system settings: no rule makes them.
+    expect(corrections('a --', ' ').edits).toEqual([]);
+    expect(corrections('hello', ' ').edits).toEqual([]);
+    expect(corrections('Done. next', '.').edits).toEqual([]);
+    expect(corrections('so i', ' ').edits).toEqual([]);
+    expect(corrections('on monday', ' ').edits).toEqual([]);
+    expect(corrections('say', '"')).toEqual({ edits: [], typed: '"' });
+    expect(corrections('it', "'")).toEqual({ edits: [], typed: "'" });
   });
 
-  test('typing corrects quotes, symbols, dashes, and capitals in the slide text', async () => {
+  test('typing corrects symbols, the ellipsis, and fractions, and nothing else', async () => {
     const { e, type } = await open(para(''));
     caret(e, 0, 0);
     type('hello world. this is "it" -- i think so on monday (c) (tm) wait... 1/2 ');
-    expect(texts(e)[0]).toBe('Hello world. This is “it” – I think so on Monday © ™ wait… ½ ');
+    expect(texts(e)[0]).toBe('hello world. this is "it" -- i think so on monday © ™ wait… ½ ');
     e.destroy();
   });
 
-  test('a capital keeps the formatting of the letter it replaces', async () => {
-    const { e, type } = await open(
-      para(run('Done. ') + '<a:r><a:rPr lang="en-US" b="1"/><a:t>next</a:t></a:r>')
-    );
-    caret(e, 0, 10);
-    type(' ');
-    const runs = resolved(e)[0].runs.filter((r) => r.kind === 'text');
-    expect(runs.map((r) => [r.text, (r as { props: { bold: boolean } }).props.bold])).toEqual([
-      ['Done. ', false],
-      ['Next ', true],
-    ]);
-    e.destroy();
-  });
-
-  test('a quote typed over a selection is curly; Backspace after a later edit is a Backspace', async () => {
+  test('a quote typed over a selection stays straight; Backspace after a later edit is a Backspace', async () => {
     const { e, type } = await open(para(run('Say word')));
     caret(e, 0, 4, 8);
     type('"');
-    expect(texts(e)[0]).toBe('Say \u201C');
+    expect(texts(e)[0]).toBe('Say "');
     const fresh = await open(para(''));
     caret(fresh.e, 0, 0);
     fresh.type('1. ');
@@ -214,7 +194,7 @@ describe('AutoCorrect while typing', () => {
     const { e, type, key } = await open(para('') + para(''));
     caret(e, 0, 0);
     type('1. first\nsecond ');
-    expect(texts(e).slice(0, 2)).toEqual(['First', 'Second ']);
+    expect(texts(e).slice(0, 2)).toEqual(['first', 'second ']);
     expect(resolved(e)[0].bullet?.type).toBe('autonum');
     expect(resolved(e)[1].bullet?.type).toBe('autonum');
     caret(e, 2, 0);

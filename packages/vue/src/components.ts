@@ -86,8 +86,9 @@ const pptxEditorRootProps = {
    */
   modules: { type: Array as PropType<readonly EditorModule[]>, default: undefined },
   /**
-   * AutoCorrect while typing (default `true`): curly quotes, symbols, fractions, en dashes,
-   * sentence capitals, and lists started by typing `1.`, `1)`, `*`, or `-` and a space. Read
+   * AutoCorrect while typing (default `true`): symbols, ellipses, fractions, and lists started
+   * by typing `1.`, `1)`, `*`, or `-` and a space. Capitals, curly quotes, dashes, and
+   * spelling are never automatic here: keyboards and systems that offer them apply them. Read
    * once, when the editor is created.
    */
   autoCorrect: { type: Boolean, default: true },

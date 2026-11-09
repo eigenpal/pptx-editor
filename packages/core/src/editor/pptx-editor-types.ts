@@ -28,9 +28,10 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
   /** Whether drags snap to smart guides; on by default. `toggleSmartGuides` switches it. */
   readonly smartGuides?: boolean;
   /**
-   * AutoCorrect while typing (default true): curly quotes, the ©, ®, and ™ signs, ellipses,
-   * fractions, en dashes, sentence capitals, and lists started by typing `1.`, `1)`, `*`, or
-   * `-` and a space.
+   * AutoCorrect while typing (default true): the ©, ®, and ™ signs, ellipses, fractions, and
+   * lists started by typing `1.`, `1)`, `*`, or `-` and a space. Capitals, curly quotes,
+   * and dashes are never automatic here: keyboards and systems that offer them apply them,
+   * whatever this option is.
    */
   readonly autoCorrect?: boolean;
   /**

@@ -81,21 +81,10 @@ test('Replace All in one long run writes the run once', async () => {
 });
 
 test('AutoCorrect after a long word scans it once', () => {
-  // A capital first letter, so no rule applies: the cost is the scan for the word alone.
+  // No rule applies: the cost is the scan for the word alone.
   const before = `W${'w'.repeat(200_000)}`;
   const start = performance.now();
   expect(corrections(before, ' ').edits).toEqual([]);
   // A linear scan takes milliseconds. The quadratic one took minutes for this length.
-  expect(performance.now() - start).toBeLessThan(1000);
-});
-
-test('AutoCorrect after a sentence with a long word scans it once', () => {
-  // The capital check reads the word before the sentence end, past a long word and a long run
-  // of spaces. A regex retried from each place took minutes for this length.
-  const head = `${' '.repeat(100_000)}x${'w'.repeat(100_000)} end. `;
-  const start = performance.now();
-  expect(corrections(`${head}next`, ' ').edits).toEqual([
-    { from: head.length, to: head.length + 1, text: 'N' },
-  ]);
   expect(performance.now() - start).toBeLessThan(1000);
 });

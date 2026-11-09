@@ -30,8 +30,12 @@ function bound(): { input: HTMLTextAreaElement; root: HTMLElement; calls: Call[]
   root.append(input);
   doc.body.append(root as unknown as Node);
   const calls: Call[] = [];
+  // No text caret: a composition's place is the selection, which stays the same here.
+  const place = { at: { kind: 'none' as const }, ids: null, text: '', revision: 0 };
   const host: SurfaceInputHost = {
     textInput: (kind, data) => calls.push(['text', kind, data]),
+    selectionPlace: () => place,
+    composeSelection: (_place, data) => (calls.push(['text', 'text', data]), true),
     shortcut: (key) => (calls.push(['key', key]), true),
     copy: () => false,
     paste: () => false,
@@ -73,10 +77,12 @@ const keyDown = (key: string, init: { keyCode?: number; isComposing?: boolean } 
 /** One composition as an input method sends it: updates, then the committed text. */
 function compose(input: HTMLTextAreaElement, steps: readonly string[], commit: string): void {
   fire(input, composition('compositionstart'));
+  // The field holds the text before the caret; the composing text goes in after it.
+  const base = input.value;
   for (const step of steps) {
     // The browser shows the composing text in the field; `beforeinput` cannot be prevented.
     fire(input, beforeInput('insertCompositionText', step));
-    input.value = step;
+    input.value = base + step;
     fire(input, new win.Event('input', { bubbles: true }) as unknown as Event);
     fire(input, composition('compositionupdate', step));
   }

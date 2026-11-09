@@ -1,18 +1,19 @@
-// AutoCorrect while typing: curly quotes, symbols, fractions, dashes, capitals, and lists.
+// AutoCorrect while typing: symbols, fractions, the ellipsis, and lists.
+//
+// These rules cover what operating systems do not change as the user types. Capitals, curly
+// quotes, dashes, and spelling follow the user's system settings: the system sends them as
+// `insertReplacementText`, and `replacement-text.ts` applies them.
 //
 // Each rule reads the paragraph text before the caret and acts when a key ends a token:
-// - A straight quote becomes a curly one: open at the paragraph start, after a space or an
-//   opening bracket; close (and an apostrophe) elsewhere.
-// - A letter c, r, or tm in parentheses becomes the ©, ®, or ™ sign
-//   on the closing parenthesis; a third full stop makes an ellipsis.
-// - On a space, punctuation, or Enter: `1/2`, `1/4`, and `3/4` become ½, ¼, and ¾; ` -- `
-//   between words becomes an en dash; the first word of a sentence or a paragraph, the word
-//   `i`, and the names of the days take a capital first letter.
+// - A letter c, r, or tm in parentheses becomes the ©, ®, or ™ sign on the closing
+//   parenthesis; a third full stop makes an ellipsis.
+// - On a space, punctuation, or Enter: `1/2`, `1/4`, and `3/4` become ½, ¼, and ¾.
 // - A space after `1.`, `1)`, `*`, or `-` at the start of a paragraph with no bullet turns the
 //   paragraph into a numbered or bulleted list. The caller commits that as its own undo step,
 //   so Backspace or Undo right after it gives the typed text back.
 //
-// Typing only: a paste or an IME commit of more than one character is never corrected.
+// Typing only: a paste, a system replacement, or an IME commit of more than one character is
+// never corrected.
 
 import type { EditorSelection, TextPoint } from '../contracts/index.ts';
 import type { LayoutItem } from '../layout/index.ts';
@@ -36,46 +37,12 @@ type TextSelection = Extract<EditorSelection, { kind: 'text' }>;
 
 /** Keys that end a token: AutoCorrect looks at the word before them. */
 const TRIGGERS = new Set([' ', '\n', '.', ',', ';', ':', '!', '?', ')', '"', "'"]);
-const OPENERS = /[\s([{“‘—–-]$/u;
 const SYMBOLS: readonly (readonly [string, string])[] = [
   ['(c', '©'],
   ['(r', '®'],
   ['(tm', '™'],
 ];
 const FRACTIONS: Readonly<Record<string, string>> = { '1/2': '½', '1/4': '¼', '3/4': '¾' };
-const DAYS = new Set([
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
-]);
-/** Keys after which a lone `i` becomes `I`. */
-const I_TRIGGERS = new Set([' ', '\n', ',', ';', ':', '!', '?', "'", '\u2019']);
-/** Common abbreviations whose full stop does not end a sentence. */
-const ABBREVIATIONS = new Set([
-  'approx',
-  'cf',
-  'dept',
-  'dr',
-  'etc',
-  'fig',
-  'inc',
-  'jr',
-  'ltd',
-  'min',
-  'mr',
-  'mrs',
-  'ms',
-  'no',
-  'p',
-  'pp',
-  'sr',
-  'st',
-  'vs',
-]);
 /** The list a paragraph start turns into, by its typed marker. */
 const LIST_MARKERS: Readonly<Record<string, 'bullet' | 'arabicPeriod' | 'arabicParenR'>> = {
   '*': 'bullet',
@@ -91,14 +58,6 @@ interface Edit {
   readonly text: string;
 }
 
-/** The character a typed quote becomes, by the text before it. */
-export function smartQuote(before: string, typed: string): string {
-  if (typed !== '"' && typed !== "'") return typed;
-  const open = before === '' || OPENERS.test(before);
-  if (typed === '"') return open ? '“' : '”';
-  return open ? '‘' : '’';
-}
-
 /**
  * The replacements a typed `trigger` makes in `before`, the paragraph text before the caret,
  * and the text that goes in for the trigger itself. Pure, for tests.
@@ -108,7 +67,7 @@ export function corrections(
   trigger: string
 ): { readonly edits: readonly Edit[]; readonly typed: string } {
   const edits: Edit[] = [];
-  const typed = trigger === '\n' ? '' : smartQuote(before, trigger);
+  const typed = trigger === '\n' ? '' : trigger;
   if (trigger === ')') {
     for (const [tail, symbol] of SYMBOLS)
       if (before.toLowerCase().endsWith(tail))
@@ -127,40 +86,7 @@ export function corrections(
   const word = before.slice(start);
   if (Object.hasOwn(FRACTIONS, word))
     edits.push({ from: start, to: before.length, text: FRACTIONS[word] });
-  if (
-    word === '--' &&
-    (trigger === ' ' || trigger === '\n') &&
-    /\S\s+$/u.test(before.slice(0, start))
-  )
-    edits.push({ from: start, to: before.length, text: '–' });
-  const letters = /^[\p{Ll}][\p{Ll}'’]*$/u.exec(word.replace(/^["'“‘([]+/u, ''));
-  if (letters && edits.length === 0) {
-    const at = before.length - letters[0].length;
-    if (capitalized(letters[0], before.slice(0, start), trigger))
-      edits.push({ from: at, to: at + 1, text: letters[0][0].toUpperCase() });
-  }
   return { edits, typed };
-}
-
-/**
- * Whether a lower-case `word` after `prefix` (text up to the token) takes a capital when
- * `trigger` ends it. The word `i` takes one only before a space or punctuation that ends a
- * word, so `i.e.` and `(i)` stay as typed.
- */
-function capitalized(word: string, prefix: string, trigger: string): boolean {
-  if (word === 'i') return I_TRIGGERS.has(trigger);
-  if (DAYS.has(word)) return true;
-  // `trimEnd` removes what `\s` matches, without a regex retry from each space.
-  const head = prefix.trimEnd();
-  if (head === '') return true;
-  if (!/[.!?]$/u.test(head) || head === prefix) return false;
-  // An abbreviation (`e.g.`, `approx.`), a lone initial, or a number (`Step 3.`) does not end
-  // a sentence.
-  let from = head.length;
-  while (from > 0 && !/\s/u.test(head[from - 1]!)) from -= 1;
-  const last = head.slice(from);
-  if (/^(?:\p{L}\.)+$/u.test(last) || /^\d+[.)]$/u.test(last)) return false;
-  return !ABBREVIATIONS.has(last.slice(0, -1).toLowerCase());
 }
 
 /** What `autoCorrectEdit` did: the caret after it, and whether it started a list. */
@@ -253,7 +179,7 @@ export function autoCorrectInput(
 
 /**
  * The text input function of an editor: each input with AutoCorrect when `enabled`, else (or
- * when AutoCorrect does not apply) as typed (`editText`).
+ * when AutoCorrect does not apply, or for an `exact` system replacement) as typed (`editText`).
  */
 export function withAutoCorrect(enabled: boolean) {
   return (
@@ -264,11 +190,13 @@ export function withAutoCorrect(enabled: boolean) {
     item: ShapeItem,
     sel: TextSelection,
     kind: TextInputKind,
-    data: string | undefined
+    data: string | undefined,
+    exact = false
   ): AutoCorrectResult => {
-    const fixed = enabled
-      ? autoCorrectInput(batch, part, slide, txBodyId, item, sel, kind, data)
-      : null;
+    const fixed =
+      enabled && !exact
+        ? autoCorrectInput(batch, part, slide, txBodyId, item, sel, kind, data)
+        : null;
     const done = fixed ?? {
       at: editText(batch, part, txBodyId, item, sel, kind, data),
       list: false,

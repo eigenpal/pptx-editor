@@ -27,8 +27,7 @@ import { commandCacheKey, compile, type CommandContext } from './commands.ts';
 import type { DocumentSession } from './document-session.ts';
 import { clampSlide } from './progressive-open.ts';
 import { changedSlide, historyAnswer, isHistoryMark, validSelection } from './history-marks.ts';
-import type { HistoryMark } from './history-marks.ts';
-import { markOf, markOptions } from './history-marks.ts';
+import { markOf, markOptions, type HistoryMark } from './history-marks.ts';
 import { EditorHistoryGroups, nextPasteSeries, type PasteSeries } from './history-groups.ts';
 import {
   CommandRefusal,
@@ -399,7 +398,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (command.type === 'undo' || command.type === 'redo') {
       if (mode === 'view') return refuse('disabled.viewing');
-      surface?.cancelDrag();
+      surface?.interrupt(); // A drag, and an IME composition, end first.
       const undo = command.type === 'undo';
       // An armed format is the last step, as in DOCX Editor: the first undo ends it alone.
       if (undo && arm.current()) return (arm.clear(), emit(), { ok: true });
@@ -493,10 +492,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   };
 
   /**
-   * Apply a text edit at the current text selection as one transaction; typing at a caret
-   * merges into one undo step. A refusal is returned and published, never dropped.
+   * Apply a text edit at the text selection as one transaction (`was`: a system edit, with
+   * no AutoCorrect, whose undo selects `was`); typing at a caret is one undo step.
    */
-  const textInput = (kind: TextInputKind, data?: string): CommandResult => {
+  const textInput = (kind: TextInputKind, data?: string, was?: EditorSelection): CommandResult => {
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (mode === 'view') return refuse('disabled.viewing');
     if (selection.kind !== 'text')
@@ -513,13 +512,13 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const armed = typed && sel.diagramNode === undefined ? arm.current() : null;
     const batch = session.batch(armed?.pkg);
     let at: TextPoint;
-    let listed = false;
+    let list = false;
     try {
       const txBody = sel.diagramNode === undefined ? selectionBody(batch, part, sel) : undefined;
       if (sel.diagramNode !== undefined) at = typeDiagram(batch, part, sel, item, kind, data);
       else if (!txBody) throw new CommandRefusal('disabled.noText');
       else {
-        ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
+        ({ at, list } = typeText(batch, part, slide, txBody.id, item, sel, kind, data, !!was));
         const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
         if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
         refit(batch, slide, part, sel.nodeId, session.measurer);
@@ -530,11 +529,11 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     }
     // Typed text is one burst, one undo step; text typed over a range starts a new burst that
     // holds the replace, so one undo removes both. A break or a delete is a step of its own.
-    const burst = kind === 'text' && !listed;
+    const burst = kind === 'text' && !list;
     if (!burst || comparePoints(sel.anchor, sel.focus) !== 0) groups.boundary();
     const caret: EditorSelection = { ...sel, anchor: at, focus: at };
     // The entry's `selectionBefore`: an undo returns this object, so the arm finds its commands.
-    const mark = { part, selection: sel };
+    const mark = { part, selection: was ?? sel };
     const r = commit(
       armed ? [...armed.ops, ...batch.ops] : batch.ops,
       { label: 'typing', ...(burst ? { historyGroup: groups.typing(sel.nodeId) } : {}) },
@@ -545,7 +544,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (armed) arm.typed(mark, armed.commands);
     if (!carried) arm.clear();
     selection = caret;
-    autoListed = listed ? { sel: caret, rev: session.store.revision } : null;
+    autoListed = list ? { sel: caret, rev: session.store.revision } : null;
     canCache.typed(`${mode}:${slide}${typingBox(caret)}`, emit);
     emit();
     return { ok: true };
@@ -759,8 +758,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       const offPresence = presence.subscribe(() => surface?.render());
       presence.reset();
       detachModules = () => (offPresence(), detachSession());
-      opened.store.subscribe(() => {
+      opened.store.subscribe((change) => {
         cached = null;
+        presence.delivered(change);
         // A change made on the store directly (a host, a script): the editor did not set the
         // slide and the selection for it, so keep them valid and tell the chrome.
         if (committing > 0 || session !== opened) return;
@@ -875,11 +875,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       applyMode();
       emit();
     },
-    goToSlide(index) {
-      instance.selectSlide(index);
-    },
+    goToSlide: (index) => instance.selectSlide(index),
     selectSlide(index, mode = 'replace') {
       if (!session) return;
+      surface?.interrupt(); // An IME composition ends on its own slide.
       const before = slide;
       const next = Math.max(0, Math.min(index, session.info.slides.length - 1));
       if (views.presentationView === 'slideMaster')
@@ -932,7 +931,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           viewing: () => mode === 'view',
           part: () => partAt(slide),
           surface: () => surface,
-          ...{ prompts, presence, painter, views, groups, gestureEdit },
+          ...{ prompts, presence, painter, views, groups, gestureEdit, arm, emit },
           commentMarkers: comments.markers(snapshot, instance, () => session?.store.package),
         })
       );

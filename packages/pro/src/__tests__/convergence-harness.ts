@@ -111,7 +111,7 @@ export function coverageDeck(): Uint8Array {
 }
 
 /** Two docs and a sync link that can pause, to make an edit wait for the flush. */
-function link(a: Y.Doc, b: Y.Doc) {
+export function link(a: Y.Doc, b: Y.Doc) {
   const queue: [Y.Doc, Uint8Array][] = [];
   let paused = false;
   const send = (to: Y.Doc) => (update: Uint8Array, origin: unknown) => {
@@ -130,7 +130,8 @@ function link(a: Y.Doc, b: Y.Doc) {
   };
 }
 
-async function replica(doc: Y.Doc, actorId: string, bytes: Uint8Array) {
+/** One peer: an editor in a collaboration room on `doc`, with the deck `bytes` open. */
+export async function replica(doc: Y.Doc, actorId: string, bytes: Uint8Array) {
   const session = createYjsCollaborationSession({
     doc,
     documentId: 'deck',
@@ -166,7 +167,7 @@ export function differingParts(x: PptxPackage, y: PptxPackage): string[] {
 const HOW_TO = 'See CONTRIBUTING.md, "Add a collaboration fixture".';
 
 /** What a fixture prepares: the deck both peers open, and the state of peer A. */
-interface FixtureSetup {
+export interface FixtureSetup {
   /** The deck both peers open; the coverage deck when absent. */
   readonly deck?: () => Uint8Array;
   /**
@@ -219,7 +220,7 @@ async function prepare(label: string, fixture: FixtureSetup) {
  * hold the same package, and that both saves reopen to one package that a second save and
  * reopen keeps. A failure names the parts that differ.
  */
-async function convergeEdit(
+export async function convergeEdit(
   label: string,
   fixture: FixtureSetup,
   edit: (a: PptxEditorInstance) => CommandResult
