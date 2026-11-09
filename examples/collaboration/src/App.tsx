@@ -45,6 +45,7 @@ interface Joined {
 export function App() {
   const [joined, setJoined] = useState<Joined | null>(null);
   const [session, setSession] = useState<YjsCollaborationSession | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const source = usePptxSource('/sample.pptx', { fonts: packagedFonts() });
   // Rooms this tab seeded. A remount (Fast Refresh, for one) then joins instead of seeding the
   // room a second time from a new, empty Y.Doc.
@@ -77,12 +78,18 @@ export function App() {
     };
     const start = () => {
       if (created) return;
-      created = createYjsCollaborationSession({
-        doc,
-        awareness: provider.awareness,
-        documentId: roomId,
-        identity: { actorId: actorIdFor(person), name: person.name, color: person.color },
-      });
+      try {
+        created = createYjsCollaborationSession({
+          doc,
+          awareness: provider.awareness,
+          documentId: roomId,
+          identity: { actorId: actorIdFor(person), name: person.name, color: person.color },
+        });
+      } catch (error) {
+        // A room that the session cannot read, for example one that a hostile peer wrote.
+        setFailure(error instanceof Error ? error.message : String(error));
+        return;
+      }
       seeded.current.add(roomId);
       report();
       setSession(created);
@@ -144,6 +151,17 @@ export function App() {
           )
         }
       />
+    );
+  }
+
+  if (failure) {
+    return (
+      <RoomMessage title="This room cannot open" alert>
+        <p>{failure}</p>
+        <p>
+          <a href={location.pathname}>Start a new room</a>
+        </p>
+      </RoomMessage>
     );
   }
 

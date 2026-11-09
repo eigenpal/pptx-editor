@@ -14,13 +14,16 @@ import type * as Y from 'yjs';
 import { CollaborationSchemaError } from '../errors.ts';
 import { META_KEY, SCHEMA_VERSION } from './schema.ts';
 
+/** The version string of a room schema number. Opaque to hosts: compare it, never parse it. */
+const versionOf = (schema: number): string => `pptx-collaboration-${schema}`;
+
 /**
- * The room format version that this release writes and opens. A session refuses a room with
- * another version (`schema-version-mismatch`).
+ * The room format version that this release writes and opens, as an opaque string. A session
+ * refuses a room with another version (`schema-version-mismatch`).
  *
  * @public
  */
-export const COLLABORATION_FORMAT_VERSION: string = String(SCHEMA_VERSION);
+export const COLLABORATION_FORMAT_VERSION: string = versionOf(SCHEMA_VERSION);
 
 /**
  * Read the format version that a room records. Reads only the room's metadata: it does not
@@ -42,5 +45,5 @@ export function readCollaborationFormatVersion(doc: Y.Doc): string {
   if (schema === undefined) throw new CollaborationSchemaError('not-initialized');
   if (typeof schema !== 'number' || !Number.isSafeInteger(schema))
     throw new CollaborationSchemaError('schema-version-mismatch', 'room schema is not a number');
-  return String(schema);
+  return versionOf(schema);
 }

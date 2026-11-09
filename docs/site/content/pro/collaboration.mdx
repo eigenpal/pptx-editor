@@ -105,7 +105,7 @@ onUpdate();
 
 A room in another format counts as a room. The session then refuses it with `schema-version-mismatch`; see [Upgrade the room format](#upgrade-the-room-format). Compare the version with `COLLABORATION_FORMAT_VERSION` to check it before you join.
 
-Only one participant seeds a room. When two participants seed one room at the same time, the replicas keep one of the two presentations, and the other participant's opened presentation is lost.
+Seed each room from one participant only. When two participants seed one room at the same time, the replicas converge on one participant's presentation. The other presentation is lost, and the room can keep parts of it that the slides do not use.
 
 ## Connect your provider
 

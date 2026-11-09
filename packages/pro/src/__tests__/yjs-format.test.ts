@@ -64,7 +64,9 @@ describe('readCollaborationFormatVersion', () => {
     // A peer that receives the room reads the same version before it joins.
     const peer = new Y.Doc();
     Y.applyUpdate(peer, Y.encodeStateAsUpdate(doc));
+    const before = Y.encodeStateAsUpdate(peer);
     expect(readCollaborationFormatVersion(peer)).toBe(COLLABORATION_FORMAT_VERSION);
+    expect(Y.encodeStateAsUpdate(peer)).toEqual(before);
     editor.destroy();
     session.destroy();
   });

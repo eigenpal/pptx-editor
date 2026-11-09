@@ -19,6 +19,8 @@ const MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
 
 /** The `simple-peer` instance of one `y-webrtc` connection. */
 interface PeerLike {
+  /** True once the data channel is open. */
+  readonly connected: boolean;
   send(data: Uint8Array): void;
   /** The stream write: queued, and held while the channel's send buffer is full. */
   write(data: Uint8Array): boolean;
@@ -32,6 +34,9 @@ function chunkPeer(peer: PeerLike): void {
   // many frames, and a browser refuses a send while its buffer is full (about 16 MiB).
   const rawSend = peer.send.bind(peer);
   const chunkedSend = (data: Uint8Array) => {
+    // Before the channel opens, refuse as the raw send does: `y-webrtc` drops the message and
+    // syncs in full on connect. A queued frame would be sent again, framed twice, on connect.
+    if (!peer.connected) throw new Error('The data channel is not open.');
     for (let start = 0; start < data.length || start === 0; start += CHUNK_BYTES) {
       const part = data.subarray(start, start + CHUNK_BYTES);
       const frame = new Uint8Array(part.length + 1);
