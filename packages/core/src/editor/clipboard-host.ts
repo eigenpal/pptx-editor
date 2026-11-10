@@ -20,6 +20,7 @@ import type { SlideLayout } from '../layout/index.ts';
 import { slideRefAt } from '../store/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import {
+  carriesAll,
   CLIPBOARD_MIME,
   clipboardText,
   copySelection,
@@ -122,27 +123,35 @@ export function createClipboardHost(editor: ClipboardEditor) {
     return pictures.warm(key, () => drawShapesPicture(session, lay, selection));
   };
 
-  /** The selected shapes as a clipboard payload. */
-  const copy = (): ClipboardPayload | null => {
+  /** The selected shapes as a clipboard payload, with no change to the last copy. */
+  const selectionPayload = (): ClipboardPayload | null => {
     const session = editor.session();
     const selection = editor.selection();
     if (!session || selection.kind !== 'shapes') return null;
     // A slide, or a layout or master in the slide master view.
     const ref = slideRefAt(session.store.package, editor.slide());
     if (!ref) return null;
-    const payload = copySelection(
+    return copySelection(
       session.store.package,
       ref.partName,
       editor.layout()?.items ?? [],
       selection,
       session.id
     );
-    if (payload) {
-      lastCopied = payload;
-      lastPicture = null;
-      // Paste's enabled state reads `lastCopied`: tell the chrome it changed.
-      editor.emit();
-    }
+  };
+
+  /** Record `payload` as the last copy. */
+  const remember = (payload: ClipboardPayload): void => {
+    lastCopied = payload;
+    lastPicture = null;
+    // Paste's enabled state reads `lastCopied`: tell the chrome it changed.
+    editor.emit();
+  };
+
+  /** The selected shapes as a clipboard payload, recorded as the last copy. */
+  const copy = (): ClipboardPayload | null => {
+    const payload = selectionPayload();
+    if (payload) remember(payload);
     return payload;
   };
 
@@ -333,8 +342,16 @@ export function createClipboardHost(editor: ClipboardEditor) {
         if (cut) editor.deleteText();
         return true;
       }
-      const payload = copy();
+      const payload = selectionPayload();
+      // A cut deletes the selection, so it must carry all of it. The clipboard cannot carry a
+      // frame whose parts cannot travel; a cut that would lose one is refused as a whole, and
+      // the clipboard and the last copy stay as they were.
+      if (cut && selection.kind === 'shapes' && !carriesAll(payload, selection.nodeIds)) {
+        editor.refuse('contextMenu.cannotCopyFrame');
+        return true;
+      }
       if (!payload) return false;
+      remember(payload);
       data.setData(CLIPBOARD_MIME, JSON.stringify(payload));
       data.setData('text/plain', clipboardText(payload));
       shapesHtml(data, payload);

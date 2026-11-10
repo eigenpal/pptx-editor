@@ -60,6 +60,15 @@ jobs:
           echo "published=true" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
+  collaboration-baseline:
+    name: Capture collaboration baseline
+    needs: source
+    if: needs.source.outputs.published == 'true'
+    uses: ./.github/workflows/collaboration-baseline.yml
+    with:
+      version: ${{ needs.source.outputs.version }}
+    secrets: inherit
+
   announcements:
     name: Release comments and roadmap
     needs: source
@@ -343,7 +352,7 @@ jobs:
 
   report:
     name: Report a failure
-    needs: [source, announcements, site]
+    needs: [source, announcements, site, collaboration-baseline]
     if: failure()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

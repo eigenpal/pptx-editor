@@ -136,12 +136,13 @@ describe('a vertical merge and a concurrent delete of one of its covered rows', 
       const { editors, sync } = await peers(deck(), order);
       const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
       sync.pause();
+      // The row deletion removes D even while the merge moves its paragraph.
       mergeFirstColumn(a, 0, 1);
       deleteRow(b, 1);
       sync.flush();
       // The room keeps the merge's span, so the store still covers "G".
       expect(merge(rowsOf(all(root(a), 'tbl')[0]!)[0]![0]!)).toBe('rowSpan=2');
-      expect(savedEqual(a, b)).toEqual(['AD|B|C', 'G|H|I']);
+      expect(savedEqual(a, b)).toEqual(['A|B|C', 'G|H|I']);
     });
 
   for (const order of TWO_ORDERS)
@@ -152,7 +153,7 @@ describe('a vertical merge and a concurrent delete of one of its covered rows', 
       mergeFirstColumn(a, 0, 2);
       deleteRow(b, 1);
       sync.flush();
-      expect(savedEqual(a, b)).toEqual(['ADG[rowSpan=2]|B|C', '[vMerge=1]|H|I']);
+      expect(savedEqual(a, b)).toEqual(['AG[rowSpan=2]|B|C', '[vMerge=1]|H|I']);
     });
 
   for (const order of TWO_ORDERS)
@@ -164,7 +165,7 @@ describe('a vertical merge and a concurrent delete of one of its covered rows', 
       deleteRow(b, 1);
       sync.flush();
       const saved = savedEqual(a, b);
-      expect(saved).toEqual(['AD[rowSpan=2]|B|C', '[vMerge=1]|H|I']);
+      expect(saved).toEqual(['A[rowSpan=2]|B|C', '[vMerge=1]|H|I']);
       // The next table command writes the same merge markup into the room.
       a.setSelection({
         kind: 'text',
@@ -204,7 +205,7 @@ describe('the save repair across replicas', () => {
       });
       expect(b.exec({ type: 'deleteColumn' }).ok).toBe(true);
       sync.flush();
-      expect(savedEqual(a, b)).toEqual(['AB|C', 'D|F', 'G|I']);
+      expect(savedEqual(a, b)).toEqual(['A|C', 'D|F', 'G|I']);
     });
 
   test('an undo of the merge on one replica saves the table as the file wrote it on both', async () => {
@@ -286,7 +287,7 @@ describe('the canvas draws what the save writes', () => {
       deleteRow(b, 1);
       sync.flush();
       const revisions = [a.session!.store.revision, b.session!.store.revision];
-      expect(drawn(a)).toEqual(['AD|B|C', 'G|H|I']);
+      expect(drawn(a)).toEqual(['A|B|C', 'G|H|I']);
       expect(drawn(b)).toEqual(drawn(a));
       expect(await drawnAfterSave(a)).toEqual(drawn(a));
       expect(await drawnAfterSave(b)).toEqual(drawn(b));
@@ -303,7 +304,7 @@ describe('the canvas draws what the save writes', () => {
       mergeFirstColumn(a, 0, 1);
       deleteRow(b, 1);
       sync.flush();
-      expect(drawn(a)).toEqual(['AD[2x1]|B|C', '·|H|I']);
+      expect(drawn(a)).toEqual(['A[2x1]|B|C', '·|H|I']);
       expect(drawn(b)).toEqual(drawn(a));
       expect(await drawnAfterSave(a)).toEqual(drawn(a));
     });
@@ -324,9 +325,9 @@ describe('the canvas draws what the save writes', () => {
     });
     expect(b.input('text', 'x').ok).toBe(true);
     sync.flush();
-    expect(drawn(a)).toEqual(['AD|B|C', 'Gx|H|I']);
+    expect(drawn(a)).toEqual(['A|B|C', 'Gx|H|I']);
     expect(drawn(b)).toEqual(drawn(a));
-    expect(savedEqual(a, b)).toEqual(['AD|B|C', 'Gx|H|I']);
+    expect(savedEqual(a, b)).toEqual(['A|B|C', 'Gx|H|I']);
   });
 
   test('a copy of the table pastes as the canvas draws it, without a mark', async () => {
@@ -345,10 +346,10 @@ describe('the canvas draws what the save writes', () => {
       rowsOf(tbl).map((row) => row.map((tc) => textOf(tc) + (merge(tc) ? `[${merge(tc)}]` : '')))
     );
     expect(tables[1]).toEqual([
-      ['AD', 'B', 'C'],
+      ['A', 'B', 'C'],
       ['G', 'H', 'I'],
     ]);
-    expect(savedEqual(a, b)).toEqual(['AD|B|C', 'G|H|I']);
+    expect(savedEqual(a, b)).toEqual(['A|B|C', 'G|H|I']);
   });
 });
 
@@ -358,7 +359,7 @@ describe('the room format names structure marks', () => {
     const [a] = editors as [PptxEditorInstance, PptxEditorInstance];
     mergeFirstColumn(a, 0, 1);
     sync.flush();
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBe(8);
     expect(isStructureEdited(frameOf(a))).toBe(true);
   });
 
@@ -367,6 +368,7 @@ describe('the room format names structure marks', () => {
     ['an older format (3), whose peers would hide merged text', 3],
     ['format 4, whose peers repair no undo by its listings and marks', 4],
     ['format 5, whose peers show no paragraph a peer typed into while another removed it', 5],
+    ['format 7, whose peers use earlier text identity and table rescue rules', 7],
     ['a newer format', SCHEMA_VERSION + 1],
   ] as const)
     test(`a replica refuses a room of ${name}, keeps its own deck, and saves no mark`, async () => {

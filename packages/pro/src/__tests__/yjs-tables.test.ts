@@ -232,7 +232,7 @@ describe('tables in a collaboration room', () => {
     sync.flush();
     converged(a.editor, b.editor);
     expect(grid(a.editor)).toEqual(grid(b.editor));
-    expect(grid(a.editor)[0]).toBe('A|B|C');
+    expect(grid(a.editor)[0]).toBe('Ax|B|C');
   });
 
   test('the table deleted while the peer types in it: the caret falls back', async () => {
@@ -421,7 +421,7 @@ describe('concurrent table structure edits', () => {
     firstLetter(a.editor, 1, 0);
     expect(a.editor.exec({ type: 'toggleBold' }).ok).toBe(true);
     const row0 = rowsOf(frame(a.editor)!)[0];
-    expect(row0.map((tc) => textOf(tc))).toEqual(['AB', 'C']);
+    expect(row0.map((tc) => textOf(tc))).toEqual(['A', 'C']);
     expect(row0.map((tc) => tc.attrs.map((x) => x.local).join(','))).toEqual(['', '']);
     expect(fingerprint(a.editor)).toBe(fingerprint(b.editor));
     savedTableValid(b.editor);

@@ -229,8 +229,9 @@ describe("an undo of an element's creation keeps a peer's later edit in it", () 
       ok(b.input('text', 'Z'));
       ok(a.exec({ type: 'undo' }));
       // A row is not valid without what the undo took (its height, each cell's body), so it
-      // does not show again; A's redo brings it back with B's text.
-      expect(settled(a, b)).toEqual(['A', 'B', 'C', 'D']);
+      // does not show again. B's paragraph shows in the cell of the same column in the row
+      // above (`undo-rehome.ts`); A's redo brings the row back with B's text.
+      expect(settled(a, b)).toEqual(['A', 'B', 'Z', 'C', 'D']);
       expect(savedRows(a)).toEqual([2, 2]);
       ok(a.exec({ type: 'redo' }));
       expect(settled(a, b)).toEqual(['A', 'B', '', 'Z', 'C', 'D']);

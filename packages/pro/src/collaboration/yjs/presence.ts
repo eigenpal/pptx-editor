@@ -20,6 +20,7 @@ import type {
   CollaborationRemoteSelection,
 } from '@pptx-editor.dev/core/editor';
 import type { PackageMirror } from './mirror.ts';
+import { itemOf, liveIds } from './text-identity.ts';
 
 /** The awareness field this editor owns. Other fields belong to other clients. */
 export const AWARENESS_FIELD = 'pptxEditor';
@@ -45,7 +46,9 @@ export interface AwarenessLike {
 }
 
 /** A text point: a relative position in a text node, or the start of an element with no text. */
-type EncodedPoint = { readonly rel: unknown } | { readonly key: string };
+type EncodedPoint =
+  | { readonly rel: unknown; readonly left?: { readonly client: number; readonly clock: number } }
+  | { readonly key: string };
 
 /** A selection as it travels in awareness. */
 export type EncodedSelection =
@@ -103,7 +106,11 @@ export function encodeSelection(
     const text = mirror.textOf(key);
     if (!text) return { key };
     const offset = Math.max(0, Math.min(Math.trunc(p.offset) || 0, text.length));
-    return { rel: Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(text, offset)) };
+    const left = offset === text.length && offset > 0 ? liveIds(text, offset - 1, 1)[0] : undefined;
+    return {
+      rel: Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(text, offset)),
+      ...(left ? { left: { client: left.client, clock: left.clock } } : {}),
+    };
   };
   const anchor = point(selection.anchor);
   const head = point(selection.head);
@@ -161,8 +168,41 @@ function decodePoint(
   }
   if (!absolute || !(absolute.type instanceof Y.Text)) return null;
   const record = mirror.recordOfText(absolute.type);
-  const node = record ? mirror.idOf(record.part, record.key) : undefined;
-  return record && node ? { part: record.part, node, offset: absolute.index } : null;
+  if (!record) return null;
+  const node = mirror.idOf(record.part, record.key);
+  const relative = json as { item?: unknown; assoc?: number };
+  const raw = relative.item ?? point.left;
+  if (raw && typeof raw === 'object') {
+    const { client, clock } = raw as { client?: unknown; clock?: unknown };
+    if (
+      typeof client === 'number' &&
+      Number.isSafeInteger(client) &&
+      client >= 0 &&
+      typeof clock === 'number' &&
+      Number.isSafeInteger(clock) &&
+      clock >= 0
+    ) {
+      const id = Y.createID(client, clock);
+      const item = itemOf(doc, id);
+      // Ordinary typing retains the anchor. Scan copies only after it moves or disappears.
+      if (node && item && !item.deleted && item.parent === absolute.type)
+        return { part: record.part, node, offset: absolute.index };
+      const found = mirror.locateCharacter(record.part, id);
+      if (found && (relative.item || found.text !== absolute.type))
+        return {
+          part: record.part,
+          node: found.node,
+          offset:
+            found.offset +
+            (relative.item
+              ? typeof relative.assoc === 'number' && relative.assoc < 0
+                ? 1
+                : 0
+              : 1),
+        };
+    }
+  }
+  return node ? { part: record.part, node, offset: absolute.index } : null;
 }
 
 /** A selection from the room, on this replica's ids, or null when it does not resolve. */

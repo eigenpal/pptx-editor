@@ -79,6 +79,7 @@
     "pro/review-styling",
     "pro/drawing",
     "pro/collaboration",
+    "pro/collaboration-versions",
     "---Editing API---",
     "editor-api/index",
     "editor-api/runtime",

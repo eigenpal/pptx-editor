@@ -22,8 +22,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //
 // Such a paragraph goes to the end of the text body of the drawn cell over it, in reading order
 // of the cells it sat in. The grid is the one the editor draws (`tableGridOf`), so the canvas,
-// find, and the save agree. A covered cell keeps at least one paragraph (21.1.2.1.1): when every
-// paragraph would go, its last one stays.
+// find, and the save agree. A text body keeps at least one paragraph (21.1.2.1.1): a body whose
+// every paragraph goes leaves the read, and a covered cell may have no text body (21.1.3.16).
+// A drawn cell may have no text body too. It then takes the whole body of a covered cell whose
+// paragraphs all go, and the next local write lists that body in the drawn cell.
 //
 // The read must give every replica's store what the room shows, also the store of a replica
 // that wrote the state itself, which does not read its own write. So the rule acts only on
@@ -67,8 +69,9 @@ import {
   type NodeId,
   type ReplicaElementSpec,
 } from '@pptx-editor.dev/core/store';
-import type { Room } from './schema.ts';
+import { F, type Room } from './schema.ts';
 import { isRemoved, LINEAGE, type Spec } from './text-lineage.ts';
+import { sequenceItems } from './yjs-items.ts';
 
 /** The record fields this module writes. */
 export const MERGED = Object.freeze({
@@ -88,6 +91,13 @@ const MAX_COVER = 4_096;
 const isElement = (n: Node | undefined): n is Element => n?.type === 'element';
 const isA = (s: Spec | undefined, local: string): s is ReplicaElementSpec =>
   !!s && !('text' in s) && s.ns === NS_A && s.local === local;
+
+/** True for an empty paragraph that a merge left in a cell (`mh`). */
+function isHolder(room: Room, k: Spec): boolean {
+  if (!isA(k, 'p') || specHoldsText(k)) return false;
+  const rec = room.nodes.get(k.key);
+  return rec instanceof Y.Map && rec.get(MERGED.holder) === true;
+}
 
 /** The text of a run or a field (`a:r`, `a:fld`): its `a:t`, or '' when it has none. */
 function runText(run: Element): string {
@@ -164,16 +174,39 @@ function coveredCells(frame: Element): { tc: Element; over: Element }[] {
 const bodiesOf = (tc: Element): Element[] =>
   elements(tc).filter((c) => c.ns === NS_A && c.local === 'txBody');
 
-/** The paragraph keys that any writer saw hidden in a covered cell, or 'all'. */
-function coverSeen(rec: unknown): ReadonlySet<string> | 'all' {
-  const out = new Set<string>();
+/**
+ * The paragraph keys that any writer saw hidden in a covered cell, each with the items of the
+ * cover records that list it (who wrote them, and when), or 'all'.
+ */
+function coverSeen(rec: unknown): ReadonlyMap<string, readonly Y.ID[]> | 'all' {
+  const out = new Map<string, Y.ID[]>();
   if (!(rec instanceof Y.Map)) return out;
   for (const [field, list] of (rec as Y.Map<unknown>).entries()) {
     if (!field.startsWith(MERGED.cover) || !Array.isArray(list)) continue;
     if (list.length > MAX_COVER) return 'all';
-    for (const k of list as unknown[]) if (typeof k === 'string') out.add(k);
+    const item = (rec as Y.Map<unknown>)._map.get(field);
+    if (!item) continue;
+    for (const k of list as unknown[])
+      if (typeof k === 'string') out.set(k, [...(out.get(k) ?? []), item.id]);
   }
   return out;
+}
+
+/**
+ * Whether a writer saw the paragraph `rec` hidden as it is: a cover record that lists it is
+ * newer than each child the paragraph lists (a run typed into it later, or by a peer at the same
+ * time, was not seen). The first `MAX_COVER` children count.
+ */
+function seenAsIs(rec: Y.Map<unknown>, covers: readonly Y.ID[]): boolean {
+  const list = rec.get(F.children);
+  if (!(list instanceof Y.Array)) return true;
+  let n = 0;
+  for (const item of sequenceItems(list)) {
+    if ((n += 1) > MAX_COVER) break;
+    const ok = covers.some((c) => c.client === item.id.client && c.clock > item.id.clock);
+    if (!ok) return false;
+  }
+  return true;
 }
 
 /**
@@ -231,13 +264,18 @@ export function markMergedCells(
       const keys = bodies
         .flatMap((body) => elements(body).filter((p) => p.local === 'p'))
         .map((p) => keyOf.get(p.id))
-        .filter((k): k is string => k !== undefined && !seen.has(k));
+        .filter((k): k is string => {
+          if (k === undefined) return false;
+          const covers = seen.get(k);
+          const p = room.nodes.get(k);
+          return !covers || !(p instanceof Y.Map) || !seenAsIs(p as Y.Map<unknown>, covers);
+        });
       if (keys.length === 0) continue;
       const own = rec.get(field);
       const mine = Array.isArray(own)
         ? (own as unknown[]).filter((k) => typeof k === 'string')
         : [];
-      rec.set(field, [...mine, ...keys].slice(0, MAX_COVER + 1));
+      rec.set(field, [...new Set([...mine, ...keys])].slice(0, MAX_COVER + 1));
     }
   }
 }
@@ -297,22 +335,28 @@ function planFrame(
   cameBack: ReadonlySet<string>,
   frame: ReplicaElementSpec,
   into: Map<string, Spec[]>,
-  left: Map<string, Spec[]>
+  left: Map<string, Spec[]>,
+  leftOut: Set<string>,
+  bodyTo: Map<string, ReplicaElementSpec>,
+  changed: Set<string> | undefined
 ): void {
   const byKey = new Map<string, ReplicaElementSpec>();
   const view = viewOf(frame, byKey);
   // A structure command in a room marks the table, and its write records what it hid: any
   // other text in a covered cell of a marked table came there by a concurrent change.
   const marked = isStructureEdited(view);
+  // The text body that a covered cell gives to a drawn cell with none, by the drawn cell.
+  const given = new Map<string, ReplicaElementSpec>();
   for (const { tc, over } of coveredCells(view)) {
     const toView = bodiesOf(over)[0];
-    const to = toView && byKey.get(toView.id);
-    if (!to) continue;
+    let to = (toView && byKey.get(toView.id)) || given.get(over.id);
     const seen = coverSeen(room.nodes.get(tc.id));
     const unseen = (k: string): boolean => {
-      if (seen === 'all' || seen.has(k)) return false;
+      if (seen === 'all') return false;
       const rec = room.nodes.get(k);
       if (!(rec instanceof Y.Map)) return false;
+      const covers = seen.get(k);
+      if (covers && seenAsIs(rec as Y.Map<unknown>, covers)) return false;
       if (marked) return true;
       return typeof rec.get(LINEAGE.movedFrom) === 'string' || isRemoved(rec as Y.Map<unknown>);
     };
@@ -325,25 +369,40 @@ function planFrame(
       );
       return [{ from, kids, going, paragraphs: kids.filter((k) => isA(k, 'p')).length }];
     });
-    // A text body holds at least one paragraph: when every paragraph of the cell would go, the
-    // last stays. A second body (two peers typed into a cell with no body) that keeps none
-    // leaves the read while another body of the cell keeps one.
-    if (plans.every((p) => p.going.length === p.paragraphs))
-      [...plans]
-        .reverse()
-        .find((p) => p.going.length > 0)
-        ?.going.pop();
-    const emptied = new Set(
-      plans.filter((p) => p.going.length === p.paragraphs).map((p) => p.from)
-    );
     const cell = byKey.get(tc.id);
-    if (cell && emptied.size > 0 && emptied.size < plans.length)
+    const overCell = byKey.get(over.id);
+    // A drawn cell with no text body (21.1.3.16 tc) takes the whole body of a covered cell
+    // whose every paragraph goes or holds no text. The next local write lists that
+    // body in the drawn cell (`changed`), so a later split shows it once on every replica.
+    let whole: ReplicaElementSpec | undefined;
+    if (!to) {
+      whole = plans.find(
+        (p) =>
+          p.going.length > 0 &&
+          p.kids.every((k) => !isA(k, 'p') || p.going.includes(k) || !specHoldsText(k))
+      )?.from;
+      if (!whole || !cell || !overCell) continue;
+      to = whole;
+      given.set(over.id, whole);
+      bodyTo.set(overCell.key, whole);
+      changed?.add(cell.key).add(overCell.key);
+    }
+    // A text body holds at least one paragraph (21.1.2.1.1), so a body that keeps none leaves
+    // the read: one whose paragraphs all go, and one whose paragraphs the read shows elsewhere
+    // (a write listed them in the drawn cell, `changed` below). When every body goes, the cell
+    // shows with no text body, which a cell may have (21.1.3.16 tc): a paragraph left there
+    // would hide its text. Each body that leaves stays listed in the room (`leftOut`).
+    const emptied = new Set(
+      plans.filter((p) => p.going.length === p.paragraphs && p.from !== whole).map((p) => p.from)
+    );
+    for (const body of emptied) leftOut.add(body.key);
+    if (cell && (emptied.size > 0 || whole))
       left.set(
         cell.key,
-        (cell.children ?? []).filter((k) => !emptied.has(k as ReplicaElementSpec))
+        (cell.children ?? []).filter((k) => k !== whole && !emptied.has(k as ReplicaElementSpec))
       );
     for (const { from, kids, going } of plans) {
-      if (going.length === 0) continue;
+      if (going.length === 0 || from === whole) continue;
       const gone = new Set(going);
       left.set(
         from.key,
@@ -358,36 +417,47 @@ function planFrame(
 
 /**
  * A part's spec with merged text shown by the rule above. `cameBack` holds the keys that the
- * rescue put back in this read. The key of each text body that the rule changed is added to
- * `changed`: the next local write of the part lists those bodies in the room as the store holds
- * them (`PackageMirror`), so the room and this store agree.
+ * rescue put back in this read. The key of each text body that the rule changed, and of each
+ * cell that gave or took a whole text body, is added to `changed`: the next local write of the
+ * part lists their children in the room as the store holds them (`PackageMirror`), so the room
+ * and this store agree. The key of each text body that the
+ * rule left out of its cell is added to `leftOut`: a local write keeps it listed in the room
+ * (`withDropped`), and later reads leave it out too, while its paragraphs show in the drawn cell.
  */
 export function withMergedText(
   room: Room,
   spec: ReplicaElementSpec,
   cameBack: ReadonlySet<string>,
-  changed?: Set<string>
+  changed?: Set<string>,
+  leftOut: Set<string> = new Set()
 ): ReplicaElementSpec {
   const into = new Map<string, Spec[]>();
   const left = new Map<string, Spec[]>();
   const frames = framesOf<ReplicaElementSpec>(spec, (s) =>
     (s.children ?? []).filter((c): c is ReplicaElementSpec => !('text' in c))
   );
-  for (const frame of frames) planFrame(room, cameBack, frame, into, left);
-  if (into.size === 0 && cameBack.size === 0) return spec;
-  const placeholder = (k: Spec): boolean => {
-    if (!isA(k, 'p') || specHoldsText(k)) return false;
-    const rec = room.nodes.get(k.key);
-    return rec instanceof Y.Map && rec.get(MERGED.holder) === true;
-  };
+  const bodyTo = new Map<string, ReplicaElementSpec>();
+  for (const frame of frames)
+    planFrame(room, cameBack, frame, into, left, leftOut, bodyTo, changed);
+
   const walk = (s: ReplicaElementSpec, depth: number): ReplicaElementSpec => {
     let kids = left.get(s.key) ?? s.children ?? [];
     const extra = into.get(s.key);
     if (extra) kids = [...kids, ...extra];
+    // A text body comes first in a cell (21.1.3.16 tc).
+    const body = bodyTo.get(s.key);
+    if (body) kids = [body, ...kids];
     // Text the rescue put back shows in this text body: the empty paragraph that held its
     // place goes.
-    if (s.local === 'txBody' && kids.some((k) => isA(k, 'p') && cameBack.has(k.key)))
-      kids = kids.filter((k) => !placeholder(k));
+    if (s.local === 'txBody') {
+      const paragraphs = kids.filter((k) => isA(k, 'p'));
+      const lastHolder = paragraphs.some((k) => !isHolder(room, k)) ? undefined : paragraphs.at(-1);
+      kids = kids.filter((k) => {
+        if (!isHolder(room, k) || k === lastHolder) return true;
+        leftOut.add(k.key);
+        return false;
+      });
+    }
     const next =
       depth < MAX_DEPTH
         ? kids.map((c) => ('text' in c ? c : walk(c as ReplicaElementSpec, depth + 1)))

@@ -15,16 +15,16 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import * as Y from 'yjs';
 import type { ReplicaElementSpec } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
+import type { Listings } from './removed-content.ts';
 import { inSchemaOrder } from './singleton-children.ts';
+import { removalSnapshot, removalsSawAnywhere, type Snapshot } from './removal-snapshots.ts';
+import { undoneWithout } from './undo-unlisted.ts';
 import {
   isCount,
-  isRemovalField,
   isRemoved,
   LINEAGE,
   MAX_EARLIER,
   MAX_PATH,
-  MAX_REMOVERS,
-  MAX_SNAPSHOT,
   MOVES_KEY,
   type PartLineage,
   type ReadRecord,
@@ -34,39 +34,20 @@ import {
 /** The most moved nodes one part read puts back; a hostile room may list more. */
 const MAX_RESCUES = 1_024;
 
-/** An ancestor's removal snapshot for a read: its keys, `all` when too large, null when none. */
-type Snapshot = ReadonlySet<string> | 'all' | null;
-
-/**
- * The keys that any removal of a record saw: the union of every writer's snapshot. A snapshot
- * or a count of writers larger than any writer makes reads as `all`; a value of a wrong type
- * is ignored.
- */
-function removalSnapshot(rec: unknown): Snapshot {
-  if (!(rec instanceof Y.Map)) return null;
-  let out: Set<string> | null = null;
-  let removers = 0;
-  for (const [field, list] of (rec as Y.Map<unknown>).entries()) {
-    if (!isRemovalField(field) || !Array.isArray(list)) continue;
-    if (list.length > MAX_SNAPSHOT + 1 || (removers += 1) > MAX_REMOVERS) return 'all';
-    out ??= new Set();
-    for (const k of list as unknown[]) if (typeof k === 'string') out.add(k);
-  }
-  return out;
-}
-
 /**
  * The ancestor whose removal did not see a moved node, or null when the removal saw it: the
  * walk up its destination chain. A chain or a snapshot longer than any writer makes counts as
- * seen (no rescue). `snapshots` keeps each ancestor's snapshot as a set, so a read builds each
- * one once.
+ * seen (no rescue). An ancestor that an undo took out without seeing the move (`move`, the
+ * item of the move's `mt` field) counts as removed unseen. `snapshots` keeps each ancestor's
+ * snapshot as a set, so a read builds each one once.
  */
 function removedUnseen(
   room: Room,
   key: string,
   to: readonly unknown[],
   reachable: ReadonlyMap<string, number>,
-  snapshots: Map<string, Snapshot>
+  snapshots: Map<string, Snapshot>,
+  move: Y.Item | undefined
 ): string | null {
   if (to.length > MAX_PATH) return null;
   for (const ancestor of to) {
@@ -78,8 +59,186 @@ function removedUnseen(
     }
     if (held === 'all') return null;
     if (held) return held.has(key) ? null : ancestor;
+    // An undo of the step that made the ancestor (a row insert) took it without a snapshot.
+    if (undoneWithout(room, ancestor, move)) return ancestor;
   }
   return null;
+}
+
+/** The item of a record field: who wrote it, and when. */
+function fieldItem(rec: Y.Map<unknown>, field: string): Y.Item | undefined {
+  const item = rec._map.get(field);
+  return item && !item.deleted ? item : undefined;
+}
+
+/**
+ * Whether a removal of a parent in the chain `to` saw `key`: its snapshot holds it. A peer that
+ * removed a row with the cell a node came from saw the node there, also when the node moved into
+ * that row at the same time.
+ */
+function removalsSaw(
+  room: Room,
+  to: readonly unknown[],
+  key: string,
+  snapshots: Map<string, Snapshot>
+): boolean {
+  for (const ancestor of to.slice(0, MAX_PATH)) {
+    if (typeof ancestor !== 'string') return true;
+    let held = snapshots.get(ancestor);
+    if (held === undefined) {
+      held = removalSnapshot(room.nodes.get(ancestor));
+      snapshots.set(ancestor, held);
+    }
+    if (held === 'all' || held?.has(key)) return true;
+  }
+  return false;
+}
+
+/** The longest chain of parents that `removalsAbove` walks up. */
+const MAX_UP = 64;
+
+/** A moved node that the rescue places, as `moveSibling` reads it. */
+interface Placed {
+  readonly key: string;
+  readonly from: string;
+  readonly clock: number;
+  readonly to: readonly unknown[];
+}
+
+/**
+ * The node that the write which moved `node` moved with it into the same place, and that the
+ * rescue places: the last one before `node` in that place's list (`after`), or else the first
+ * one after it. `at` is the index of `node` in that list. One write moves nodes with one clock
+ * (`mq`) and one chain of parents (`mt`).
+ */
+function moveSibling(
+  room: Room,
+  node: { key: string; clock: number; to: readonly unknown[] },
+  placed: readonly Placed[]
+): { with: Placed; after: boolean; at: number } | null {
+  const dest = node.to[0];
+  if (typeof dest !== 'string') return null;
+  const rec = room.nodes.get(dest);
+  const list = rec instanceof Y.Map ? rec.get(F.children) : undefined;
+  if (!(list instanceof Y.Array)) return null;
+  const order = (list.toArray() as unknown[]).slice(0, MAX_RESCUES);
+  const at = order.indexOf(node.key);
+  if (at < 0) return null;
+  const same = (c: Placed): boolean =>
+    c.key !== node.key &&
+    c.clock === node.clock &&
+    c.to.length === node.to.length &&
+    c.to.every((k, i) => k === node.to[i]);
+  const byKeyOf = new Map(placed.filter(same).map((c) => [c.key, c]));
+  if (byKeyOf.size === 0) return null;
+  for (let i = at - 1; i >= 0; i -= 1) {
+    const c = byKeyOf.get(order[i] as string);
+    if (c) return { with: c, after: true, at };
+  }
+  for (let i = at + 1; i < order.length; i += 1) {
+    const c = byKeyOf.get(order[i] as string);
+    if (c) return { with: c, after: false, at };
+  }
+  return null;
+}
+
+/**
+ * What the removals at or above `start` (by the records that list it, up to `MAX_UP` levels) saw
+ * of `key`: `seen` when a snapshot holds it (or is too large to read), `unseen` when there are
+ * snapshots and none holds it, and `none` when no record there was removed.
+ */
+function removalsAbove(
+  room: Room,
+  start: string,
+  key: string,
+  listings: Listings,
+  snapshots: Map<string, Snapshot>
+): 'seen' | 'unseen' | 'none' {
+  let found = false;
+  const visited = new Set<string>();
+  let level = [start];
+  for (let depth = 0; depth < MAX_UP && level.length > 0; depth += 1) {
+    const up: string[] = [];
+    for (const k of level) {
+      if (visited.has(k)) continue;
+      visited.add(k);
+      let held = snapshots.get(k);
+      if (held === undefined) {
+        held = removalSnapshot(room.nodes.get(k));
+        snapshots.set(k, held);
+      }
+      if (held === 'all' || held?.has(key)) return 'seen';
+      if (held) found = true;
+      for (const parent of listings().get(k) ?? []) up.push(parent);
+    }
+    level = up.slice(0, MAX_RESCUES);
+  }
+  return found ? 'unseen' : 'none';
+}
+
+const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const isA = (s: Spec | undefined, local: string): s is ReplicaElementSpec =>
+  !!s && !('text' in s) && s.ns === NS_A && s.local === local;
+
+/** The keys a record lists, or none. */
+function listedOf(room: Room, key: string): unknown[] {
+  const rec = room.nodes.get(key);
+  const list = rec instanceof Y.Map ? rec.get(F.children) : undefined;
+  return list instanceof Y.Array ? (list.toArray() as unknown[]).slice(0, MAX_RESCUES) : [];
+}
+
+/** The DrawingML local name of a record, or undefined. */
+function localOf(room: Room, key: unknown): string | undefined {
+  const rec = typeof key === 'string' ? room.nodes.get(key) : undefined;
+  const shell: unknown = rec instanceof Y.Map ? rec.get(F.shell) : undefined;
+  if (typeof shell !== 'object' || shell === null) return undefined;
+  const { ns, local } = shell as { ns?: unknown; local?: unknown };
+  return ns === NS_A && typeof local === 'string' ? local : undefined;
+}
+
+/**
+ * The place in a table cell that stays, for a paragraph or a text body whose chain of parents
+ * `to` (its text body or its cell, then its row and its table) lost the cell or the row. A cell
+ * must show its text, and a removal that did not see the node did not remove it on purpose.
+ * From a removed row: the cell in the same column (its index in the removed row, else the first
+ * column) of the first row of the table that can take it. From a removed cell of a row that stays: the first cell of
+ * that row that can take it. A paragraph goes into the cell's text body, so a cell without one
+ * cannot take it; a text body goes into the cell, beside any body it has (core joins the bodies
+ * of a cell, `cellAsSaved`). Every replica reads the same room and spec, so all pick the same.
+ */
+function survivingCell(
+  room: Room,
+  node: string,
+  to: readonly unknown[],
+  specOf: ReadonlyMap<string, ReplicaElementSpec>
+): string | undefined {
+  const kind = localOf(room, node);
+  const at = kind === 'p' ? 1 : kind === 'txBody' ? 0 : -1;
+  if (at < 0 || localOf(room, to[at]) !== 'tc') return undefined;
+  const [cell, row, table] = to.slice(at, at + 3) as string[];
+  if (localOf(room, row) !== 'tr') return undefined;
+  const into = (tc: Spec | undefined): string | undefined => {
+    if (!isA(tc, 'tc')) return undefined;
+    if (kind === 'txBody') return tc.key;
+    return (tc.children ?? []).find((k) => isA(k, 'txBody'))?.key;
+  };
+  const shownRow = specOf.get(row!);
+  if (!specOf.has(cell!) && isA(shownRow, 'tr'))
+    for (const tc of shownRow.children ?? []) {
+      const place = into(tc);
+      if (place) return place;
+    }
+  const shownTable = specOf.get(table ?? '');
+  if (shownRow || !isA(shownTable, 'tbl')) return undefined;
+  // A column delete takes the cell out of its row too: its column is gone, so the first one.
+  const column = Math.max(0, listedOf(room, row!).indexOf(cell));
+  for (const tr of shownTable.children ?? []) {
+    if (!isA(tr, 'tr')) continue;
+    const cells = (tr.children ?? []).filter((k) => isA(k, 'tc'));
+    const place = into(cells[Math.min(column, cells.length - 1)]);
+    if (place) return place;
+  }
+  return undefined;
 }
 
 /** One order of keys on every replica. */
@@ -103,7 +262,9 @@ class Overlay extends Set<string> {
  * old index, in schema order. A node removed after its move stays removed. A node inside
  * another rescued node goes with it, and no key is placed twice. The key of each node put back
  * is added to `placed`. A node with no place left adds the removed ancestor that did not see it
- * to `stranded`: a removed paragraph then comes back with it (`withRemovedRuns`).
+ * to `stranded`: a removed paragraph then comes back with it (`withRemovedRuns`). With
+ * `listings`, a node whose old parent a peer removed after the node left it goes with the nodes
+ * the same write moved (`followMoveSiblings`).
  */
 export function rescueMoved(
   room: Room,
@@ -111,7 +272,8 @@ export function rescueMoved(
   spec: ReplicaElementSpec,
   read: ReadRecord,
   placed?: Set<string>,
-  stranded?: Set<string>
+  stranded?: Set<string>,
+  listings?: Listings
 ): ReplicaElementSpec {
   const moves = room.doc.getMap(MOVES_KEY);
   if (moves.size === 0) return spec;
@@ -119,10 +281,12 @@ export function rescueMoved(
   // Each shown key's parent and its place in document order, for a node that follows a join.
   const parentOf = new Map<string, string>();
   const orderOf = new Map<string, number>();
+  const specOf = new Map<string, ReplicaElementSpec>();
   const collect = (s: Spec, depth: number, parent: string | null): void => {
     depthOf.set(s.key, depth);
     orderOf.set(s.key, orderOf.size);
     if (parent !== null) parentOf.set(s.key, parent);
+    if (!('text' in s)) specOf.set(s.key, s);
     if (!('text' in s)) for (const c of s.children ?? []) collect(c, depth + 1, s.key);
   };
   collect(spec, 0, null);
@@ -135,6 +299,8 @@ export function rescueMoved(
     clock: number;
     to: unknown[];
     after?: string;
+    /** The key it goes right before (a node that follows the nodes moved with it). */
+    before?: string;
     seq?: number;
   };
   const candidates: Candidate[] = [];
@@ -185,8 +351,11 @@ export function rescueMoved(
     const at = rec.get(LINEAGE.movedIndex);
     const q = rec.get(LINEAGE.movedClock);
     const clock = typeof q === 'number' && Number.isFinite(q) ? q : 0;
-    const removed = removedUnseen(room, key, to, depthOf, snapshots);
+    const move = fieldItem(rec as Y.Map<unknown>, LINEAGE.movedTo);
+    const removed = removedUnseen(room, key, to, depthOf, snapshots, move);
     if (removed === null) continue;
+    // A removal of the place that lists it now saw it there: a later write moved it on.
+    if (listings && removalsAbove(room, key, key, listings, snapshots) === 'seen') continue;
     // More than any writer makes in one read: a hostile room. Put none back.
     if (candidates.length + orphans.length >= MAX_RESCUES) return spec;
     if (from !== undefined) {
@@ -205,6 +374,89 @@ export function rescueMoved(
   const placedOutOf = new Map<string, { key: string; into: string }>();
   let pending = orphans;
   let seq = 0;
+  // An orphan that left its cell before a peer removed that cell goes with the nodes that the
+  // same write moved with it (`sameMove`), as they go back: the cell's remover saw it leave, so
+  // only the removal of its new place took it, and that removal did not see it. Each orphan
+  // goes right after the last of them before it in the place they went to, or right before the
+  // first one after it. Returns the orphans that have no such node.
+  const followMoveSiblings = (rest: readonly Orphan[]): Orphan[] => {
+    if (!listings) return [...rest];
+    let left = [...rest];
+    for (let round = 0; round < rest.length && left.length > 0; round += 1) {
+      const next: Orphan[] = [];
+      const placed: Candidate[] = [];
+      for (const o of left) {
+        const sibling = moveSibling(room, o, candidates);
+        // No removal saw it: not one of the chain it moved into, not one above the place it
+        // is listed now, and not one above its old parent, which a peer removed after it left.
+        const free =
+          !removalsSaw(room, o.to, o.key, snapshots) &&
+          removalsAbove(room, o.key, o.key, listings, snapshots) !== 'seen' &&
+          removalsAbove(room, o.last, o.key, listings, snapshots) === 'unseen';
+        if (!sibling || !free) {
+          next.push(o);
+          continue;
+        }
+        const anchor = sibling.after ? { after: sibling.with.key } : { before: sibling.with.key };
+        // `seq` holds its place in the list it went to, for the order below.
+        const { key, clock, to } = o;
+        placed.push({
+          key,
+          from: sibling.with.from,
+          index: Infinity,
+          clock,
+          to,
+          ...anchor,
+          seq: sibling.at,
+        });
+      }
+      if (placed.length === 0) break;
+      placed.sort((x, y) => x.seq! - y.seq! || byKey(x.key, y.key));
+      for (const c of placed) candidates.push({ ...c, seq: seq++ });
+      left = next;
+    }
+    return left;
+  };
+  // A paragraph or a text body whose old cell and new cell both went, and whose removals did
+  // not see it there, goes to a table cell that stays (`survivingCell`).
+  let seenAnywhere: ReadonlySet<string> | 'all' | undefined;
+  const cellOf = (o: Orphan): string | undefined => {
+    if (!listings) return undefined;
+    const free =
+      !removalsSaw(room, o.to, o.key, snapshots) &&
+      removalsAbove(room, o.last, o.key, listings, snapshots) !== 'seen';
+    if (!free) return undefined;
+    // A removal of a place where a read showed the node saw it there.
+    seenAnywhere ??= removalsSawAnywhere(room, partName);
+    if (seenAnywhere === 'all' || seenAnywhere.has(o.key)) return undefined;
+    let into = survivingCell(room, o.key, o.to, specOf);
+    if (into) return into;
+    // Concurrent removals can leave no row, although none removed the moved text. Keep a
+    // valid row as its container. Text that a removal saw is already deleted from its records.
+    const rowKey = o.to.find((k) => localOf(room, k) === 'tr');
+    const tableKey = o.to.find((k) => localOf(room, k) === 'tbl');
+    const table = typeof tableKey === 'string' ? specOf.get(tableKey) : undefined;
+    if (
+      typeof rowKey !== 'string' ||
+      !isA(table, 'tbl') ||
+      table.children?.some((c) => isA(c, 'tr'))
+    )
+      return undefined;
+    const row = read(rowKey, new Set(depthOf.keys()), depthOf.get(table.key)! + 1);
+    if (!isA(row ?? undefined, 'tr')) return undefined;
+    const append = (node: ReplicaElementSpec): ReplicaElementSpec => ({
+      ...node,
+      children:
+        node.key === table.key
+          ? [...(node.children ?? []), row!]
+          : (node.children ?? []).map((c) => ('text' in c ? c : append(c))),
+    });
+    spec = append(spec);
+    collect(spec, 0, null);
+    placed?.add(row!.key);
+    into = survivingCell(room, o.key, o.to, specOf);
+    return into;
+  };
   while (pending.length > 0) {
     const round: (Orphan & { after: string; into: string })[] = [];
     const rest: Orphan[] = [];
@@ -217,7 +469,12 @@ export function rescueMoved(
       else round.push({ ...o, after, into });
     }
     if (round.length === 0) {
-      for (const o of rest) stranded?.add(o.removed);
+      for (const o of followMoveSiblings(rest).sort((a, b) => byKey(a.key, b.key))) {
+        const into = listings && cellOf(o);
+        if (into)
+          candidates.push({ key: o.key, from: into, index: Infinity, clock: o.clock, to: o.to });
+        else stranded?.add(o.removed);
+      }
       break;
     }
     round.sort((x, y) => x.clock - y.clock || x.index - y.index || byKey(x.key, y.key));
@@ -243,6 +500,7 @@ export function rescueMoved(
     index: number;
     clock: number;
     after?: string;
+    before?: string;
     seq: number;
   };
   const additions = new Map<string, Addition[]>();
@@ -255,6 +513,7 @@ export function rescueMoved(
       index: c.index,
       clock: c.clock,
       after: c.after,
+      before: c.before,
       seq: c.seq ?? 0,
     };
     const list = additions.get(c.from);
@@ -271,18 +530,26 @@ export function rescueMoved(
     // write go back in the order of their indexes. Then schema order.
     const placed: Spec[] = [...children];
     const order = extra
-      .filter((x) => x.after === undefined)
+      .filter((x) => x.after === undefined && x.before === undefined)
       .sort((x, y) => y.clock - x.clock || x.index - y.index || byKey(x.node.key, y.node.key));
     for (const { node, index } of order) placed.splice(Math.min(index, placed.length), 0, node);
     // A node that follows a join goes right after its anchor, after the nodes before it that
     // follow the same anchor, in the order the rounds above placed them.
-    const following = extra.filter((x) => x.after !== undefined).sort((x, y) => x.seq - y.seq);
+    // A node that goes before its anchor goes right before it, so such nodes keep their order.
+    const following = extra
+      .filter((x) => x.after !== undefined || x.before !== undefined)
+      .sort((x, y) => x.seq - y.seq);
     const lastAfter = new Map<string, string>();
-    for (const { node, after } of following) {
-      const anchor = lastAfter.get(after!) ?? after!;
+    for (const { node, after, before } of following) {
+      if (after === undefined) {
+        const at = placed.findIndex((k) => k.key === before);
+        placed.splice(at < 0 ? placed.length : at, 0, node);
+        continue;
+      }
+      const anchor = lastAfter.get(after) ?? after;
       const at = placed.findIndex((k) => k.key === anchor);
       placed.splice(at < 0 ? placed.length : at + 1, 0, node);
-      lastAfter.set(after!, node.key);
+      lastAfter.set(after, node.key);
     }
     const name = { ns: s.ns, local: s.local };
     return {

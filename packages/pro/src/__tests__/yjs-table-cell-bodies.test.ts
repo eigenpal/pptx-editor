@@ -75,13 +75,14 @@ function type(e: PptxEditorInstance, text: string): void {
 }
 
 /**
- * Split cell (`row`, `column`) of `e`'s table into two rows. The command gives the cell with no
- * text body an empty one.
+ * Split cell (`row`, `column`) of `e`'s table into two rows. The command leaves a drawn cell
+ * with no text body as it is, so an undo of it takes no body that a peer typed into.
  */
 function split(e: PptxEditorInstance, row: number, column: number): void {
+  const before = bodiesIn(root(e)).map(textOf);
   caret(e, row, column);
   expect(e.exec({ type: 'splitCell', rows: 2, cols: 1 }).ok).toBe(true);
-  expect(bodiesIn(root(e)).map(textOf)).toEqual(['']);
+  expect(bodiesIn(root(e)).map(textOf)).toEqual(before);
 }
 
 /** The paragraphs that `e` draws in cell (0, `column`). */
@@ -206,19 +207,40 @@ describe('concurrent typing into a table cell with no text body keeps every peer
       expect(bodiesIn(root(a))).toHaveLength(1);
     });
 
-    test(`a blank body that a peer's table command adds gives way to the typed text (${name})`, async () => {
+    test(`a peer's table command adds no body, so its undo keeps the typed text (${name})`, async () => {
       const { editors, sync } = await peers(deck(), ids);
       const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
       sync.pause();
       type(a, 'xx');
-      // A split of another cell gives every cell of the table with no text body an empty one.
+      // A split of another cell leaves the cell with no text body as it is.
       split(b, 1, 0);
       sync.flush();
-      expect(bodiesIn(root(a))).toHaveLength(2);
+      expect(bodiesIn(root(a))).toHaveLength(1);
       expect(settled(editors)).toEqual(['xx']);
       expect(b.exec({ type: 'undo' }).ok).toBe(true);
       sync.flush();
       expect(settled(editors)).toEqual(['xx']);
+    });
+
+    test(`text typed into the cell while a peer undoes a row delete is kept (${name})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+      // B deletes the second row, and A sees it. B's undo of the delete and A's typing into
+      // the cell with no text body happen at the same time.
+      caret(b, 1, 0);
+      expect(b.exec({ type: 'deleteRow' }).ok).toBe(true);
+      sync.flush();
+      sync.pause();
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      type(a, 'xx');
+      sync.flush();
+      expect(settled(editors)).toEqual(['xx']);
+      expect(b.exec({ type: 'redo' }).ok).toBe(true);
+      sync.flush();
+      expect(settled(editors)).toEqual(['xx']);
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      sync.flush();
+      expect(settled(editors)).toEqual([]);
     });
 
     test(`text typed into the cell while a peer merges it into its neighbor shows in the merged cell (${name})`, async () => {
@@ -272,15 +294,15 @@ describe('concurrent typing into a table cell with no text body keeps every peer
       expect(text).not.toContain('p');
     });
 
-    test(`two peers' table commands leave one empty paragraph in the cell (${name})`, async () => {
+    test(`two peers' table commands leave the cell with no text body (${name})`, async () => {
       const { editors, sync } = await peers(deck(), ids);
       const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
       sync.pause();
       split(a, 1, 0);
       split(b, 1, 1);
       sync.flush();
-      expect(bodiesIn(root(a))).toHaveLength(2);
-      expect(settled(editors)).toEqual(['']);
+      expect(bodiesIn(root(a))).toHaveLength(0);
+      expect(settled(editors)).toEqual([]);
     });
   }
 

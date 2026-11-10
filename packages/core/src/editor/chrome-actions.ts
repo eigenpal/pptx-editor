@@ -22,6 +22,7 @@ import { warnNoAltTextPopup, warnNoLinkPopup } from './dev-warnings.ts';
 import { asCut } from './removal-notice.ts';
 import { focusTextAfterChrome } from './chrome-popover.ts';
 import { tablePaste } from './table-clipboard.ts';
+import { carriesAll } from './clipboard.ts';
 import type { ToolbarShownValue, ToolbarValueMap } from './toolbar-values.ts';
 import { canRenameSectionInPlace, runSectionSlot } from './section-renamers.ts';
 
@@ -315,8 +316,11 @@ export function runClipboardSlot(
         ? editor.lastCopied
         : null
       : editor.copy();
-    const all = sel.kind === 'shapes' && copied?.shapes.length === sel.nodeIds.length;
-    if (slot === 'edit.cut' && all) asCut(editor, () => editor.exec({ type: 'delete' }));
+    if (slot !== 'edit.cut') return;
+    // Cut deletes only what its copy carried. Else it is refused, as a keyboard cut is.
+    if (sel.kind === 'shapes' && carriesAll(copied, sel.nodeIds))
+      asCut(editor, () => editor.exec({ type: 'delete' }));
+    else editor.reject('contextMenu.cannotCopyFrame');
     return;
   }
   if (text) {

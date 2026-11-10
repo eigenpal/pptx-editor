@@ -35,8 +35,12 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Everything read here is untrusted: a wrong value is ignored, and every walk is bounded.
 
 import * as Y from 'yjs';
+import { readText } from './text-case.ts';
 import type { Element, Node, NodeId } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
+
+/** Per remover: the state vector observed when a row or cell was deleted. */
+export const REMOVAL_CLOCK_PREFIX = 'rv.';
 
 /** The record fields this module writes. */
 export const IDENTITY = Object.freeze({
@@ -214,6 +218,41 @@ export function followsIn(room: Room, transaction: Y.Transaction): Set<string> {
  * entry per span, so a write adds only its own spans, and two peers never write one key.
  */
 export const RESTORED_KEY = 'pptx-restored-v1';
+/** Participant clocks make explicit deletion intent visible to later restores. */
+export const DELETE_CLOCK_KEY = 'pptx-delete-clock-v1';
+/** Previous character, move flag, and state vector for each restored character. */
+export const RESTORED_STEP_KEY = 'pptx-restored-steps-v1';
+/** Split position and tie-break provenance retained through undo and follow moves. */
+export const RESTORED_START_KEY = 'pptx-restored-starts-v1';
+
+export interface RestoredPlace {
+  readonly start: Y.ID;
+  readonly enter: boolean;
+  readonly client: number;
+  readonly key: string;
+}
+
+/** The original copy's position and tie-break identity, carried through undo. */
+export function restoredPlaceOf(doc: Y.Doc, id: Y.ID): RestoredPlace | null {
+  const value = doc.getMap(RESTORED_START_KEY).get(idKey(id.client, id.clock));
+  if (
+    !Array.isArray(value) ||
+    value.length !== 5 ||
+    ![value[0], value[1], value[3]].every((n) => Number.isSafeInteger(n) && n >= 0) ||
+    typeof value[2] !== 'boolean' ||
+    typeof value[4] !== 'string'
+  )
+    return null;
+  return {
+    start: Y.createID(value[0], value[1]),
+    enter: value[2],
+    client: value[3],
+    key: value[4],
+  };
+}
+export function restoredStartOf(doc: Y.Doc, id: Y.ID): Y.ID | null {
+  return restoredPlaceOf(doc, id)?.start ?? null;
+}
 
 /** The longest span a restore mark describes: one step puts back no more (`undo-restore.ts`). */
 export const MAX_RESTORED = 1 << 16;
@@ -401,6 +440,36 @@ export function rootOf(doc: Y.Doc, id: Y.ID, memo?: Map<string, Y.ID>, restores 
   return at;
 }
 
+/** The deletion identity follows copies and restored moves, but stops at an undone deletion. */
+export function deletionRoot(doc: Y.Doc, id: Y.ID, memo = new Map<string, Y.ID>()): Y.ID {
+  const key = idKey(id.client, id.clock);
+  const known = memo.get(key);
+  if (known) return known;
+  let at = id;
+  for (let depth = 0; depth < MAX_CHAIN; depth += 1) {
+    const item = itemOf(doc, at);
+    const copy = item ? markHolding(recordOfItem(item), at) : null;
+    if (copy) {
+      at = copy.source(at.clock - copy.clock);
+      continue;
+    }
+    const step: unknown = doc.getMap(RESTORED_STEP_KEY).get(idKey(at.client, at.clock));
+    if (
+      !Array.isArray(step) ||
+      (step.length !== 3 && step.length !== 4) ||
+      step[2] !== true ||
+      !Number.isSafeInteger(step[0]) ||
+      step[0] < 0 ||
+      !Number.isSafeInteger(step[1]) ||
+      step[1] < 0
+    )
+      break;
+    at = Y.createID(step[0], step[1]);
+  }
+  memo.set(key, at);
+  return at;
+}
+
 /** What a write did to one text record's `Y.Text`. */
 export interface TextWrite {
   /** The record was made by this write. */
@@ -522,7 +591,8 @@ export function markCopies(
 
 /**
  * After a local write: each run or paragraph the write removed loses the characters its writer
- * saw, and a removed run records its place in the paragraph it left (`rr.<key>`). Returns the
+ * saw, and a removed run records its place in the paragraph it left (`rr.<key>`). Removed rows and
+ * cells also retain their former parent so concurrent typing can reach a surviving cell. Returns the
  * ids of the deleted characters.
  */
 export function markRemoved(
@@ -543,7 +613,11 @@ export function markRemoved(
       const kept = new Set(el.children.map((c) => c.id));
       let prev = '';
       for (const c of old.children) {
-        if (!kept.has(c.id) && isElement(c) && (isA(c, 'r') || isA(c, 'p')))
+        if (
+          !kept.has(c.id) &&
+          isElement(c) &&
+          (isA(c, 'r') || isA(c, 'p') || isA(c, 'tr') || isA(c, 'tc'))
+        )
           left.push({ node: c, from: el, prev });
         prev = keyOf.get(c.id) ?? prev;
       }
@@ -556,9 +630,18 @@ export function markRemoved(
     const key = keyOf.get(node.id);
     const parent = keyOf.get(from.id);
     const parentRec = parent === undefined ? undefined : room.nodes.get(parent);
-    const place = (isA(node, 'r') && isA(from, 'p')) || (isA(node, 'p') && isTextBody(from));
+    const place =
+      (isA(node, 'r') && isA(from, 'p')) ||
+      (isA(node, 'p') && isTextBody(from)) ||
+      (isA(node, 'tr') && isA(from, 'tbl')) ||
+      (isA(node, 'tc') && isA(from, 'tr'));
     if (place && key !== undefined && parentRec instanceof Y.Map)
       parentRec.set(`${IDENTITY.removedRun}${key}`, prev);
+    if (key !== undefined && (isA(node, 'tr') || isA(node, 'tc'))) {
+      const rec = room.nodes.get(key);
+      if (rec instanceof Y.Map)
+        rec.set(`${REMOVAL_CLOCK_PREFIX}${room.doc.clientID}`, Y.encodeStateVector(room.doc));
+    }
     // The characters this writer saw go; a peer's characters typed at the same time stay.
     // A node the write keeps elsewhere (a run a join moved out of a removed paragraph) keeps
     // its text.
@@ -575,7 +658,7 @@ export function markRemoved(
       const text = rec instanceof Y.Map ? rec.get(F.text) : undefined;
       if (!(text instanceof Y.Text) || n.type !== 'text' || n.value.length === 0) continue;
       // Only when the room holds what the writer's tree held: those are the characters it saw.
-      if (text.toString() !== n.value) continue;
+      if (readText(text) !== n.value) continue;
       for (const id of liveIds(text, 0, text.length)) deleted.push(id);
       text.delete(0, text.length);
     }

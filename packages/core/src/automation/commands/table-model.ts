@@ -220,7 +220,9 @@ const MERGE_ATTRS = ['gridSpan', 'rowSpan', 'hMerge', 'vMerge'] as const;
 /**
  * Set the merge attributes of the cell at (r, c) to exactly `want`. A covered cell may have no
  * text body (`a:txBody` is optional, 21.1.3.16); one that becomes a drawn cell gets an empty
- * body, formatted like its row's first cell, so it takes text.
+ * body, formatted like its row's first cell, so it takes text. A drawn cell without a body stays
+ * as it is: typing gives it one (`selectionBody`), and in a collaboration room an undo of this
+ * write would take a body that a peer typed into at the same time.
  */
 function writeCell(
   batch: OpBatch,
@@ -230,9 +232,11 @@ function writeCell(
   want: Record<string, string>
 ): void {
   const tc = m.tcs[r][c];
+  const on = (name: string) => ['1', 'true'].includes(attr(tc, name) ?? '');
+  const covered = on('hMerge') || on('vMerge');
   for (const name of MERGE_ATTRS)
     if (attr(tc, name) !== want[name]) setAttr(batch, m.part, tc.id, name, want[name] ?? null);
-  if (!want.hMerge && !want.vMerge && !child(batch.element(m.part, tc.id), 'a:txBody'))
+  if (covered && !want.hMerge && !want.vMerge && !child(batch.element(m.part, tc.id), 'a:txBody'))
     batch.insert({
       op: 'insertNode',
       part: m.part,

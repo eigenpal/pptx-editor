@@ -19,10 +19,12 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   delete reached it. A delete is idempotent, so every replica that deleted the character may
 //   write it.
 // - Once: when two copies of one character show and an Enter made one of them (or a copy it
-//   copies), the copy whose split starts later keeps it, then the one later in the document; the
-//   other copy loses the character. Only the characters the new copy holds count. Two copies
-//   made by formats alone are the split lineage's (`dropLosingSplits` in `text-lineage.ts`).
-//   Any replica may write it (a delete).
+//   copies), the copy whose split starts later keeps it. Of two splits that start at one
+//   character, an Enter's copy keeps it over a format's, then the higher client's of two Enters,
+//   so replicas that decide with different views decide alike; then the one later in the
+//   document. The other copy loses the character. Only the characters the new copy holds
+//   count. Two copies made by formats alone are the split lineage's (`dropLosingSplits` in
+//   `text-lineage.ts`). Any replica may write it (a delete).
 // - Order: a paragraph that this replica's Enter made goes after the paragraph of a peer's Enter
 //   that cut the same text earlier. Only the paragraph's author moves it.
 // - Follow an Enter: a peer's copy in the paragraph that this replica's Enter moved its own copy
@@ -34,12 +36,21 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import * as Y from 'yjs';
 import type { FollowedRun } from './undo-followed.ts';
-import type { Element, Node, NodeId, PptxPackage } from '@pptx-editor.dev/core/store';
+import {
+  placesOf,
+  copyOrder,
+  contenderOf,
+  restoredKeeps,
+  restoredStart,
+  type RepairView,
+  type Place,
+} from './copy-order.ts';
+export type { RepairView } from './copy-order.ts';
+export { placeOf } from './copy-order.ts';
 import { F, type Room } from './schema.ts';
 import { LINEAGE } from './text-lineage.ts';
 import {
   COPIES_KEY,
-  MAX_CHAIN,
   copyOf,
   followsOf,
   idKey,
@@ -47,9 +58,13 @@ import {
   itemOf,
   markFollow,
   markRestored,
+  RESTORED_STEP_KEY,
+  RESTORED_START_KEY,
+  restoredPlaceOf,
   recordOfItem,
   restoredOf,
   rootOf,
+  deletionRoot,
   seenBy,
   type Copy,
 } from './text-identity.ts';
@@ -63,12 +78,6 @@ const MAX_CHARS = 1 << 20;
 const MAX_LOOKS = 65_536;
 /** The steps the paragraph rules (order, follow an Enter) take in one repair. */
 const MAX_STEPS = 1 << 20;
-
-/** What a repair reads of this replica: its keys and the package the store shows. */
-export interface RepairView {
-  readonly keyOf: (partName: string, id: NodeId) => string | undefined;
-  readonly package: PptxPackage;
-}
 
 /** Text this replica typed that a repair moved: the first old id, the first new id, a length. */
 export type MovedText = (from: Y.ID, to: Y.ID, length: number) => void;
@@ -91,13 +100,6 @@ interface Holder {
   readonly id: Y.ID;
 }
 
-/** Where the store shows a text record: its paragraph (with the paragraph's parent), its run. */
-interface Place {
-  readonly order: number;
-  readonly p?: { readonly key: string; readonly parent: string };
-  readonly run?: string;
-}
-
 /** What the paragraph rules share within one repair. */
 interface Repair {
   readonly room: Room;
@@ -113,47 +115,6 @@ interface Repair {
   readonly movedRun?: MovedRun | undefined;
 }
 
-const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
-const isElement = (n: Node): n is Element => n.type === 'element';
-
-/** Where a root character stands in the text it was typed in, to order two splits' starts. */
-function placeOf(doc: Y.Doc, id: Y.ID): { text: unknown; at: number } | null {
-  const item = itemOf(doc, id);
-  if (!item) return null;
-  let at = 0;
-  for (let it = item.parent instanceof Y.Text ? item.parent._start : null; it; it = it.right) {
-    if (it === item) return { text: item.parent, at: at + (id.clock - item.id.clock) };
-    at += it.length;
-  }
-  return null;
-}
-
-/** The place in the store's view of each text record of a part, in document order. */
-function placesOf(view: RepairView, partName: string): Map<string, Place> {
-  const placed = new Map<string, Place>();
-  const part = view.package.parts.get(partName);
-  if (part?.kind !== 'xml') return placed;
-  type At = Omit<Place, 'order'>;
-  const walk = (el: Element, at: At, parent: string | undefined): void => {
-    const key = view.keyOf(partName, el.id);
-    const here: At =
-      el.ns === NS_A && el.local === 'p' && key && parent
-        ? { p: { key, parent } }
-        : el.ns === NS_A && el.local === 'r' && key
-          ? { ...at, run: key }
-          : at;
-    for (const c of el.children) {
-      if (isElement(c)) walk(c, here, key);
-      else {
-        const k = view.keyOf(partName, c.id);
-        if (k !== undefined) placed.set(k, { order: placed.size, ...here });
-      }
-    }
-  };
-  walk(part.xml.root, {}, undefined);
-  return placed;
-}
-
 /**
  * Repair the copies of one part after a peer's change. `fresh` are the copies that change
  * brought; `deleted` the root characters this replica deleted. Call inside a transaction.
@@ -165,7 +126,8 @@ export function repairCopies(
   deleted: ReadonlySet<string>,
   view: RepairView,
   moved: MovedText,
-  movedRun?: MovedRun
+  movedRun?: MovedRun,
+  structural: ReadonlySet<string> = new Set(fresh)
 ): void {
   const doc = room.doc;
   const me = doc.clientID;
@@ -180,7 +142,7 @@ export function repairCopies(
   const arrived = new Set(
     fresh.filter((k) => {
       const c = entryOf(k);
-      return c !== null && c.copy.client !== me;
+      return c !== null;
     })
   );
   if (arrived.size === 0) return;
@@ -202,60 +164,130 @@ export function repairCopies(
   const memo = new Map<string, Y.ID>();
   const root = (id: Y.ID) => rootOf(doc, id, memo);
   const copyMemo = new Map<string, Y.ID>();
-  const startOf = new Map<string, { text: unknown; at: number } | null>();
-  const start = (c: CopyEntry) => {
-    if (!startOf.has(c.key)) startOf.set(c.key, placeOf(doc, root(c.copy.source(0))));
-    return startOf.get(c.key)!;
-  };
-  /** > 0 when copy `a`'s split starts later than `b`'s; 0 when they cannot be told apart. */
-  const laterStart = (a: CopyEntry, b: CopyEntry): number => {
-    const x = start(a);
-    const y = start(b);
-    return x && y && x.text === y.text ? x.at - y.at : 0;
-  };
-  const orderOf = (c: CopyEntry) => placed.get(c.key)?.order ?? -1;
-  /** The copy that keeps a character two copies hold: later start, then later in the document. */
-  const better = (a: CopyEntry, b: CopyEntry): CopyEntry =>
-    (laterStart(a, b) || orderOf(a) - orderOf(b)) >= 0 ? a : b;
+  const order = copyOrder(doc, placed);
+  const contender = (c: CopyEntry) => contenderOf(doc, c, memo);
+  const laterStart = (a: CopyEntry, b: CopyEntry) => order.laterRoot(contender(a), contender(b));
   const ownId = (c: CopyEntry, j: number) => Y.createID(c.copy.client, c.copy.clock + j);
-  /** Whether an Enter made the copy, or a copy it copies (a format of the moved text). */
-  const fromEnter = (c: CopyEntry): boolean => {
-    if (c.copy.newParagraph) return true;
-    let at = c.copy.source(0);
-    for (let depth = 0; depth < MAX_CHAIN; depth += 1) {
-      const item = itemOf(doc, at);
-      const copy = item ? copyOf(recordOfItem(item)) : null;
-      const j = copy ? at.clock - copy.clock : -1;
-      if (!copy || at.client !== copy.client || j < 0 || j >= copy.length) return false;
-      if (copy.newParagraph) return true;
-      at = copy.source(j);
+
+  // A hidden format piece can hold the last live copy after another piece is undone.
+  const live = new Set<string>();
+  for (const key of placed.keys()) {
+    const record = room.nodes.get(key);
+    const text = record instanceof Y.Map ? record.get(F.text) : null;
+    if (!(text instanceof Y.Text)) continue;
+    for (let item = text._start; item; item = item.right) {
+      if (++chars > MAX_CHARS) return;
+      if (item.deleted || !item.countable) continue;
+      for (let j = 0; j < item.length; j += 1) {
+        if (++chars > MAX_CHARS) return;
+        const r = root(Y.createID(item.id.client, item.id.clock + j));
+        live.add(idKey(r.client, r.clock));
+      }
     }
-    return false;
-  };
+  }
+  const parents = new Map<string, string>();
+  for (const [key, record] of room.nodes) {
+    if (++chars > MAX_CHARS) return;
+    if (!(record instanceof Y.Map) || record.get(F.part) !== partName) continue;
+    const children = record.get(F.children);
+    if (!(children instanceof Y.Array)) continue;
+    for (const child of children.toArray()) {
+      if (++chars > MAX_CHARS) return;
+      if (typeof child === 'string') parents.set(child, key);
+    }
+  }
+  const revealed = new Set<string>();
+  for (const c of [...all].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))) {
+    if (placed.has(c.key)) continue;
+    const ids: Y.ID[] = [];
+    for (let item = c.text._start; item; item = item.right) {
+      if (++chars > MAX_CHARS) return;
+      if (item.deleted || !item.countable) continue;
+      for (let j = 0; j < item.length; j += 1) {
+        if (++chars > MAX_CHARS) return;
+        ids.push(root(Y.createID(item.id.client, item.id.clock + j)));
+      }
+    }
+    if (!ids.some((id) => !live.has(idKey(id.client, id.clock)))) continue;
+    const textElement = parents.get(c.key);
+    const run = textElement ? parents.get(textElement) : undefined;
+    const record = run ? room.nodes.get(run) : undefined;
+    if (!(record instanceof Y.Map) || !record.has(LINEAGE.splitFrom)) continue;
+    record.set(LINEAGE.copyWinner, true);
+    revealed.add(c.key);
+    arrived.add(c.key);
+    for (const id of ids) live.add(idKey(id.client, id.clock));
+  }
 
   // Live, shown copy characters by root.
   const holders = new Map<string, Holder[]>();
   for (const c of all) {
-    if (!placed.has(c.key)) continue;
-    for (let j = 0; j < c.copy.length; j += 1) {
-      const id = ownId(c, j);
-      if (isGone(doc, id)) continue;
-      const r = root(c.copy.source(j));
-      const k = idKey(r.client, r.clock);
-      const list = holders.get(k);
-      if (list) list.push({ copy: c, id });
-      else holders.set(k, [{ copy: c, id }]);
-    }
+    if (!placed.has(c.key) && !revealed.has(c.key)) continue;
+    const marks = [c.copy, ...followsOf(room.nodes.get(c.key))];
+    for (const mark of marks)
+      for (let j = 0; j < mark.length; j += 1) {
+        if ((chars += 1) > MAX_CHARS) return;
+        const id = Y.createID(mark.client, mark.clock + j);
+        if (isGone(doc, id)) continue;
+        const r = root(id);
+        const k = idKey(r.client, r.clock);
+        const list = holders.get(k);
+        if (list) {
+          if (!list.some((held) => Y.compareIDs(held.id, id))) list.push({ copy: c, id });
+        } else holders.set(k, [{ copy: c, id }]);
+      }
   }
+  // A copy of an explicitly restored deletion belongs to a later text lifecycle.
+  // It must survive a concurrent copy whose source was still deleted.
+  const betterHolder = (a: Holder, b: Holder): Holder => {
+    const x = deletionRoot(doc, a.id, copyMemo);
+    const y = deletionRoot(doc, b.id, copyMemo);
+    if (!Y.compareIDs(x, y)) {
+      const original = root(a.id);
+      if (Y.compareIDs(x, original)) return b;
+      if (Y.compareIDs(y, original)) return a;
+    }
+    const at = (h: Holder) => {
+      const place = restoredPlaceOf(doc, h.id);
+      return place
+        ? {
+            key: place.key,
+            from: place.start,
+            start: root(place.start),
+            enter: place.enter,
+            client: place.client,
+          }
+        : contender(h.copy);
+    };
+    return order.ahead(at(a), at(b)) ? a : b;
+  };
   /** The shown copy of a root character that keeps it, or undefined. */
   const keeper = (r: Y.ID): Holder | undefined =>
-    holders
-      .get(idKey(r.client, r.clock))
-      ?.reduce((x, y) => (better(x.copy, y.copy) === x.copy ? x : y));
+    holders.get(idKey(r.client, r.clock))?.reduce(betterHolder);
 
   // Follow: this replica's text typed after a moved character goes after its copy.
-  for (const c of incoming)
-    followMoves(room, c, seenBy(room.nodes.get(c.key)), (id) => keeper(root(id)), moved);
+  for (const c of incoming.filter((c) => c.copy.client !== me))
+    followMoves(
+      room,
+      c,
+      seenBy(room.nodes.get(c.key)),
+      (id) => keeper(root(id)),
+      moved,
+      (text, item, j, id) => {
+        const list = holders.get(idKey(root(id).client, root(id).clock)) ?? [];
+        const first = restoredStart(item, j, (k) => restoredOf(doc, k) !== null);
+        return restoredKeeps(
+          room,
+          order,
+          text,
+          first,
+          list.map((h) => h.copy),
+          memo,
+          id
+        );
+      },
+      all.map((c) => c.text)
+    );
 
   const doomed = new Map<Y.Text, Y.ID[]>();
   const doom = (text: Y.Text, id: Y.ID) => {
@@ -268,23 +300,20 @@ export function repairCopies(
     for (const c of incoming)
       for (let j = 0; j < c.copy.length; j += 1) {
         // Through copies only: what an undo put back after the delete stays (`rootOf`).
-        const r = rootOf(doc, c.copy.source(j), copyMemo, false);
+        const r = deletionRoot(doc, c.copy.source(j), copyMemo);
         if (deleted.has(idKey(r.client, r.clock)) && !isGone(doc, ownId(c, j)))
           doom(c.text, ownId(c, j));
       }
   // Once: of two shown copies of one character, where an Enter made one, one keeps it. Only the
   // characters the new copies hold: a duplicate that stood before them is not this repair's.
-  const enterMemo = new Map<string, boolean>();
-  const isEnter = (c: CopyEntry): boolean => {
-    let out = enterMemo.get(c.key);
-    if (out === undefined) enterMemo.set(c.key, (out = fromEnter(c)));
-    return out;
-  };
   for (const list of holders.values()) {
     if (list.length < 2 || !list.some((h) => arrived.has(h.copy.key))) continue;
-    if (!list.some((h) => isEnter(h.copy))) continue;
-    if (new Set(list.map((h) => h.copy.key)).size < 2) continue;
-    const keep = list.reduce((x, y) => (better(x.copy, y.copy) === x.copy ? x : y));
+
+    const keep = list.reduce(betterHolder);
+    const run = placed.get(keep.copy.key)?.run;
+    const record = run ? room.nodes.get(run) : undefined;
+    if (record instanceof Y.Map && record.get(LINEAGE.copyWinner) !== true)
+      record.set(LINEAGE.copyWinner, true);
     for (const h of list) if (h !== keep) doom(h.copy.text, h.id);
   }
   for (const [text, ids] of doomed)
@@ -315,7 +344,17 @@ export function repairCopies(
     for (const r of x) if (y.has(r)) return true;
     return false;
   };
-  const ctx: Repair = { room, me, incoming, all, placed, share, laterStart, step, movedRun };
+  const ctx: Repair = {
+    room,
+    me,
+    incoming: incoming.filter((c) => c.copy.client !== me && structural.has(c.key)),
+    all,
+    placed,
+    share,
+    laterStart,
+    step,
+    movedRun,
+  };
   // Order: this replica's new paragraph goes after a peer's that cut the same text earlier.
   reorderParagraphs(ctx);
   followEnter(ctx);
@@ -455,74 +494,142 @@ function followMoves(
   incoming: CopyEntry,
   seen: ((id: Y.ID) => boolean) | null,
   keeper: (moved: Y.ID) => Holder | undefined,
-  moved: MovedText
+  moved: MovedText,
+  keeps: (text: Y.Text, item: Y.Item, j: number, id: Y.ID) => boolean,
+  otherSources: readonly Y.Text[]
 ): void {
   const doc = room.doc;
   const me = doc.clientID;
   const first = itemOf(doc, incoming.copy.source(0));
-  const source = first?.parent;
-  if (!(source instanceof Y.Text)) return;
+  const original = first?.parent;
+  if (!(original instanceof Y.Text)) return;
+  const memo = new Map<string, Y.ID>();
+  const rootKey = (id: Y.ID) => {
+    const r = rootOf(doc, id, memo);
+    return idKey(r.client, r.clock);
+  };
+  const roots = new Set<string>();
   const sources = new Set<string>();
   for (let j = 0; j < incoming.copy.length; j += 1) {
     const s = incoming.copy.source(j);
     sources.add(idKey(s.client, s.clock));
+    roots.add(rootKey(s));
   }
-  const anchorOf = new Map<string, Y.ID>();
-  /** A group: the characters it takes, the text it writes, and its restore marks by offset. */
-  type Group = {
-    anchor: Y.ID;
-    ids: Y.ID[];
-    /** The characters of `ids` that `text` writes again, in order. */
-    written: Y.ID[];
-    text: string;
-    marks: [number, Y.ID][];
-  };
-  const groups: Group[] = [];
-  let open: Group | null = null;
-  for (let item = source._start; item !== null; item = item.right) {
-    if (item.deleted || !(item.content instanceof Y.ContentString)) continue;
-    const str = item.content.str;
-    for (let j = 0; j < str.length; j += 1) {
-      const id = Y.createID(item.id.client, item.id.clock + j);
-      const origin = j === 0 ? item.origin : Y.createID(item.id.client, item.id.clock + j - 1);
-      const ok = origin ? idKey(origin.client, origin.clock) : '';
-      const anchor =
-        item.id.client !== me || !origin ? undefined : sources.has(ok) ? origin : anchorOf.get(ok);
-      if (!anchor) {
-        open = null;
-        continue;
-      }
-      anchorOf.set(idKey(id.client, id.clock), anchor);
-      // Text typed after it still follows, in the same group.
-      if (seen?.(id)) continue;
-      if (!open || !Y.compareIDs(open.anchor, anchor)) {
-        open = { anchor, ids: [], written: [], text: '', marks: [] };
-        groups.push(open);
-      }
-      open.ids.push(id);
-      const stands = restoredOf(doc, id);
-      if (stands && keeper(id)) continue;
-      if (stands) open.marks.push([open.text.length, stands]);
-      open.written.push(id);
-      open.text += str[j]!;
+  let remaining = MAX_CHARS;
+  const copiedAt = new Map<string, number>();
+  for (const candidate of otherSources) {
+    const mark = copyOf(candidate.parent);
+    if (!mark || mark.client !== me) continue;
+    for (let k = 0; k < mark.length; k += 1) {
+      if (--remaining < 0) return;
+      const id = mark.source(k);
+      const key = idKey(id.client, id.clock);
+      copiedAt.set(key, Math.min(copiedAt.get(key) ?? Infinity, mark.clock));
     }
   }
-  for (const group of groups) {
-    const best = keeper(group.anchor);
-    const at = best ? liveIndex(best.copy.text, best.id) : -1;
-    if (!best || at < 0) continue;
-    deleteChars(source, new Set(group.ids.map((id) => idKey(id.client, id.clock))));
-    if (group.text.length === 0) continue;
-    const clock = Y.getState(doc.store, me);
-    best.copy.text.insert(at + 1, group.text);
-    // A peer that deleted the old characters and has not seen this move deletes the new ones.
-    const rec = room.nodes.get(best.copy.key);
-    if (rec instanceof Y.Map) markFollow(rec as Y.Map<unknown>, me, clock, group.written);
-    markRestored(
-      doc,
-      group.marks.flatMap(([k, stands]) => [clock + k, stands.client, stands.clock, 1])
-    );
-    moved(group.ids[0]!, Y.createID(me, clock), group.text.length);
+  for (const source of new Set([original, ...otherSources])) {
+    const anchorOf = new Map<string, { id: Y.ID; before: boolean }>();
+    /** A group: the characters it takes, the text it writes, and its restore marks by offset. */
+    type Group = {
+      anchor: Y.ID;
+      before: boolean;
+      ids: Y.ID[];
+      /** The characters of `ids` that `text` writes again, in order. */
+      written: Y.ID[];
+      text: string;
+      marks: [number, Y.ID][];
+    };
+    const groups: Group[] = [];
+    let open: Group | null = null;
+    for (let item = source._start; item !== null; item = item.right) {
+      if (--remaining < 0) return;
+      if (item.deleted || !(item.content instanceof Y.ContentString)) continue;
+      const str = item.content.str;
+      for (let j = 0; j < str.length; j += 1) {
+        if (--remaining < 0) return;
+        const id = Y.createID(item.id.client, item.id.clock + j);
+        const copied = copyOf(source.parent);
+        if (
+          copied &&
+          id.client === copied.client &&
+          id.clock >= copied.clock &&
+          id.clock < copied.clock + copied.length
+        )
+          continue;
+        let origin = j === 0 ? item.origin : Y.createID(item.id.client, item.id.clock + j - 1);
+        const movedBeforeTyping =
+          origin && (copiedAt.get(idKey(origin.client, origin.clock)) ?? Infinity) < item.id.clock;
+        if (j === 0 && origin && movedBeforeTyping && isGone(doc, origin)) {
+          let prior = item.left;
+          let looked = 0;
+          while (prior && (prior.deleted || !prior.countable) && looked++ < MAX_LOOKS)
+            prior = prior.left;
+          if (prior && !prior.deleted && prior.countable)
+            origin = Y.createID(prior.id.client, prior.id.clock + prior.length - 1);
+        }
+        const ok = origin ? idKey(origin.client, origin.clock) : '';
+        const right = j === 0 ? item.rightOrigin : null;
+        const anchor =
+          item.id.client !== me
+            ? undefined
+            : origin && (sources.has(ok) || roots.has(rootKey(origin)))
+              ? { id: origin, before: false }
+              : (anchorOf.get(ok) ??
+                (!origin && right && roots.has(rootKey(right))
+                  ? { id: right, before: true }
+                  : undefined));
+        if (!anchor) {
+          open = null;
+          continue;
+        }
+        anchorOf.set(idKey(id.client, id.clock), anchor);
+        // Text typed after it still follows, in the same group.
+        if (seen?.(id)) continue;
+        if (!open || !Y.compareIDs(open.anchor, anchor.id) || open.before !== anchor.before) {
+          open = {
+            anchor: anchor.id,
+            before: anchor.before,
+            ids: [],
+            written: [],
+            text: '',
+            marks: [],
+          };
+          groups.push(open);
+        }
+        const stands = restoredOf(doc, id);
+        if (stands && roots.has(rootKey(id))) continue;
+        if (stands && keeps(source, item, j, id)) continue;
+        open.ids.push(id);
+        if (stands && keeper(id)) continue;
+        if (stands) open.marks.push([open.text.length, stands]);
+        open.written.push(id);
+        open.text += str[j]!;
+      }
+    }
+    for (const group of groups) {
+      const best = keeper(group.anchor);
+      const at = best ? liveIndex(best.copy.text, best.id) : -1;
+      if (!best || at < 0 || best.copy.text === source) continue;
+      deleteChars(source, new Set(group.ids.map((id) => idKey(id.client, id.clock))));
+      if (group.text.length === 0) continue;
+      const clock = Y.getState(doc.store, me);
+      best.copy.text.insert(at + Number(!group.before), group.text);
+      // A peer that deleted the old characters and has not seen this move deletes the new ones.
+      const rec = room.nodes.get(best.copy.key);
+      if (rec instanceof Y.Map) markFollow(rec as Y.Map<unknown>, me, clock, group.written);
+      for (let k = 0; k < group.written.length; k += 1)
+        for (const name of [RESTORED_STEP_KEY, RESTORED_START_KEY]) {
+          const map = doc.getMap(name);
+          const source = group.written[k]!;
+          const value = map.get(idKey(source.client, source.clock));
+          if (value !== undefined) map.set(idKey(me, clock + k), value);
+        }
+      markRestored(
+        doc,
+        group.marks.flatMap(([k, stands]) => [clock + k, stands.client, stands.clock, 1])
+      );
+      moved(group.ids[0]!, Y.createID(me, clock), group.text.length);
+    }
   }
 }
 
@@ -550,7 +657,7 @@ export function repairFollows(
       for (let j = 0; j < mark.length; j += 1) {
         const own = Y.createID(mark.client, mark.clock + j);
         // Through copies only, as for a copy: what an undo put back after the delete stays.
-        const r = rootOf(doc, mark.source(j), memo, false);
+        const r = deletionRoot(doc, mark.source(j), memo);
         if (deleted.has(idKey(r.client, r.clock)) && !isGone(doc, own)) doomed.push(own);
       }
     }
@@ -593,5 +700,63 @@ function reorderParagraphs({
     if (!target) continue;
     list.delete(qAt, 1);
     list.insert(list.toArray().indexOf(target.key) + 1, [qp.key]);
+  }
+}
+
+/** Apply known deletions even while another copy source has not arrived. */
+export function repairDeletedCopies(
+  room: Room,
+  part: string,
+  keys: readonly string[],
+  deleted: ReadonlySet<string>
+): void {
+  if (deleted.size === 0) return;
+  const memo = new Map<string, Y.ID>();
+  let remaining = MAX_CHARS;
+  for (const key of keys.slice(0, MAX_COPIES)) {
+    const record = room.nodes.get(key);
+    const copy = copyOf(record);
+    const text = record instanceof Y.Map ? record.get(F.text) : null;
+    if (
+      !copy ||
+      !(text instanceof Y.Text) ||
+      !(record instanceof Y.Map) ||
+      record.get(F.part) !== part
+    )
+      continue;
+    const ids = new Set<string>();
+    for (let item = text._start; item && remaining-- > 0; item = item.right) {
+      if (item.deleted || !item.countable) continue;
+      for (let j = 0; j < item.length && remaining-- > 0; j += 1) {
+        const id = Y.createID(item.id.client, item.id.clock + j);
+        const root = deletionRoot(room.doc, id, memo);
+        if (deleted.has(idKey(root.client, root.clock))) ids.add(idKey(id.client, id.clock));
+      }
+    }
+    deleteChars(text, ids);
+    if (remaining <= 0) return;
+  }
+}
+
+/** Delete every known instance of identities removed by one local edit. */
+export function repairKnownDeletes(room: Room, part: string, removed: ReadonlySet<string>): void {
+  if (removed.size === 0) return;
+  const memo = new Map<string, Y.ID>();
+  let remaining = MAX_CHARS;
+  for (const record of room.nodes.values()) {
+    if (--remaining < 0) return;
+    if (!(record instanceof Y.Map) || record.get(F.part) !== part) continue;
+    const text = record.get(F.text);
+    if (!(text instanceof Y.Text)) continue;
+    const ids = new Set<string>();
+    for (let item = text._start; item && --remaining >= 0; item = item.right) {
+      if (item.deleted || !item.countable) continue;
+      for (let j = 0; j < item.length && --remaining >= 0; j += 1) {
+        const id = Y.createID(item.id.client, item.id.clock + j);
+        const root = rootOf(room.doc, id, memo);
+        if (removed.has(idKey(root.client, root.clock))) ids.add(idKey(id.client, id.clock));
+      }
+    }
+    deleteChars(text, ids);
   }
 }

@@ -151,15 +151,18 @@ Destroy the editor before its session. Then disconnect and destroy provider reso
 
 ## Handle history and access
 
-Undo and redo operate on the local participant’s changes through the collaboration session. Concurrent changes can affect what an undo retains. Review the concurrent editing limits below.
+Undo and redo operate on the local participant’s changes through the collaboration session. Undoing typing also removes known copies made by another participant’s formatting or paragraph split. Undo metadata travels with restored text, including when your provider delivers updates separately.
+
+Simultaneous case changes keep one copy of each character. Each participant can undo their case choice independently. Peer formatting preserves carets and text selection ranges when it splits runs.
+
+Concurrent table operations preserve peer text in surviving cells when its original row or cell disappears. Rescued text remains visible in orphaned vertical merge cells. Explicit text deletions still apply. Review the concurrent editing limits below.
 
 Authenticate users before connecting them to a room. Authorize document access and enforce write permissions in your provider or server. A `documentId` is an identifier, not an access token. Use encrypted transport and disconnect participants when access ends.
 
 ## Concurrent editing limits
 
 - **Undo and redo.** Undo can remove peer text inside a shape, row, or cell that you created. Redo restores that content.
-- **Text conflicts.** Concurrent formatting, paragraph splits, and undo can duplicate or reorder text. Some sequences involving three participants can lose characters.
-- **Table conflicts.** Concurrent cell merges and row or column changes can lose text in some sequences. For example, merging cells while two peers delete covered rows can lose merged text.
+- **Text conflicts.** Concurrent undo can reorder text.
 - **Property conflicts.** Concurrent writes to one attribute keep one value. Overlapping fills or effects can reveal the other version when the winning edit is undone.
 
 ## Upgrade the room format
@@ -177,6 +180,12 @@ const unsubscribe = session.subscribeStatus(() => {
 });
 // Call unsubscribe() when your UI unmounts.
 ```
+
+Room format `pptx-collaboration:1.8.1.1` uses updated text identity and table recovery rules. It cannot join legacy format `pptx-collaboration-7`.
+
+Use [collaboration versions](/docs/pro/collaboration-versions) to check admission, inspect saved rooms, and migrate between formats.
+
+To move an existing presentation, save it with a release that accepts its room format. Open that PPTX in a new room with the updated release. This transfers presentation content, but not the old room’s Yjs history. Keep the old room intact.
 
 Do not reset a populated room to bypass that refusal.
 
