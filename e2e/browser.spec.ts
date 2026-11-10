@@ -137,11 +137,12 @@ test('layout: a 390 px window keeps the font pair on the bar and the Text contro
   await page.keyboard.press('ControlOrMeta+a');
   // The font and size of the unit test's steps (`demo-menus.test.tsx`), so the bar measures the
   // same names.
-  await page.locator('[data-slot="font.family"]').click();
+  const toolbar = page.getByRole('toolbar', { name: 'Formatting' });
+  await toolbar.locator('[data-slot="font.family"]').click();
   await page.keyboard.type('Georgia');
   await page.keyboard.press('Enter');
-  await page.locator('.pptx-toolbar__size').fill('40');
-  await page.locator('.pptx-toolbar__size').press('Enter');
+  await toolbar.locator('.pptx-toolbar__size').fill('40');
+  await toolbar.locator('.pptx-toolbar__size').press('Enter');
   await page.setViewportSize({ width: 390, height: 800 });
   await expect(
     page.locator('.pptx-toolbar > [data-group="font"] .pptx-toolbar__size')
