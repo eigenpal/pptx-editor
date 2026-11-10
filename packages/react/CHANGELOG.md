@@ -1,5 +1,15 @@
 # @pptx-editor.dev/react
 
+## 0.4.0
+
+### Minor Changes
+
+- 91482da: Add customizable selection-aware inspectors for React and Vue, with safe drafts and matching automation APIs. Edit line widths, endpoints, gradients, shadows, and reflections while preserving unedited XML. Keep picture pickers bound to their original document and selection. Line endpoint commands now refuse mixed line and non-line selections without changing any object.
+
+### Patch Changes
+
+- Updated dependencies: @pptx-editor.dev/core@0.4.0, @pptx-editor.dev/i18n@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes

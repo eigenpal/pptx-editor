@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/pro",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module with the comments pane and review hooks for React and Vue, realtime collaboration, and advanced drawing rendering (charts, glow, inner shadow, reflection, and soft edge).",
   "type": "module",
   "sideEffects": false,
@@ -37,9 +37,9 @@
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pro"
   },
   "peerDependencies": {
-    "@pptx-editor.dev/core": "~0.3.0",
-    "@pptx-editor.dev/react": "~0.3.0",
-    "@pptx-editor.dev/vue": "~0.3.0",
+    "@pptx-editor.dev/core": "~0.4.0",
+    "@pptx-editor.dev/react": "~0.4.0",
+    "@pptx-editor.dev/vue": "~0.4.0",
     "react": "^18.0.0 || ^19.0.0",
     "vue": "^3.5.0"
   },

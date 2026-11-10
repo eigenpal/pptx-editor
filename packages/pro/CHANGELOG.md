@@ -1,5 +1,20 @@
 # @pptx-editor.dev/pro
 
+## 0.4.0
+
+### Minor Changes
+
+- 58af1e4: Preserve peer text, case changes, and carets through concurrent edits and undo. Add `assertCollaborationFormatCompatibility()`. Breaking collaboration upgrade: rooms use `pptx-collaboration:1.8.1.1`; update all participants and [migrate saved rooms](https://pptx-editor.dev/docs/pro/collaboration-versions). Add immutable release baselines.
+
+### Patch Changes
+
+- 1742572: Add `readCollaborationFormatVersion()` and `COLLABORATION_FORMAT_VERSION` to `@pptx-editor.dev/pro`, so a participant who joins can wait until the Y.Doc holds the room and never seeds a second copy. `CollaborationFailureCode` gains `not-initialized`, for a Y.Doc that holds no room yet; an exhaustive switch over the codes needs a case for it.
+- 58af1e4: Index winning format pieces before placing concurrent edits. Avoid repeated full scans when a collaboration room contains many split pieces. Preserve existing placement rules and resource limits.
+- 58af1e4: Keep all text, in order, when a peer formats part of a run while another peer presses Enter in that run and joins the paragraphs again. Two Enters at the same place also keep each character once.
+- 58af1e4: Fix collaborative table edits that lost text no peer removed. Merged text now survives concurrent row and column deletes, undo of an insert, and merges that overlap, and a covered cell shows text that a peer typed into it. A table command no longer adds a text body to a cell that has none, so its undo keeps a peer's typing.
+- 58af1e4: Keep peer text during collaborative undo and redo. Undoing formatting or paragraph splits preserves peer insertions and deletions. Undoing typing removes its concurrent copies. Redoing deletion also removes peer copies, including copies of restored text.
+- Updated dependencies: @pptx-editor.dev/core@0.4.0, @pptx-editor.dev/react@0.4.0, @pptx-editor.dev/vue@0.4.0
+
 ## 0.3.1
 
 No changes in this release.
