@@ -32,6 +32,7 @@ import {
 afterEach(closeDemo);
 
 const byRole = screen.getByRole;
+const toolbar = () => within(screen.getByRole('toolbar', { name: 'Formatting' }));
 const rail = () => [...document.querySelectorAll<HTMLElement>('.pptx-rail__item')];
 const count = (selector: string) => document.querySelectorAll(selector).length;
 const chip = () => document.querySelector('.pptx-chip')?.textContent;
@@ -254,7 +255,9 @@ describe('demo context menus', () => {
     // A two-state row is a checkbox row (`aria-checked`), as in DOCX Editor's menus.
     await click(within(menu()!).getByRole('menuitemcheckbox', { name: 'Bold' }));
     expect(menu()).toBeNull();
-    expect(byRole('button', { name: /^Bold/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(toolbar().getByRole('button', { name: /^Bold/ }).getAttribute('aria-pressed')).toBe(
+      'true'
+    );
     expect(demo.errors).toEqual([]);
   });
 
@@ -304,7 +307,7 @@ describe('demo context menus', () => {
     expect(document.querySelector('.pptx-surface__slide')!.textContent).toContain('Alpha beta');
     // Increase Font Size steps up from the current size.
     const before = Number(size().value);
-    await click(byRole('button', { name: /Increase font size/ }));
+    await click(toolbar().getByRole('button', { name: /Increase font size/ }));
     await until(() => expect(Number(size().value)).toBeGreaterThan(before));
     expect(demo.errors).toEqual([]);
   });

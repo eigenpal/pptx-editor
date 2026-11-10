@@ -269,7 +269,7 @@ const named = (parent: Element, names: ReadonlySet<string>): Element[] =>
  * inside a theme style, the placeholder color is the color the `a:effectRef` names
  * (ECMA-376 Part 1, 20.1.4.2.8 effectRef). The placeholder's transforms follow the ref's own.
  */
-function withRefColor(spec: NodeSpec, ref: NodeSpec | undefined): NodeSpec {
+export function withRefColor(spec: NodeSpec, ref: NodeSpec | undefined): NodeSpec {
   const isPh =
     spec.ns === NS.a &&
     spec.local === 'schemeClr' &&
@@ -317,7 +317,7 @@ function themeEffects(batch: OpBatch, part: string, style: Element | undefined):
  * nearest effect list of the placeholders it inherits from, else the theme style of the nearest
  * `p:style` (its own first). A shape that edits one effect keeps the others.
  */
-function inheritedEffects(batch: OpBatch, part: string, el: Element): NodeSpec[] {
+export function inheritedEffects(batch: OpBatch, part: string, el: Element): NodeSpec[] {
   const chain = [el, ...inheritedPlaceholders(batch.pkg, part, el)];
   for (const e of chain.slice(1)) {
     const spPr = child(e, 'p:spPr');
@@ -340,7 +340,7 @@ function effectTargets(batch: OpBatch, part: string, ids: readonly string[]): El
 }
 
 /** The shape's `a:effectLst`, written from its inherited effects when the shape has none. */
-function effectListOf(
+export function effectListOf(
   batch: OpBatch,
   part: string,
   el: Element,
@@ -448,7 +448,7 @@ function inheritedThreeD(batch: OpBatch, part: string, el: Element): InheritedTh
  * The theme part of a slide, layout, or master part: through the slide's layout, the layout's
  * master, and the master's theme relationship.
  */
-function themePartFor(batch: OpBatch, part: string): string | undefined {
+export function themePartFor(batch: OpBatch, part: string): string | undefined {
   const layout = relTargetByType(batch.pkg, part, REL.slideLayout) ?? part;
   const master = relTargetByType(batch.pkg, layout, REL.slideMaster) ?? layout;
   return relTargetByType(batch.pkg, master, REL.theme);

@@ -258,7 +258,9 @@ describe('Vue panes match React', () => {
         .find((l) => l.textContent === 'Lock aspect ratio')!
         .querySelector('input')!;
     const widthOf = (el: HTMLElement) =>
-      el.querySelector<HTMLInputElement>('input[aria-label="Width"]')!;
+      el.querySelector<HTMLInputElement>(
+        '[data-format-section="geometry"] input[aria-label="Width"]'
+      )!;
     // A shape with no text: a text frame that fits its text would set its own height.
     const select = async (): Promise<PptxEditorInstance> => {
       const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
@@ -277,6 +279,7 @@ describe('Vue panes match React', () => {
     // React: the 2 by 1 inch shape, locked, then 4 inches wide.
     const r = await select();
     const re = mountReact(createElement(SidePanel), r);
+    act(() => void fireEvent.click(re.querySelector('[data-format-toggle="geometry"]')!));
     expect(lockOf(re).checked).toBe(false);
     act(() => void fireEvent.click(lockOf(re)));
     expect(r.snapshot().geometry?.lockAspectRatio).toBe(true);
@@ -288,6 +291,8 @@ describe('Vue panes match React', () => {
     // Vue: the same steps.
     const v = await select();
     const ve = await mountVue(() => h(PptxEditorSidePanel), v);
+    ve.querySelector<HTMLElement>('[data-format-toggle="geometry"]')!.click();
+    await nextTick();
     expect(lockOf(ve).checked).toBe(false);
     lockOf(ve).click();
     await nextTick();

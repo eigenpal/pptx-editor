@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { PNG } from 'pngjs';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
-import { createPptxEditor, insertImageFile, type PptxEditorInstance } from '../index.ts';
+import {
+  captureImageTarget,
+  createPptxEditor,
+  insertImageFile,
+  type PptxEditorInstance,
+} from '../index.ts';
 
 // Change Picture from a file (`insertImageFile`): the browser decode reads the stored pixels
 // (not the EXIF orientation), and a selection that moves while the file loads refuses the change.
@@ -46,6 +51,52 @@ const nodeAt = (e: PptxEditorInstance, i: number): string =>
   e.session!.layout(0)!.items[i]!.element.nodeId;
 
 describe('Change Picture from a file', () => {
+  test('a picker keeps its launch target before the file starts loading', async () => {
+    const e = await open();
+    e.setSelection({ kind: 'shapes', nodeIds: [nodeAt(e, 0)] });
+    const current = captureImageTarget(e);
+    e.setSelection({ kind: 'shapes', nodeIds: [nodeAt(e, 1)] });
+    const before = e.save();
+    const file = new File([png(30, 40).slice().buffer as ArrayBuffer], 'tall.png', {
+      type: 'image/png',
+    });
+    await insertImageFile(e, file, 'replaceImage', current);
+    expect(e.save()).toEqual(before);
+    expect(e.snapshot().lastRejection?.reason).toBe('disabled.selectionChanged');
+    e.destroy();
+  });
+
+  test('a replaced document invalidates a pending picker despite matching node identities', async () => {
+    const e = await open();
+    const source = e.save()!;
+    e.setSelection({ kind: 'shapes', nodeIds: [nodeAt(e, 0)] });
+    const current = captureImageTarget(e);
+    expect((await e.load(source)).ok).toBe(true);
+    e.setSelection({ kind: 'shapes', nodeIds: [nodeAt(e, 0)] });
+    const before = e.save();
+    const file = new File([png(30, 40).slice().buffer as ArrayBuffer], 'tall.png', {
+      type: 'image/png',
+    });
+    await insertImageFile(e, file, 'replaceImage', current);
+    expect(e.save()).toEqual(before);
+    expect(e.snapshot().lastRejection?.reason).toBe('disabled.selectionChanged');
+    e.destroy();
+  });
+
+  test('a file read failure reports a refusal without an unhandled rejection', async () => {
+    const e = await open();
+    e.setSelection({ kind: 'shapes', nodeIds: [nodeAt(e, 0)] });
+    const before = e.save();
+    const file = {
+      arrayBuffer: async () => {
+        throw new Error('read failed');
+      },
+    } as unknown as File;
+    await insertImageFile(e, file, 'replaceImage');
+    expect(e.save()).toEqual(before);
+    expect(e.snapshot().lastRejection?.reason).toBe('errors.unsupported');
+    e.destroy();
+  });
   test('decodes the stored pixels, not the EXIF orientation', async () => {
     const e = await open();
     e.setSelection({ kind: 'shapes', nodeIds: [nodeAt(e, 0)] });

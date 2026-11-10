@@ -218,6 +218,8 @@ export interface ShapeSummary {
   /** `p:cNvPr/@name`. */
   readonly name: string;
   readonly kind: 'shape' | 'picture' | 'group' | 'connector' | 'graphicFrame';
+  /** Whether the element supports start and end arrowhead types. */
+  readonly lineEnds?: boolean;
   /** `p:cNvPr/@hidden`: the element does not draw. */
   readonly hidden: boolean;
   /** A group's children, top first. */

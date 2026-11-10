@@ -31,6 +31,12 @@ import {
   withFontOrigin,
   type EditorFontsOption,
   type EditorModule,
+  formatLineState,
+  formatSectionsOf,
+  formatSelectionCategory,
+  formatSectionOpen,
+  setFormatSectionOpen,
+  listenFormatSectionExpansion,
 } from '@pptx-editor.dev/core/editor';
 import type {
   CanResult,
@@ -53,12 +59,16 @@ import {
   type PptxEditorProps as ReactPptxEditorProps,
   type PptxEditorRef as ReactPptxEditorRef,
   type PptxEditorRootProps as ReactPptxEditorRootProps,
+  type FormatPanelProps as ReactFormatPanelProps,
+  FormatPanel as ReactFormatPanel,
 } from '@pptx-editor.dev/react';
 import {
   PptxEditor as VuePptxEditor,
   type PptxEditorProps as VuePptxEditorProps,
   type PptxEditorRef as VuePptxEditorRef,
   type PptxEditorRootProps as VuePptxEditorRootProps,
+  type FormatPanelProps as VueFormatPanelProps,
+  FormatPanel as VueFormatPanel,
 } from '@pptx-editor.dev/vue';
 
 // A no-arg command must be constructible.
@@ -67,6 +77,37 @@ const boldCmd: EditorCommand = { type: 'toggleBold' };
 // Commands with arguments.
 const sizeCmd: EditorCommand = { type: 'setFontSize', points: 24 };
 const shapeCmd: EditorCommand = { type: 'insertShape', preset: 'rect' };
+
+// Hosts can compose the same inspector and read mixed line state through built exports.
+const reactFormatProps: ReactFormatPanelProps = {
+  sections: ['line', 'effects', 'geometry'],
+  sectionContent: { effects: null },
+};
+const vueFormatProps: VueFormatPanelProps = { sections: ['line', 'effects', 'geometry'] };
+function formatConsumer(editor: PptxEditorInstance): void {
+  const snapshot = editor.snapshot();
+  const category = formatSelectionCategory(snapshot);
+  const sections = formatSectionsOf(snapshot, ['line', 'geometry']);
+  const width: number | null | undefined = formatLineState(editor)?.width;
+  const open: boolean = formatSectionOpen(editor, category, 'line');
+  const stop = listenFormatSectionExpansion(editor, () => undefined);
+  setFormatSectionOpen(editor, category, 'line', !open);
+  stop();
+  const format = editor.shapeFormat();
+  if (format.ok && format.format.shadow)
+    editor.exec({
+      type: 'patchShapeFormat',
+      target: format.format.target,
+      patch: { kind: 'shadow', distance: 4 },
+    });
+  void sections;
+  void width;
+}
+void formatConsumer;
+void reactFormatProps;
+void vueFormatProps;
+void ReactFormatPanel;
+void VueFormatPanel;
 
 // @ts-expect-error a command with arguments needs them
 const sizeWithoutPoints: EditorCommand = { type: 'setFontSize' };

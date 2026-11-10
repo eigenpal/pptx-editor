@@ -2,7 +2,18 @@
 // `p:spPr` / `a:ln` / `a:bodyPr` children in schema order (CT_ShapeProperties,
 // CT_LineProperties, CT_TextBodyProperties), so saved files stay valid.
 
-import { attr, child, NS, type Element } from '../../store/index.ts';
+import {
+  attr,
+  child,
+  intAttr,
+  NS,
+  REL,
+  relTargetByType,
+  specOf,
+  xmlPartOf,
+  type Element,
+  type PptxPackage,
+} from '../../store/index.ts';
 import type {
   ColorChoice,
   GradientFill,
@@ -13,6 +24,7 @@ import type {
   ThemeColorSlot,
   VerticalAlign,
 } from '../../contracts/neutral.ts';
+import { inheritedPlaceholders, parseTheme } from '../../cascade/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { patternXml, pictureFillXml, pictureType } from './fill-commands.ts';
 import { addImagePart, specFromXml } from './shape-commands.ts';
@@ -201,6 +213,19 @@ function lineOf(batch: OpBatch, part: string, id: string): Element {
   const ln = child(spPr, 'a:ln');
   if (ln) return ln;
   const after = new Set([...GEOMETRY, ...FILLS]);
+  const inherited = inheritedPlaceholders(batch.pkg, part, batch.element(part, id))
+    .map((el) => child(child(el, 'p:spPr'), 'a:ln'))
+    .find(Boolean);
+  if (inherited) {
+    let index = 0;
+    spPr.children.forEach((c, i) => {
+      if (isA(c, after)) index = i + 1;
+    });
+    return batch.element(
+      part,
+      batch.insert({ op: 'insertNode', part, parent: spPr.id, index, spec: specOf(inherited) })
+    );
+  }
   const lnId = replaceIn(batch, part, spPr.id, new Set(), after, '<a:ln/>');
   return batch.element(part, lnId);
 }
@@ -324,11 +349,22 @@ const END_TYPES: readonly LineEndType[] = [
   'diamond',
 ];
 
+/** A supported endpoint type, or none for an absent or unknown value. */
+export function lineEndType(value: string | undefined): LineEndType {
+  return END_TYPES.includes(value as LineEndType) ? (value as LineEndType) : 'none';
+}
+
 /** Whether an element is a line: a connector, or a shape with a line preset. */
-export function isLine(el: Element): boolean {
+export function isLine(el: Element, pkg?: PptxPackage, part?: string): boolean {
   if (el.kind === 'cxnSp') return true;
   if (el.kind !== 'sp') return false;
-  return LINE_PRESETS.test(attr(child(child(el, 'p:spPr'), 'a:prstGeom'), 'prst') ?? '');
+  for (const source of [el, ...(pkg && part ? inheritedPlaceholders(pkg, part, el) : [])]) {
+    const props = child(source, 'p:spPr');
+    if (child(props, 'a:custGeom')) return false;
+    const preset = child(props, 'a:prstGeom');
+    if (preset) return LINE_PRESETS.test(attr(preset, 'prst') ?? '');
+  }
+  return false;
 }
 
 /** Set the arrowheads of lines. `head` is the start of the path, `tail` its end. */
@@ -342,27 +378,70 @@ export function setLineEnds(
   for (const t of [head, tail])
     if (t !== undefined && !END_TYPES.includes(t))
       throw new CommandRefusal('errors.unsupported', 'lineEnd');
-  const lines = ids.filter((id) => isLine(batch.element(part, id)));
-  if (lines.length === 0) throw new CommandRefusal('disabled.notALine');
+  const lines = ids.map((id) => batch.element(part, id));
+  if (lines.length === 0 || lines.some((el) => !isLine(el, batch.pkg, part)))
+    throw new CommandRefusal('disabled.notALine');
   const before = new Set([...FILLS, 'prstDash', 'custDash', 'round', 'bevel', 'miter']);
-  for (const id of lines) {
-    if (head !== undefined)
-      replaceIn(
-        batch,
-        part,
-        lineOf(batch, part, id).id,
-        new Set(['headEnd']),
-        before,
-        `<a:headEnd type="${head}"/>`
-      );
-    if (tail !== undefined)
-      replaceIn(
-        batch,
-        part,
-        lineOf(batch, part, id).id,
-        new Set(['tailEnd']),
-        new Set([...before, 'headEnd']),
-        `<a:tailEnd type="${tail}"/>`
-      );
+  for (const el of lines) {
+    for (const [name, type] of [
+      ['headEnd', head],
+      ['tailEnd', tail],
+    ] as const) {
+      if (type === undefined) continue;
+      const inherited = lineEndSource(batch, part, el, name);
+      const line = lineOf(batch, part, el.id);
+      const own = child(line, `a:${name}`);
+      if (own) {
+        if (attr(own, 'type') !== type)
+          batch.push({
+            op: 'setAttribute',
+            part,
+            node: own.id,
+            name: { ns: '', local: 'type' },
+            value: type,
+          });
+      } else {
+        const preceding = name === 'headEnd' ? before : new Set([...before, 'headEnd']);
+        let index = 0;
+        line.children.forEach((c, i) => {
+          if (isA(c, preceding)) index = i + 1;
+        });
+        const source = inherited ? specOf(inherited) : { ns: NS.a, local: name, prefix: 'a' };
+        batch.insert({
+          op: 'insertNode',
+          part,
+          parent: line.id,
+          index,
+          spec: {
+            ...source,
+            attrs: [
+              ...(source.attrs ?? []).filter((a) => a.ns !== '' || a.local !== 'type'),
+              { ns: '', local: 'type', value: type },
+            ],
+          },
+        });
+      }
+    }
   }
+}
+
+/** The resolved endpoint's source, including its dimensions and extension content. */
+function lineEndSource(
+  batch: OpBatch,
+  part: string,
+  el: Element,
+  name: string
+): Element | undefined {
+  const chain = [el, ...inheritedPlaceholders(batch.pkg, part, el)];
+  const direct = chain.map((e) => child(child(e, 'p:spPr'), 'a:ln')).find(Boolean);
+  const end = child(direct, `a:${name}`);
+  if (end) return end;
+  const style = chain.map((e) => child(e, 'p:style')).find(Boolean);
+  const idx = intAttr(child(style, 'a:lnRef'), 'idx') ?? 0;
+  if (idx <= 0) return undefined;
+  const layout = relTargetByType(batch.pkg, part, REL.slideLayout) ?? part;
+  const master = relTargetByType(batch.pkg, layout, REL.slideMaster) ?? layout;
+  const themePart = relTargetByType(batch.pkg, master, REL.theme);
+  const theme = themePart ? parseTheme(xmlPartOf(batch.pkg, themePart)) : undefined;
+  return child(theme?.lineStyles[idx - 1], `a:${name}`);
 }

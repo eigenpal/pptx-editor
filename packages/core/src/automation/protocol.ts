@@ -11,6 +11,7 @@
 // nothing at all. Nothing in this file names a tree node or a store: a value a consumer receives
 // must not be a reference into the engine.
 
+import type { LineEndType, ShapeFormatProperties } from '../contracts/neutral.ts';
 import type { AutomationOperation } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
@@ -197,6 +198,8 @@ export interface AutomationBackgroundRead {
 
 /** A shape outline. The weight is in points. */
 export interface AutomationLineRead {
+  readonly head?: LineEndType;
+  readonly tail?: LineEndType;
   readonly visible: boolean;
   readonly color: string | null;
   readonly weight: number | null;
@@ -436,6 +439,7 @@ export interface AutomationSelectionRead {
 
 /** What an operation answered with. */
 export type AutomationValue =
+  | { readonly kind: 'shapeFormat'; readonly format: ShapeFormatProperties }
   | { readonly kind: 'handle'; readonly handle: AutomationHandle }
   | { readonly kind: 'handles'; readonly handles: readonly AutomationHandle[] }
   /** A lookup that found nothing, asked for with `orNull`. */

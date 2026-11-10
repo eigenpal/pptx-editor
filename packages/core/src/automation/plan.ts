@@ -1,6 +1,8 @@
 // One operation, planned: a query answers from the working package, and a command adds its
 // store ops to the batch. The host runs this for each operation in order.
 
+import { readShapeFormatProperties, patchShapeFormatProperties } from './commands/format-detail.ts';
+import { edit } from './targets.ts';
 import type { AutomationOperation } from './operations.ts';
 import type { AutomationRef, AutomationValue } from './protocol.ts';
 import * as adjustments from './plan-adjustments.ts';
@@ -264,6 +266,18 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
             : null;
       if (!master) throw new AutomationFailure('unsupported-content', 'no slide master');
       return { kind: 'handle', handle: master };
+    }
+    case 'readShapeFormat': {
+      const at = shapeAt(ctx, op.shape);
+      return {
+        kind: 'shapeFormat',
+        format: edit(() => readShapeFormatProperties(ctx.batch, at.part, at.el.id)),
+      };
+    }
+    case 'patchShapeFormat': {
+      const at = shapeAt(ctx, op.shape);
+      edit(() => patchShapeFormatProperties(ctx.batch, at.part, at.el.id, op.patch));
+      return { kind: 'applied' };
     }
     case 'readFill':
       return op.cell === undefined

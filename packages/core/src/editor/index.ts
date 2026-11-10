@@ -429,6 +429,7 @@ export {
   editorCommandFor,
   isAdapterSlot,
   insertImageFile,
+  captureImageTarget,
   pickImageInto,
   pickPictureFill,
   fillWithPictureFile,
@@ -990,3 +991,5 @@ export {
   type CorrectionGridCell,
   type CorrectionGridRow,
 } from './picture-corrections.ts';
+export * from './format-inspector.ts';
+export * from './format-detail-fields.ts';

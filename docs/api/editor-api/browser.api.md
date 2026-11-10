@@ -20,8 +20,18 @@ import { AutomationTableCellFormatRead } from '@pptx-editor.dev/core/automation'
 import { AutomationTextSpan } from '@pptx-editor.dev/core/automation';
 import { AutomationValue } from '@pptx-editor.dev/core/automation';
 import { FontSource } from '@pptx-editor.dev/core/layout';
+import { GradientDetail } from '@pptx-editor.dev/core/contracts';
+import { GradientStopDetail } from '@pptx-editor.dev/core/contracts';
 import { ImageRasterizer } from '@pptx-editor.dev/core/editor';
+import { LineEndType } from '@pptx-editor.dev/core/contracts';
+import { LineEndType as LineEndType_2 } from '@pptx-editor.dev/core/automation';
 import { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { ReflectionDetail } from '@pptx-editor.dev/core/contracts';
+import { ShadowDetail } from '@pptx-editor.dev/core/contracts';
+import { ShapeFormatPatch } from '@pptx-editor.dev/core/contracts';
+import { ShapeFormatPatch as ShapeFormatPatch_2 } from '@pptx-editor.dev/core/automation';
+import { ShapeFormatProperties } from '@pptx-editor.dev/core/contracts';
+import { ShapeFormatProperties as ShapeFormatProperties_2 } from '@pptx-editor.dev/core/automation';
 
 // @public
 export interface AddSlideOptions {
@@ -815,6 +825,10 @@ export enum GeometricShapeType {
     wedgeRRectCallout = "WedgeRRectCallout"
 }
 
+export { GradientDetail }
+
+export { GradientStopDetail }
+
 // @public
 export class Hyperlink extends ModelObject {
     // @internal
@@ -884,6 +898,8 @@ export interface InsertSlideOptions {
 
 // @public
 export function isPptxEditorError(value: unknown): value is PptxEditorError;
+
+export { LineEndType }
 
 // @public
 export type LoadOption = string | readonly string[] | LoadQueryOptions | LoadPropertyOptions;
@@ -1146,6 +1162,8 @@ export interface PresentationCapabilities {
     readonly selection: boolean;
 }
 
+export { ReflectionDetail }
+
 // @public
 export class RequestContext {
     // @internal
@@ -1178,6 +1196,8 @@ export interface RequestContextDebugInfo {
 // @public
 export type RunCallback<T> = (context: RequestContext) => Promise<T>;
 
+export { ShadowDetail }
+
 // @public
 export class Shape extends ModelObject {
     // @internal
@@ -1191,6 +1211,7 @@ export class Shape extends ModelObject {
     get customXmlParts(): CustomXmlPartCollection;
     delete(): void;
     get fill(): ShapeFill;
+    getFormat(): ClientResult<ShapeFormatProperties_2>;
     getImageAsBase64(options?: ShapeGetImageOptions): ClientResult<string>;
     getParentSlide(): Slide;
     getParentSlideLayout(): SlideLayout;
@@ -1215,6 +1236,7 @@ export class Shape extends ModelObject {
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
     get parentGroup(): Shape;
+    patchFormat(patch: ShapeFormatPatch_2): void;
     get placeholderFormat(): PlaceholderFormat;
     get rotation(): number;
     set rotation(value: number);
@@ -1383,6 +1405,10 @@ export enum ShapeFontUnderlineStyle {
     wavyHeavy = "WavyHeavy"
 }
 
+export { ShapeFormatPatch }
+
+export { ShapeFormatProperties }
+
 // @public
 export enum ShapeGetImageFormatType {
     // (undocumented)
@@ -1445,8 +1471,12 @@ export class ShapeLineFormat extends ModelObject {
     set color(value: string);
     get dashStyle(): ShapeLineDashStyle | `${ShapeLineDashStyle}`;
     set dashStyle(value: ShapeLineDashStyle | `${ShapeLineDashStyle}`);
+    get endArrowhead(): LineEndType_2;
+    set endArrowhead(value: LineEndType_2);
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
+    get startArrowhead(): LineEndType_2;
+    set startArrowhead(value: LineEndType_2);
     get style(): ShapeLineStyle | `${ShapeLineStyle}`;
     set style(value: ShapeLineStyle | `${ShapeLineStyle}`);
     get transparency(): number;

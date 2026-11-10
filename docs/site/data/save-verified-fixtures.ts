@@ -133,7 +133,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
     'sha256:11fee431d75edb3255ee2e5fe61cfae95b23496c194e581df535033fe80c243d',
   'review.comments': 'sha256:2823b6a3277894e25e5d9ae6519d032e276acc6416ed89f2188ba1387ce7629a',
   'shapes.arrange': 'sha256:4701cd3ccd6930d3b7f250b7bb632460e869c08904ce4f132c7272c5764ad5f3',
-  'shapes.connectors': 'sha256:e734d6ef3ed3218480c862dff622121acdee1f26ca896d8f5c6b4a8895dfbe23',
+  'shapes.connectors': 'sha256:570a05eba2d398edf54a8d0dae99babf4bed618847e96fe349c8876c63e619a8',
   'shapes.custom-geometry':
     'sha256:92f1dde2f588f6ae5ed166bf172650e33d7743573d26d47ffe8f2ed4da668081',
   'shapes.flip-rotate': 'sha256:26b871a092abb1e4eeae76b4fb83a42b043d7da8336f81cd177cd919dda79223',

@@ -18,6 +18,7 @@ import {
 } from '../store/index.ts';
 import type { ShapeSummary } from '../contracts/index.ts';
 import { contentElements } from '../cascade/index.ts';
+import { isLine } from '../automation/commands/style-commands.ts';
 import { aspectLocked } from '../automation/commands/arrange-commands.ts';
 
 const KINDS: Readonly<Record<string, ShapeSummary['kind']>> = {
@@ -31,7 +32,13 @@ const KINDS: Readonly<Record<string, ShapeSummary['kind']>> = {
 /** The deepest group nesting the list follows (the reader's cap, AGENTS.md "Security"). */
 const MAX_DEPTH = 32;
 
-function summaries(tree: Element, root: Element, depth: number): ShapeSummary[] {
+function summaries(
+  tree: Element,
+  root: Element,
+  depth: number,
+  pkg: PptxPackage,
+  part: string
+): ShapeSummary[] {
   const out: ShapeSummary[] = [];
   // Markup-compatibility branches as the cascade reads them.
   for (const el of contentElements(tree, root)) {
@@ -40,11 +47,13 @@ function summaries(tree: Element, root: Element, depth: number): ShapeSummary[] 
     const nv = elements(el).find((c) => c.ns === NS.p && c.local.startsWith('nv'));
     const cNvPr = child(nv, 'p:cNvPr');
     const hidden = attr(cNvPr, 'hidden');
-    const kids = kind === 'group' && depth < MAX_DEPTH ? summaries(el, root, depth + 1) : undefined;
+    const kids =
+      kind === 'group' && depth < MAX_DEPTH ? summaries(el, root, depth + 1, pkg, part) : undefined;
     out.push({
       nodeId: el.id,
       name: attr(cNvPr, 'name') ?? '',
       kind,
+      ...(isLine(el, pkg, part) ? { lineEnds: true } : {}),
       hidden: hidden === '1' || hidden === 'true',
       ...(kids ? { children: kids } : {}),
     });
@@ -64,14 +73,16 @@ export function createShapeListSource(): (
   part: string | undefined
 ) => readonly ShapeSummary[] {
   let lastPart: object | undefined;
+  let lastPackage: PptxPackage | undefined;
   let last: readonly ShapeSummary[] = EMPTY;
   return (pkg, part) => {
     const xml = pkg && part ? xmlPartOf(pkg, part) : undefined;
     if (!xml) return EMPTY;
-    if (xml === lastPart) return last;
+    if (xml === lastPart && pkg === lastPackage) return last;
     const tree = find(xml.root, 'p:spTree');
-    const next = tree ? summaries(tree, xml.root, 0) : EMPTY;
+    const next = tree ? summaries(tree, xml.root, 0, pkg!, part!) : EMPTY;
     lastPart = xml;
+    lastPackage = pkg;
     if (JSON.stringify(next) !== JSON.stringify(last)) last = next;
     return last;
   };

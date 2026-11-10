@@ -916,3 +916,12 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   Ribbon: PptxEditorRibbon,
   StatusBar: PptxEditorStatusBar,
 });
+
+export { FormatPanel, FormatSection } from './FormatPanel.tsx';
+export {
+  type FormatSectionId,
+  type FormatSectionDefinition,
+  FORMAT_SECTIONS,
+  formatSectionsOf,
+} from '@pptx-editor.dev/core/editor';
+export type { FormatPanelProps, FormatSectionProps } from './FormatPanel.tsx';

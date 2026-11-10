@@ -953,6 +953,27 @@
       },
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
+    },
+    "FormatPanel": {
+      "reactProps": "FormatPanelProps",
+      "paired": ["className", "sections"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default",
+        "sectionContent": "slide"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "FormatSection": {
+      "reactProps": "FormatSectionProps",
+      "paired": ["section"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
     }
   },
   "propsUnchecked": {
@@ -1314,7 +1335,15 @@
       "usePptxSource",
       "UsePptxSourceOptions",
       "useEditorHostDocument",
-      "UseEditorHostDocumentReturn"
+      "UseEditorHostDocumentReturn",
+      "FORMAT_SECTIONS",
+      "FormatPanel",
+      "FormatPanelProps",
+      "FormatSection",
+      "FormatSectionProps",
+      "FormatSectionDefinition",
+      "FormatSectionId",
+      "formatSectionsOf"
     ],
     "reactNamesAsVueNames": {
       "SlideRail": "PptxEditorSlideRail",

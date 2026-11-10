@@ -1835,5 +1835,30 @@
     "masterHint": null,
     "masterHintOne": null,
     "masterHintNone": null
+  },
+  "inspector": {
+    "blur": "ぼかし",
+    "distance": "距離",
+    "opacity": "不透明度",
+    "startOpacity": "開始の不透明度",
+    "endOpacity": "終了の不透明度",
+    "startPosition": "開始位置",
+    "endPosition": "終了位置",
+    "gradientStop": "グラデーションの分岐点 {index}",
+    "mixed": "混在",
+    "color": "色",
+    "gradient": "グラデーション",
+    "effectUnavailable": "この効果は保持されます。このエディターでは編集できません。",
+    "numberRange": "{min}から{max}までの数値を入力してください。",
+    "numberMinimum": "{min}以上の数値を入力してください。",
+    "selectStop": "選択したグラデーションの分岐点",
+    "stopLimit": "グラデーションには2つ以上の分岐点が必要です。",
+    "addStopLimit": "分岐点が10個未満の場合に追加できます。",
+    "lineWidth": "幅",
+    "line": "線",
+    "outline": "枠線",
+    "previewUnavailable": "この元の色ではプレビューを表示できません。",
+    "geometry": "サイズと位置",
+    "numberRangeExclusive": "{min}より大きく{max}以下の数値を入力してください。"
   }
 }

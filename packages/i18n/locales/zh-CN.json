@@ -1835,5 +1835,30 @@
     "masterHint": null,
     "masterHintOne": null,
     "masterHintNone": null
+  },
+  "inspector": {
+    "blur": "模糊",
+    "distance": "距离",
+    "opacity": "不透明度",
+    "startOpacity": "起始不透明度",
+    "endOpacity": "结束不透明度",
+    "startPosition": "起始位置",
+    "endPosition": "结束位置",
+    "gradientStop": "渐变光圈 {index}",
+    "mixed": "混合",
+    "color": "颜色",
+    "gradient": "渐变",
+    "effectUnavailable": "此效果会保留。此编辑器不支持编辑。",
+    "numberRange": "输入 {min} 到 {max} 之间的数字。",
+    "numberMinimum": "输入大于或等于 {min} 的数字。",
+    "selectStop": "选中的渐变光圈",
+    "stopLimit": "渐变至少需要两个光圈。",
+    "addStopLimit": "渐变光圈少于十个时可以添加。",
+    "lineWidth": "宽度",
+    "line": "线条",
+    "outline": "轮廓",
+    "previewUnavailable": "此源颜色无法预览。",
+    "geometry": "大小和位置",
+    "numberRangeExclusive": "输入大于 {min} 且不超过 {max} 的数字。"
   }
 }

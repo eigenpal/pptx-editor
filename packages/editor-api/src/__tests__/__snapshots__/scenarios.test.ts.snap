@@ -1,5 +1,21 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`scenarios on the server runtime shapes.line-endpoint-types 1`] = `
+{
+  "readBack": {
+    "end": "triangle",
+    "start": "diamond",
+    "width": 3.13,
+  },
+  "status": "ok",
+  "value": {
+    "end": "triangle",
+    "start": "diamond",
+    "width": 3.13,
+  },
+}
+`;
+
 exports[`scenarios on the server runtime presentation.read-basics 1`] = `
 {
   "status": "ok",
@@ -1316,6 +1332,66 @@ exports[`scenarios on the server runtime shapes.delete-and-placeholders 1`] = `
         "type": "Content",
       },
     ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.patch-gradient 1`] = `
+{
+  "readBack": {
+    "angle": 120,
+    "stops": [
+      {
+        "opacity": 1,
+        "position": 0,
+      },
+      {
+        "opacity": 0.35,
+        "position": 0.5,
+      },
+      {
+        "opacity": 1,
+        "position": 1,
+      },
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "angle": 120,
+    "stops": [
+      {
+        "opacity": 1,
+        "position": 0,
+      },
+      {
+        "opacity": 0.35,
+        "position": 0.5,
+      },
+      {
+        "opacity": 1,
+        "position": 1,
+      },
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.patch-effects 1`] = `
+{
+  "readBack": {
+    "blur": 7,
+    "distance": 9,
+    "opacity": 0.6,
+    "reflectionDistance": 5,
+    "reflectionOpacity": 0.75,
+  },
+  "status": "ok",
+  "value": {
+    "blur": 7,
+    "distance": 9,
+    "opacity": 0.6,
+    "reflectionDistance": 5,
+    "reflectionOpacity": 0.75,
   },
 }
 `;

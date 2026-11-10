@@ -18,6 +18,7 @@ import {
   type PropType,
 } from 'vue';
 import {
+  formatSelectionHasLineEnds,
   dialogInitialFocus,
   isDialogBackdropPoint,
   colorMenuSelection,
@@ -695,7 +696,7 @@ export const LineMenuControl = defineComponent({
     const { t } = useTranslation();
     const anchor = ref<HTMLButtonElement | null>(null);
     const open = ref(false);
-    const isLine = useEditorState((s) => s.geometry?.lineHead !== undefined);
+    const isLine = useEditorState((s) => formatSelectionHasLineEnds(s));
     const trigger = useTriggerAttributes(
       props.slot,
       'pptx-toolbar__button pptx-toolbar__button--wide',

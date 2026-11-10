@@ -1,6 +1,7 @@
 // The public option and instance types of `createPptxEditor`, kept beside the facade so that
 // `pptx-editor.ts` stays under the 1000-line cap.
 
+import type { ShapeFormatRead } from '../contracts/index.ts';
 import type {
   ClipboardPayload,
   CommandResult,
@@ -165,6 +166,8 @@ export interface PptxEditorInstance extends Editor {
    * `setChartType`, `setChartFormat`, and `setChartColor` change it.
    */
   chartFormat(nodeId?: string): ChartFormatRead;
+  /** Detailed gradient, shadow, and reflection values of one shape. */
+  shapeFormat(nodeId?: string): ShapeFormatRead;
   /** The shapes copied last in this editor (paste uses it when the clipboard is not readable). */
   readonly lastCopied: ClipboardPayload | null;
   /**

@@ -22,3 +22,19 @@ export interface EditorRejection {
    */
   readonly noop?: boolean;
 }
+
+/** Whether a command can run now; when it cannot, the i18n key of the reason. @public */
+export type CanResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+
+/**
+ * The outcome of a command. A refusal with `noop` means the command had nothing to do (nothing
+ * to undo, nothing selected): nothing changed, and nothing went wrong. @public
+ */
+export type CommandResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly reason: string;
+      readonly detail?: string;
+      readonly noop?: boolean;
+    };

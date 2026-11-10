@@ -3,13 +3,14 @@
 //
 //   bun scripts/sample-deck/showcase.ts      (also run by `bun run sample:build`)
 //
-// The deck uses no feature that the public fidelity page lists as an approximation, except the link
-// text on the links slide (`hyperlink-text`). Every slide's speaker notes say what to try.
+// The showcase test records known approximation diagnostics by slide. These checks do not
+// replace PDF fidelity comparisons. Every slide's speaker notes say what to try.
 // All content is written here; the only picture is generated (showcase-image.ts).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { buildPptx, type FixtureSlide } from '../fixtures/builder.ts';
 import { landscapePng } from './showcase-image.ts';
+import { specializedShowcase } from './showcase-specialized.ts';
 import {
   NO_FILL,
   NO_LINE,
@@ -635,6 +636,7 @@ export function showcaseSlides(): FixtureSlide[] {
     editingSlide(),
     hiddenSlide(),
     closingSlide(),
+    ...specializedShowcase().slides,
   ];
 }
 
@@ -644,6 +646,8 @@ export function buildShowcase(): Uint8Array {
     width: 12_192_000,
     height: 6_858_000,
     slides: showcaseSlides(),
+    extraParts: specializedShowcase().extraParts,
+    binaryParts: specializedShowcase().binaryParts,
     media: [{ name: 'image1.png', bytes: landscapePng(), contentType: 'image/png' }],
     colors: SHOWCASE_COLORS,
     majorFont: 'Calibri',

@@ -3,6 +3,7 @@
 // `packages/core/src/automation`. `@pptx-editor.dev/editor-api` is the object model over this
 // protocol. DOCX Editor commit adf0e178.
 
+export type { LineEndType, ShapeFormatPatch, ShapeFormatProperties } from '../contracts/neutral.ts';
 export type {
   AutomationAdjustmentsRead,
   AutomationBackgroundFillRead,

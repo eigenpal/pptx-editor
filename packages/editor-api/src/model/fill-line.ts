@@ -8,6 +8,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `#RRGGBB` strings or preset color names; transparency is 0 (opaque) to 1 (clear).
 
 import type {
+  LineEndType,
   AutomationCellAddress,
   AutomationFillWrite,
   AutomationLineWrite,
@@ -124,7 +125,23 @@ export class ShapeFill extends ModelObject {
   }
 }
 
-const LINE_NAMES = ['color', 'dashStyle', 'style', 'transparency', 'visible', 'weight'] as const;
+const LINE_NAMES = [
+  'color',
+  'dashStyle',
+  'style',
+  'transparency',
+  'visible',
+  'weight',
+  'startArrowhead',
+  'endArrowhead',
+] as const;
+
+function arrowhead(value: unknown, target: string): LineEndType {
+  const name = text(value, target);
+  if (!['none', 'triangle', 'arrow', 'stealth', 'oval', 'diamond'].includes(name))
+    failArgument(target, 'an arrowhead type');
+  return name as LineEndType;
+}
 
 /**
  * The outline of a shape, or a line.
@@ -138,6 +155,21 @@ export class ShapeLineFormat extends ModelObject {
   constructor(context: RequestContext, path: ObjectPath, shape: ObjectPath) {
     super(context, path);
     this.#shape = shape;
+  }
+
+  /** The start arrowhead type. A write keeps its dimensions and extension content. */
+  get startArrowhead(): LineEndType {
+    return this.loadedProperty('startArrowhead');
+  }
+  set startArrowhead(value: LineEndType) {
+    this.#write('startArrowhead', { head: arrowhead(value, this.at('startArrowhead')) });
+  }
+  /** The end arrowhead type. `none` hides the arrowhead and keeps its dimensions. */
+  get endArrowhead(): LineEndType {
+    return this.loadedProperty('endArrowhead');
+  }
+  set endArrowhead(value: LineEndType) {
+    this.#write('endArrowhead', { tail: arrowhead(value, this.at('endArrowhead')) });
   }
 
   /** The line color as `#RRGGBB`, or an empty string when it has none. */
@@ -197,6 +229,8 @@ export class ShapeLineFormat extends ModelObject {
       'line',
       (ref) => ({ op: 'readLine', shape: ref(shape) }),
       (v) => ({
+        startArrowhead: v.line.head ?? 'none',
+        endArrowhead: v.line.tail ?? 'none',
         color: v.line.color ?? '',
         dashStyle: DASH_STYLE.fromFile(v.line.dashStyle) ?? 'Solid',
         style: LINE_STYLE.fromFile(v.line.style) ?? 'Single',

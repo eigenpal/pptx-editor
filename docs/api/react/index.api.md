@@ -61,6 +61,10 @@ import { FontResolverMark } from '@pptx-editor.dev/core/editor';
 import { FontSource } from '@pptx-editor.dev/core/contracts';
 import { FontSourceSubstitution } from '@pptx-editor.dev/core/contracts';
 import { FontUrlSource } from '@pptx-editor.dev/core/editor';
+import { FORMAT_SECTIONS } from '@pptx-editor.dev/core/editor';
+import { FormatSectionDefinition } from '@pptx-editor.dev/core/editor';
+import { FormatSectionId } from '@pptx-editor.dev/core/editor';
+import { formatSectionsOf } from '@pptx-editor.dev/core/editor';
 import { gradientCss } from '@pptx-editor.dev/core/editor';
 import { GradientFill } from '@pptx-editor.dev/core/editor';
 import { HistoryGroupBindingOptions } from '@pptx-editor.dev/core/editor';
@@ -492,6 +496,35 @@ export { FontSource }
 export { FontSourceSubstitution }
 
 export { FontUrlSource }
+
+export { FORMAT_SECTIONS }
+
+// @public
+export function FormatPanel(input: FormatPanelProps): react.JSX.Element;
+
+// @public
+export interface FormatPanelProps {
+    readonly children?: ReactNode;
+    // (undocumented)
+    readonly className?: string;
+    readonly sectionContent?: Partial<Record<FormatSectionId, ReactNode>>;
+    readonly sections?: readonly FormatSectionId[];
+}
+
+// @public
+export function FormatSection(input: FormatSectionProps): react.JSX.Element;
+
+export { FormatSectionDefinition }
+
+export { FormatSectionId }
+
+// @public
+export interface FormatSectionProps {
+    // (undocumented)
+    readonly section: FormatSectionDefinition;
+}
+
+export { formatSectionsOf }
 
 export { gradientCss }
 

@@ -1,6 +1,7 @@
 // Shape writes: add, delete, position and size, name, visibility, alt text, z-order, groups,
 // fill, and outline. Each lowers to the editor's own edits (`commands/`) where one exists.
 
+import { setLineEnds } from './commands/style-commands.ts';
 import { layoutSlide, createFixedMeasurer, type TextMeasurer } from '../layout/index.ts';
 import {
   attr,
@@ -567,6 +568,8 @@ export function setLine(
   const before = readLine(ctx, ref);
   const current = before.kind === 'line' ? before.line : null;
   edit(() => {
+    if (line.head !== undefined || line.tail !== undefined)
+      setLineEnds(ctx.batch, at.part, [at.el.id], line.head, line.tail);
     let ln = child(ctx.batch.element(at.part, props.id), 'a:ln');
     if (!ln) {
       let index = 0;

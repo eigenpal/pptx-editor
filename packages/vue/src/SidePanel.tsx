@@ -18,270 +18,22 @@ import {
   type VNodeChild,
 } from 'vue';
 import {
-  elementKindLabelKey,
-  elementRotates,
-  formatPanelSize,
   listenPaneRequests,
   takePaneRequest,
   SIDE_PANEL_TAB_ICONS,
-  TABLE_OPTION_ROWS,
   visibleSidePanelTabs,
   type SidePanelTab,
   panelHistoryKey,
-  platformShortcuts,
   radioGroupStep,
-  formatPanelKeys,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, ToolButton, keepFocus } from './chrome.tsx';
-import { useEditorDialog } from './popups.ts';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { PptxEditorSelectionPane } from './SelectionPane.tsx';
 import { AnimationsPane } from './AnimationsPane.tsx';
 import { ChartDataPane } from './ChartDataPane.tsx';
 import { DiagramTextPane } from './DiagramTextPane.tsx';
-
-const EMU_PER_INCH = 914_400;
-const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
-
-/** A number field that commits on Enter or blur and shows the document value otherwise. */
-const PanelNumberField = defineComponent({
-  name: 'PptxPanelNumberField',
-  props: {
-    label: { type: String, required: true },
-    value: { type: String, required: true },
-    unit: { type: String, required: true },
-    disabled: { type: Boolean, required: true },
-    onCommit: { type: Function as PropType<(value: number) => void>, required: true },
-  },
-  setup(props) {
-    const draft = ref<string | null>(null);
-    const commit = (): void => {
-      // An empty field keeps the value: `Number('')` is 0, which would move the shape.
-      const d = draft.value;
-      const n = d === null || d.trim() === '' ? NaN : Number(d.replace(',', '.'));
-      if (Number.isFinite(n) && draft.value !== props.value) props.onCommit(n);
-      draft.value = null;
-    };
-    return () => (
-      <label class="pptx-field">
-        {props.label}
-        <span class="pptx-field__control">
-          <input
-            inputmode="decimal"
-            aria-label={props.label}
-            value={draft.value ?? props.value}
-            disabled={props.disabled}
-            // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
-            data-draft={draft.value !== null}
-            onInput={(e: Event) => {
-              draft.value = (e.target as HTMLInputElement).value;
-            }}
-            onBlur={commit}
-            onKeydown={(e: KeyboardEvent) => {
-              // Enter commits and keeps the focus here, so the next key still reaches the panel.
-              if (e.key === 'Enter') commit();
-              if (e.key === 'Escape') draft.value = null;
-            }}
-          />
-          <span class="pptx-field__unit">{props.unit}</span>
-        </span>
-      </label>
-    );
-  },
-});
-
-/** Position, size, rotation, and text fitting of the selected element. */
-const FormatTab = defineComponent({
-  name: 'PptxFormatTab',
-  setup() {
-    const { t } = useTranslation();
-    const editor = usePptxEditor();
-    const geometry = useEditorState((s) => s.geometry);
-    const table = useEditorState((s) => s.table);
-    const chart = useEditorState((s) => s.chart ?? null);
-    const diagram = useEditorState((s) => s.diagram ?? null);
-    const readOnly = useEditorState((s) => s.mode === 'view');
-    // A layout or a master in the slide master view names itself in the heading.
-    const panelTitle = useEditorState((s) => formatPanelKeys(s).title);
-    const panelBody = useEditorState((s) => formatPanelKeys(s).body);
-    const selected = useEditorState((s) =>
-      s.selection.kind === 'shapes' ? s.selection.nodeIds.length : 0
-    );
-    const background = useEditorDialog('background');
-    return () => {
-      const g = geometry.value;
-      if (!g)
-        return selected.value > 1 ? (
-          <div class="pptx-empty">
-            <p class="pptx-empty__title">
-              {t('panel.format.multipleTitle', { count: selected.value })}
-            </p>
-            <p class="pptx-empty__body">{platformShortcuts(t('panel.format.multipleBody'))}</p>
-          </div>
-        ) : (
-          [
-            <div class="pptx-panel__section">
-              <h3 class="pptx-panel__title">{t(panelTitle.value)}</h3>
-              {background.isAvailable.value ? (
-                <button
-                  type="button"
-                  class="pptx-button"
-                  disabled={readOnly.value}
-                  onClick={(e: MouseEvent) => background.open(e.currentTarget as HTMLElement)}
-                >
-                  {t('menu.background')}
-                </button>
-              ) : null}
-            </div>,
-            <div class="pptx-empty">
-              <p class="pptx-empty__title">{t('panel.format.emptyTitle')}</p>
-              <p class="pptx-empty__body">{t(panelBody.value)}</p>
-            </div>,
-          ]
-        );
-      const move = (patch: Partial<Record<'x' | 'y' | 'cx' | 'cy' | 'rot', number>>): void => {
-        editor.value?.exec({
-          type: 'setTransform',
-          nodeId: g.nodeId,
-          x: patch.x ?? g.x,
-          y: patch.y ?? g.y,
-          cx: Math.max(0, patch.cx ?? g.cx),
-          cy: Math.max(0, patch.cy ?? g.cy),
-          rot: patch.rot ?? g.rot,
-        });
-      };
-      const inch = (v: number): number => Math.round(v * EMU_PER_INCH);
-      const unit = t('panel.format.inchUnit');
-      const tableSection = () => {
-        const tb = table.value;
-        if (!tb) return null;
-        return (
-          <div class="pptx-panel__section">
-            <h3 class="pptx-panel__title">{t('panel.format.table')}</h3>
-            <div class="pptx-panel__grid">
-              <PanelNumberField
-                label={t('panel.format.rowHeight')}
-                value={inches(tb.rowHeight)}
-                unit={unit}
-                disabled={readOnly.value}
-                onCommit={(v: number) =>
-                  editor.value?.exec({ type: 'setRowHeight', height: inch(v) })
-                }
-              />
-              <PanelNumberField
-                label={t('panel.format.columnWidth')}
-                value={inches(tb.columnWidth)}
-                unit={unit}
-                disabled={readOnly.value}
-                onCommit={(v: number) =>
-                  editor.value?.exec({ type: 'setColumnWidth', width: inch(v) })
-                }
-              />
-            </div>
-            <div class="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
-              {TABLE_OPTION_ROWS.map(({ option, labelKey }) => (
-                <label key={option} class="pptx-radio">
-                  <input
-                    type="checkbox"
-                    checked={tb.options.includes(option)}
-                    disabled={readOnly.value}
-                    onChange={() => editor.value?.exec({ type: 'toggleTableStyleOption', option })}
-                  />
-                  {t(labelKey)}
-                </label>
-              ))}
-            </div>
-          </div>
-        );
-      };
-      const field = (key: 'x' | 'y' | 'cx' | 'cy', labelKey: TranslationKey) => (
-        <PanelNumberField
-          label={t(labelKey)}
-          value={inches(g[key])}
-          unit={unit}
-          disabled={readOnly.value}
-          // A locked aspect ratio sizes both sides from one.
-          onCommit={(v: number) =>
-            move(
-              key === 'cx' || key === 'cy' ? formatPanelSize(g, key, inch(v)) : { [key]: inch(v) }
-            )
-          }
-        />
-      );
-      return [
-        <div class="pptx-panel__section">
-          <h3 class="pptx-panel__title">{t('panel.format.element')}</h3>
-          <span class="pptx-chip">
-            {t(elementKindLabelKey(g, table.value, { chart: chart.value, diagram: diagram.value }))}
-          </span>
-        </div>,
-        <div class="pptx-panel__section">
-          <h3 class="pptx-panel__title">{t('panel.format.size')}</h3>
-          <div class="pptx-panel__grid">
-            {field('cx', 'panel.format.width')}
-            {field('cy', 'panel.format.height')}
-          </div>
-          <label class="pptx-radio">
-            <input
-              type="checkbox"
-              checked={g.lockAspectRatio === true}
-              disabled={readOnly.value}
-              onChange={(e: Event) =>
-                editor.value?.exec({
-                  type: 'setLockAspectRatio',
-                  lock: (e.currentTarget as HTMLInputElement).checked,
-                })
-              }
-            />
-            {t('imageProperties.lockAspect')}
-          </label>
-        </div>,
-        <div class="pptx-panel__section">
-          <h3 class="pptx-panel__title">{t('panel.format.position')}</h3>
-          <div class="pptx-panel__grid">
-            {field('x', 'panel.format.x')}
-            {field('y', 'panel.format.y')}
-          </div>
-        </div>,
-        elementRotates(g, table.value) ? (
-          <div class="pptx-panel__section">
-            <h3 class="pptx-panel__title">{t('panel.format.rotation')}</h3>
-            <div class="pptx-panel__grid">
-              <PanelNumberField
-                label={t('panel.format.angle')}
-                value={String(Math.round(g.rot * 10) / 10)}
-                unit="°"
-                disabled={readOnly.value}
-                onCommit={(v: number) => move({ rot: ((v % 360) + 360) % 360 })}
-              />
-            </div>
-          </div>
-        ) : null,
-        tableSection(),
-        g.textFitting ? (
-          <div class="pptx-panel__section">
-            <h3 class="pptx-panel__title">{t('panel.format.textFitting')}</h3>
-            <div class="pptx-radios" role="radiogroup" aria-label={t('panel.format.textFitting')}>
-              {(['none', 'shrink', 'shape'] as const).map((mode) => (
-                <label key={mode} class="pptx-radio">
-                  <input
-                    type="radio"
-                    name="pptx-text-fitting"
-                    checked={g.textFitting === mode}
-                    disabled={readOnly.value}
-                    onChange={() => editor.value?.exec({ type: 'setAutofit', mode })}
-                  />
-                  {t(`panel.format.fitting.${mode}`)}
-                </label>
-              ))}
-            </div>
-          </div>
-        ) : null,
-      ];
-    };
-  },
-});
+import { FormatPanel } from './FormatPanel.tsx';
 
 const sidePanelProps = {
   /** The panel's width in CSS pixels. */
@@ -298,7 +50,7 @@ const sidePanelProps = {
 
 /** A tab's packaged pane. The Comments tab has none: a review pane fills its slot. */
 function packagedPane(tab: SidePanelTab, t: (key: TranslationKey) => string): VNodeChild {
-  if (tab === 'format') return <FormatTab />;
+  if (tab === 'format') return <FormatPanel />;
   if (tab === 'chart') return <ChartDataPane />;
   if (tab === 'diagram') return <DiagramTextPane />;
   if (tab === 'selection') return <PptxEditorSelectionPane />;

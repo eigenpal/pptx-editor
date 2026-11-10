@@ -80,6 +80,7 @@ const COMMAND_TABLE = {
   // Shape format
   setShapeFill: true,
   setShapeGradient: true,
+  patchShapeFormat: true,
   setShapePattern: true,
   setShapePicture: true,
   setLineColor: true,

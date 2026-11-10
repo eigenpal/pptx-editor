@@ -105,6 +105,11 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
         },
       },
     },
+    FormatPanel: { component: vue.FormatPanel },
+    FormatSection: {
+      component: vue.FormatSection,
+      props: { section: vue.FORMAT_SECTIONS.find((s) => s.id === 'fill') },
+    },
     PptxEditorRoot: { component: vue.PptxEditorRoot },
     PptxEditorToolbar: { component: vue.PptxEditorToolbar, props: { preset: false } },
     ToolbarAction: { component: vue.ToolbarAction, props: { label: 'Probe' } },

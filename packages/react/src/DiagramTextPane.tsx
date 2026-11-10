@@ -68,6 +68,7 @@ function NodeField({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
+            e.stopPropagation();
             commit();
           }
           if (e.key === 'Escape') reset();
