@@ -9,6 +9,25 @@ import type { TextAction } from './yjs-text-fuzz.test.ts';
 
 export const FIXED_FORMAT: readonly FuzzRegression<TextAction>[] = [
   {
+    name: 'a deleted character stays deleted when a format arrives before its source copy',
+    seed: 388,
+    actions: [
+      { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 2, length: 2 },
+      { kind: 'edit', peer: 0, edit: 'delete', paragraph: 1, offset: 1, length: 3 },
+      { kind: 'deliver', from: 2, to: 1, count: 1 },
+      {
+        kind: 'edit',
+        peer: 1,
+        edit: 'color',
+        paragraph: 2,
+        offset: 1,
+        length: 3,
+        color: 'accent2',
+      },
+      { kind: 'flush' },
+    ],
+  },
+  {
     name: 'undoing typing removes copies restored by peer formatting',
     seed: 1849,
     actions: [

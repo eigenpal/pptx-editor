@@ -10,7 +10,7 @@ export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
   // These tasks use their own React and Vue servers in inspector.config.ts.
-  testIgnore: /inspector(?:-tasks|-effects)?\.spec\.ts$/,
+  testIgnore: /inspector(?:-tasks|-effects|-accessibility)?\.spec\.ts$/,
   timeout: 60_000,
   use: {
     baseURL: `http://localhost:${PORT}`,

@@ -144,6 +144,8 @@ Add classes through component props instead of removing the library's classes. T
 
 A disabled control carries `aria-disabled="true"`, not the native `disabled` attribute. It stays focusable, runs nothing, and gives its reason to assistive technology, so do not hide it with `pointer-events: none` or `display: none`. Keep visible focus indicators and readable text in each theme.
 
+The default themes use opaque `--doc-focus-ring` colors for keyboard focus. Text fields, number fields, selects, and dialog text areas use `--doc-border-input` for their boundaries. Decorative separators use `--doc-border`. Keep focus indicators and enabled field boundaries at least 3:1 against adjacent surfaces when you override these tokens.
+
 ### Dark mode behavior
 
 `colorMode="system"` follows the operating system and updates when it changes. With a dark mode, `PptxEditor.Viewport` and every dialog carry `dark` beside `.pptx-editor`. Declare dark overrides with `.acme-theme .pptx-editor.dark` after the editor stylesheet.

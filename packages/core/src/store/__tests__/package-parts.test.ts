@@ -28,6 +28,20 @@ function withPart(
   contentType: string,
   bytes: Uint8Array
 ): Uint8Array {
+  if (contentType.startsWith('image/')) {
+    files['ppt/slides/slide1.xml'] = strToU8(
+      strFromU8(files['ppt/slides/slide1.xml']).replace(
+        '</p:sld>',
+        '<p:extLst><p:ext uri="urn:test" r:id="rIdMedia"/></p:extLst></p:sld>'
+      )
+    );
+    files['ppt/slides/_rels/slide1.xml.rels'] = strToU8(
+      strFromU8(files['ppt/slides/_rels/slide1.xml.rels']).replace(
+        '</Relationships>',
+        `<Relationship Id="rIdMedia" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="/${name}"/></Relationships>`
+      )
+    );
+  }
   const ct = strFromU8(files['[Content_Types].xml']).replace(
     '</Types>',
     `<Override PartName="/${name}" ContentType="${contentType}"/></Types>`

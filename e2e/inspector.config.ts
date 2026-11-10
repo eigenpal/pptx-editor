@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 // Run the same inspector tasks against both source adapters, without shared development servers.
 export default defineConfig({
   testDir: '.',
-  testMatch: /inspector(?:-tasks|-effects)?\.spec\.ts$/,
+  testMatch: /inspector(?:-tasks|-effects|-accessibility)?\.spec\.ts$/,
   outputDir: '../test-results/inspector',
   timeout: 60_000,
   workers: 1,

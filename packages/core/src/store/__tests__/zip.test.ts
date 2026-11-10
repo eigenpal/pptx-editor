@@ -298,7 +298,24 @@ describe('P6: compressed media is stored, not deflated again', () => {
   test('PNG and JPEG are stored; XML is deflated; the package reads back the same', () => {
     const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
     const deck = buildPptx({
-      slides: [{ shapes: '' }],
+      slides: [
+        {
+          shapes: '',
+          ext: '<p:extLst><p:ext uri="urn:test" r:id="png"/><p:ext uri="urn:test:jpeg" r:id="jpeg"/></p:extLst>',
+          rels: [
+            [
+              'png',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+              '../media/image1.png',
+            ],
+            [
+              'jpeg',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+              '../media/image2.jpeg',
+            ],
+          ],
+        },
+      ],
       media: [
         { name: 'image1.png', bytes: PNG, contentType: 'image/png' },
         { name: 'image2.jpeg', bytes: jpeg, contentType: 'image/jpeg' },
