@@ -152,7 +152,7 @@ export interface KnownGapList {
  * --update-gaps` rewrites this list from a run; review the diff, because a new kind is a fix.
  */
 export const FIXTURE_KNOWN_GAPS: KnownGapList = {
-  pdfjs: '6.4.299',
+  pdfjs: '6.5.438',
   chromium: 'chromium-headless-shell 1248',
   fonts:
     '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',
@@ -250,7 +250,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
  * --update-gaps` rewrites this list from a run of the export lane.
  */
 export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
-  pdfjs: '6.4.299',
+  pdfjs: '6.5.438',
   chromium: 'chromium-headless-shell 1248',
   fonts:
     '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',

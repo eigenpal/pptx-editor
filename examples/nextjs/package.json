@@ -14,7 +14,7 @@
     "@pptx-editor.dev/i18n": "workspace:*",
     "@pptx-editor.dev/pro": "workspace:*",
     "@pptx-editor.dev/react": "workspace:*",
-    "next": "^16.2.7",
+    "next": "^16.4.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
