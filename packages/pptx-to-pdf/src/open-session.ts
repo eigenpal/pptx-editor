@@ -82,7 +82,14 @@ export async function openExportSession(
         : [options.fonts as FontSource];
   // East Asian text whose font is missing draws with Noto Sans CJK JP when the optional
   // `@docx-editor.dev/fonts-cjk` is installed (`cjk-font.ts`), after the caller's fonts.
-  const remote = options.googleFonts ? await googleExportFonts(source, signal, given) : [];
+  let remote: FontSource[] = [];
+  try {
+    if (options.googleFonts) remote = await googleExportFonts(source, signal, given);
+  } catch (error) {
+    // A resolver aborts by rejecting. Session opens expose the typed refusal instead.
+    if (signal?.aborted) return { ok: false, reason: 'aborted' };
+    throw error;
+  }
   const cjk = options.googleFonts ? undefined : await cjkFallbackFont(source);
   if (signal?.aborted) return { ok: false, reason: 'aborted' };
   const fonts = [...given, ...remote, ...(cjk ? [cjk] : [])];

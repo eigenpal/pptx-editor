@@ -73,13 +73,14 @@ With `googleFonts` disabled, East Asian text can use Noto Sans CJK JP from this 
 
 `result.fontResolution` records the faces used, substitutions, refused embedded faces, and failed substitute loads. Inspect it with the conversion diagnostics when investigating different line breaks or missing characters.
 
-| Diagnostic               | Meaning                                          |
-| ------------------------ | ------------------------------------------------ |
-| `font.substituted`       | A requested family uses another face             |
-| `font.substitute-failed` | A packaged substitute failed to load             |
-| `font.missing`           | No font bytes are available for a face           |
-| `font.not-embedded`      | Font embedding is refused; its text is not drawn |
-| `text.missing-glyph`     | The selected face lacks a required character     |
+| Diagnostic | Meaning |
+| --- | --- |
+| `font.substituted` | A requested family uses another face |
+| `font.substitute-failed` | A packaged substitute failed to load |
+| `font.missing` | No font bytes are available for a face |
+| `font.not-embedded` | Font embedding is refused; its text is not drawn |
+| `text.shaping` | A shaping limit prevents contextual glyphs; export uses nominal glyphs |
+| `text.missing-glyph` | The selected face lacks a required character |
 
 The exporter respects font embedding permissions. It refuses variable fonts and faces whose permissions prevent its embedding or subsetting path. It does not install presentation fonts on the host system.
 

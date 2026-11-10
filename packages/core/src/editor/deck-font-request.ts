@@ -1,3 +1,4 @@
+import { eastAsianScriptOf } from '../cascade/script-fonts.ts';
 // The font request a deck makes of the host's font origins (PPTX only; the composition itself is
 // DOCX Editor's, `packages/core/src/layout/font-resolver.ts`). The families are the theme fonts of
 // every theme a slide master uses, with the script fonts of the languages the deck names, then
@@ -111,6 +112,8 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
       ? [partFonts(part.xml)]
       : []
   );
+  const defaultPart = xmlPartOf(pkg, presentationPart);
+  const inheritedLanguages = defaultPart ? partFonts(defaultPart).languages : [];
   const languages = new Set(parts.flatMap((p) => [...p.languages]));
   const themes = [...new Set(presentationInfo(pkg).slides.map((s) => s.themePart))];
   for (const name of themes)
@@ -126,22 +129,31 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
       }
     }
   for (const p of parts) for (const face of p.faces) add(face);
-  // An available open Arabic face also covers Arabic in Latin-named runs.
-  if (parts.some((p) => p.arabic)) add('Amiri');
+  // Reserve space for coverage fallbacks even when the declared-family list is full.
+  const fallbacks = new Set<string>();
+  if (parts.some((p) => p.arabic)) fallbacks.add('Amiri');
   for (const part of parts.filter((p) => p.cjk)) {
-    const languages = part.languages.size ? [...part.languages] : ['ja'];
-    for (const language of languages) {
-      add(
-        /^ko/i.test(language)
+    const scripts = [...(part.languages.size ? part.languages : inheritedLanguages)]
+      .map(eastAsianScriptOf)
+      .filter(Boolean);
+    for (const script of scripts.length ? scripts : ['Jpan']) {
+      fallbacks.add(
+        script === 'Hang'
           ? 'Noto Sans KR'
-          : /^zh.*(?:TW|HK|Hant)/i.test(language)
+          : script === 'Hant'
             ? 'Noto Sans TC'
-            : /^zh/i.test(language)
+            : script === 'Hans'
               ? 'Noto Sans SC'
               : 'Noto Sans JP'
       );
     }
   }
+  const missing = [...fallbacks].filter((family) => !byKey.has(family.toLowerCase()));
+  for (const key of [...byKey.keys()].reverse()) {
+    if (byKey.size + missing.length <= MAX_RESOLVER_FAMILIES) break;
+    if (![...fallbacks].some((family) => family.toLowerCase() === key)) byKey.delete(key);
+  }
+  for (const family of missing) add(family);
   return [...byKey.values()];
 }
 

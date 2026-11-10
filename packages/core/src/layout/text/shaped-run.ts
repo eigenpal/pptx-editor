@@ -23,6 +23,8 @@ export function shapeRtlRun(run: GlyphRun, measurer: TextMeasurer): GlyphRun {
   for (const match of [...run.text.matchAll(/[^ \t\u3000]+|[ \u3000]/gu)].reverse()) {
     const word = match[0];
     const shaped = measurer.shape(run.face, word, { rtl: true, kerning });
+    // A bounded shaper can refuse a word. Keep nominal paint rather than drop its text.
+    if (shaped.length === 0) return run;
     const clusters = [...new Set(shaped.map((g) => g.cluster))].sort((a, b) => a - b);
     const ends = new Map(clusters.map((start, i) => [start, clusters[i + 1] ?? word.length]));
     const carriers = new Map<number, number>();

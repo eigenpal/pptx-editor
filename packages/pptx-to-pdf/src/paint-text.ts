@@ -105,7 +105,9 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
   for (const line of layout.lines) {
     const rtlOnly = line.runs.some((r) => r.rtl) && line.runs.every((r) => r.rtl || !r.text.trim());
     // Emit visual order across font/style boundaries too, so readers infer word spaces.
-    const runs = rtlOnly ? [...line.runs].sort((a, b) => a.x[0] - b.x[0]) : line.runs;
+    const runs = line.runs.some((r) => r.rtl)
+      ? [...line.runs].sort((a, b) => a.x[0] - b.x[0])
+      : line.runs;
     for (const run of runs) {
       if (run.picture) {
         await drawBulletPicture(run, line.baseline, p);
@@ -148,6 +150,12 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         decorate();
         continue;
       }
+      if (run.rtl && !run.glyphs)
+        p.diag.add(
+          'text.shaping',
+          'approximation',
+          'Contextual glyphs are unavailable; text uses nominal glyphs.'
+        );
       const key = p.fontKey(run.face.id, font);
       const size = run.sizePt * EMU_PER_PT;
       // Stacked text: the line's baseline is the axis through the letter centers (core's
