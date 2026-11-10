@@ -26,6 +26,8 @@ After publication, the post-release workflow calls the baseline capture workflow
 
 For local capture, run `bun run collaboration:catalog --capture X.Y.Z`. Capture releases in chronological order from actual npm packages. The command checks package `gitHead` against tag `vX.Y.Z`. It records registry integrity, source lock hash, exact installation lock, and a synthetic saved room. The synthetic fixture contains reversible editing history. The baseline worker never imports workspace packages. The initial release predates format inspection exports, so its worker reads its legacy schema metadata.
 
+Post-release capture waits for all three published package records before it creates a branch. It retries temporary registry failures within a fixed budget. Authentication failures and invalid metadata fail immediately. Registry reads prefer online metadata to avoid stale cache entries.
+
 Captured files cannot be overwritten. Retries reuse the existing capture branch and validate existing fixture hashes. Use the **Capture collaboration baseline** manual workflow to retry a failed post-release capture. A capture failure occurs after publication; do not republish the release.
 
 The design follows DOCX Editor's collaboration compatibility policy and release harness. Source revision: `13f08556889ef7c192023f92aa865cc9cc8e3fe4`.
