@@ -23,6 +23,7 @@ import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { repairTransitionRoot } from './transition-repair.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
 import { DerivedParts } from './parts-map.ts';
+import { savedPictureParts } from './saved-pictures.ts';
 import {
   deferredXmlPart,
   holdsStandIn,
@@ -413,7 +414,7 @@ export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
   const encoder = new TextEncoder();
   const entries = new Map<string, Uint8Array>();
   // [Content_Types].xml first: some readers sniff the first entry.
-  const ordered = [...pkg.parts.values()].sort((a, b) =>
+  const ordered = [...savedPictureParts(pkg).values()].sort((a, b) =>
     a.partName === CONTENT_TYPES_PART ? -1 : b.partName === CONTENT_TYPES_PART ? 1 : 0
   );
   // The presentation part leaves with one extension list, one section list, and one slide id

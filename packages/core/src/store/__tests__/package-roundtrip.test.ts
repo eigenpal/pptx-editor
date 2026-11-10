@@ -31,6 +31,14 @@ function sample(): Uint8Array {
           text: para(run('Hello')),
         }),
         notes: 'Speaker note',
+        ext: '<p:extLst><p:ext uri="urn:test" r:id="rIdMedia"/></p:extLst>',
+        rels: [
+          [
+            'rIdMedia',
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+            '../media/image1.png',
+          ],
+        ],
       },
       { shapes: '', layout: 'blank' },
     ],

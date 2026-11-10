@@ -407,3 +407,23 @@ Picture replacement and picture fill pickers SHALL capture their document and se
 - **WHEN** a new document has matching selected node identifiers
 - **AND** an earlier picture picker returns a file
 - **THEN** the file does not change the new document
+
+### Requirement: Unused picture export
+
+Saving SHALL omit unused image relationships from parsed presentation slide, layout, master, and notes parts. Saving SHALL omit image parts with no remaining relationships. Unknown relationships and opaque owners SHALL retain their image targets. Unreadable relationships SHALL prevent cleanup. Export cleanup SHALL NOT change the live document or collaboration room.
+
+#### Scenario: Replace a picture and undo after saving
+
+- **WHEN** a participant replaces a picture and saves
+- **THEN** the saved file omits the old image unless another relationship uses it
+- **AND** undo and pending peer edits can still use the original image in the live document
+
+### Requirement: Visible control boundaries
+
+Default themes SHALL provide at least 3:1 contrast for keyboard focus indicators and enabled form field boundaries against adjacent surfaces. React and Vue SHALL share these styles.
+
+#### Scenario: Focus a dialog field
+
+- **WHEN** a user focuses a text field, number field, select, or description text area with the keyboard
+- **THEN** its focus indicator remains visible in light and dark themes
+- **AND** invalid fields retain a distinct visible error boundary

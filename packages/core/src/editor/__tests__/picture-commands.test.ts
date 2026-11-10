@@ -618,9 +618,8 @@ describe('crop to shape, change, and reset', () => {
     const saved = readPptx(e.save()!);
     expect(saved.ok).toBe(true);
     if (!saved.ok) return;
-    // The old image stays: in a shared document another participant may still use it.
+    // Save omits the unused image. The live store keeps it for undo and collaboration.
     expect([...saved.pkg.parts.keys()].filter((p) => p.startsWith('/ppt/media/'))).toEqual([
-      '/ppt/media/image1.png',
       '/ppt/media/image2.png',
     ]);
     expect(

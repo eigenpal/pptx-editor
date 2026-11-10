@@ -1,0 +1,12 @@
+{
+  "impact": "compatible",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Picture cleanup affects only exported parts. It does not mutate shared room state, operations, repair rules, or live canonical models. Chrome colors do not affect collaboration.",
+  "tests": [
+    "packages/core/src/store/__tests__/saved-pictures.test.ts",
+    "packages/pro/src/__tests__/yjs-picture-save.test.ts",
+    "packages/pro/src/__tests__/collaboration-coverage.test.ts"
+  ]
+}

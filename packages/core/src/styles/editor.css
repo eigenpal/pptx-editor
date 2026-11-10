@@ -100,7 +100,7 @@
   --doc-border: #e0e0e0; /* standard borders */
   --doc-border-light: #dadce0; /* lighter borders */
   --doc-border-dark: #d0d0d0; /* darker borders (tables) */
-  --doc-border-input: #ccc; /* input borders */
+  --doc-border-input: #80868b; /* input borders */
 
   /* Status */
   --doc-error: #c5221f; /* error states */
@@ -173,7 +173,7 @@
   --doc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 
   /* Focus ring & text selection (derived from primary) */
-  --doc-focus-ring: rgba(26, 115, 232, 0.4);
+  --doc-focus-ring: #1557b0;
   --doc-selection: rgba(26, 115, 232, 0.3);
 
   /* ----------------------------------------------------------------------
@@ -313,7 +313,7 @@
   --doc-border: #3c3c3c; /* standard borders */
   --doc-border-light: #353535; /* lighter borders */
   --doc-border-dark: #555555; /* darker borders (tables) */
-  --doc-border-input: #4a4a4a; /* input borders */
+  --doc-border-input: #9aa0a6; /* input borders */
   --doc-error: #f28b82;
   --doc-error-bg: #3c1f1d;
   --doc-success: #81c995;
@@ -330,7 +330,7 @@
   --doc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
   --doc-overlay: rgba(0, 0, 0, 0.7);
   --doc-hf-dim-opacity: 0.4;
-  --doc-focus-ring: rgba(78, 157, 255, 0.45);
+  --doc-focus-ring: #6cb0ff;
   --doc-selection: rgba(78, 157, 255, 0.32);
 
   /* Page and caret tokens for dark mode, kept for token parity with DOCX Editor. The
@@ -485,6 +485,11 @@
 .pptx-editor :focus-visible {
   outline: 2px solid var(--doc-focus-ring);
   outline-offset: 1px;
+}
+/* Disabled chrome remains focusable. Dimming the whole control must not dim its focus ring. */
+.pptx-editor [aria-disabled='true']:focus-visible {
+  opacity: 1;
+  color: var(--doc-text-subtle);
 }
 .pptx-editor svg.pptx-icon {
   width: 18px;
@@ -3236,7 +3241,7 @@
   box-sizing: border-box;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--doc-border);
+  border: 1px solid var(--doc-border-input);
   border-radius: var(--doc-radius-control, 8px);
   background: var(--doc-surface);
   color: var(--doc-text);
@@ -3608,7 +3613,7 @@
   width: 100%;
   min-height: 88px;
   padding: 8px 10px;
-  border: 1px solid var(--doc-border);
+  border: 1px solid var(--doc-border-input);
   border-radius: var(--doc-radius-control, 8px);
   background: var(--doc-surface);
   color: var(--doc-text);
@@ -4010,7 +4015,7 @@ legend.pptx-dialog__label {
 .pptx-field select {
   height: 32px;
   padding: 0 8px;
-  border: 1px solid var(--doc-border);
+  border: 1px solid var(--doc-border-input);
   border-radius: var(--doc-radius-control, 8px);
   background: var(--doc-surface);
   color: var(--doc-text);
