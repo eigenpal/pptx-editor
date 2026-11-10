@@ -62,11 +62,12 @@ export async function exportPdf(
   if (!(source instanceof Uint8Array)) throw new TypeError('source must be a Uint8Array');
   validateOptions(options);
   return withPdfWork(options, async (work, phase) => {
-    const { fonts, substitutes } = options;
+    const { fonts, substitutes, googleFonts } = options;
     const opened = await openExportSession(
       source,
       {
         ...(fonts !== undefined ? { fonts } : {}),
+        ...(googleFonts !== undefined ? { googleFonts } : {}),
         ...(substitutes !== undefined ? { substitutes } : {}),
       },
       work.signal

@@ -43,7 +43,8 @@
   "dependencies": {
     "@pptx-editor.dev/pro": "~0.3.1",
     "fontkit": "2.0.4",
-    "pdf-lib": "1.17.1"
+    "pdf-lib": "1.17.1",
+    "@docx-editor.dev/fonts": "^2.34.0"
   },
   "devDependencies": {
     "@docx-editor.dev/fonts-cjk": "^2.34.0",

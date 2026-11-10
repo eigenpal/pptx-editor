@@ -249,9 +249,11 @@ describe('the browser entries are the package exports', () => {
     expect(BROWSER_ENTRIES.map(([name]) => name).sort()).toEqual(exported.sort());
   });
 
-  test('every runtime dependency of the pro and PDF packages is forbidden in a browser', () => {
+  test('every runtime dependency exclusive to pro and PDF is forbidden in a browser', () => {
     const missing = ['pro', 'pptx-to-pdf'].flatMap((pkg) =>
       runtimeDependencies(pkg)
+        // The shared font catalog is also a core dependency and has browser-safe entries.
+        .filter((dependency) => dependency !== '@docx-editor.dev/fonts')
         .filter((dependency) => !BROWSER_FORBIDDEN_DEPENDENCIES.includes(dependency))
         .map((dependency) => `  '${dependency}' (packages/${pkg}/package.json)`)
     );

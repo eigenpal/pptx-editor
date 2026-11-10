@@ -4,7 +4,27 @@ description: 'Supply font bytes, deploy substitute fonts, and inspect font diagn
 category: 'Export formats'
 ---
 
-PDF export uses the same font bytes for layout and output. Supply required faces through `fonts` when your presentation needs fonts outside its embedded or packaged substitute faces.
+Enable Google Fonts for open fallback faces, or supply font bytes for offline export. PDF layout and output use the same bytes.
+
+## Use Google Fonts
+
+Set `googleFonts: true` to resolve fonts from the pinned Google Fonts catalog. The exporter requests Amiri for Arabic text and regional Noto Sans faces for CJK text. Supplied fonts keep precedence. Substitutes can change line breaks.
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+const result = await exportPdf(await readFile('deck.pptx'), {
+  googleFonts: true,
+  fidelityPolicy: 'best-effort',
+});
+console.log(result.diagnostics);
+await writeFile('deck.pdf', result.bytes);
+```
+
+This option makes network requests and defaults to `false`. It uses a closed catalog with pinned URLs and verified font hashes. It does not fetch URLs from the presentation. Network failures can leave missing glyphs; inspect `diagnostics` before serving the PDF. For offline exports, supply font bytes through `fonts`.
+
+Arabic export uses contextual glyphs and mark positions from the layout engine. Its text layer preserves words and spaces for search and copy.
 
 ## Supply font faces
 
@@ -35,7 +55,7 @@ const result = await exportPdf(await readFile('deck.pptx'), {
 await writeFile('deck.pdf', result.bytes);
 ```
 
-Replace the example family and paths with your licensed font files. Earlier supplied faces take priority, followed by permitted embedded fonts and metric-compatible substitutes. Set `substitutes: false` to disable packaged substitutes.
+Replace the example family and paths with your licensed font files. Earlier supplied faces take priority, followed by permitted embedded fonts, enabled Google Fonts, and packaged substitutes. Set `substitutes: false` to disable packaged substitutes.
 
 ## Deploy font assets
 
@@ -47,19 +67,20 @@ For East Asian fallback fonts, install the optional package:
 npm install @docx-editor.dev/fonts-cjk
 ```
 
-When a presentation contains East Asian text, the exporter can load Noto Sans CJK JP from this package. Keep its assets in your deployment output.
+With `googleFonts` disabled, East Asian text can use Noto Sans CJK JP from this package. Keep its assets in your deployment output.
 
 ## Inspect font resolution
 
 `result.fontResolution` records the faces used, substitutions, refused embedded faces, and failed substitute loads. Inspect it with the conversion diagnostics when investigating different line breaks or missing characters.
 
-| Diagnostic               | Meaning                                          |
-| ------------------------ | ------------------------------------------------ |
-| `font.substituted`       | A requested family uses another face             |
-| `font.substitute-failed` | A packaged substitute failed to load             |
-| `font.missing`           | No font bytes are available for a face           |
-| `font.not-embedded`      | Font embedding is refused; its text is not drawn |
-| `text.missing-glyph`     | The selected face lacks a required character     |
+| Diagnostic | Meaning |
+| --- | --- |
+| `font.substituted` | A requested family uses another face |
+| `font.substitute-failed` | A packaged substitute failed to load |
+| `font.missing` | No font bytes are available for a face |
+| `font.not-embedded` | Font embedding is refused; its text is not drawn |
+| `text.shaping` | A shaping limit prevents contextual glyphs; export uses nominal glyphs |
+| `text.missing-glyph` | The selected face lacks a required character |
 
 The exporter respects font embedding permissions. It refuses variable fonts and faces whose permissions prevent its embedding or subsetting path. It does not install presentation fonts on the host system.
 

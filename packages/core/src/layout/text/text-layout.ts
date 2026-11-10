@@ -1,3 +1,4 @@
+import { shapeRtlRun, type PositionedGlyph } from './shaped-run.ts';
 // Slide text layout: one text body into positioned lines. DOM-free; the measurer is
 // injected. All lengths are EMU.
 //
@@ -52,6 +53,8 @@ const MAX_LINES = 10_000;
 /** One positioned glyph run on a line. */
 export interface GlyphRun {
   readonly kind: 'text' | 'bullet';
+  /** Contextual glyphs positioned relative to the run left edge and baseline. */
+  readonly glyphs?: readonly PositionedGlyph[];
   /** Display text (after caps). */
   readonly text: string;
   /**
@@ -226,7 +229,7 @@ function displayText(text: string, caps: RunProps['caps']): string {
 
 /**
  * Split text by the face that draws each character: `face`, or another face for a character
- * it lacks (`TextMeasurer.fallbackFace`). ASCII stays in `face`.
+ * it lacks (`TextMeasurer.fallbackFace`), including punctuation in script-specific faces.
  */
 function glyphFallbackPieces(
   text: string,
@@ -235,7 +238,7 @@ function glyphFallbackPieces(
   lang: string | undefined
 ): { text: string; face: ResolvedFace }[] {
   const fallback = measurer.fallbackFace;
-  if (!fallback || !/[^\u0000-\u007f]/.test(text)) return [{ text, face }];
+  if (!fallback) return [{ text, face }];
   const out: { text: string; face: ResolvedFace }[] = [];
   for (let i = 0; i < text.length;) {
     const cp = text.codePointAt(i) ?? 0;
@@ -247,9 +250,7 @@ function glyphFallbackPieces(
       (cp === 0x200d || /^\p{M}$/u.test(String.fromCodePoint(cp)));
     const drawn = joins
       ? out[out.length - 1].face
-      : cp < 0x80
-        ? face
-        : (fallback.call(measurer, face, cp, lang) ?? face);
+      : (fallback.call(measurer, face, cp, lang) ?? face);
     const last = out[out.length - 1];
     if (last && last.face === drawn) last.text += text.slice(i, i + len);
     else out.push({ text: text.slice(i, i + len), face: drawn });
@@ -972,7 +973,10 @@ export function layoutTextOn(
     box: frame,
     rotation,
     upright: vert === 'eaVert' ? 'eastAsian' : stackedVert ? 'all' : 'none',
-    lines: finalLines,
+    lines: finalLines.map((line) => ({
+      ...line,
+      runs: line.runs.map((run) => shapeRtlRun(run, measurer)),
+    })),
     contentHeight: needed + bp.tIns + bp.bIns,
     paragraphLengths,
     substitutions: [...substitutions],

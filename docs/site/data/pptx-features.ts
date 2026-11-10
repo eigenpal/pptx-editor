@@ -207,7 +207,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Edit East Asian, right-to-left, and mixed-direction text with script-specific fonts and navigation. Line layout remains approximate. Arabic letters join in the editor but remain separate in PDF export.',
+      'Edit East Asian, right-to-left, and mixed-direction text with script-specific fonts and navigation. Line layout remains approximate. Arabic letters join in the editor and PDF export when a suitable font is available.',
     docsLink: '/docs/guides/east-asian-text',
   },
   {

@@ -1623,6 +1623,9 @@ export interface DateTimeState {
     readonly text: string;
 }
 
+// @public
+export function deckFontRequest(pkg: PptxPackage, signal?: AbortSignal): FontResolutionRequest;
+
 // @internal
 export function deckSlideCount(editor: SessionHolder | null | undefined): number;
 

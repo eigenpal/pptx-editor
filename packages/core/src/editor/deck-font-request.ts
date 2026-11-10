@@ -1,3 +1,4 @@
+import { eastAsianScriptOf } from '../cascade/script-fonts.ts';
 // The font request a deck makes of the host's font origins (PPTX only; the composition itself is
 // DOCX Editor's, `packages/core/src/layout/font-resolver.ts`). The families are the theme fonts of
 // every theme a slide master uses, with the script fonts of the languages the deck names, then
@@ -34,6 +35,8 @@ const cache = new WeakMap<XmlPart, PartFonts>();
 /** What a part names: its typefaces in document order, and its run languages. */
 interface PartFonts {
   readonly faces: readonly string[];
+  readonly arabic: boolean;
+  readonly cjk: boolean;
   /** `lang` and `altLang` of its run properties, which pick theme script fonts. */
   readonly languages: ReadonlySet<string>;
 }
@@ -48,6 +51,8 @@ function partFonts(part: XmlPart): PartFonts {
   if (hit) return hit;
   const faces: string[] = [];
   const languages = new Set<string>();
+  let arabic = false;
+  let cjk = false;
   const walk = (el: Element, depth: number): void => {
     if (depth > 256) return;
     if (el.ns === NS.a && TYPEFACE_ELEMENTS.has(el.local)) {
@@ -59,10 +64,22 @@ function partFonts(part: XmlPart): PartFonts {
         const lang = attr(el, name);
         if (lang) languages.add(lang);
       }
-    for (const c of el.children) if (c.type === 'element') walk(c, depth + 1);
+    for (const c of el.children) {
+      if (c.type === 'element') walk(c, depth + 1);
+      else if (c.type === 'text' && el.ns === NS.a && el.local === 't') {
+        if (/[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]/u.test(c.value))
+          arabic = true;
+        if (
+          /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7ff\uf900-\ufaff\uff00-\uffef\u{20000}-\u{3ffff}]/u.test(
+            c.value
+          )
+        )
+          cjk = true;
+      }
+    }
   };
   walk(part.root, 0);
-  const out = { faces, languages };
+  const out = { faces, languages, arabic, cjk };
   cache.set(part, out);
   return out;
 }
@@ -95,6 +112,8 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
       ? [partFonts(part.xml)]
       : []
   );
+  const defaultPart = xmlPartOf(pkg, presentationPart);
+  const inheritedLanguages = defaultPart ? partFonts(defaultPart).languages : [];
   const languages = new Set(parts.flatMap((p) => [...p.languages]));
   const themes = [...new Set(presentationInfo(pkg).slides.map((s) => s.themePart))];
   for (const name of themes)
@@ -110,6 +129,31 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
       }
     }
   for (const p of parts) for (const face of p.faces) add(face);
+  // Reserve space for coverage fallbacks even when the declared-family list is full.
+  const fallbacks = new Set<string>();
+  if (parts.some((p) => p.arabic)) fallbacks.add('Amiri');
+  for (const part of parts.filter((p) => p.cjk)) {
+    const scripts = [...(part.languages.size ? part.languages : inheritedLanguages)]
+      .map(eastAsianScriptOf)
+      .filter(Boolean);
+    for (const script of scripts.length ? scripts : ['Jpan']) {
+      fallbacks.add(
+        script === 'Hang'
+          ? 'Noto Sans KR'
+          : script === 'Hant'
+            ? 'Noto Sans TC'
+            : script === 'Hans'
+              ? 'Noto Sans SC'
+              : 'Noto Sans JP'
+      );
+    }
+  }
+  const missing = [...fallbacks].filter((family) => !byKey.has(family.toLowerCase()));
+  for (const key of [...byKey.keys()].reverse()) {
+    if (byKey.size + missing.length <= MAX_RESOLVER_FAMILIES) break;
+    if (![...fallbacks].some((family) => family.toLowerCase() === key)) byKey.delete(key);
+  }
+  for (const family of missing) add(family);
   return [...byKey.values()];
 }
 

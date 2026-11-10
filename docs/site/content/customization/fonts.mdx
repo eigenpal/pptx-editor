@@ -4,13 +4,52 @@ description: 'Load font bytes for PPTX editor layout, choose font sources, repla
 category: 'Customization'
 ---
 
-Pass a font configuration through `fonts`. The editor measures text with font bytes, so CSS `@font-face` rules do not affect layout. The API is the same as DOCX Editor's, so one font setup works for both editors.
+Pass font sources through `fonts` so the editor can measure and render text with the same bytes. CSS `@font-face` rules alone do not configure layout.
 
-Without `fonts`, the editor measures with the deck's embedded fonts, then with the metric-compatible substitutes of `@docx-editor.dev/fonts`, from the package's own bytes. It makes no network request.
+## Use Google Fonts
 
-Embedded faces must permit installable or editable embedding. The editor does not load restricted, preview-and-print-only, or bitmap-only embedded faces for measurement or display. It uses an available host face or substitute instead. This rule also applies in viewer mode, because the same session can later allow editing. Save preserves the original embedded font bytes and relationships.
+Install `@docx-editor.dev/fonts` alongside your [React or Vue adapter](/docs/frameworks). This browser example loads packaged substitutes and Google Fonts, including Arabic and CJK fallback faces:
 
-Substitution can change text layout. Supply font bytes with appropriate rights when you need the original appearance.
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor, useFonts } from '@pptx-editor.dev/react';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+import '@pptx-editor.dev/react/styles.css';
+
+export function FontEditor({ bytes }: { bytes: Uint8Array }) {
+  const fonts = useFonts(packagedFonts(), googleFonts({ cjk: true }));
+  return <PptxEditor document={bytes} fonts={fonts} />;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditor, useFonts } from '@pptx-editor.dev/vue';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+import '@pptx-editor.dev/vue/styles.css';
+
+defineProps<{ bytes: Uint8Array }>();
+const fonts = useFonts(packagedFonts(), googleFonts({ cjk: true }));
+</script>
+
+<template>
+  <PptxEditor :document="bytes" :fonts="fonts" />
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Google Fonts makes network requests when the deck needs a catalog family. Arabic text requests Amiri. CJK text requests a regional Noto Sans fallback. Large CJK faces load in the background and can change line breaks when they arrive. Use `googleFonts({ allow: ['Amiri', 'Lato'] })` to limit the catalog families you permit.
+
+Without `fonts`, the editor uses permitted embedded fonts and packaged substitutes without network requests. For server-side output, configure [PDF fonts](/docs/export/pdf/fonts) separately.
 
 ## Load application fonts
 
@@ -134,21 +173,6 @@ Failure reasons are `networkError`, `httpError`, `hashMismatch`, `overLimit`, `e
 
 `fonts` accepts a `FontConfigurationFragment`, a complete `FontConfiguration`, or a `FontResolver`. Combine origins with `useFonts()` or `composeFontConfiguration`.
 
-```tsx
-import { useFonts } from '@pptx-editor.dev/react';
-import { packagedFonts } from '@docx-editor.dev/fonts';
-import { googleFonts } from '@docx-editor.dev/fonts/google';
-
-const local = packagedFonts();
-const remote = googleFonts({ allow: ['Lato', 'Arvo', 'PT Serif'] });
-
-export function useDeckFonts() {
-  return useFonts(local, remote);
-}
-```
-
-In Vue, call `useFonts()` the same way in `<script setup>` and bind the result to `:fonts`.
-
 | Source | Use |
 | --- | --- |
 | `packagedFonts()` | Metric-compatible substitutes for common defaults, from the package's own bytes. |
@@ -169,32 +193,13 @@ Earlier sources win for the same family, weight, and style. A supplied face wins
 
 A `FontResolver` receives `families`, `defaultFamily`, and optional `signal` and `resolvedFaces`. It returns a configuration, a fragment, or `undefined`. Map family names to URLs through your own lookup, and pass `signal` to your fetch calls so cancellation stops network work.
 
-For a deck, `families` lists the theme fonts first (`a:majorFont` and `a:minorFont`, with the script fonts of the languages that the runs name when the theme's `a:ea` or `a:cs` is empty), then every `a:latin`, `a:ea`, `a:cs`, `a:sym`, and `a:buFont` typeface in the slides, layouts, and masters, at most 64. `defaultFamily` is the theme's minor Latin font, the font of body text.
+`families` contains up to 64 requested names, including theme fonts, explicit typefaces, and script fallbacks. `defaultFamily` is the theme's minor Latin font.
 
 ### Render Chinese, Japanese, and Korean text
 
-Choose one East Asian source. If you list both, both download and the first one paints.
+Use `googleFonts({ cjk: true })` as shown above for regional Noto Sans faces. For self-hosted CJK fonts, install `@docx-editor.dev/fonts-cjk` and import `cjkFonts` from its `/browser` entry. Pass `cjkFonts()` to `useFonts()` instead of enabling Google's CJK source. Choose one CJK source to avoid downloading both.
 
-```tsx
-import { useFonts } from '@pptx-editor.dev/react';
-import { packagedFonts } from '@docx-editor.dev/fonts';
-import { googleFonts } from '@docx-editor.dev/fonts/google';
-import { cjkFonts } from '@docx-editor.dev/fonts-cjk/browser';
-
-// Option 1: regional Noto Sans faces from Google Fonts, 4.6 to 8.5 MB each.
-export function useGoogleCjkFonts() {
-  return useFonts(packagedFonts(), googleFonts({ cjk: true }));
-}
-
-// Option 2: one pan-CJK face, about 16 MB, from your origin.
-export function useSelfHostedCjkFonts() {
-  return useFonts(packagedFonts(), googleFonts(), cjkFonts());
-}
-```
-
-Call one of these hooks in your editor component and pass the result to `fonts`. Install `@docx-editor.dev/fonts-cjk` yourself; the editor packages do not depend on it.
-
-Neither downloads anything for decks without East Asian families. East Asian text whose own font is missing draws with the East Asian face you supply. See [Chinese, Japanese, and Korean text](/docs/guides/east-asian-text).
+A missing font uses an available face with suitable glyphs. Substitution can change line breaks. See [Chinese, Japanese, and Korean text](/docs/guides/east-asian-text).
 
 ## Replace fonts
 
@@ -278,6 +283,8 @@ await editor.setFonts(withFontOrigin(editor.fonts, { sources: localFaces }));
 `PptxEditor.FontNotice` uses this path for the fonts on the user's computer.
 
 ## Limits
+
+Embedded fonts must permit installable or editable embedding. Restricted, preview-and-print-only, and bitmap-only faces are not loaded, including in viewer mode. Save preserves their original bytes and relationships.
 
 - Deck font names never authorize remote requests. The editor never fetches by itself.
 - Host bytes pass the content hash, the sfnt check, `maxFontBytes`, the 64 MiB face limit, 256 faces, and 128 MiB in total.

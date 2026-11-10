@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Contextual glyph records and font requests affect derived layout and PDF output. They do not change shared operations, room metadata, repair rules, or the canonical document model.",
+  "tests": [
+    "packages/pptx-to-pdf/src/__tests__/rtl-export.test.ts",
+    "packages/pro/src/__tests__/collaboration-coverage.test.ts"
+  ]
+}

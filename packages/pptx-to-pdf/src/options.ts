@@ -49,7 +49,7 @@ export function validateOptions(options: PdfExportOptions): {
   const policy = options.fidelityPolicy;
   if (policy !== undefined && policy !== 'strict' && policy !== 'best-effort')
     throw new RangeError('Invalid fidelityPolicy: expected strict, best-effort');
-  for (const name of ['substitutes', 'includeHiddenSlides'] as const) {
+  for (const name of ['substitutes', 'includeHiddenSlides', 'googleFonts'] as const) {
     if (options[name] !== undefined && typeof options[name] !== 'boolean')
       throw new TypeError(`${name} must be boolean`);
   }

@@ -993,3 +993,5 @@ export {
 } from './picture-corrections.ts';
 export * from './format-inspector.ts';
 export * from './format-detail-fields.ts';
+
+export { deckFontRequest } from './deck-font-request.ts';

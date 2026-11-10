@@ -4,7 +4,7 @@ description: 'Fonts, line breaking, input methods, PDF export, and interface lan
 category: 'Guides'
 ---
 
-The editor reads, edits, and draws Chinese, Japanese, and Korean text. This page tells you what to set up.
+Supply CJK fonts to edit Chinese, Japanese, and Korean text without missing glyphs. Use the [React and Vue Google Fonts examples](/docs/customization/fonts#use-google-fonts) to configure the editor. Set the text language in the presentation so fallback fonts use the correct regional glyphs.
 
 ## Fonts
 
@@ -22,19 +22,6 @@ Quotes, dashes, the ellipsis, and arrows use `a:ea` when the run's `lang` or `al
 When the slot's font has no glyph for a character, such as `①` in Arial, the character uses another loaded face that has it. East Asian faces come first.
 
 When a run names no East Asian font and the theme's `a:ea` is empty, the theme's script font (`a:font script="Jpan"`, `Hans`, `Hant`, or `Hang`) for the run's language applies. `lang` comes first, then `altLang`.
-
-Browsers and servers rarely have the fonts that decks name, such as Yu Gothic or SimSun. Supply an East Asian face through the `fonts` option. See [Fonts](/docs/customization/fonts#render-chinese-japanese-and-korean-text):
-
-```tsx
-import { useFonts } from '@pptx-editor.dev/react';
-import { packagedFonts } from '@docx-editor.dev/fonts';
-import { googleFonts } from '@docx-editor.dev/fonts/google';
-import { cjkFonts } from '@docx-editor.dev/fonts-cjk/browser';
-
-export function useDeckFonts() {
-  return useFonts(packagedFonts(), googleFonts(), cjkFonts());
-}
-```
 
 East Asian text whose font is missing uses the first host face that the text's language puts first: Noto Sans CJK SC or Noto Sans SC for Simplified Chinese, Noto Sans CJK TC or Noto Sans TC for Traditional Chinese, Noto Sans CJK KR or Noto Sans KR for Korean, and Noto Sans CJK JP or Noto Sans JP for Japanese and other text. The other faces follow. The face gives the glyphs, not the metrics of the missing font, so line breaks can differ.
 
@@ -68,11 +55,21 @@ If you add your own key handlers, ignore events with `isComposing` set or with k
 
 ## PDF export
 
-`@pptx-editor.dev/pptx-to-pdf` finds `@docx-editor.dev/fonts-cjk` when you install it next to the exporter. For a deck with East Asian text, East Asian text in a missing font then draws with Noto Sans CJK JP. Without the package, such characters are left out and reported as `text.missing-glyph`.
+Enable Google Fonts on the Node.js exporter to load regional CJK fallbacks:
 
-```bash
-npm install @docx-editor.dev/fonts-cjk
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+const result = await exportPdf(await readFile('deck.pptx'), {
+  googleFonts: true,
+  fidelityPolicy: 'best-effort',
+});
+console.log(result.diagnostics);
+await writeFile('deck.pdf', result.bytes);
 ```
+
+Browser fonts do not transfer to the server. For offline export, supply font bytes or install `@docx-editor.dev/fonts-cjk` for Noto Sans CJK JP. The optional package is used when `googleFonts` is disabled. See [PDF fonts](/docs/export/pdf/fonts) for deployment and diagnostics.
 
 ## Interface language
 
@@ -82,7 +79,7 @@ npm install @docx-editor.dev/fonts-cjk
 
 - Vertical East Asian text (`eaVert`) draws upright characters with no vertical metrics or vertical glyph forms.
 - Punctuation does not compress, and `strictFirstAndLastChars` is not applied.
-- There is no Traditional Chinese interface catalog yet.
+- The bundled interface catalogs do not include Traditional Chinese.
 - A run with no language and a theme with an empty `a:ea` uses its Latin font for East Asian text.
 
 ## See also

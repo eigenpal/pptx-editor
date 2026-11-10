@@ -163,3 +163,27 @@ The layout SHALL draw an equation (`a14:m`) whose constructs it reads, within it
 
 - **WHEN** an equation holds a construct that the layout does not read
 - **THEN** the `mc:Fallback` branch draws
+
+### Requirement: Contextual RTL PDF text
+
+PDF export SHALL use the layout engine's contextual RTL glyphs and mark offsets. Text effects SHALL use the same glyphs. The text layer SHALL retain searchable words and spaces without duplicating combining marks.
+
+#### Scenario: Arabic fallback
+
+- **WHEN** Arabic text names an unavailable font and the host enables Google Fonts
+- **THEN** an available Amiri face supplies its glyphs without changing the saved presentation
+- **AND** PDF letters join and extracted words retain their spaces
+
+### Requirement: Explicit network fonts
+
+PDF export SHALL make Google Fonts requests only when `googleFonts` is enabled. It SHALL resolve names through the pinned catalog, verify font hashes, and preserve supplied and permitted embedded faces before network fallback faces.
+
+#### Scenario: Offline default
+
+- **WHEN** an export omits `googleFonts`
+- **THEN** font resolution makes no Google Fonts requests
+
+#### Scenario: Invalid network bytes
+
+- **WHEN** a returned face fails its pinned hash or structural check
+- **THEN** the exporter does not shape or embed those bytes
