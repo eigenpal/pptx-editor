@@ -19,14 +19,14 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   uncovers hold. A caret in a covered position goes to the merged cell that covers it.
 // - After each flush, every session is `ready`, and the replicas hold the same package.
 // - Text conservation (`fuzz-ledger.ts`): each character shows at most once, shows unless a
-//   peer removed it, and stays removed unless a peer brought it back. A character placed at the
-//   same time as a peer's delete of its row or column may go with it. A merge copies the text
-//   of the cells it covers, so a concurrent delete of that text may lose.
+//   peer removed it, and stays removed unless a peer brought it back. Concurrent row or column
+//   removal must preserve peer typing. Explicit text deletion reaches known copies.
 // - After each flush, the canvas grid (the table that layout draws) equals the grid of the
 //   saved deck reopened in a fresh editor, on every replica.
 // At the end, each replica's save reopens to the same deck, a second save keeps it, and the
 // saved deck passes the part checks (`table-merge` included).
 
+import { REGRESSIONS, BODILESS_REGRESSIONS } from './yjs-table-fuzz-fixed.ts';
 import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { textOf, type Element } from '@pptx-editor.dev/core/store';
 import { buildPptx, cell, table } from '../../../../scripts/fixtures/builder.ts';
@@ -51,7 +51,6 @@ import {
   type Delivery,
   type FuzzKnownFailure,
   type FuzzKnownSeed,
-  type FuzzRegression,
 } from './fuzz-support.ts';
 import { IN, all, kids, root } from './lineage-support.ts';
 
@@ -628,282 +627,14 @@ async function runSeed(d: FuzzDeck, seed: number) {
   return { problems: await perform(run, recorded), actions };
 }
 
-/** Fixed histories that once failed. Add a shrunk seed here when its issue is fixed. */
-const REGRESSIONS: readonly FuzzRegression<TableAction>[] = [
-  {
-    name: 'an undo of a merge after a peer deleted its first column keeps the merged text',
-    seed: 95,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'merge', row: 2, column: 1, row2: 2, column2: 0 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 0, edit: 'deleteColumn', row: 0, column: 0 },
-      { kind: 'deliver', from: 0, to: 2, count: 1 },
-      { kind: 'edit', peer: 2, edit: 'undo', row: 2, column: 0 },
-    ],
-  },
-  {
-    name: 'concurrent deletes of the last two columns after a row insert save a valid table',
-    seed: 291,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'deleteColumn', row: 3, column: 1 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 0, edit: 'insertRow', row: 2, column: 0, before: true },
-      { kind: 'edit', peer: 0, edit: 'deleteColumn', row: 1, column: 1 },
-      { kind: 'edit', peer: 2, edit: 'deleteColumn', row: 2, column: 0 },
-    ],
-  },
-  {
-    name: 'a row insert and a concurrent column insert draw the grid that the save writes',
-    seed: 241,
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'insertRow', row: 2, column: 2, before: false },
-      { kind: 'edit', peer: 1, edit: 'insertColumn', row: 2, column: 2, before: false },
-    ],
-  },
-  {
-    name: 'a merge and a concurrent delete of its first column keep the other merged text',
-    seed: 18,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'deleteColumn', row: 0, column: 0 },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 0, column: 1, row2: 2, column2: 0 },
-      { kind: 'flush' },
-    ],
-  },
-  {
-    name: 'a merge and a concurrent row insert inside it show the merged text once',
-    seed: 2,
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'merge', row: 2, column: 1, row2: 0, column2: 1 },
-      { kind: 'edit', peer: 2, edit: 'insertRow', row: 2, column: 0, before: true },
-      { kind: 'flush' },
-    ],
-  },
-  {
-    name: 'text typed into a cell that a peer merges at the same time is kept',
-    seed: 27,
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'insertRow', row: 0, column: 2, before: true },
-      { kind: 'deliver', from: 0, to: 1, count: 1 },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 1, column: 1, row2: 0, column2: 0 },
-      { kind: 'edit', peer: 0, edit: 'type', row: 0, column: 0, offset: 0, letter: 'ā' },
-      { kind: 'flush' },
-    ],
-  },
-  {
-    name: 'an undo of a merge keeps the merged text after concurrent row and column deletes',
-    seed: 16,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'deleteRow', row: 2, column: 1 },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 1, column: 2, row2: 0, column2: 2 },
-      { kind: 'edit', peer: 1, edit: 'deleteRow', row: 0, column: 2 },
-      { kind: 'edit', peer: 0, edit: 'deleteColumn', row: 0, column: 0 },
-      { kind: 'deliver', from: 1, to: 0, count: 3 },
-      { kind: 'deliver', from: 2, to: 0, count: 1 },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 1, column: 1, row2: 1, column2: 0 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 2, edit: 'undo', row: 1, column: 1 },
-    ],
-  },
-  {
-    name: 'a split after a merge that moved typed text leaves the same table on every replica',
-    seed: 460,
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'split', row: 3, column: 1, split: { rows: 2, cols: 1 } },
-      { kind: 'edit', peer: 1, edit: 'deleteColumn', row: 2, column: 2 },
-      { kind: 'deliver', from: 0, to: 1, count: 2 },
-      { kind: 'edit', peer: 1, edit: 'split', row: 4, column: 0, split: { rows: 1, cols: 2 } },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 3, column: 4, row2: 1, column2: 1 },
-      { kind: 'edit', peer: 1, edit: 'type', row: 1, column: 4, offset: 0, letter: 'ā' },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 0, column: 4, row2: 2, column2: 3 },
-      { kind: 'edit', peer: 2, edit: 'undo', row: 3, column: 3 },
-      { kind: 'edit', peer: 2, edit: 'split', row: 1, column: 2, split: { rows: 1, cols: 2 } },
-    ],
-  },
-  {
-    name: 'a merge, a delete of its first row, and a delete of the column its text left keep the text',
-    seed: 1,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'merge', row: 2, column: 1, row2: 1, column2: 0 },
-      { kind: 'edit', peer: 0, edit: 'deleteRow', row: 1, column: 0 },
-      { kind: 'edit', peer: 2, edit: 'deleteColumn', row: 0, column: 0 },
-    ],
-  },
-  {
-    name: 'a merge into a new row and a concurrent undo of the row insert keep the merged text',
-    seed: 266,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'insertRow', row: 0, column: 2, before: true },
-      { kind: 'deliver', from: 2, to: 0, count: 1 },
-      { kind: 'edit', peer: 2, edit: 'undo', row: 2, column: 1 },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 0, column: 0, row2: 3, column2: 0 },
-    ],
-  },
-  {
-    name: 'two concurrent merges whose spans cover cells that neither merged show their text',
-    seed: 1899,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'merge', row: 1, column: 2, row2: 0, column2: 0 },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 2, column: 0, row2: 0, column2: 0 },
-    ],
-  },
-  {
-    name: 'a column delete after concurrent merges leaves the same table on every replica',
-    seed: 620,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'insertColumn', row: 1, column: 3, before: true },
-      { kind: 'deliver', from: 2, to: 1, count: 1 },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 2, column: 2, row2: 0, column2: 1 },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 2, column: 3, row2: 3, column2: 1 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 0, edit: 'insertColumn', row: 3, column: 3, before: true },
-      { kind: 'edit', peer: 0, edit: 'deleteColumn', row: 3, column: 2 },
-    ],
-  },
-  {
-    name: 'a split after concurrent merges empty a covered cell leaves one table on every replica',
-    seed: 1402,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'merge', row: 2, column: 0, row2: 0, column2: 2 },
-      { kind: 'edit', peer: 1, edit: 'insertColumn', row: 2, column: 2, before: true },
-      { kind: 'edit', peer: 0, edit: 'deleteColumn', row: 1, column: 0 },
-      { kind: 'edit', peer: 0, edit: 'insertColumn', row: 1, column: 1, before: true },
-      { kind: 'deliver', from: 0, to: 1, count: 1 },
-      { kind: 'deliver', from: 1, to: 2, count: 2 },
-      { kind: 'edit', peer: 1, edit: 'type', row: 0, column: 1, offset: 1, letter: 'ā' },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 2, column: 0, row2: 1, column2: 3 },
-      { kind: 'deliver', from: 0, to: 1, count: 1 },
-      { kind: 'deliver', from: 2, to: 1, count: 4 },
-      { kind: 'edit', peer: 1, edit: 'split', row: 1, column: 2, split: { rows: 1, cols: 2 } },
-    ],
-  },
-  {
-    name: 'a merge over a row a peer deleted keeps the text of a cell that lost its text body',
-    seed: 265,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'split', row: 1, column: 0, split: { rows: 1, cols: 2 } },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 0, column: 1, row2: 2, column2: 1 },
-      { kind: 'edit', peer: 2, edit: 'deleteRow', row: 0, column: 0 },
-      { kind: 'deliver', from: 2, to: 1, count: 3 },
-      { kind: 'deliver', from: 1, to: 0, count: 1 },
-      { kind: 'edit', peer: 1, edit: 'type', row: 0, column: 0, offset: 2, letter: 'Ă' },
-      { kind: 'deliver', from: 1, to: 0, count: 1 },
-      { kind: 'deliver', from: 1, to: 0, count: 1 },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 0, column: 3, row2: 0, column2: 0 },
-    ],
-  },
-  {
-    name: 'text typed into a new row that a concurrent merge covers shows in the merged cell',
-    seed: 169,
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'merge', row: 1, column: 0, row2: 2, column2: 2 },
-      { kind: 'edit', peer: 1, edit: 'insertRow', row: 1, column: 2, before: false },
-      { kind: 'deliver', from: 1, to: 2, count: 1 },
-      { kind: 'edit', peer: 2, edit: 'type', row: 2, column: 2, offset: 1, letter: 'Ă' },
-    ],
-  },
-  {
-    name: 'text typed into a new split cell that a concurrent merge covers shows in the merged cell',
-    seed: 1714,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'split', row: 1, column: 0, split: { rows: 2, cols: 2 } },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 0, column: 1, row2: 1, column2: 0 },
-      { kind: 'edit', peer: 1, edit: 'type', row: 1, column: 1, offset: 1, letter: 'ă' },
-    ],
-  },
-  {
-    name: 'text typed into a cell that a split uncovered and a merge covers again is kept',
-    seed: 960,
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'merge', row: 0, column: 0, row2: 1, column2: 3 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 2, edit: 'split', row: 1, column: 2, split: { rows: 2, cols: 1 } },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 1, column: 1, row2: 0, column2: 3 },
-      { kind: 'edit', peer: 1, edit: 'type', row: 1, column: 0, offset: 1, letter: 'Ą' },
-    ],
-  },
-  {
-    name: 'text typed into a cell that a second merge covers at the same time is kept',
-    seed: 391,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'split', row: 1, column: 2, split: { rows: 2, cols: 2 } },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 0, column: 3, row2: 2, column2: 4 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 0, edit: 'type', row: 4, column: 5, offset: 1, letter: 'ă' },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 0, column: 4, row2: 6, column2: 3 },
-    ],
-  },
-  {
-    name: 'text typed into a cell that a merge covers after a column insert is kept',
-    seed: 1971,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'split', row: 0, column: 0, split: { rows: 2, cols: 2 } },
-      { kind: 'edit', peer: 2, edit: 'insertColumn', row: 1, column: 1, before: true },
-      { kind: 'deliver', from: 1, to: 0, count: 1 },
-      { kind: 'deliver', from: 2, to: 1, count: 3 },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 5, column: 2, row2: 1, column2: 3 },
-      { kind: 'deliver', from: 2, to: 0, count: 2 },
-      { kind: 'edit', peer: 0, edit: 'type', row: 1, column: 2, offset: 0, letter: 'Ă' },
-    ],
-  },
-  {
-    name: 'text typed into a cell that a row delete uncovered and a merge covers again is kept',
-    seed: 836,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'merge', row: 0, column: 2, row2: 1, column2: 2 },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 1, column: 3, row2: 1, column2: 1 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 2, edit: 'deleteRow', row: 0, column: 0 },
-      { kind: 'edit', peer: 0, edit: 'merge', row: 2, column: 2, row2: 0, column2: 1 },
-      { kind: 'deliver', from: 2, to: 1, count: 1 },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 0, column: 2, row2: 1, column2: 1 },
-      { kind: 'deliver', from: 2, to: 0, count: 1 },
-      { kind: 'edit', peer: 0, edit: 'type', row: 1, column: 1, offset: 1, letter: 'ą' },
-    ],
-  },
-];
 /** Histories that fail today, each with its issue and the problem it pins. */
-const KNOWN_FAILURES: readonly FuzzKnownFailure<TableAction>[] = [
-  {
-    name: 'text typed into a new column is lost when a peer undoes the insert at the same time',
-    issue: '#109',
-    seed: 10,
-    problem: 'characters that no peer removed are lost: "Ă" in ["A|B|C","D|E|F","G|H|I"]',
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'insertColumn', row: 1, column: 3, before: false },
-      { kind: 'edit', peer: 2, edit: 'type', row: 1, column: 1, offset: 2, letter: 'ā' },
-      { kind: 'edit', peer: 2, edit: 'undo', row: 2, column: 1 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 0, edit: 'type', row: 2, column: 4, offset: 1, letter: 'Ă' },
-      { kind: 'edit', peer: 2, edit: 'undo', row: 1, column: 1 },
-    ],
-  },
-  {
-    name: 'merged text that left a row is lost when peers delete its old and its new row',
-    issue: '#1',
-    seed: 1740,
-    problem: 'characters that no peer removed are lost: "F" in ["G|H|I"]',
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'merge', row: 0, column: 2, row2: 1, column2: 2 },
-      { kind: 'edit', peer: 2, edit: 'deleteRow', row: 1, column: 1 },
-      { kind: 'edit', peer: 1, edit: 'deleteRow', row: 0, column: 2 },
-    ],
-  },
-];
+const KNOWN_FAILURES: readonly FuzzKnownFailure<TableAction>[] = [];
 
 /**
  * Default seeds that fail today, each with the issue that its shrunk history shows and the
  * problem it pins. Remove a seed when its issue is fixed: the test then says so.
  */
-const KNOWN_SEEDS: Readonly<Record<number, FuzzKnownSeed>> = {
-  10: {
-    issue: '#109',
-    problem:
-      'characters that no peer removed are lost: "Ă" in ["||[1x2]|·","A|CF[2x2]|·|","D|·|·|","[1x2]|·|I|"]',
-  },
-};
+const KNOWN_SEEDS: Readonly<Record<number, FuzzKnownSeed>> = {};
 
 fuzzSuite<TableAction>({
   name: 'table fuzz',
@@ -923,53 +654,11 @@ fuzzSuite<TableAction>({
 // pins, so the pins of the mode above stay valid. Its knobs have the prefix `TABLE_BODILESS`.
 const BODILESS_KNOBS = fuzzKnobs('TABLE_BODILESS', 16);
 
-/** Fixed histories of the bodiless deck (as `REGRESSIONS`). */
-const BODILESS_REGRESSIONS: readonly FuzzRegression<TableAction>[] = [
-  {
-    name: 'text typed into a cell without a text body while a peer undoes a row delete is kept',
-    seed: 1958,
-    actions: [
-      { kind: 'edit', peer: 1, edit: 'deleteRow', row: 0, column: 0 },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 1, edit: 'undo', row: 0, column: 1 },
-      { kind: 'edit', peer: 2, edit: 'type', row: 0, column: 1, offset: 0, letter: 'ă' },
-    ],
-  },
-  {
-    name: 'a merge over a cell without a text body and a delete of its first column keep the text',
-    seed: 471,
-    actions: [
-      { kind: 'edit', peer: 2, edit: 'merge', row: 1, column: 1, row2: 2, column2: 0 },
-      { kind: 'edit', peer: 1, edit: 'deleteColumn', row: 2, column: 0 },
-    ],
-  },
-];
 /** Histories of the bodiless deck that fail today (as `KNOWN_FAILURES`). */
-const BODILESS_KNOWN_FAILURES: readonly FuzzKnownFailure<TableAction>[] = [
-  {
-    name: 'text that two concurrent merges move is lost when a peer deletes one merged cell',
-    issue: '#1',
-    seed: 22,
-    problem: 'characters that no peer removed are lost: "H" in ["[3x1]|F","·|","·|I"]',
-    actions: [
-      { kind: 'edit', peer: 0, edit: 'deleteRow', row: 0, column: 1 },
-      { kind: 'edit', peer: 0, edit: 'insertRow', row: 1, column: 1, before: true },
-      { kind: 'flush' },
-      { kind: 'edit', peer: 1, edit: 'deleteColumn', row: 3, column: 0 },
-      { kind: 'edit', peer: 2, edit: 'merge', row: 3, column: 1, row2: 0, column2: 0 },
-      { kind: 'edit', peer: 1, edit: 'merge', row: 1, column: 0, row2: 3, column2: 0 },
-    ],
-  },
-];
+const BODILESS_KNOWN_FAILURES: readonly FuzzKnownFailure<TableAction>[] = [];
 
 /** Default seeds of the bodiless deck that fail today (as `KNOWN_SEEDS`). */
-const BODILESS_KNOWN_SEEDS: Readonly<Record<number, FuzzKnownSeed>> = {
-  10: {
-    issue: '#109',
-    problem:
-      'characters that no peer removed are lost: "Ă" in ["||[1x2]|·","A|CF[2x2]|·|","D|·|·|","[1x2]|·|I|"]',
-  },
-};
+const BODILESS_KNOWN_SEEDS: Readonly<Record<number, FuzzKnownSeed>> = {};
 
 fuzzSuite<TableAction>({
   name: 'table fuzz, cell without a text body',

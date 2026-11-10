@@ -35,6 +35,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Everything read here comes from the room and is untrusted: every walk is bounded.
 
 import * as Y from 'yjs';
+import { fromEnter } from './copy-order.ts';
 import { F, type Room } from './schema.ts';
 import {
   COPIES_KEY,
@@ -44,8 +45,12 @@ import {
   MAX_RESTORED,
   recordOfItem,
   RESTORED_KEY,
+  RESTORED_STEP_KEY,
   restoredOf,
+  restoredPlaceOf,
+  type RestoredPlace,
   rootOf,
+  deletionRoot,
 } from './text-identity.ts';
 import { deleteChars, forEachItem, holderItem, type IdSet } from './yjs-items.ts';
 
@@ -83,6 +88,36 @@ export function movedRoots(room: Room, insertions: IdSet): Set<string> | null {
     }
   });
   return over ? null : out;
+}
+
+/** The original split boundary of each character that a step moved into a copy. */
+export function movedStarts(room: Room, insertions: IdSet): Map<string, RestoredPlace> {
+  const starts = new Map<string, RestoredPlace>();
+  let remaining = MAX_CHARS;
+  const memo = new Map<string, Y.ID>();
+  forEachItem(room.doc, insertions, (item) => {
+    if (remaining <= 0 || !item.countable || !isNodeText(room, item.parent)) return;
+    const copy = copyOf(recordOfItem(item));
+    for (let j = 0; j < item.length && --remaining >= 0; j += 1) {
+      const id = Y.createID(item.id.client, item.id.clock + j);
+      const start =
+        copy &&
+        id.client === copy.client &&
+        id.clock >= copy.clock &&
+        id.clock < copy.clock + copy.length
+          ? {
+              start: copy.source(0),
+              enter: fromEnter(room.doc, copy),
+              client: copy.client,
+              key: String(recordOfItem(item)?.get(F.key) ?? ''),
+            }
+          : restoredPlaceOf(room.doc, id);
+      if (!start) continue;
+      const root = rootOf(room.doc, id, memo);
+      starts.set(idKey(root.client, root.clock), start);
+    }
+  });
+  return starts;
 }
 
 /** Whether the read shows the record that holds `text` (`shows(part, key)`). */
@@ -198,7 +233,9 @@ export function dropDeadMoves(
 export function dropDeletedRestores(
   room: Room,
   keys: Iterable<string | null>,
-  deleted: ReadonlySet<string>
+  deleted: ReadonlySet<string>,
+  rejected?: (id: string, source: string) => void,
+  deletedAt?: ReadonlyMap<string, number>
 ): boolean {
   if (deleted.size === 0) return false;
   const doc = room.doc;
@@ -252,9 +289,42 @@ export function dropDeletedRestores(
       const at = idKey(target.client, target.clock);
       // An undo of the split puts back a source; a redo after it puts back a copy's character.
       const source = by.copies.get(at);
-      if (!by.sources.has(at) && !(source !== undefined && by.restored.has(source))) continue;
-      const root = rootOf(doc, target, memo, false);
-      if (!deleted.has(idKey(root.client, root.clock)) && !deletedIdentity(target)) continue;
+      const step: unknown = doc.getMap(RESTORED_STEP_KEY).get(idKey(client, first + k));
+      const precise =
+        Array.isArray(step) &&
+        (step.length === 3 || step.length === 4) &&
+        Number.isSafeInteger(step[0]) &&
+        step[0] >= 0 &&
+        Number.isSafeInteger(step[1]) &&
+        step[1] >= 0 &&
+        typeof step[2] === 'boolean';
+      let rejectedSource = '';
+      if (precise) {
+        const root = deletionRoot(doc, Y.createID(step[0], step[1]), memo);
+        const rootKey = idKey(root.client, root.clock);
+        if (!deleted.has(rootKey)) continue;
+        if (!step[2]) {
+          const vector = step[3];
+          const deletionClock = deletedAt?.get(rootKey);
+          if (!Array.isArray(vector) || vector.length > 8192 || deletionClock === undefined)
+            continue;
+          let sawDeletion = false;
+          for (let i = 0; i + 1 < vector.length; i += 2)
+            if (
+              vector[i] === doc.clientID &&
+              Number.isSafeInteger(vector[i + 1]) &&
+              vector[i + 1] > deletionClock
+            )
+              sawDeletion = true;
+          if (sawDeletion) continue;
+        }
+        rejectedSource = rootKey;
+      } else {
+        if (!by.sources.has(at) && !(source !== undefined && by.restored.has(source))) continue;
+        const root = rootOf(doc, target, memo, false);
+        if (!deleted.has(idKey(root.client, root.clock)) && !deletedIdentity(target)) continue;
+      }
+      rejected?.(idKey(client, first + k), rejectedSource);
       const item = itemOf(doc, Y.createID(client, first + k));
       if (!item || item.deleted || !isNodeText(room, item.parent)) continue;
       const ids = drop.get(item.parent) ?? new Set<string>();
@@ -309,17 +379,29 @@ function readMoves(room: Room, client: number): Moves | null {
 }
 
 /** The live text characters of `insertions` (as `idKey`), or null over the cap. */
+function latestItem(doc: Y.Doc, id: Y.ID): Y.Item | null {
+  let at = id;
+  for (let n = 0; n < 32; n += 1) {
+    const item = itemOf(doc, at);
+    if (!item || !item.redone) return item;
+    at = Y.createID(item.redone.client, item.redone.clock + at.clock - item.id.clock);
+  }
+  return null;
+}
+
 export function liveInserted(room: Room, insertions: IdSet): Set<string> | null {
   const out = new Set<string>();
   let over = false;
   forEachItem(room.doc, insertions, (item) => {
-    if (over || item.deleted || !item.countable || !isNodeText(room, item.parent)) return;
+    if (over || !item.countable || !isNodeText(room, item.parent)) return;
     for (let j = 0; j < item.length; j += 1) {
       if (out.size >= MAX_CHARS) {
         over = true;
         return;
       }
-      out.add(idKey(item.id.client, item.id.clock + j));
+      const id = Y.createID(item.id.client, item.id.clock + j);
+      const latest = latestItem(room.doc, id);
+      if (latest && !latest.deleted) out.add(idKey(id.client, id.clock));
     }
   });
   return over ? null : out;
@@ -344,6 +426,15 @@ export function deletedByStep(
   const full = new Map<string, Y.ID>();
   const copies = new Map<string, Y.ID>();
   const putBack = new Set<string>();
+  const typed = new Set<string>();
+  let inspected = 0;
+  forEachItem(doc, ranges.insertions, (item) => {
+    if (!item.countable || !isNodeText(room, item.parent)) return;
+    for (let j = 0; j < item.length && inspected++ < MAX_CHARS; j += 1) {
+      const id = Y.createID(item.id.client, item.id.clock + j);
+      if (Y.compareIDs(rootOf(doc, id, full), id)) typed.add(idKey(id.client, id.clock));
+    }
+  });
   let count = 0;
   forEachItem(doc, ranges.deletions, (old) => {
     if (count > MAX_CHARS || !old.countable || old.redone === null) return;
@@ -360,16 +451,51 @@ export function deletedByStep(
     for (let j = 0; j < item.length; j += 1) {
       const id = Y.createID(item.id.client, item.id.clock + j);
       if (!before.has(idKey(id.client, id.clock))) continue;
-      if (copy && copy.client === id.client && id.clock >= copy.clock) {
-        if (id.clock < copy.clock + copy.length) continue;
-      }
+      if (latestItem(doc, id)?.deleted !== true) continue;
       const r = rootOf(doc, id, full);
+      if (copy && copy.client === id.client && id.clock >= copy.clock) {
+        if (id.clock < copy.clock + copy.length && !typed.has(idKey(r.client, r.clock))) continue;
+      }
       if (putBack.has(idKey(r.client, r.clock))) continue;
       // A peer's copy can copy the character itself or the character it stands for.
-      const root = rootOf(doc, id, copies, false);
+      const root = deletionRoot(doc, id, copies);
       out.add(idKey(root.client, root.clock));
       out.add(idKey(r.client, r.clock));
     }
   });
   return out;
+}
+
+/** An undo of typing also removes known copies of those typed characters. */
+export function includeCopiedTyping(room: Room, ranges: { insertions: IdSet }): void {
+  const roots = new Set<string>();
+  const memo = new Map<string, Y.ID>();
+  let remaining = MAX_CHARS;
+  forEachItem(room.doc, ranges.insertions, (item) => {
+    if (!item.countable || !isNodeText(room, item.parent)) return;
+    for (let j = 0; j < item.length && remaining-- > 0; j += 1) {
+      const id = Y.createID(item.id.client, item.id.clock + j);
+      if (Y.compareIDs(rootOf(room.doc, id, memo), id)) roots.add(idKey(id.client, id.clock));
+    }
+  });
+  if (remaining <= 0 || roots.size === 0) return;
+  const added = Y.createDeleteSet();
+  for (const record of room.nodes.values()) {
+    if (--remaining < 0) return;
+    const text = record instanceof Y.Map ? record.get(F.text) : null;
+    if (!(text instanceof Y.Text)) continue;
+    for (let item = text._start; item && --remaining >= 0; item = item.right) {
+      if (item.deleted || !item.countable) continue;
+      for (let j = 0; j < item.length && --remaining >= 0; j += 1) {
+        const id = Y.createID(item.id.client, item.id.clock + j);
+        const root = rootOf(room.doc, id, memo);
+        if (!roots.has(idKey(root.client, root.clock))) continue;
+        const entries = added.clients.get(id.client) ?? [];
+        entries.push({ clock: id.clock, len: 1 } as never);
+        added.clients.set(id.client, entries);
+      }
+    }
+    if (remaining < 0) return;
+  }
+  ranges.insertions = Y.mergeDeleteSets([ranges.insertions, added]);
 }

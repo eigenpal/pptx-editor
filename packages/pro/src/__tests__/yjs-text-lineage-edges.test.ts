@@ -105,8 +105,8 @@ describe('the pieces of a piece', () => {
       selectIn(b, 0, 9);
       expect(b.input('text', 'X').ok).toBe(true);
       sync.flush();
-      // The loser's edited text shows once more, in order, after the winner's word.
-      expect(converged(...editors)).toEqual(['Hello worldorXld']);
+      // Both formats keep each source character once and preserve the inserted character.
+      expect(converged(...editors)).toEqual(['Hello worXld']);
     });
 
   for (const ids of TWO_ORDERS)
@@ -123,7 +123,7 @@ describe('the pieces of a piece', () => {
       selectIn(b, 0, 11);
       expect(b.input('text', '!').ok).toBe(true);
       sync.flush();
-      expect(converged(...editors)).toEqual(['Hello wo', 'rldworld!']);
+      expect(converged(...editors)).toEqual(['Hello wo', 'rld!']);
     });
 });
 

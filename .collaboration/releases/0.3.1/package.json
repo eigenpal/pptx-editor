@@ -1,0 +1,12 @@
+{
+  "name": "pptx-collaboration-baseline",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pptx-editor.dev/i18n": "0.3.1",
+    "@pptx-editor.dev/core": "0.3.1",
+    "@pptx-editor.dev/pro": "0.3.1",
+    "yjs": "13.6.33",
+    "y-protocols": "1.0.7"
+  }
+}

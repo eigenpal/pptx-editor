@@ -67,7 +67,7 @@ describe('a peer edits text that an undo put back', () => {
       });
 
   for (const swap of ORDERS)
-    test(`a delete reaches no copy of what a concurrent undo put back (${order(swap)})`, async () => {
+    test(`a concurrent delete survives an undo of Enter (${order(swap)})`, async () => {
       const { a, b, sync } = await replicas(oneRun('IJKL'), swap);
       sync.pause();
       selectIn(a, 0, 3, 4);
@@ -76,8 +76,8 @@ describe('a peer edits text that an undo put back', () => {
       ok(b.input('paragraph'));
       ok(b.exec({ type: 'undo' }));
       sync.flush();
-      expect(converged(a, b)).toEqual(['IJKL']);
-      // Both copy the "L" that B's undo put back: it stays once.
+      expect(converged(a, b)).toEqual(['IJK']);
+      // Later splits keep the independently deleted character absent.
       sync.pause();
       selectIn(a, 0, 3);
       ok(a.input('paragraph'));
@@ -85,7 +85,7 @@ describe('a peer edits text that an undo put back', () => {
       ok(b.input('paragraph'));
       sync.flush();
       const text = converged(a, b).join('');
-      expect(text).toContain('L');
+      expect(text).not.toContain('L');
       expect(text.length).toBe(new Set(text).size);
     });
 });

@@ -278,8 +278,14 @@ function peerChild(
   // A node moved in, or a split piece made, without the remover seeing it: its text goes with
   // the move or the split (`move-rescue.ts`, `placeEditedPieces` in `text-lineage.ts`), unless
   // the move rescue found no other place for it.
-  const split = typeof child.get(LINEAGE.splitFrom) === 'string';
-  const moved = split || (typeof from === 'string' && !rescue.stranded);
+  const splitFrom = child.get(LINEAGE.splitFrom);
+  const splitAway =
+    typeof splitFrom === 'string' &&
+    (rescue.listings().get(splitFrom) ?? []).some((parent) => {
+      const record = room.nodes.get(parent);
+      return parent !== self && record instanceof Y.Map && !isRemoved(record);
+    });
+  const moved = splitAway || (typeof from === 'string' && !rescue.stranded);
   if (moved && !seen().has(key)) return null;
   if (shell.local === 'br') return seen().has(key) ? null : 'br';
   return shell.local === 'r' || shell.local === 'fld' ? 'run' : null;
@@ -359,7 +365,9 @@ export function withRemovedRuns(
   paragraph: Y.Map<unknown>,
   children: readonly Spec[],
   read: (key: string) => ReplicaElementSpec | null,
-  rescue: ParagraphRescue = newParagraphRescue(new Set(), roomListings(room)(partName))
+  rescue: ParagraphRescue = newParagraphRescue(new Set(), roomListings(room)(partName)),
+  showsRestored: (key: string) => boolean = () => false,
+  accept: (spec: ReplicaElementSpec) => void = () => {}
 ): readonly Spec[] {
   const walk = rescue.walk;
   const places = fieldsOf(paragraph, walk, false).places;
@@ -378,6 +386,7 @@ export function withRemovedRuns(
     return spec && step(walk, sizeOf(spec, MAX_READ_STEPS)) ? spec : null;
   };
   const putBack = (key: string, spec: ReplicaElementSpec) => {
+    accept(spec);
     back.set(key, spec);
     walk.placed.set(key, String(self));
   };
@@ -396,7 +405,8 @@ export function withRemovedRuns(
     if (body) {
       // A paragraph is read only when its records hold a peer's text, and the read decides.
       const one = { stranded: rescue.stranded.has(key), listings: rescue.listings, walk };
-      if (!paragraphHoldsText(room, key, rec as Y.Map<unknown>, one)) continue;
+      if (!paragraphHoldsText(room, key, rec as Y.Map<unknown>, one) && !showsRestored(key))
+        continue;
       const spec = readOnce(key);
       if (!spec || !paragraphSpecHoldsText(room, spec, rec as Y.Map<unknown>, one)) continue;
       putBack(key, spec);

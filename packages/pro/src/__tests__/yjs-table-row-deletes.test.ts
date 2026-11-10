@@ -104,14 +104,14 @@ describe('a row delete after two peers moved one paragraph at once', () => {
     });
 
   for (const order of TWO_ORDERS)
-    test(`a peer that types in the paragraph while the row goes loses it with the row (client order ${orderName(order)})`, async () => {
+    test(`a peer that types in the paragraph while the row goes keeps its typing (client order ${orderName(order)})`, async () => {
       const { a, b, sync } = await concurrentMoves(order);
       sync.pause();
       const t = all(root(b), 't').find((x) => textOf(x) === 'PQRS')!;
       transact(b, [{ op: 'setText', part: slide1(b), node: t.id, text: 'PQRS!' }]);
       transact(a, deleteMergedFirstRowOps(a));
       sync.flush();
-      expect(converged(a, b)).toEqual(['']);
+      expect(converged(a, b)).toEqual(['!']);
       // The typist's undo reverts its typing only: the paragraph does not come back.
       expect(b.exec({ type: 'undo' }).ok).toBe(true);
       expect(converged(a, b)).toEqual(['']);
@@ -133,9 +133,9 @@ describe('a row delete after two peers moved one paragraph at once', () => {
           index: body.children.indexOf(firstP),
         },
       ]);
-      expect(converged(a, b)).toEqual(['A', 'TUVW', 'PQRS', '']);
+      expect(converged(a, b)).toEqual(['A', 'TUVW', 'PQRS']);
       transact(b, deleteMergedFirstRowOps(b));
-      expect(converged(a, b)).toEqual(['PQRS', '']);
+      expect(converged(a, b)).toEqual(['PQRS']);
       savedValid(a);
     });
 });
@@ -386,7 +386,7 @@ describe('a merge while peers delete both rows of the merged cell', () => {
     });
 
   for (const order of TWO_ORDERS)
-    test(`the delete of the lower row after the merge, and a delete of the upper row that did not see it (client order ${names(order)})`, async () => {
+    test(`the delete of the lower row after the merge, and a delete of the upper row that did not see it keep the text (client order ${names(order)})`, async () => {
       const { editors, sync, docs } = await peers(threeRows(), [...order, 3_003]);
       const [a, b, c] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
       sync.pause();
@@ -396,11 +396,13 @@ describe('a merge while peers delete both rows of the merged cell', () => {
       deleteRow(b, 1);
       deleteRow(c, 0);
       sync.flush();
-      expect(tablesConverged(editors)).toEqual(['C|Z']);
+      // B saw "B" leave its row, and C did not see "B" in the merged cell: no peer removed it,
+      // so it goes to the same column of the row that stays (`survivingCell` in move-rescue.ts).
+      expect(tablesConverged(editors)).toEqual(['CB|Z']);
     });
 
   for (const order of THREE_ORDERS)
-    test(`typing in the merged cell while both rows go is removed with them (client order ${names(order)})`, async () => {
+    test(`typing in the merged cell survives when both rows go (client order ${names(order)})`, async () => {
       const { editors, sync } = await peers(threeRows(), order);
       const [a, b, c] = editors as [PptxEditorInstance, PptxEditorInstance, PptxEditorInstance];
       sync.pause();
@@ -410,7 +412,7 @@ describe('a merge while peers delete both rows of the merged cell', () => {
       deleteRow(b, 1);
       deleteRow(c, 0);
       sync.flush();
-      expect(tablesConverged(editors)).toEqual(['C|Z']);
+      expect(tablesConverged(editors)).toEqual(['Cx|Z']);
     });
 
   for (const order of THREE_ORDERS)
@@ -423,8 +425,8 @@ describe('a merge while peers delete both rows of the merged cell', () => {
       deleteRow(c, 0);
       sync.flush();
       expect(c.exec({ type: 'undo' }).ok).toBe(true);
-      // The upper row comes back as the room holds it: the merged cell with "A" and "B".
-      for (const e of editors) expect(grid(e)).toEqual(['AB|X', 'C|Z']);
+      // C restores its row and "A". B's independent deletion of "B" still applies.
+      for (const e of editors) expect(grid(e)).toEqual(['A|X', 'C|Z']);
       expect(b.exec({ type: 'undo' }).ok).toBe(true);
       // The lower row comes back as the covered cell of the merge, with its empty paragraph.
       expect(tablesConverged(editors)).toEqual(['AB|X', '|Y', 'C|Z']);

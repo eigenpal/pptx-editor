@@ -28,6 +28,15 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import * as Y from 'yjs';
 import { F, type Room } from './schema.ts';
+import { LINEAGE } from './text-lineage.ts';
+import {
+  placesOf,
+  copyOrder,
+  restoredKeeps,
+  restoredStart,
+  type RepairView,
+  type HeldBy,
+} from './copy-order.ts';
 import {
   COPIES_KEY,
   copyOf,
@@ -36,6 +45,10 @@ import {
   markRestored,
   MAX_RESTORED,
   RESTORED_KEY,
+  RESTORED_STEP_KEY,
+  RESTORED_START_KEY,
+  restoredPlaceOf,
+  type RestoredPlace,
   restoredOf,
   rootOf,
 } from './text-identity.ts';
@@ -59,9 +72,9 @@ function shownCopies(
   shows: (part: string, key: string) => boolean,
   memo: Map<string, Y.ID>,
   skip: ReadonlySet<string> = new Set()
-): Map<string, Char> | null {
+): Map<string, Char[]> | null {
   const doc = room.doc;
-  const shown = new Map<string, Char>();
+  const shown = new Map<string, Char[]>();
   let read = 0;
   for (const [key, part] of doc.getMap(COPIES_KEY).entries()) {
     if (typeof part !== 'string' || !parts.has(part) || !shows(part, key)) continue;
@@ -76,7 +89,11 @@ function shownCopies(
         if (skip.has(own)) continue;
         const root = rootOf(doc, Y.createID(it.id.client, it.id.clock + j), memo);
         const id = idKey(root.client, root.clock);
-        if (id !== own && !shown.has(id)) shown.set(id, { text, item: it, j });
+        if (id !== own) {
+          const chars = shown.get(id) ?? [];
+          chars.push({ text, item: it, j });
+          shown.set(id, chars);
+        }
       }
     }
   }
@@ -121,7 +138,8 @@ interface Restored extends Char {
 export function repairRestored(
   room: Room,
   deletions: IdSet,
-  shows: (part: string, key: string) => boolean
+  shows: (part: string, key: string) => boolean,
+  view: RepairView
 ): boolean {
   const doc = room.doc;
   // Each character put back: the new item and offset, and the identity of the old character.
@@ -143,7 +161,7 @@ export function repairRestored(
       restored.push({ text, item: now, j, root, char: charOf(now, j) });
     }
   });
-  return !over && repairChars(room, restored, shows, memo, () => true);
+  return !over && repairChars(room, restored, shows, memo, () => true, view);
 }
 
 /**
@@ -157,7 +175,8 @@ function repairChars(
   restored: readonly Restored[],
   shows: (part: string, key: string) => boolean,
   memo: Map<string, Y.ID>,
-  mayMove: (r: Restored) => boolean
+  mayMove: (r: Restored) => boolean,
+  view: RepairView
 ): boolean {
   const doc = room.doc;
   if (restored.length === 0) return false;
@@ -181,7 +200,7 @@ function repairChars(
         const id = Y.createID(item.id.client, item.id.clock + j);
         if (isRestored.has(idKey(id.client, id.clock))) continue;
         const root = rootOf(doc, id, memo);
-        const copy = shown.get(idKey(root.client, root.clock));
+        const copy = shown.get(idKey(root.client, root.clock))?.[0];
         if (copy && copy.text !== r.text) return copy;
         if (!item.deleted) return null;
       }
@@ -193,11 +212,37 @@ function repairChars(
   // Decide every character before writing, so each decision reads the text as the undo left it.
   const drop: Restored[] = [];
   const moves: { to: Char; chars: Restored[] }[] = [];
+  const orders = new Map([...parts].map((part) => [part, copyOrder(doc, placesOf(view, part))]));
+  const copyDrops: Char[] = [];
   for (const r of restored) {
-    const copy = shown.get(idKey(r.root.client, r.root.clock));
-    if (copy && copy.text !== r.text) {
-      drop.push(r);
-      continue;
+    const copies = (shown.get(idKey(r.root.client, r.root.clock)) ?? []).filter(
+      (c) => c.text !== r.text
+    );
+    if (copies.length > 0) {
+      const held: HeldBy[] = copies.flatMap((c) => {
+        const key = keyOfText(room, c.text);
+        const copy = copyOf(c.text.parent);
+        return key && copy ? [{ key, copy }] : [];
+      });
+      const start = restoredStart(
+        r.item,
+        r.j,
+        (id) => isRestored.has(idKey(id.client, id.clock)) || restoredOf(doc, id) !== null
+      );
+      const order = orders.get(partOfText(room, r.text)!);
+      if (order && restoredKeeps(room, order, r.text, start, held, memo, idOf(r)))
+        copyDrops.push(...copies);
+      else {
+        const places = placesOf(view, partOfText(room, r.text)!);
+        for (const copy of held) {
+          const run = places.get(copy.key)?.run;
+          const record = run ? room.nodes.get(run) : undefined;
+          if (record instanceof Y.Map && record.get(LINEAGE.copyWinner) !== true)
+            record.set(LINEAGE.copyWinner, true);
+        }
+        drop.push(r);
+        continue;
+      }
     }
     const to = mayMove(r) ? anchorOf(r) : null;
     if (!to) continue;
@@ -205,7 +250,7 @@ function repairChars(
     if (last && last.to.item === to.item && last.to.j === to.j) last.chars.push(r);
     else moves.push({ to, chars: [r] });
   }
-  if (drop.length === 0 && moves.length === 0) return false;
+  if (drop.length === 0 && moves.length === 0 && copyDrops.length === 0) return false;
   // Write the moved text after its anchor, then delete what was put back, last first.
   const spans: number[] = [];
   for (const { to, chars } of moves) {
@@ -215,12 +260,19 @@ function repairChars(
     if (value.length === 0) continue;
     const clock = Y.getState(doc.store, doc.clientID);
     to.text.insert(at + 1, value);
-    chars.forEach((c, k) => spans.push(clock + k, c.root.client, c.root.clock, 1));
+    chars.forEach((c, k) => {
+      spans.push(clock + k, c.root.client, c.root.clock, 1);
+      for (const name of [RESTORED_STEP_KEY, RESTORED_START_KEY]) {
+        const map = doc.getMap(name);
+        const value = map.get(key(c));
+        if (value !== undefined) map.set(idKey(doc.clientID, clock + k), value);
+      }
+    });
     drop.push(...chars);
   }
   markRestored(doc, spans);
   const byText = new Map<Y.Text, Set<string>>();
-  for (const r of drop) {
+  for (const r of [...drop, ...copyDrops]) {
     const ids = byText.get(r.text);
     if (ids) ids.add(key(r));
     else byText.set(r.text, new Set([key(r)]));
@@ -238,13 +290,16 @@ function repairChars(
  */
 export function noteRestored(
   room: Room,
-  deletions: IdSet
+  deletions: IdSet,
+  moved?: ReadonlySet<string> | null,
+  starts?: ReadonlyMap<string, RestoredPlace>
 ): { roots: Set<string>; texts: Set<Y.Text> } {
   const doc = room.doc;
   const spans: number[] = [];
   const roots = new Set<string>();
   const texts = new Set<Y.Text>();
   const copyMemo = new Map<string, Y.ID>();
+  const seen = [...Y.decodeStateVector(Y.encodeStateVector(doc))].flatMap(([c, n]) => [c, n]);
   let count = 0;
   forEachItem(doc, deletions, (old) => {
     if (!old.countable || !(old.parent instanceof Y.Text) || old.redone === null) return;
@@ -267,6 +322,31 @@ export function noteRestored(
       const root = rootOf(doc, target, copyMemo, false);
       roots.add(idKey(root.client, root.clock));
       const clock = redone.clock + j;
+      const identity = rootOf(doc, target);
+      const start =
+        starts?.get(idKey(identity.client, identity.clock)) ??
+        restoredPlaceOf(doc, Y.createID(old.id.client, old.id.clock + j));
+      if (start)
+        doc
+          .getMap(RESTORED_START_KEY)
+          .set(idKey(doc.clientID, clock), [
+            start.start.client,
+            start.start.clock,
+            start.enter,
+            start.client,
+            start.key,
+          ]);
+      if (moved) {
+        const identity = rootOf(doc, target);
+        doc
+          .getMap(RESTORED_STEP_KEY)
+          .set(idKey(doc.clientID, clock), [
+            old.id.client,
+            old.id.clock + j,
+            moved.has(idKey(identity.client, identity.clock)),
+            seen,
+          ]);
+      }
       const n = spans.length;
       const joins =
         n > 0 &&
@@ -338,20 +418,16 @@ const stays = (a: Y.ID, b: Y.ID): boolean =>
   a.client < b.client || (a.client === b.client && a.clock > b.clock);
 
 /**
- * Characters put back twice. Two peers that each undid their own delete of one character put
- * it back as two new characters: in one text, or in two (one peer's undo of an Enter puts the
- * character back in the run the Enter cut, and another peer's undo of a delete puts it back in
- * the Enter's copy); and a character an undo put back while a peer's Enter or format copied the
- * same character elsewhere shows in both places. Of the characters put back that stand for one
- * root, the one with the smallest id stays: of all the texts of the parts of `texts` that the
- * read shows (`shows`), and of each text that it does not show alone. None stays where a shown
- * copy holds the root: the copy is where the peer moved the text. Every replica decides alike,
- * so the deletes agree. Call inside a transaction; returns whether it wrote anything.
+ * Keep one restored character per identity across shown texts, or within each hidden text.
+ * Explicit deletion restores precede move restores. Split provenance resolves different places;
+ * otherwise the smaller client and its latest character survive. Copies use the same ordering.
+ * Call inside a transaction. Returns whether the repair writes anything.
  */
 export function dropRestoredTwins(
   room: Room,
   texts: Iterable<Y.Text>,
-  shows: (part: string, key: string) => boolean
+  shows: (part: string, key: string) => boolean,
+  view: RepairView
 ): boolean {
   const doc = room.doc;
   const memo = new Map<string, Y.ID>();
@@ -367,6 +443,26 @@ export function dropRestoredTwins(
   const list = new Set(restoredTextsOf(room, parts));
   for (const text of given) list.add(text);
   // The character that stays for each root (of a hidden text: for each text and root).
+  const orders = new Map([...parts].map((part) => [part, copyOrder(doc, placesOf(view, part))]));
+  const ahead = (a: Y.ID, b: Y.ID, part: string): boolean => {
+    const aStep = doc.getMap(RESTORED_STEP_KEY).get(idKey(a.client, a.clock));
+    const bStep = doc.getMap(RESTORED_STEP_KEY).get(idKey(b.client, b.clock));
+    if (Array.isArray(aStep) && Array.isArray(bStep) && aStep[2] !== bStep[2])
+      return aStep[2] === false;
+    const x = restoredPlaceOf(doc, a);
+    const y = restoredPlaceOf(doc, b);
+    if (x && y && x.key !== y.key) {
+      const contender = (p: RestoredPlace) => ({
+        key: p.key,
+        from: p.start,
+        start: rootOf(doc, p.start, memo),
+        enter: p.enter,
+        client: p.client,
+      });
+      return orders.get(part)!.ahead(contender(x), contender(y));
+    }
+    return stays(a, b);
+  };
   const keep = new Map<string, { id: Y.ID; text: Y.Text }>();
   const drop = new Map<Y.Text, Set<string>>();
   const dropOne = (text: Y.Text, id: Y.ID): void => {
@@ -389,7 +485,7 @@ export function dropRestoredTwins(
         const r = scope + idKey(root.client, root.clock);
         const kept = keep.get(r);
         if (!kept) keep.set(r, { id, text });
-        else if (stays(id, kept.id)) {
+        else if (ahead(id, kept.id, part)) {
           dropOne(kept.text, kept.id);
           keep.set(r, { id, text });
         } else dropOne(text, id);
@@ -406,6 +502,6 @@ export function dropRestoredTwins(
     survivors.push({ text, item, j, root: rootOf(doc, id, memo), char: charOf(item, j) });
   }
   const client = doc.clientID;
-  const moved = repairChars(room, survivors, shows, memo, (r) => r.item.id.client === client);
+  const moved = repairChars(room, survivors, shows, memo, (r) => r.item.id.client === client, view);
   return moved || drop.size > 0;
 }

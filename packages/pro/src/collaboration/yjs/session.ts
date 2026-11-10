@@ -20,6 +20,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // it was made, and `historySelection()` returns it.
 
 import * as Y from 'yjs';
+import { hasCompatibleVersions, writeCollaborationVersions } from './format.ts';
+import { rememberListings } from './undo-listings-history.ts';
+import { copySourcesReady } from './copy-events.ts';
 import {
   createCollaborationStatusTracker,
   type CollaborationDocumentPort,
@@ -53,7 +56,6 @@ import {
   LOCAL_ORIGIN,
   REDO_REPAIR_ORIGIN,
   REPAIR_ORIGIN,
-  SCHEMA_VERSION,
   SEED_ORIGIN,
   TEXT_REPAIR_ORIGIN,
   TIDY_ORIGIN,
@@ -61,7 +63,8 @@ import {
   roomOf,
 } from './schema.ts';
 import { RESTORED_KEY, followsIn } from './text-identity.ts';
-import { repairCopies, repairFollows } from './text-repair.ts';
+import { placePeerPieces } from './piece-place.ts';
+import { repairDeletedCopies, repairCopies, repairFollows } from './text-repair.ts';
 import { nodeRecordDeleteFilter } from './undo-delete-filter.ts';
 import {
   carryFollowed,
@@ -83,6 +86,8 @@ import {
   liveInserted,
   liveRoots,
   movedRoots,
+  includeCopiedTyping,
+  movedStarts,
 } from './undo-moves.ts';
 import { withoutLoserRestores, withoutTakenRedo } from './undo-splits.ts';
 import { forgetUndoneListings, noteUndoneListings, unlistEmptied } from './undo-unlisted.ts';
@@ -273,9 +278,11 @@ export function createYjsCollaborationSession(
     // Yjs skips each item it cannot apply and takes the next one in the same call, so the item
     // it applied (`popped`) can differ from the one on top before the call, and none may apply.
     const top = stack[stack.length - 1]!;
+    if (undo) includeCopiedTyping(room, top);
     // The text the step moves back, and which of it a character still holds (`undo-moves.ts`),
     // read before the rules below take items out of the step.
     const moved = movedRoots(room, (top as unknown as StepRanges).insertions);
+    const starts = movedStarts(room, (top as unknown as StepRanges).insertions);
     // Yjs can apply the step below the top in its place (see below): read its moves too.
     const below = undo && stack.length > 1 ? stack[stack.length - 2]! : null;
     const movedBelow = below ? movedRoots(room, (below as unknown as StepRanges).insertions) : null;
@@ -307,11 +314,39 @@ export function createYjsCollaborationSession(
       const kept = withoutTakenRedo(room, top);
       top.insertions = kept.insertions;
       top.deletions = kept.deletions;
+      noteUndoneListings(room, top, (write) => doc.transact(write, UNDONE_ORIGIN), new Set(), true);
     }
     const listed = [...stack];
     popped = null;
-    if (undo) manager.undo();
-    else manager.redo();
+    const applyStep = (direction: boolean): void => {
+      const items = direction ? manager.undoStack : manager.redoStack;
+      const expected = items[items.length - 1];
+      const moving =
+        expected === top ? moved : expected ? movedRoots(room, expected.insertions) : null;
+      const placing =
+        expected === top ? starts : expected ? movedStarts(room, expected.insertions) : undefined;
+      // Restore identities travel in the same update as the restored characters.
+      try {
+        doc.transact(() => {
+          const applied = direction ? manager.undo() : manager.redo();
+          manager.undoing = direction;
+          manager.redoing = !direction;
+          manager.currStackItem = applied;
+          if (applied)
+            noteRestored(
+              room,
+              applied.deletions,
+              applied === expected ? moving : movedBelow,
+              applied === expected ? placing : undefined
+            );
+        }, manager);
+      } finally {
+        manager.undoing = false;
+        manager.redoing = false;
+        manager.currStackItem = null;
+      }
+    };
+    applyStep(undo);
     if (!undo && popped === top)
       forgetUndoneListings(room, top, (write) => doc.transact(write, UNDONE_ORIGIN));
     const applied = popped as { meta: Map<string, unknown> } | null;
@@ -338,7 +373,7 @@ export function createYjsCollaborationSession(
           TEXT_REPAIR_ORIGIN
         );
       popped = null;
-      manager.redo();
+      applyStep(false);
       compensated = popped;
       skippedTop = true;
     } else if (!undo && applied === top) {
@@ -349,7 +384,7 @@ export function createYjsCollaborationSession(
       // skipped steps go back onto the redo stack, and the top step comes back by its repair.
       if (applied) {
         popped = null;
-        manager.undo();
+        applyStep(true);
         compensated = popped;
       }
       for (const item of skipped.slice(1).reverse()) manager.redoStack.push(item);
@@ -366,22 +401,28 @@ export function createYjsCollaborationSession(
       doc.transact(() => noteRestored(room, ranges.deletions), UNDONE_ORIGIN);
     }
     const done = applied && !skippedTop && (undo || applied === top) ? applied : null;
-    if (done && mirror) {
+    if (done && mirror && attachedPort) {
       const reading = mirror;
       const ranges = done as unknown as StepRanges;
       const shows = (part: string, key: string) => reading.idOf(part, key) !== undefined;
+      const view = { keyOf: reading.keyOf.bind(reading), package: attachedPort.package() };
       let roots: ReadonlySet<string> = new Set();
       // Moved text that a peer deleted before the step stays deleted. The delete is not part of
       // the step: a later redo or undo reads it as the peer's (`withoutTakenRedo`).
       if (done === top && moved && alive)
         doc.transact(() => dropDeadMoves(room, ranges.deletions, moved, alive), TEXT_REPAIR_ORIGIN);
       stepRepair(manager, undo, () => {
-        const restored = noteRestored(room, ranges.deletions);
+        const restored = noteRestored(
+          room,
+          ranges.deletions,
+          done === top ? moved : movedBelow,
+          done === top ? starts : undefined
+        );
         roots = restored.roots;
         if (undo) unlistEmptied(room, ranges, shows);
-        repairRestored(room, ranges.deletions, shows);
+        repairRestored(room, ranges.deletions, shows, view);
         // A peer that put back the same characters before shows them once.
-        dropRestoredTwins(room, restored.texts, shows);
+        dropRestoredTwins(room, restored.texts, shows, view);
       });
       // This replica's delete of a character the step put back no longer reaches its copies,
       // and its delete of a character the step deleted reaches a peer's copy made at once.
@@ -457,7 +498,7 @@ export function createYjsCollaborationSession(
       detachCurrent?.();
       setStatus('initializing');
       const schema = room.meta.get('schema');
-      if (schema !== undefined && schema !== SCHEMA_VERSION) {
+      if (room.meta.size > 0 && !hasCompatibleVersions(room.meta)) {
         setStatus('error', 'schema-version-mismatch', `room schema ${String(schema)}`);
         return () => {};
       }
@@ -502,7 +543,7 @@ export function createYjsCollaborationSession(
       if (attachedMirror.seeded) applyRemote(attachedMirror.allParts(port.package()), true);
       else
         doc.transact(() => {
-          room.meta.set('schema', SCHEMA_VERSION);
+          writeCollaborationVersions(room.meta);
           room.meta.set('documentId', documentId);
           attachedMirror.seed(port.package());
         }, SEED_ORIGIN);
@@ -526,6 +567,7 @@ export function createYjsCollaborationSession(
         return rec instanceof Y.Map && rec.get(F.attrs) === map;
       };
       const noteWrites = (event: StackEvent): void => {
+        rememberListings(room, event.stackItem as typeof event.stackItem & StepRanges);
         // An item that undo or redo pushes gets the record of the step it reverts.
         const current = undoManager.currStackItem as { meta: Map<string, unknown> } | null;
         if ((undoManager.undoing || undoManager.redoing) && current) {
@@ -559,7 +601,11 @@ export function createYjsCollaborationSession(
             () => attachedMirror.dropHiddenListings(tx.parts, tx.before, tx.after),
             TIDY_ORIGIN
           );
-        doc.transact(() => attachedMirror.writeChange(tx.before, tx.after, tx.parts), LOCAL_ORIGIN);
+        doc.transact(
+          () =>
+            attachedMirror.writeChange(tx.before, tx.after, tx.parts, tx.label === 'changeCase'),
+          LOCAL_ORIGIN
+        );
         // A node shown only for a peer's content leaves when this edit took that content.
         const again = attachedMirror.showingUnlisted(tx.parts);
         if (again.length > 0) applyRemote(again, false);
@@ -589,9 +635,24 @@ export function createYjsCollaborationSession(
       // A peer's split that moved text this replica edited at the same time: the replica that
       // typed or deleted that text writes the repair (`text-repair.ts`). Text it moves keeps its
       // place in this replica's history, so its undo still removes it.
+      const pendingCopies = new Map<string, Set<string>>();
+      const pendingStructure = new Map<string, Set<string>>();
       const repairText = (transaction: Y.Transaction, fresh: Map<string, string[]>): void => {
         const deleted = attachedMirror.deletedText;
-        const follows = deleted.size > 0 ? followsIn(room, transaction) : new Set<string>();
+        const newCopies = attachedMirror.newCopies(transaction, false);
+        for (const [part, keys] of pendingCopies)
+          fresh.set(part, [...new Set([...(fresh.get(part) ?? []), ...keys])]);
+        for (const [part, keys] of pendingStructure)
+          newCopies.set(part, [...new Set([...(newCopies.get(part) ?? []), ...keys])]);
+        const follows = followsIn(room, transaction);
+        for (const key of follows) {
+          const rec = room.nodes.get(key);
+          const part = rec instanceof Y.Map ? rec.get(F.part) : undefined;
+          if (typeof part !== 'string') continue;
+          const keys = fresh.get(part) ?? [];
+          if (!keys.includes(key)) keys.push(key);
+          fresh.set(part, keys);
+        }
         if (fresh.size === 0 && follows.size === 0) return;
         const view = {
           keyOf: attachedMirror.keyOf.bind(attachedMirror),
@@ -600,7 +661,15 @@ export function createYjsCollaborationSession(
         const moved: [Y.ID, Y.ID, number][] = [];
         const runs: FollowedRun[] = [];
         doc.transact(() => {
-          for (const [part, keys] of fresh)
+          for (const [part, keys] of fresh) {
+            if (!copySourcesReady(room, part)) {
+              repairDeletedCopies(room, part, keys, deleted);
+              pendingCopies.set(part, new Set(keys));
+              pendingStructure.set(part, new Set(newCopies.get(part) ?? []));
+              continue;
+            }
+            pendingCopies.delete(part);
+            pendingStructure.delete(part);
             repairCopies(
               room,
               part,
@@ -608,8 +677,10 @@ export function createYjsCollaborationSession(
               deleted,
               view,
               (from, to, length) => moved.push([from, to, length]),
-              (run) => runs.push(run)
+              (run) => runs.push(run),
+              new Set(newCopies.get(part) ?? [])
             );
+          }
           repairFollows(room, follows, deleted);
         }, TEXT_REPAIR_ORIGIN);
         // A peer's run that followed this replica's Enter goes back with an undo of the Enter.
@@ -630,7 +701,7 @@ export function createYjsCollaborationSession(
         // the room at the same time) refuses the room as attach does: this replica stops
         // applying the room and keeps its own presentation.
         const schema = room.meta.get('schema');
-        if (schema !== SCHEMA_VERSION && transaction.changed.has(room.meta as never)) {
+        if (!hasCompatibleVersions(room.meta) && transaction.changed.has(room.meta as never)) {
           detach();
           setStatus('error', 'schema-version-mismatch', `room schema ${String(schema)}`);
           return;
@@ -649,23 +720,36 @@ export function createYjsCollaborationSession(
         // `step`, and its own repair writes nothing that a repair would restore.
         if (touched.size > 0) applyRemote(touched, false, !transaction.local);
         if (transaction.local) return;
-        const fresh = attachedMirror.newCopies(transaction);
-        repairText(transaction, fresh);
-        // A character put back twice, by two peers' undos or beside a peer's copy of it, shows
-        // once (`dropRestoredTwins`): when the marks or the copy arrive.
         const marks = transaction.changed.get(restoredMarks);
         // A peer's undo of a split puts back text that this replica deleted at the same time.
         if (marks && attachedMirror.deletedText.size > 0)
           doc.transact(
-            () => dropDeletedRestores(room, marks, attachedMirror.deletedText),
+            () =>
+              dropDeletedRestores(
+                room,
+                marks,
+                attachedMirror.deletedText,
+                (id, source) => attachedMirror.noteRejected(id, source),
+                attachedMirror.deletedAt
+              ),
             TEXT_REPAIR_ORIGIN
           );
+        const fresh = attachedMirror.newCopies(transaction);
+        repairText(transaction, fresh);
+        // A peer's format pieces that Yjs listed after this replica's runs go after their run.
+        placePeerPieces(room, transaction, TEXT_REPAIR_ORIGIN);
+        // A character put back twice, by two peers' undos or beside a peer's copy of it, shows
+        // once (`dropRestoredTwins`): when the marks or the copy arrive.
         const texts = marks ? textsOfMarks(room, marks) : new Set<Y.Text>();
         if (fresh.size > 0 && room.doc.getMap(RESTORED_KEY).size > 0)
           for (const t of restoredTextsOf(room, new Set(fresh.keys()))) texts.add(t);
         if (texts.size > 0) {
           const shows = (part: string, key: string) => attachedMirror.idOf(part, key) !== undefined;
-          doc.transact(() => dropRestoredTwins(room, texts, shows), TEXT_REPAIR_ORIGIN);
+          const view = {
+            keyOf: attachedMirror.keyOf.bind(attachedMirror),
+            package: port.package(),
+          };
+          doc.transact(() => dropRestoredTwins(room, texts, shows, view), TEXT_REPAIR_ORIGIN);
         }
       };
       doc.on('afterTransaction', onTransaction);

@@ -17,6 +17,9 @@ import { ReviewPaneOptions } from '@pptx-editor.dev/core/editor';
 import * as Y from 'yjs';
 
 // @public
+export function assertCollaborationFormatCompatibility(version: unknown): void;
+
+// @public
 export interface AwarenessLike {
     readonly clientID: number;
     getStates(): Map<number, Record<string, unknown>>;

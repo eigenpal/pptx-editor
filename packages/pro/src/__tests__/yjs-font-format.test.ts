@@ -56,15 +56,22 @@ function link(a: Y.Doc, b: Y.Doc) {
   b.on('update', send(a));
   return {
     pause: () => (paused = true),
-    flush: () => {
+    flush: (reverse = false) => {
       paused = false;
-      for (const [to, update] of queue.splice(0)) Y.applyUpdate(to, update, 'link');
+      const updates = queue.splice(0);
+      if (reverse) updates.reverse();
+      for (const [to, update] of updates) {
+        Y.applyUpdate(to, update, 'link');
+        if (reverse) Y.applyUpdate(to, update, 'link');
+      }
     },
   };
 }
 
-async function replicas() {
+async function replicas(swap = false) {
   const docs = [new Y.Doc(), new Y.Doc()] as const;
+  docs[0].clientID = swap ? 202 : 101;
+  docs[1].clientID = swap ? 101 : 202;
   const sync = link(docs[0], docs[1]);
   const editors: PptxEditorInstance[] = [];
   for (const [i, doc] of docs.entries()) {
@@ -81,7 +88,7 @@ async function replicas() {
     expect((await editor.load(deck())).ok).toBe(true);
     editors.push(editor);
   }
-  return { a: editors[0]!, b: editors[1]!, sync };
+  return { a: editors[0]!, b: editors[1]!, sync, docs };
 }
 
 const fingerprint = (e: PptxEditorInstance) =>
@@ -325,10 +332,212 @@ describe('font formatting under collaboration', () => {
     converged(a, b);
     expect(texts(a).join('')).toBe('HELqLO WORLD');
   });
-  test.todo(
-    'two peers make the same case change at once: each letter once, not twice (older code: a concurrent replace of the same text)'
-  );
-  test.todo('a peer formats inside the run that holds this caret: the caret stays put (2.7)');
+  for (const swap of [false, true]) {
+    test(`concurrent case changes preserve text through both undo histories (${swap})`, async () => {
+      const { a, b, sync } = await replicas(swap);
+      try {
+        for (const e of [a, b]) e.setSelection({ kind: 'shapes', nodeIds: [shapeOf(e)!.id] });
+        sync.pause();
+        for (const e of [a, b]) expect(e.exec({ type: 'changeCase', case: 'upper' }).ok).toBe(true);
+        sync.flush(swap);
+        converged(a, b);
+        expect(texts(a).join('')).toBe('HELLO WORLD');
+        expect(a.exec({ type: 'undo' }).ok).toBe(true);
+        converged(a, b);
+        expect(texts(a).join('')).toBe('HELLO WORLD');
+        expect(b.exec({ type: 'undo' }).ok).toBe(true);
+        converged(a, b);
+        expect(texts(a).join('')).toBe('Hello world');
+        for (const e of [b, a]) {
+          expect(e.exec({ type: 'redo' }).ok).toBe(true);
+          converged(a, b);
+          expect(texts(a).join('')).toBe('HELLO WORLD');
+        }
+      } finally {
+        a.destroy();
+        b.destroy();
+      }
+    });
+    for (const concurrent of [false, true])
+      test(`case changes follow formatted copies and undo (${swap}, ${concurrent})`, async () => {
+        const { a, b, sync } = await replicas(swap);
+        try {
+          if (concurrent) sync.pause();
+          a.setSelection({ kind: 'shapes', nodeIds: [shapeOf(a)!.id] });
+          expect(a.exec({ type: 'changeCase', case: 'upper' }).ok).toBe(true);
+          select(b, 2, 4);
+          expect(b.exec({ type: 'toggleBold' }).ok).toBe(true);
+          sync.flush();
+          converged(a, b);
+          expect(texts(a).join('')).toBe('HELLO WORLD');
+          expect(a.exec({ type: 'undo' }).ok).toBe(true);
+          converged(a, b);
+          expect(texts(a).join('')).toBe('Hello world');
+          expect(a.exec({ type: 'redo' }).ok).toBe(true);
+          converged(a, b);
+          expect(texts(a).join('')).toBe('HELLO WORLD');
+          expect(b.exec({ type: 'undo' }).ok).toBe(true);
+          converged(a, b);
+          expect(texts(a).join('')).toBe('HELLO WORLD');
+        } finally {
+          a.destroy();
+          b.destroy();
+        }
+      });
+  }
+  test('concurrent Unicode case changes preserve complete characters and undo', async () => {
+    const { a, b, sync } = await replicas();
+    try {
+      select(a, 0, 11);
+      e2eType(a, '𐐨 café ß 😀');
+      sync.pause();
+      for (const e of [a, b]) {
+        e.setSelection({ kind: 'shapes', nodeIds: [shapeOf(e)!.id] });
+        expect(e.exec({ type: 'changeCase', case: 'upper' }).ok).toBe(true);
+      }
+      sync.flush(true);
+      converged(a, b);
+      expect(texts(a).join('')).toBe('𐐀 CAFÉ ß 😀');
+      for (const e of [a, b]) expect(e.exec({ type: 'undo' }).ok).toBe(true);
+      converged(a, b);
+      expect(texts(a).join('')).toBe('𐐨 café ß 😀');
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+  test('typing a differently cased replacement creates a new character identity', async () => {
+    const { a, b } = await replicas();
+    try {
+      select(a, 0);
+      e2eType(a, 'Č');
+      select(b, 0, 1);
+      e2eType(b, 'č');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      converged(a, b);
+      expect(texts(a).join('')).toBe('čHello world');
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+  for (const edit of ['paragraph', 'deleteBackward'] as const)
+    test(`case changes and concurrent ${edit} retain character identities`, async () => {
+      const { a, b, sync } = await replicas();
+      try {
+        sync.pause();
+        a.setSelection({ kind: 'shapes', nodeIds: [shapeOf(a)!.id] });
+        expect(a.exec({ type: 'changeCase', case: 'upper' }).ok).toBe(true);
+        select(b, 3, edit === 'paragraph' ? 3 : 5);
+        expect(b.input(edit).ok).toBe(true);
+        sync.flush(true);
+        converged(a, b);
+        expect(textOf(find(shapeOf(a)!, 'p:txBody'))).toBe(
+          edit === 'paragraph' ? 'HELLO WORLD' : 'HEL WORLD'
+        );
+        expect(a.exec({ type: 'undo' }).ok).toBe(true);
+        converged(a, b);
+        expect(textOf(find(shapeOf(a)!, 'p:txBody'))).toBe(
+          edit === 'paragraph' ? 'Hello world' : 'Hel world'
+        );
+        expect(b.exec({ type: 'undo' }).ok).toBe(true);
+        converged(a, b);
+        expect(textOf(find(shapeOf(a)!, 'p:txBody'))).toBe('Hello world');
+      } finally {
+        a.destroy();
+        b.destroy();
+      }
+    });
+  test('saved room updates preserve case choices on a fresh replica', async () => {
+    const { a, b, docs } = await replicas();
+    const restored = new Y.Doc();
+    const session = createYjsCollaborationSession({
+      doc: restored,
+      documentId: 'deck',
+      identity: { actorId: 'restored', name: 'Restored' },
+    });
+    const c = createPptxEditor({
+      fixedMeasurer: true,
+      substitutes: false,
+      modules: [collaborationModule({ session })],
+    });
+    try {
+      a.setSelection({ kind: 'shapes', nodeIds: [shapeOf(a)!.id] });
+      expect(a.exec({ type: 'changeCase', case: 'upper' }).ok).toBe(true);
+      select(b, 2, 4);
+      expect(b.exec({ type: 'toggleBold' }).ok).toBe(true);
+      Y.applyUpdate(restored, Y.encodeStateAsUpdate(docs[0]));
+      expect((await c.load(deck())).ok).toBe(true);
+      converged(a, c);
+      expect(texts(c).join('')).toBe('HELLO WORLD');
+      expect(a.exec({ type: 'undo' }).ok).toBe(true);
+      Y.applyUpdate(restored, Y.encodeStateAsUpdate(docs[0], Y.encodeStateVector(restored)));
+      converged(a, c);
+      expect(texts(c).join('')).toBe('Hello world');
+    } finally {
+      a.destroy();
+      b.destroy();
+      c.destroy();
+      session.destroy();
+      restored.destroy();
+    }
+  });
+  for (const offset of [0, 1, 2, 3, 4, 5, 8, 11])
+    test(`peer formatting preserves the caret at ${offset}`, async () => {
+      const { a, b } = await replicas();
+      try {
+        select(b, offset);
+        select(a, 2, 4);
+        expect(a.exec({ type: 'toggleBold' }).ok).toBe(true);
+        e2eType(b, '!');
+        converged(a, b);
+        expect(texts(a).join('')).toBe(
+          'Hello world'.slice(0, offset) + '!' + 'Hello world'.slice(offset)
+        );
+      } finally {
+        a.destroy();
+        b.destroy();
+      }
+    });
+  for (const [from, to] of [
+    [1, 4],
+    [4, 1],
+    [2, 5],
+    [5, 2],
+  ])
+    test(`peer formatting preserves selection ${from}..${to}`, async () => {
+      const { a, b } = await replicas();
+      try {
+        select(b, from!, to!);
+        select(a, 2, 4);
+        expect(a.exec({ type: 'toggleBold' }).ok).toBe(true);
+        e2eType(b, '!');
+        converged(a, b);
+        expect(texts(a).join('')).toBe(
+          'Hello world'.slice(0, Math.min(from!, to!)) +
+            '!' +
+            'Hello world'.slice(Math.max(from!, to!))
+        );
+      } finally {
+        a.destroy();
+        b.destroy();
+      }
+    });
+  test('peer formatting undo and redo preserve the caret', async () => {
+    const { a, b } = await replicas();
+    try {
+      select(b, 3);
+      select(a, 2, 4);
+      for (const type of ['toggleBold', 'undo', 'redo'] as const)
+        expect(a.exec({ type }).ok).toBe(true);
+      e2eType(b, '!');
+      converged(a, b);
+      expect(texts(a).join('')).toBe('Hel!lo world');
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
 });
 
 /** Type at the caret as the surface does. */

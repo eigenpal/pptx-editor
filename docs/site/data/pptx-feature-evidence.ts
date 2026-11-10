@@ -227,7 +227,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   // --- Comments & review -------------------------------------------------
   'review.comments': { fixtures: ['slide-structure', 'text-runs'] },
   // --- Collaboration & automation ----------------------------------------
-  'collaboration.realtime': { fixtures: ['text-runs'] },
+  'collaboration.realtime': { fixtures: ['text-runs', 'tables'] },
   'collaboration.automation-api': { fixtures: ['text-runs'] },
   // --- Export & print ----------------------------------------------------
   'export.images': { fixtures: [] },

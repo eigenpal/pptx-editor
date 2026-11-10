@@ -372,14 +372,14 @@ function planFrame(
     const cell = byKey.get(tc.id);
     const overCell = byKey.get(over.id);
     // A drawn cell with no text body (21.1.3.16 tc) takes the whole body of a covered cell
-    // whose every paragraph goes or is an empty merge holder. The next local write lists that
+    // whose every paragraph goes or holds no text. The next local write lists that
     // body in the drawn cell (`changed`), so a later split shows it once on every replica.
     let whole: ReplicaElementSpec | undefined;
     if (!to) {
       whole = plans.find(
         (p) =>
           p.going.length > 0 &&
-          p.kids.every((k) => !isA(k, 'p') || p.going.includes(k) || isHolder(room, k))
+          p.kids.every((k) => !isA(k, 'p') || p.going.includes(k) || !specHoldsText(k))
       )?.from;
       if (!whole || !cell || !overCell) continue;
       to = whole;
@@ -439,7 +439,7 @@ export function withMergedText(
   const bodyTo = new Map<string, ReplicaElementSpec>();
   for (const frame of frames)
     planFrame(room, cameBack, frame, into, left, leftOut, bodyTo, changed);
-  if (into.size === 0 && left.size === 0 && cameBack.size === 0) return spec;
+
   const walk = (s: ReplicaElementSpec, depth: number): ReplicaElementSpec => {
     let kids = left.get(s.key) ?? s.children ?? [];
     const extra = into.get(s.key);
@@ -449,8 +449,15 @@ export function withMergedText(
     if (body) kids = [body, ...kids];
     // Text the rescue put back shows in this text body: the empty paragraph that held its
     // place goes.
-    if (s.local === 'txBody' && kids.some((k) => isA(k, 'p') && cameBack.has(k.key)))
-      kids = kids.filter((k) => !isHolder(room, k));
+    if (s.local === 'txBody') {
+      const paragraphs = kids.filter((k) => isA(k, 'p'));
+      const lastHolder = paragraphs.some((k) => !isHolder(room, k)) ? undefined : paragraphs.at(-1);
+      kids = kids.filter((k) => {
+        if (!isHolder(room, k) || k === lastHolder) return true;
+        leftOut.add(k.key);
+        return false;
+      });
+    }
     const next =
       depth < MAX_DEPTH
         ? kids.map((c) => ('text' in c ? c : walk(c as ReplicaElementSpec, depth + 1)))

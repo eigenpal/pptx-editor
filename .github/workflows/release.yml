@@ -219,6 +219,9 @@ jobs:
         with:
           name: publish-dist
           path: packages
+      - name: Verify collaboration release baselines
+        if: ${{ needs.mode.outputs.mode == 'publish' }}
+        run: bun run collaboration:test
       - name: Release PR or publish
         id: changesets
         uses: changesets/action@v2

@@ -263,8 +263,8 @@ describe('two peers that format one run at once', () => {
     selectText(b, 11, 11);
     expect(b.input('text', '?').ok).toBe(true);
     sync.flush();
-    // Duplicated text is better than lost text: both edited pieces stay.
-    expect(converged(a, b)).toEqual(['Hello world!world?']);
+    // Each original character stays once. Both peers keep their typed punctuation.
+    expect(converged(a, b)).toEqual(['Hello world!?']);
   });
 
   test('a line break typed at the cut against a format of the word shows the word once', async () => {
@@ -294,8 +294,8 @@ describe('two peers that format one run at once', () => {
     selectText(b, 11, 11);
     expect(b.input('text', ' there').ok).toBe(true);
     sync.flush();
-    // Kept, never lost; the edited piece shows its word again (design.md, "Known gaps").
-    expect(converged(a, b)).toEqual(['XHello worldworld there']);
+    // The edited piece keeps its typed text and shares the original characters once.
+    expect(converged(a, b)).toEqual(['XHello world there']);
   });
 
   test('text the loser types after a line break at the cut, while a peer writes back, is kept', async () => {
@@ -311,8 +311,8 @@ describe('two peers that format one run at once', () => {
     selectText(b, 12, 12);
     expect(b.input('text', ' there').ok).toBe(true);
     sync.flush();
-    // Line breaks are not text here; the edited piece shows its word again (a known gap).
-    expect(converged(a, b)).toEqual(['XHello worldworld there']);
+    // Line breaks are not text here. The original word stays once.
+    expect(converged(a, b)).toEqual(['XHello world there']);
   });
 
   for (const swap of [false, true])
@@ -330,7 +330,7 @@ describe('two peers that format one run at once', () => {
       selectText(b, 11, 11);
       expect(b.input('text', '!!').ok).toBe(true);
       sync.flush();
-      expect(converged(a, b)).toEqual(['o worldworld!!']);
+      expect(converged(a, b)).toEqual(['o world!!']);
     });
 
   for (const swap of [false, true])
@@ -355,7 +355,7 @@ describe('two peers that format one run at once', () => {
         sync.flush();
         // The kept piece follows the winner's piece, so the word order stays. When b wins (client
         // order B, A), its edited piece is the one that shows.
-        const word = swap ? 'world there' : 'worldworld there';
+        const word = 'world there';
         expect(converged(a, b).join('|')).toBe(
           edit === 'join' ? `FirstHello ${word}` : `First|Hel|lo ${word}`
         );
@@ -504,7 +504,7 @@ describe('two peers that format one run at once', () => {
       selectIn(b, 1, 11, 11);
       expect(b.input('text', ' there').ok).toBe(true);
       sync.flush();
-      expect(converged(a, b)).toEqual([swap ? 'Firlo world there' : 'Firlo worldworld there']);
+      expect(converged(a, b)).toEqual(['Firlo world there']);
     });
 
   test('the loser types into its piece and takes it back: the replicas stay equal', async () => {
@@ -517,12 +517,12 @@ describe('two peers that format one run at once', () => {
     selectText(b, 11, 11);
     expect(b.input('text', '!!').ok).toBe(true);
     sync.flush();
-    expect(converged(a, b)).toEqual(['Hello worldworld!!']);
-    // An edit marks the piece for good, so taking the text back keeps it on both replicas.
+    expect(converged(a, b)).toEqual(['Hello world!!']);
+    // Taking back the typed punctuation keeps the original word once.
     const at = paragraphs(b)[0]!.length;
     selectText(b, at - 2, at);
     expect(b.input('deleteBackward').ok).toBe(true);
-    expect(converged(a, b)).toEqual(['Hello worldworld']);
+    expect(converged(a, b)).toEqual(['Hello world']);
   });
 
   test('a shown piece of the loser that a user then deletes stays deleted', async () => {
@@ -535,7 +535,7 @@ describe('two peers that format one run at once', () => {
     selectText(b, 11, 11);
     expect(b.input('text', '?').ok).toBe(true);
     sync.flush();
-    expect(converged(a, b)).toEqual(['Hello worldworld?']);
+    expect(converged(a, b)).toEqual(['Hello world?']);
     selectText(a, 11, 17);
     expect(a.input('deleteBackward').ok).toBe(true);
     expect(converged(a, b)).toEqual(['Hello world']);
@@ -628,9 +628,38 @@ describe('a merge while a peer deletes the row of the merged cell', () => {
       expect(converged(a, b)).toEqual(['B!']);
     });
 
-  // The rescued cell keeps `vMerge="1"` with no cell above it. Its reference PDF draws it and
-  // its text; the editor's cascade hides such a cell (older code).
-  test.todo('the rescued text in a cell that keeps vMerge="1" is in the layout');
+  for (const swap of [false, true])
+    test(`rescued text remains visible in an orphan vertically merged cell (${swap})`, async () => {
+      const { a, b, sync } = await replicas(tableDeck(), swap);
+      try {
+        sync.pause();
+        transact(a, mergeOps(a));
+        transact(b, [{ op: 'removeNode', part: slide1(b), node: firstRow(b).id }]);
+        sync.flush();
+        expect(converged(a, b)).toEqual(['B']);
+        for (const editor of [a, b]) {
+          const frame = editor
+            .session!.layout(0)!
+            .items.find((item) => item.element.kind === 'graphicFrame');
+          if (frame?.kind !== 'frame') throw new Error('Missing table');
+          const drawn = frame.table!.cells;
+          expect(drawn).toHaveLength(1);
+          expect(
+            drawn[0]!.text.lines.flatMap((line) => line.runs.map((run) => run.text)).join('')
+          ).toBe('B');
+          const cell = frame.element.table!.cells[0]!;
+          expect(cell.covered).toBe(false);
+          expect(
+            all(root(editor), 'tc')
+              .find((node) => node.id === cell.nodeId)
+              ?.attrs.some((attribute) => attribute.local === 'vMerge' && attribute.value === '1')
+          ).toBe(true);
+        }
+      } finally {
+        a.destroy();
+        b.destroy();
+      }
+    });
 
   test('a delete that saw the merge removes the merged text with the row', async () => {
     const { a, b } = await replicas(tableDeck());

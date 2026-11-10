@@ -1,4 +1,11 @@
 {
   "title": "Pro",
-  "pages": ["index", "comments", "review-styling", "drawing", "collaboration"]
+  "pages": [
+    "index",
+    "comments",
+    "review-styling",
+    "drawing",
+    "collaboration",
+    "collaboration-versions"
+  ]
 }

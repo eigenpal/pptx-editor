@@ -1,0 +1,99 @@
+---
+title: 'Collaboration versions'
+description: 'Check collaboration formats and migrate saved presentation rooms between releases.'
+category: 'Pro'
+---
+
+Check the collaboration format before your provider exchanges document updates. Authorize access to the presentation separately. Collaboration requires the EigenPal Pro License.
+
+Use the public format constant and admission check on both ends of your connection:
+
+```ts
+import {
+  COLLABORATION_FORMAT_VERSION,
+  assertCollaborationFormatCompatibility,
+} from '@pptx-editor.dev/pro';
+
+export function connectionMetadata() {
+  return { collaborationFormat: COLLABORATION_FORMAT_VERSION };
+}
+
+export function admitConnection(metadata: { collaborationFormat?: unknown }) {
+  try {
+    assertCollaborationFormatCompatibility(metadata.collaborationFormat);
+    return { accepted: true };
+  } catch {
+    return { accepted: false, reason: 'Use a compatible application version.' };
+  }
+}
+```
+
+Call `admitConnection()` after authorization and before synchronization starts. Reject the connection when it returns `accepted: false`. The check does not authenticate clients, validate document content, or migrate rooms.
+
+## Package versions and room formats
+
+A package version identifies a release. A collaboration format identifies compatible shared state and interpretation rules. Compare complete format strings for equality. Do not parse, order, hard-code, or override them in your application.
+
+The format has four internal version fields:
+
+| Field           | Changes when incompatible behavior affects       |
+| --------------- | ------------------------------------------------ |
+| Protocol        | Connection and update semantics                  |
+| Shared schema   | Shared nodes, character identities, and metadata |
+| Repair          | Deterministic conflict resolution and recovery   |
+| Canonical model | Document interpretation and canonical comparison |
+
+The format `pptx-collaboration:1.8.1.1` introduces separate fields. It replaces the legacy `pptx-collaboration-7` format. These formats cannot share a room. A breaking format change requires a minor or major package release and migration instructions.
+
+## Inspect a saved room
+
+Restore saved updates into a separate `Y.Doc` before inspection. Use this function with that restored document:
+
+```ts
+import type * as Y from 'yjs';
+import {
+  readCollaborationFormatVersion,
+  assertCollaborationFormatCompatibility,
+} from '@pptx-editor.dev/pro';
+
+export function checkSavedRoom(doc: Y.Doc): string {
+  const version = readCollaborationFormatVersion(doc);
+  assertCollaborationFormatCompatibility(version);
+  return version;
+}
+```
+
+Handle `CollaborationSchemaError` at your loading boundary. The `not-initialized` code means the document holds no room. The `schema-version-mismatch` code means the format is malformed or incompatible. Use a compatible deployment instead of reconnecting repeatedly.
+
+Inspection does not join, export, or change the room. It can return an incompatible legacy format. It does not validate the presentation content. Your application owns the temporary document and must call `doc.destroy()` after inspection.
+
+## Migrate a room
+
+1. Stop new edits and preserve a backup of the saved room updates.
+2. Open the room with the release that supports its format.
+3. Save the presentation as a PPTX file through that editor.
+4. Deploy compatible clients and servers together.
+5. Create a new room with a new room identifier and new persistence keys.
+6. Load the exported PPTX and let one participant seed the new room.
+7. Check the presentation and participant synchronization before reopening access.
+
+The PPTX transfers presentation content. It does not transfer Yjs update history, undo history, awareness, or offline edits. Never replay old updates into the new room. Reconcile offline changes separately before migration. Keep the original room intact until you verify the replacement. To roll back after new edits, export and reconcile those edits before restoring the old deployment.
+
+## Release baselines
+
+Release checks use isolated installations of published packages and immutable saved room fixtures. The checks verify package integrity, saved content, admission behavior, and migration through a compatible release. Equal formats also run mixed-client checks in both seed directions. Candidate clients run a three-participant convergence check with reordered incremental updates, duplicate delivery, reconnect, undo, and redo. These checks complement the collaboration fuzz tests.
+
+Baseline coverage starts at `0.3.1`. Earlier releases have no captured baseline in this catalog. Missing baseline evidence blocks subsequent stable publication.
+
+{/* collaboration-releases:start */}
+
+| Package release | Collaboration format   |
+| --------------- | ---------------------- |
+| `0.3.1`         | `pptx-collaboration-7` |
+
+{/* collaboration-releases:end */}
+
+## See also
+
+- [Configure collaboration](/docs/pro/collaboration)
+- [Load and save presentations](/docs/guides/loading-and-saving)

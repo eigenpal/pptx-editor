@@ -42,6 +42,7 @@ export {
 export { CollaborationSchemaError } from './collaboration/errors.ts';
 export {
   COLLABORATION_FORMAT_VERSION,
+  assertCollaborationFormatCompatibility,
   readCollaborationFormatVersion,
 } from './collaboration/yjs/format.ts';
 export { type AwarenessLike } from './collaboration/yjs/presence.ts';
