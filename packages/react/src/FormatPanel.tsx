@@ -76,7 +76,7 @@ export function FormatSection({ section }: FormatSectionProps) {
             {section.slots
               .filter((slot) => slot !== 'slide.background' || background.isAvailable)
               .map((slot) => (
-                <div className="pptx-format-control" key={slot}>
+                <div className="pptx-format-control" data-format-slot={slot} key={slot}>
                   {slot !== 'shape.lineWidth' ? (
                     <span className="pptx-format-control__label">
                       {t(chromeControlForSlot(slot)!.labelKey)}

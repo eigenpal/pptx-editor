@@ -315,6 +315,12 @@ The Format panel SHALL expose sections for the selected object's supported edits
 - **WHEN** several object types are selected
 - **THEN** Format does not offer a common property that silently edits only some selected objects
 
+#### Scenario: Customize the toolbar independently
+
+- **WHEN** a host hides or replaces a toolbar control
+- **THEN** the inspector retains its independently configured control
+- **AND** inspector control rows expose `data-format-slot` for scoped selectors
+
 ### Requirement: Partial gradient and effect editing
 
 Detailed gradient, shadow, and reflection edits SHALL preserve source XML for unspecified properties. Existing preset commands SHALL remain available for intentional replacement. Browser commands and server automation SHALL use the same partial operations.
@@ -324,6 +330,12 @@ Detailed gradient, shadow, and reflection edits SHALL preserve source XML for un
 - **WHEN** a user changes an existing stop's opacity
 - **THEN** its source color and unrelated transforms remain unchanged
 - **AND** other stops remain unchanged through save and reopen
+
+#### Scenario: Edit an inherited gradient stop
+
+- **WHEN** the first edit copies an inherited gradient into the slide
+- **THEN** the inspector retains the selected stop and field focus
+- **AND** subsequent edits and undo keep the same stop selected
 
 #### Scenario: Change a custom shadow
 
@@ -355,6 +367,13 @@ The default inspector SHALL put the selection's primary controls before secondar
 - **THEN** the Line section exposes exact width, dash, Start, and End controls
 - **AND** differing endpoint values display Mixed
 - **AND** changing an endpoint type preserves its dimensions and unknown content
+
+#### Scenario: Display an imported line width
+
+- **WHEN** an imported width has more than two decimal places in points
+- **THEN** the inspector displays a rounded value without changing the source
+- **AND** mixed-value comparisons use the exact resolved widths
+- **AND** the public geometry snapshot retains its visible-only, rounded width
 
 #### Scenario: Use a custom section order
 

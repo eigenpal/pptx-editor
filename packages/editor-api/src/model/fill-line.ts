@@ -18,6 +18,8 @@ import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
 import type { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
 import {
+  ARROWHEAD_STYLE,
+  type ShapeArrowheadStyle,
   DASH_STYLE,
   FILL_TYPE,
   LINE_STYLE,
@@ -132,16 +134,9 @@ const LINE_NAMES = [
   'transparency',
   'visible',
   'weight',
-  'startArrowhead',
-  'endArrowhead',
+  'beginArrowheadStyle',
+  'endArrowheadStyle',
 ] as const;
-
-function arrowhead(value: unknown, target: string): LineEndType {
-  const name = text(value, target);
-  if (!['none', 'triangle', 'arrow', 'stealth', 'oval', 'diamond'].includes(name))
-    failArgument(target, 'an arrowhead type');
-  return name as LineEndType;
-}
 
 /**
  * The outline of a shape, or a line.
@@ -157,19 +152,23 @@ export class ShapeLineFormat extends ModelObject {
     this.#shape = shape;
   }
 
-  /** The start arrowhead type. A write keeps its dimensions and extension content. */
-  get startArrowhead(): LineEndType {
-    return this.loadedProperty('startArrowhead');
+  /** SDK extension: the start arrowhead style. A write keeps its dimensions and extension content. */
+  get beginArrowheadStyle(): ShapeArrowheadStyle | `${ShapeArrowheadStyle}` {
+    return this.loadedProperty('beginArrowheadStyle');
   }
-  set startArrowhead(value: LineEndType) {
-    this.#write('startArrowhead', { head: arrowhead(value, this.at('startArrowhead')) });
+  set beginArrowheadStyle(value: ShapeArrowheadStyle | `${ShapeArrowheadStyle}`) {
+    this.#write('beginArrowheadStyle', {
+      head: ARROWHEAD_STYLE.toFile(value, this.at('beginArrowheadStyle')) as LineEndType,
+    });
   }
-  /** The end arrowhead type. `none` hides the arrowhead and keeps its dimensions. */
-  get endArrowhead(): LineEndType {
-    return this.loadedProperty('endArrowhead');
+  /** SDK extension: the end arrowhead style. `None` hides the arrowhead and keeps its dimensions. */
+  get endArrowheadStyle(): ShapeArrowheadStyle | `${ShapeArrowheadStyle}` {
+    return this.loadedProperty('endArrowheadStyle');
   }
-  set endArrowhead(value: LineEndType) {
-    this.#write('endArrowhead', { tail: arrowhead(value, this.at('endArrowhead')) });
+  set endArrowheadStyle(value: ShapeArrowheadStyle | `${ShapeArrowheadStyle}`) {
+    this.#write('endArrowheadStyle', {
+      tail: ARROWHEAD_STYLE.toFile(value, this.at('endArrowheadStyle')) as LineEndType,
+    });
   }
 
   /** The line color as `#RRGGBB`, or an empty string when it has none. */
@@ -229,8 +228,8 @@ export class ShapeLineFormat extends ModelObject {
       'line',
       (ref) => ({ op: 'readLine', shape: ref(shape) }),
       (v) => ({
-        startArrowhead: v.line.head ?? 'none',
-        endArrowhead: v.line.tail ?? 'none',
+        beginArrowheadStyle: ARROWHEAD_STYLE.fromFile(v.line.head ?? 'none') ?? 'None',
+        endArrowheadStyle: ARROWHEAD_STYLE.fromFile(v.line.tail ?? 'none') ?? 'None',
         color: v.line.color ?? '',
         dashStyle: DASH_STYLE.fromFile(v.line.dashStyle) ?? 'Solid',
         style: LINE_STYLE.fromFile(v.line.style) ?? 'Single',

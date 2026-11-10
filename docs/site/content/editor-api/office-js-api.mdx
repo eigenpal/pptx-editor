@@ -103,3 +103,6 @@ These members extend the Office.js shape:
 - `PptxEditor.createServer` and `PptxEditor.createBrowser` create a runtime.
 - `runtime.run`, `runtime.save`, `runtime.dispose`, and `runtime.capabilities` manage the runtime.
 - `PptxEditorError` and `isPptxEditorError` describe refusals, with `StaleDocument`, `RuntimeDisposed`, and the other codes on the [overview](/docs/editor-api).
+
+- `Shape.getFormat()` and `Shape.patchFormat()` read and patch detailed gradient and effect properties.
+- `ShapeLineFormat.beginArrowheadStyle`, `ShapeLineFormat.endArrowheadStyle`, and `ShapeArrowheadStyle` edit endpoint styles. They are SDK extensions, not members of the pinned Office.js reference.

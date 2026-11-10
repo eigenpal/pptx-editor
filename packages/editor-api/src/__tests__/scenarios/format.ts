@@ -38,11 +38,11 @@ async function endpointsRead(context: RequestContext): Promise<Json> {
   await context.sync();
   const shape = shapes.items.find((s) => s.name === 'Inspector line');
   check(shape, 'line exists');
-  shape.lineFormat.load('startArrowhead,endArrowhead,weight');
+  shape.lineFormat.load('beginArrowheadStyle,endArrowheadStyle,weight');
   await context.sync();
   return {
-    start: shape.lineFormat.startArrowhead,
-    end: shape.lineFormat.endArrowhead,
+    start: shape.lineFormat.beginArrowheadStyle,
+    end: shape.lineFormat.endArrowheadStyle,
     width: shape.lineFormat.weight,
   };
 }
@@ -58,8 +58,8 @@ export const FORMAT_SCENARIOS: readonly Scenario[] = [
         .getItemAt(0)
         .shapes.addLine('Straight', { left: 10, top: 20, width: 100, height: 20 });
       line.name = 'Inspector line';
-      line.lineFormat.startArrowhead = 'diamond';
-      line.lineFormat.endArrowhead = 'triangle';
+      line.lineFormat.beginArrowheadStyle = 'Open';
+      line.lineFormat.endArrowheadStyle = 'Triangle';
       line.lineFormat.weight = 3.125;
       await context.sync();
       return endpointsRead(context);

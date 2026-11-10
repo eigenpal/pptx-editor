@@ -86,6 +86,16 @@ export enum ShapeLineDashStyle {
   systemDashDot = 'SystemDashDot',
 }
 
+/** SDK extension for line endpoint styles. @public */
+export enum ShapeArrowheadStyle {
+  none = 'None',
+  triangle = 'Triangle',
+  open = 'Open',
+  stealth = 'Stealth',
+  oval = 'Oval',
+  diamond = 'Diamond',
+}
+
 /** @public */
 export enum ShapeLineStyle {
   single = 'Single',
@@ -564,6 +574,16 @@ export const DASH_STYLE = enumMap<`${ShapeLineDashStyle}`>(
   ],
   { writeOnly: [['SquareDot', 'sysDot']] }
 );
+
+/** SDK endpoint styles mapped to DrawingML `ST_LineEndType`. */
+export const ARROWHEAD_STYLE = enumMap<`${ShapeArrowheadStyle}`>([
+  ['None', 'none'],
+  ['Triangle', 'triangle'],
+  ['Open', 'arrow'],
+  ['Stealth', 'stealth'],
+  ['Oval', 'oval'],
+  ['Diamond', 'diamond'],
+]);
 
 /** `ST_CompoundLine` (ECMA-376 Part 1, 20.1.10.15). */
 export const LINE_STYLE = enumMap<`${ShapeLineStyle}`>([

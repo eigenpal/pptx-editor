@@ -72,14 +72,14 @@ import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
 export async function formatConnector(runtime: PptxEditorRuntime) {
   return runtime.run(async (context) => {
     const line = context.presentation.slides.getItemAt(0).shapes.getItemAt(0).lineFormat;
-    line.load(['weight', 'startArrowhead', 'endArrowhead']);
+    line.load(['weight', 'beginArrowheadStyle', 'endArrowheadStyle']);
     await context.sync();
     const previousWidth = line.weight;
 
     line.weight = 2.25;
     line.dashStyle = 'DashDot';
-    line.startArrowhead = 'diamond';
-    line.endArrowhead = 'triangle';
+    line.beginArrowheadStyle = 'Diamond';
+    line.endArrowheadStyle = 'Triangle';
     await context.sync();
     return previousWidth;
   });
@@ -88,7 +88,7 @@ export async function formatConnector(runtime: PptxEditorRuntime) {
 
 The first synchronization loads the values used by the example. The second batches independent property writes. Omit the first read when you do not need previous values. Keep line proxies inside `runtime.run()`. Handle rejected synchronizations with the runtime's [error handling](/docs/editor-api/runtime).
 
-`weight` uses points. `startArrowhead` and `endArrowhead` accept `none`, `triangle`, `arrow`, `stealth`, `oval`, or `diamond`. These endpoint properties extend the editing API. Changing an endpoint type preserves its imported dimensions and extension content. Setting one endpoint leaves the other unchanged. Use `none` to hide a marker.
+`weight` uses points. `beginArrowheadStyle` and `endArrowheadStyle` accept `None`, `Triangle`, `Open`, `Stealth`, `Oval`, or `Diamond`. These endpoint properties extend the editing API. Changing an endpoint type preserves its imported dimensions and extension content. Setting one endpoint leaves the other unchanged. Use `None` to hide a marker. `Open` maps to the DrawingML `arrow` value. These properties are SDK extensions, not members of the pinned Office.js reference.
 
 ## Edit gradient and effect properties
 

@@ -395,6 +395,10 @@ A section replacement owns its heading and disclosure behavior. Render `FormatSe
 
 Render `FormatPanel` directly inside your root when your layout does not need panel tabs. Keep the existing `panes.format` or `#format` replacement when you need the complete panel shell. See the [formatting section reference](/docs/customization/reference/layout#formatting-sections) for identifiers and reusable parts.
 
+Toolbar overrides apply only to that toolbar. Hiding or replacing a toolbar slot does not hide or replace its inspector control. Use `sections`, React `sectionContent`, or Vue section slots to customize the inspector independently.
+
+Inspector controls reuse the toolbar control components and their base CSS classes. A `data-slot` value identifies a control type, not a unique element. Scope toolbar selectors to `.pptx-toolbar`. Scope inspector selectors to `.pptx-format-panel`, or select a control row with `[data-format-slot="font.family"]`. Scope host CSS in the same way when you want different toolbar and inspector styles.
+
 ### Open the side panel from the toolbar
 
 The toolbar's **Selection pane**, **Format shape**, and **Edit chart…** controls call `requestPane(editor, pane)`. A mounted side panel turns to that tab and moves the focus to it. While no side panel is mounted and your host does not listen, the controls are disabled with the `disabled.noSidePanel` reason.

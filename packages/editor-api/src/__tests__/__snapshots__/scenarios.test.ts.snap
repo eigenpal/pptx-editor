@@ -3,14 +3,14 @@
 exports[`scenarios on the server runtime shapes.line-endpoint-types 1`] = `
 {
   "readBack": {
-    "end": "triangle",
-    "start": "diamond",
+    "end": "Triangle",
+    "start": "Open",
     "width": 3.13,
   },
   "status": "ok",
   "value": {
-    "end": "triangle",
-    "start": "diamond",
+    "end": "Triangle",
+    "start": "Open",
     "width": 3.13,
   },
 }

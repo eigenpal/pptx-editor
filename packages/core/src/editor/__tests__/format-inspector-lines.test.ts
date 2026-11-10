@@ -194,3 +194,28 @@ test('disclosures remember editor and category preferences without writing docum
   e.destroy();
   other.destroy();
 });
+
+test('public geometry keeps rounded visible widths while inspector compares exact resolved widths', async () => {
+  const files = unzipSync(deck());
+  files['ppt/slides/slide1.xml'] = strToU8(
+    strFromU8(files['ppt/slides/slide1.xml']!).replace('w="39687"', 'w="39688"')
+  );
+  const e = await open(zipSync(files));
+  const lines = ids(e).slice(0, 2);
+  for (const [index, id] of lines.entries()) {
+    e.setSelection({ kind: 'shapes', nodeIds: [id] });
+    expect(e.snapshot().geometry!.lineWidth).toBe(index === 0 ? 3.13 : 3.12);
+    expect(formatLineState(e)!.width).toBe((index === 0 ? 39688 : 39687) / 12700);
+  }
+  // Two values in the same display rounding bucket must still be mixed.
+  e.setSelection({ kind: 'shapes', nodeIds: [lines[0]!] });
+  expect(e.exec({ type: 'setLineWidth', points: 39686 / 12700 }).ok).toBe(true);
+  e.setSelection({ kind: 'shapes', nodeIds: lines });
+  expect(formatLineState(e)).toMatchObject({ width: null, widthMixed: true });
+  expect(formatControlMixed(e, 'shape.lineWidth')).toBe(true);
+  e.setSelection({ kind: 'shapes', nodeIds: [lines[0]!] });
+  expect(e.exec({ type: 'setLineColor', color: null }).ok).toBe(true);
+  expect(e.snapshot().geometry!.lineWidth).toBeUndefined();
+  expect(formatLineState(e)!.width).toBeNull();
+  e.destroy();
+});

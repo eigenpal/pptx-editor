@@ -1,3 +1,5 @@
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { buildPptx, shape } from '../../../scripts/fixtures/builder.ts';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { createElement } from 'react';
@@ -29,12 +31,51 @@ function choose(slide: number, name: string) {
 const field = (id: string) =>
   host.querySelector<HTMLInputElement>(`input[data-format-property="${id}"]`)!;
 
+function inheritedGradientDeck(): Uint8Array {
+  const gradient =
+    '<a:gradFill><a:gsLst>' +
+    [0, 50000, 100000]
+      .map((position) => `<a:gs pos="${position}"><a:schemeClr val="accent1"/></a:gs>`)
+      .join('') +
+    '</a:gsLst><a:lin ang="2700000"/></a:gradFill>';
+  const files = unzipSync(
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            name: 'Inherited',
+            x: 0,
+            y: 0,
+            cx: 914400,
+            cy: 914400,
+            fill: gradient,
+          }),
+        },
+      ],
+    })
+  );
+  const slide = strFromU8(files['ppt/slides/slide1.xml']!).replace(
+    '<p:nvPr></p:nvPr>',
+    '<p:nvPr><p:ph type="body" idx="4"/></p:nvPr>'
+  );
+  files['ppt/slideLayouts/slideLayout2.xml'] = strToU8(
+    slide.replace(/<p:sld\b/, '<p:sldLayout').replace('</p:sld>', '</p:sldLayout>')
+  );
+  files['ppt/slides/slide1.xml'] = strToU8(slide.replace(gradient, ''));
+  return zipSync(files);
+}
+
 for (const adapter of ['react', 'vue'] as const)
   describe(`${adapter} format inspector`, () => {
-    async function mount(custom = false) {
+    async function mount(custom = false, inherited = false) {
       editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
-      expect((await editor.load(buildShowcase())).ok).toBe(true);
-      choose(6, 'Three stops');
+      expect((await editor.load(inherited ? inheritedGradientDeck() : buildShowcase())).ok).toBe(
+        true
+      );
+      if (inherited) choose(0, 'Inherited');
+      else choose(6, 'Three stops');
       if (adapter === 'react') {
         host = render(
           createElement(
@@ -93,6 +134,75 @@ for (const adapter of ['react', 'vue'] as const)
         fireEvent.change(select, { target: { value: select.options[index]!.value } })
       );
     }
+    test('keeps an inherited stop selected through materialization, later edits, and undo', async () => {
+      await mount(false, true);
+      await selectStop(1);
+      const before = editor.shapeFormat();
+      if (!before.ok) throw new Error(before.reason);
+      const sourceId = before.format.gradient!.stops[1]!.id;
+      const editedField = field('gradient-stop.1.opacity');
+      editedField.focus();
+      const selectedIndex = () =>
+        host.querySelector<HTMLSelectElement>('[data-format-stop-select]')!.selectedIndex;
+      await input('gradient-stop.1.opacity', '65');
+      await update(() => fireEvent.keyDown(field('gradient-stop.1.opacity'), { key: 'Enter' }));
+      const local = editor.shapeFormat();
+      if (!local.ok) throw new Error(local.reason);
+      expect(local.format.gradient!.stops[1]!.id).not.toBe(sourceId);
+      expect(document.activeElement).toBe(editedField);
+      expect(field('gradient-stop.1.opacity')).toBe(editedField);
+      expect(selectedIndex()).toBe(1);
+      await input('gradient-stop.1.position', '60');
+      await update(() => fireEvent.keyDown(field('gradient-stop.1.position'), { key: 'Enter' }));
+      const edited = editor.shapeFormat();
+      expect(
+        edited.ok && edited.format.gradient!.stops.map((stop) => [stop.position, stop.opacity])
+      ).toEqual([
+        [0, 1],
+        [0.6, 0.65],
+        [1, 1],
+      ]);
+      await update(() => {
+        editor.exec({ type: 'undo' });
+      });
+      expect(selectedIndex()).toBe(1);
+      await update(() => {
+        editor.exec({ type: 'undo' });
+      });
+      expect(selectedIndex()).toBe(1);
+      expect(field('gradient-stop.1.opacity').value).toBe('100');
+      await input('gradient-stop.1.opacity', '80');
+      await update(() => fireEvent.keyDown(field('gradient-stop.1.opacity'), { key: 'Enter' }));
+      const rematerialized = editor.shapeFormat();
+      expect(
+        rematerialized.ok && rematerialized.format.gradient!.stops.map((stop) => stop.opacity)
+      ).toEqual([1, 0.8, 1]);
+      expect(selectedIndex()).toBe(1);
+    });
+    test('adds and removes inherited stops without changing the selected survivor', async () => {
+      await mount(false, true);
+      await selectStop(1);
+      await update(() => fireEvent.click(host.querySelector('[data-format-stop] > button')!));
+      const select = () => host.querySelector<HTMLSelectElement>('[data-format-stop-select]')!;
+      expect(select().options.length).toBe(2);
+      expect(select().selectedIndex).toBe(1);
+      await update(() => {
+        editor.exec({ type: 'undo' });
+      });
+      expect(select().selectedIndex).toBe(2);
+      const add = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Add'
+      )!;
+      await update(() => fireEvent.click(add));
+      expect(select().options.length).toBe(4);
+      expect(select().selectedIndex).toBe(2);
+      await input('gradient-stop.2.opacity', '40');
+      await update(() => fireEvent.keyDown(field('gradient-stop.2.opacity'), { key: 'Enter' }));
+      const result = editor.shapeFormat();
+      expect(result.ok && result.format.gradient!.stops.map((stop) => stop.opacity)).toEqual([
+        1, 1, 0.4, 1,
+      ]);
+    });
     test('edits gradient details and preserves theme stops through undo', async () => {
       await mount();
       expect(field('gradient.angle').value).toBe('45');
@@ -244,7 +354,7 @@ for (const adapter of ['react', 'vue'] as const)
       expect(host.textContent).toContain('greater than 0');
       await input('line.width', '0.125');
       await update(() => fireEvent.keyDown(field('line.width'), { key: 'Enter' }));
-      expect(Number(field('line.width').value)).toBe(Math.round(0.125 * 12700) / 12700);
+      expect(Number(field('line.width').value)).toBe(0.13);
       await input('geometry.width', '-1');
       await update(() => fireEvent.keyDown(field('geometry.width'), { key: 'Enter' }));
       expect(field('geometry.width').getAttribute('aria-invalid')).toBe('true');

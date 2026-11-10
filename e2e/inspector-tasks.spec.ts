@@ -92,6 +92,7 @@ test('inspector task: imported line width and independent arrow ends retain unre
   await width.fill('3.125');
   await width.press('Enter');
   await expect(width).toBeFocused();
+  await expect(width).toHaveValue('3.13');
   expect(connector(await xml(page, 8), 'Straight connector')).toBe(
     before.replace('w="28575"', 'w="39688"')
   );

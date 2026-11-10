@@ -216,3 +216,49 @@ export function gradientPreviewCss(
     })
     .join(', ')})`;
 }
+
+/** Keep stop selection across source cloning and undo. XML IDs are local to each part. @internal */
+export function createGradientStopIdentity() {
+  const versions = new Map<string, Map<string, string>>();
+  let previous = new Map<string, string>();
+  const resolve = (stops: GradientDetail['stops']) => {
+    const signature = JSON.stringify(stops.map((stop) => stop.id));
+    let identities = versions.get(signature);
+    if (!identities) {
+      identities = new Map(
+        stops.map((stop) => [stop.id, previous.get(stop.id) ?? `${signature}:${stop.id}`])
+      );
+      versions.set(signature, identities);
+    }
+    previous = identities;
+    return identities;
+  };
+  return {
+    identity(stops: GradientDetail['stops'], id: string) {
+      return resolve(stops).get(id) ?? id;
+    },
+    patched(
+      before: GradientDetail['stops'],
+      after: GradientDetail['stops'],
+      patch: Extract<ShapeFormatPatch, { kind: 'gradient' }>
+    ) {
+      const old = resolve(before);
+      const source = before.filter((stop) => stop.id !== patch.removeStop);
+      const copied = [...after];
+      if (patch.addStop) {
+        const index = source.findIndex((stop) => {
+          const position =
+            patch.stop?.id === stop.id ? (patch.stop.position ?? stop.position) : stop.position;
+          return position > patch.addStop!.position;
+        });
+        copied.splice(index < 0 ? source.length : index, 1);
+      }
+      if (source.length !== copied.length) return;
+      const signature = JSON.stringify(after.map((stop) => stop.id));
+      const next = new Map(after.map((stop) => [stop.id, `${signature}:${stop.id}`]));
+      source.forEach((stop, index) => next.set(copied[index]!.id, old.get(stop.id)!));
+      versions.set(signature, next);
+      previous = next;
+    },
+  };
+}

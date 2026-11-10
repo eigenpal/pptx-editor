@@ -45,6 +45,7 @@ export {
   ShapeFontUnderlineStyle,
   ShapeLineDashStyle,
   ShapeLineStyle,
+  ShapeArrowheadStyle,
   ShapeType,
   ShapeZOrder,
   SlideBackgroundFillType,

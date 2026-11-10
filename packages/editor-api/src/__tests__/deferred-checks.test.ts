@@ -24,8 +24,8 @@ const reference = JSON.parse(
 const EXTENSIONS: ReadonlySet<string> = new Set([
   'getFormat',
   'patchFormat',
-  'startArrowhead',
-  'endArrowhead',
+  'beginArrowheadStyle',
+  'endArrowheadStyle',
 ]);
 
 /** The members of `proto` and the classes above it that check their arguments at the sync. */

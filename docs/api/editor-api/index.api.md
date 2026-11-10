@@ -24,7 +24,6 @@ import { GradientDetail } from '@pptx-editor.dev/core/contracts';
 import { GradientStopDetail } from '@pptx-editor.dev/core/contracts';
 import { ImageRasterizer } from '@pptx-editor.dev/core/editor';
 import { LineEndType } from '@pptx-editor.dev/core/contracts';
-import { LineEndType as LineEndType_2 } from '@pptx-editor.dev/core/automation';
 import { ReflectionDetail } from '@pptx-editor.dev/core/contracts';
 import { ShadowDetail } from '@pptx-editor.dev/core/contracts';
 import { ShapeFormatPatch } from '@pptx-editor.dev/core/contracts';
@@ -1265,6 +1264,22 @@ export interface ShapeAddOptions {
     width?: number;
 }
 
+// @public
+export enum ShapeArrowheadStyle {
+    // (undocumented)
+    diamond = "Diamond",
+    // (undocumented)
+    none = "None",
+    // (undocumented)
+    open = "Open",
+    // (undocumented)
+    oval = "Oval",
+    // (undocumented)
+    stealth = "Stealth",
+    // (undocumented)
+    triangle = "Triangle"
+}
+
 // @public (undocumented)
 export enum ShapeAutoSize {
     // (undocumented)
@@ -1465,16 +1480,16 @@ export enum ShapeLineDashStyle {
 export class ShapeLineFormat extends ModelObject {
     // @internal
     constructor(context: RequestContext, path: ObjectPath, shape: ObjectPath);
+    get beginArrowheadStyle(): ShapeArrowheadStyle | `${ShapeArrowheadStyle}`;
+    set beginArrowheadStyle(value: ShapeArrowheadStyle | `${ShapeArrowheadStyle}`);
     get color(): string;
     set color(value: string);
     get dashStyle(): ShapeLineDashStyle | `${ShapeLineDashStyle}`;
     set dashStyle(value: ShapeLineDashStyle | `${ShapeLineDashStyle}`);
-    get endArrowhead(): LineEndType_2;
-    set endArrowhead(value: LineEndType_2);
+    get endArrowheadStyle(): ShapeArrowheadStyle | `${ShapeArrowheadStyle}`;
+    set endArrowheadStyle(value: ShapeArrowheadStyle | `${ShapeArrowheadStyle}`);
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
-    get startArrowhead(): LineEndType_2;
-    set startArrowhead(value: LineEndType_2);
     get style(): ShapeLineStyle | `${ShapeLineStyle}`;
     set style(value: ShapeLineStyle | `${ShapeLineStyle}`);
     get transparency(): number;

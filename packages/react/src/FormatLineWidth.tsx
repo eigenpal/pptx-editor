@@ -15,7 +15,7 @@ export function FormatLineWidth() {
       key={key}
       label={t('inspector.lineWidth')}
       property="line.width"
-      value={line.width === null ? null : String(line.width)}
+      value={line.width === null ? null : String(Math.round(line.width * 100) / 100)}
       unit="pt"
       min={0}
       exclusiveMin
@@ -25,6 +25,7 @@ export function FormatLineWidth() {
       onCommit={(points) => {
         if (!editor || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== key)
           return t('disabled.invalidValue');
+        if (points === line.width) return null;
         const result = editor.exec({ type: 'setLineWidth', points });
         return result.ok ? null : translateKeyOrText(t, result.reason);
       }}

@@ -88,7 +88,7 @@ export const FormatSection = defineComponent({
                 {section.slots
                   .filter((slot) => slot !== 'slide.background' || background.isAvailable.value)
                   .map((slot) => (
-                    <div class="pptx-format-control" key={slot}>
+                    <div class="pptx-format-control" data-format-slot={slot} key={slot}>
                       {slot !== 'shape.lineWidth' ? (
                         <span class="pptx-format-control__label">
                           {t(chromeControlForSlot(slot)!.labelKey)}

@@ -2,6 +2,7 @@
 import { useState, useRef, useLayoutEffect } from 'react';
 import {
   chromeControlForSlot,
+  createGradientStopIdentity,
   colorChoiceOf,
   colorPickOf,
   formatPropertyGroups,
@@ -24,6 +25,7 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
     offered?.options?.some((option) => option.value === 'reflection.tightTouching') === true;
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const stopIdentity = useRef(createGradientStopIdentity());
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const [focusStop, setFocusStop] = useState<number | null>(null);
   useLayoutEffect(() => {
@@ -47,13 +49,22 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
         {translateKeyOrText(t, detail.effectsReason)}
       </p>
     );
+  const identity = (id: string) => stopIdentity.current.identity(detail.gradient?.stops ?? [], id);
   const activeStop =
-    detail.gradient?.stops.find((stop) => stop.id === selectedStop) ?? detail.gradient?.stops[0];
+    detail.gradient?.stops.find(
+      (stop) => selectedStop !== null && identity(stop.id) === selectedStop
+    ) ?? detail.gradient?.stops[0];
   const key = `${editor?.session?.id}:${formatTargetKey(snapshot)}`;
   const apply = (patch: ShapeFormatPatch): string | null => {
     if (!editor || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== key)
       return t('disabled.invalidValue');
     const result = editor.exec({ type: 'patchShapeFormat', target: detail.target, patch });
+    if (result.ok && patch.kind === 'gradient') {
+      const next = editor.shapeFormat();
+      if (next.ok && next.format.gradient && detail.gradient) {
+        stopIdentity.current.patched(detail.gradient.stops, next.format.gradient.stops, patch);
+      }
+    }
     return result.ok ? null : translateKeyOrText(t, result.reason);
   };
   const disabled = snapshot.mode === 'view';
@@ -66,7 +77,7 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
         <FormatGradientPicker
           gradient={detail.gradient}
           selected={activeStop.id}
-          onSelect={setSelectedStop}
+          onSelect={(id) => setSelectedStop(identity(id))}
         />
       ) : null}
       {formatPropertyGroups(detail, section)
@@ -74,7 +85,7 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
         .map((group) => (
           <fieldset
             className="pptx-format-property-group"
-            key={group.id}
+            key={identity(group.id)}
             data-format-stop={group.index}
           >
             <legend>{t(group.labelKey, group.index ? { index: group.index } : undefined)}</legend>
@@ -128,7 +139,9 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
                   if (!refusal) {
                     const remaining = detail.gradient!.stops.filter((stop) => stop.id !== group.id);
                     setSelectedStop(
-                      remaining[Math.min((group.index ?? 1) - 1, remaining.length - 1)]!.id
+                      identity(
+                        remaining[Math.min((group.index ?? 1) - 1, remaining.length - 1)]!.id
+                      )
                     );
                     setFocusStop((group.index ?? 1) - 1);
                   }
@@ -157,8 +170,14 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
                 const next = editor!.shapeFormat();
                 if (next.ok)
                   setSelectedStop(
-                    next.format.gradient?.stops[index < 0 ? detail.gradient!.stops.length : index]
-                      ?.id ?? null
+                    next.format.gradient
+                      ? stopIdentity.current.identity(
+                          next.format.gradient.stops,
+                          next.format.gradient.stops[
+                            index < 0 ? detail.gradient!.stops.length : index
+                          ]!.id
+                        )
+                      : null
                   );
                 setFocusStop(0);
               }

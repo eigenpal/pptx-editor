@@ -1522,6 +1522,14 @@ export function createFontSource(bytes: Uint8Array, request: FontFaceRequest & {
 };
 
 // @internal
+export function createGradientStopIdentity(): {
+    identity(stops: GradientDetail["stops"], id: string): string;
+    patched(before: GradientDetail["stops"], after: GradientDetail["stops"], patch: Extract<ShapeFormatPatch, {
+        kind: "gradient";
+    }>): void;
+};
+
+// @internal
 export function createHyperlinkPopupController(editor: Editor, clipboard?: () => {
     writeText(text: string): Promise<void>;
 } | undefined): HyperlinkPopupController;

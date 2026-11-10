@@ -19,7 +19,7 @@ export const FormatLineWidth = defineComponent({
           key={key}
           label={t('inspector.lineWidth')}
           property="line.width"
-          value={line.width === null ? null : String(line.width)}
+          value={line.width === null ? null : String(Math.round(line.width * 100) / 100)}
           unit="pt"
           min={0}
           exclusiveMin
@@ -32,6 +32,7 @@ export const FormatLineWidth = defineComponent({
               `${editor.value.session?.id}:${formatTargetKey(editor.value.snapshot())}` !== key
             )
               return t('disabled.invalidValue');
+            if (points === line.width) return null;
             const result = editor.value.exec({ type: 'setLineWidth', points });
             return result.ok ? null : translateKeyOrText(t, result.reason);
           }}

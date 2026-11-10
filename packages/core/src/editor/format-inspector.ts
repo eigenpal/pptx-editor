@@ -1,5 +1,6 @@
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { geometryOf } from './selection-state.ts';
+import { itemById } from './surface.ts';
 import { currentSlideSummary } from './master-rail.ts';
 import type { Editor, EditorSnapshot, LineEndType, ShapeSummary } from '../contracts/index.ts';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
@@ -283,7 +284,16 @@ export function formatLineState(editor: Editor | null): FormatLineState | null {
     geometries.some((g) => !g || !['shape', 'connector', 'picture'].includes(g.kind))
   )
     return null;
-  const widths = geometries.map((g) => g!.lineWidth);
+  // Public geometry keeps its visible-only, rounded toolbar value. Read resolved lines
+  // independently so imported EMU precision and mixed widths survive the inspector.
+  const widths = geometries.map((g) => {
+    const element = layout && itemById(layout, g!.nodeId)?.element;
+    return element && 'line' in element
+      ? element.line
+        ? element.line.width / 12_700
+        : undefined
+      : g!.lineWidth;
+  });
   const heads = geometries.map((g) => g!.lineHead);
   const tails = geometries.map((g) => g!.lineTail);
   const mixed = (values: readonly unknown[]) => values.some((v) => v !== values[0]);
@@ -364,6 +374,7 @@ export function formatControlMixed(editor: PptxEditorInstance | null, slot: Chro
   if (!editor) return false;
   const snapshot = editor.snapshot();
   const font = snapshot.format?.font?.disagrees;
+  if (slot === 'shape.lineWidth') return formatLineState(editor)?.widthMixed === true;
   if (slot === 'font.family') return font?.fontFamily === true;
   if (slot === 'font.size') return font?.fontSizePt === true;
   if (slot === 'text.bold') return font?.bold === true;
@@ -380,8 +391,6 @@ export function formatControlMixed(editor: PptxEditorInstance | null, slot: Chro
           return [g.fill, g.gradient, g.pattern];
         case 'shape.lineColor':
           return g.lineColor;
-        case 'shape.lineWidth':
-          return g.lineWidth;
         case 'shape.lineStart':
           return g.lineHead;
         case 'shape.lineEnd':

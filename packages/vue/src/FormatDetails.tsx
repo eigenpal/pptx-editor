@@ -2,6 +2,7 @@
 import { defineComponent, ref, nextTick, type PropType } from 'vue';
 import {
   chromeControlForSlot,
+  createGradientStopIdentity,
   colorChoiceOf,
   colorPickOf,
   formatPropertyGroups,
@@ -23,6 +24,7 @@ export const FormatDetails = defineComponent({
     const snapshot = useEditorState((s) => s);
     const offered = useOfferedControl('shape.effects', chromeControlForSlot('shape.effects'));
     const root = ref<HTMLDivElement | null>(null);
+    const stopIdentity = createGradientStopIdentity();
     const selectedStop = ref<string | null>(null);
     const error = ref<string | null>(null);
     return () => {
@@ -43,9 +45,11 @@ export const FormatDetails = defineComponent({
             {translateKeyOrText(t, detail.effectsReason)}
           </p>
         );
+      const identity = (id: string) => stopIdentity.identity(detail.gradient?.stops ?? [], id);
       const activeStop =
-        detail.gradient?.stops.find((stop) => stop.id === selectedStop.value) ??
-        detail.gradient?.stops[0];
+        detail.gradient?.stops.find(
+          (stop) => selectedStop.value !== null && identity(stop.id) === selectedStop.value
+        ) ?? detail.gradient?.stops[0];
       const key = `${editor.value?.session?.id}:${formatTargetKey(snapshot.value)}`;
       const apply = (patch: ShapeFormatPatch): string | null => {
         if (
@@ -58,6 +62,12 @@ export const FormatDetails = defineComponent({
           target: detail.target,
           patch,
         });
+        if (result.ok && patch.kind === 'gradient') {
+          const next = editor.value.shapeFormat();
+          if (next.ok && next.format.gradient && detail.gradient) {
+            stopIdentity.patched(detail.gradient.stops, next.format.gradient.stops, patch);
+          }
+        }
         return result.ok ? null : translateKeyOrText(t, result.reason);
       };
       const disabled = snapshot.value.mode === 'view';
@@ -74,7 +84,7 @@ export const FormatDetails = defineComponent({
               gradient={detail.gradient}
               selected={activeStop.id}
               onSelect={(id) => {
-                selectedStop.value = id;
+                selectedStop.value = identity(id);
               }}
             />
           ) : null}
@@ -83,7 +93,7 @@ export const FormatDetails = defineComponent({
             .map((group) => (
               <fieldset
                 class="pptx-format-property-group"
-                key={group.id}
+                key={identity(group.id)}
                 data-format-stop={group.index}
               >
                 <legend>
@@ -139,8 +149,9 @@ export const FormatDetails = defineComponent({
                         const remaining = detail.gradient!.stops.filter(
                           (stop) => stop.id !== group.id
                         );
-                        selectedStop.value =
-                          remaining[Math.min((group.index ?? 1) - 1, remaining.length - 1)]!.id;
+                        selectedStop.value = identity(
+                          remaining[Math.min((group.index ?? 1) - 1, remaining.length - 1)]!.id
+                        );
                         void nextTick(() =>
                           root.value
                             ?.querySelector<HTMLElement>('[data-format-stop-select]')
@@ -170,10 +181,14 @@ export const FormatDetails = defineComponent({
                   if (!error.value) {
                     const next = editor.value!.shapeFormat();
                     if (next.ok)
-                      selectedStop.value =
-                        next.format.gradient?.stops[
-                          index < 0 ? detail.gradient!.stops.length : index
-                        ]?.id ?? null;
+                      selectedStop.value = next.format.gradient
+                        ? stopIdentity.identity(
+                            next.format.gradient.stops,
+                            next.format.gradient.stops[
+                              index < 0 ? detail.gradient!.stops.length : index
+                            ]!.id
+                          )
+                        : null;
                     void nextTick(() =>
                       root.value?.querySelector<HTMLElement>('[data-format-stop-select]')?.focus()
                     );
