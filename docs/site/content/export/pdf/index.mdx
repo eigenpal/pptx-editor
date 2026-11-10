@@ -25,6 +25,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
 const result = await exportPdf(await readFile('deck.pptx'), {
+  googleFonts: true,
   fidelityPolicy: 'best-effort',
 });
 await writeFile('deck.pdf', result.bytes);
@@ -34,6 +35,8 @@ for (const diagnostic of result.diagnostics) {
   }
 }
 ```
+
+`googleFonts: true` enables network font resolution, including Arabic and CJK fallbacks. Omit it for offline conversion with [supplied fonts](/docs/export/pdf/fonts).
 
 `best-effort` returns the PDF with diagnostics. Review those diagnostics before presenting the output as complete. The default policy is `strict`. It throws `PdfFidelityError` for any unsupported or approximate content. Information diagnostics, such as font substitution, do not block strict export.
 
@@ -48,9 +51,3 @@ Each exported slide produces one PDF page at the presentation’s slide size. Hi
 | Configure fonts and deployment assets      | [PDF fonts](/docs/export/pdf/fonts)               |
 | Check options, results, and errors         | [PDF API](/docs/export/pdf/api)                   |
 | Reuse a session or return an HTTP response | [PDF integrations](/docs/export/pdf/integrations) |
-
-## See also
-
-- [PDF fonts](/docs/export/pdf/fonts)
-- [PDF API](/docs/export/pdf/api)
-- [PPTX fidelity](/docs/pptx-fidelity)

@@ -103,7 +103,10 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
   if (layout.upright !== 'none' && hasCharacters(layout))
     p.diag.add('text.upright', 'approximation', 'Upright vertical characters are drawn rotated.');
   for (const line of layout.lines) {
-    for (const run of line.runs) {
+    const rtlOnly = line.runs.some((r) => r.rtl) && line.runs.every((r) => r.rtl || !r.text.trim());
+    // Emit visual order across font/style boundaries too, so readers infer word spaces.
+    const runs = rtlOnly ? [...line.runs].sort((a, b) => a.x[0] - b.x[0]) : line.runs;
+    for (const run of runs) {
       if (run.picture) {
         await drawBulletPicture(run, line.baseline, p);
         continue;
@@ -159,12 +162,22 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         p.push(setFillingRgbColor(...rgb(runColor)));
       } else p.push(setTextRenderingMode(TextRenderingMode.Clip));
       let shown = 0;
-      // Each character in its cell; a right-to-left run reads right to left (`runGlyphs`).
-      for (const { char: ch, x } of runGlyphs(run)) {
-        // The glyph the face's cmap gives, with no shaping: no ligatures, and the isolated form
-        // of an Arabic letter, in a cell measured from the joined form, so letters can overlap.
-        // The editor's SVG text shapes each right-to-left word as a whole.
-        const glyph = font.font.glyphForCodePoint(ch.codePointAt(0) ?? 0)?.id ?? 0;
+      const extra: { id: number; x: number; y: number; scaleX: number }[] = [];
+      const glyphs =
+        run.glyphs?.map((g) => ({ ...g, x: run.x[0] + g.x })) ??
+        [...runGlyphs(run)].map(({ char, x }) => ({
+          id: font.font.glyphForCodePoint(char.codePointAt(0) ?? 0)?.id ?? 0,
+          text: char,
+          x,
+          y: 0,
+          scaleX: 1,
+        }));
+      for (const { id: glyph, text: ch, x, y: dy, scaleX } of glyphs) {
+        if (rtlOnly && /^ +$/.test(ch)) continue;
+        if (ch === '') {
+          if (glyph > 0) extra.push({ id: glyph, x, y: y + dy, scaleX });
+          continue;
+        }
         if (glyph <= 0) {
           if (ch.trim() !== '')
             p.diag.add(
@@ -176,8 +189,11 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         }
         // Text space: y up again inside the flipped page, at the size layout measured.
         p.push(
-          setTextMatrix(size, 0, 0, -size, x, y),
-          showText(PDFHexString.of(font.encode(glyph, ch)))
+          setTextMatrix(size * scaleX, 0, 0, -size, x, y + dy),
+          showText(
+            // Readers reorder visual RTL text, including the characters inside one cluster.
+            PDFHexString.of(font.encode(glyph, run.rtl ? Array.from(ch).reverse().join('') : ch))
+          )
         );
         shown += 1;
       }
@@ -189,6 +205,22 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         gradientBox(gradient, bounds.w, bounds.h, p);
       }
       p.push(popGraphicsState());
+      // Marks without their own text use outlines, so extraction never duplicates a cluster.
+      for (const g of extra) {
+        p.push(pushGraphicsState());
+        if (runColor) {
+          p.alpha(runColor.a, 1);
+          p.push(setFillingRgbColor(...rgb(runColor)));
+        }
+        traceGlyph(font, g.id, g.x, g.y, size / font.font.unitsPerEm, g.scaleX, p);
+        if (gradient) {
+          p.push(clipNonZero(), endPath());
+          bounds ??= textBounds(layout);
+          p.push(concatTransformationMatrix(1, 0, 0, 1, bounds.x, bounds.y));
+          gradientBox(gradient, bounds.w, bounds.h, p);
+        } else p.push(fill());
+        p.push(popGraphicsState());
+      }
       decorate();
     }
     if (line.marks) drawMarks(layout, line, p, scope, markBounds);
@@ -477,38 +509,57 @@ export function fillTextOutlines(
       if (!face) continue;
       const k = (run.sizePt * EMU_PER_PT) / face.font.unitsPerEm;
       const y = line.baseline - run.rise;
-      for (const { char, x } of runGlyphs(run)) {
-        const cp = char.codePointAt(0) ?? 0;
-        const glyph = face.font.glyphForCodePoint(cp);
-        if (!glyph || glyph.id <= 0) continue;
-        // Font units, y up → EMU, y down, at the glyph's origin.
-        const px = (gx: number): number => x + gx * k;
-        const py = (gy: number): number => y - gy * k;
-        let [cx, cy] = [0, 0];
-        for (const c of glyph.path.commands) {
-          const a = c.args;
-          if (c.command === 'moveTo') p.push(moveTo(px(a[0]), py(a[1])));
-          else if (c.command === 'lineTo') p.push(lineTo(px(a[0]), py(a[1])));
-          else if (c.command === 'bezierCurveTo')
-            p.push(appendBezierCurve(px(a[0]), py(a[1]), px(a[2]), py(a[3]), px(a[4]), py(a[5])));
-          else if (c.command === 'quadraticCurveTo')
-            p.push(
-              appendBezierCurve(
-                px(cx + ((a[0] - cx) * 2) / 3),
-                py(cy + ((a[1] - cy) * 2) / 3),
-                px(a[2] + ((a[0] - a[2]) * 2) / 3),
-                py(a[3] + ((a[1] - a[3]) * 2) / 3),
-                px(a[2]),
-                py(a[3])
-              )
-            );
-          else p.push(closePath());
-          if (c.command !== 'closePath') [cx, cy] = [a[a.length - 2], a[a.length - 1]];
-        }
-        // A path object ends at its paint operator; glyph outlines fill nonzero.
-        if (glyph.path.commands.length > 0) p.push(strokeToo ? fillAndStroke() : fill());
+      const glyphs =
+        run.glyphs?.map((g) => ({ ...g, x: run.x[0] + g.x })) ??
+        [...runGlyphs(run)].map(({ char, x }) => ({
+          id: face.font.glyphForCodePoint(char.codePointAt(0) ?? 0)?.id ?? 0,
+          x,
+          y: 0,
+          scaleX: 1,
+        }));
+      for (const g of glyphs) {
+        if (g.id <= 0) continue;
+        traceGlyph(face, g.id, g.x, y + g.y, k, g.scaleX, p);
+        p.push(strokeToo ? fillAndStroke() : fill());
       }
     }
   }
   p.push(popGraphicsState());
+}
+
+/** Trace an admitted glyph in page units, including contextual mark offsets. */
+function traceGlyph(
+  face: EmbeddedFace,
+  id: number,
+  x: number,
+  y: number,
+  k: number,
+  scaleX: number,
+  p: PageOps
+): void {
+  const glyph = face.font.getGlyph(id);
+  // Font units, y up → EMU, y down, at the glyph's origin.
+  const px = (gx: number): number => x + gx * k * scaleX;
+  const py = (gy: number): number => y - gy * k;
+  let [cx, cy] = [0, 0];
+  for (const c of glyph.path.commands) {
+    const a = c.args;
+    if (c.command === 'moveTo') p.push(moveTo(px(a[0]), py(a[1])));
+    else if (c.command === 'lineTo') p.push(lineTo(px(a[0]), py(a[1])));
+    else if (c.command === 'bezierCurveTo')
+      p.push(appendBezierCurve(px(a[0]), py(a[1]), px(a[2]), py(a[3]), px(a[4]), py(a[5])));
+    else if (c.command === 'quadraticCurveTo')
+      p.push(
+        appendBezierCurve(
+          px(cx + ((a[0] - cx) * 2) / 3),
+          py(cy + ((a[1] - cy) * 2) / 3),
+          px(a[2] + ((a[0] - a[2]) * 2) / 3),
+          py(a[3] + ((a[1] - a[3]) * 2) / 3),
+          px(a[2]),
+          py(a[3])
+        )
+      );
+    else p.push(closePath());
+    if (c.command !== 'closePath') [cx, cy] = [a[a.length - 2], a[a.length - 1]];
+  }
 }

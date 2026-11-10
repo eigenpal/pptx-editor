@@ -20,7 +20,7 @@ export const PROJECTION_KEYS: readonly string[] = [
 ];
 
 /** The options that shape the session. `openDocumentForExport` takes them, not `exportPdfFrom`. */
-export const SESSION_KEYS: readonly string[] = ['fonts', 'substitutes'];
+export const SESSION_KEYS: readonly string[] = ['fonts', 'substitutes', 'googleFonts'];
 
 /**
  * Open a reusable PDF session over immutable PPTX bytes. Pass the session to `exportPdfFrom`

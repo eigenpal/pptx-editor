@@ -212,6 +212,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       // The demo exports what the editor shows, so approximations become diagnostics.
       return exportPdf(bytes, {
         fidelityPolicy: 'best-effort',
+        googleFonts: true,
         timeoutMs: DEADLINE_MS,
         maxOutputBytes: MAX_OUTPUT,
         signal: abort.signal,

@@ -43,6 +43,10 @@ export interface PdfExportOptions {
    * DOCX Editor configures this through its font sources instead.
    */
   readonly substitutes?: boolean;
+  /** Resolve fonts from the pinned Google Fonts catalog, including Arabic and CJK fallbacks.
+   * Makes network requests. Defaults to false. Supplied fonts keep precedence.
+   */
+  readonly googleFonts?: boolean;
   /** Include slides marked hidden (`p:sld/@show="0"`). Defaults to false. */
   readonly includeHiddenSlides?: boolean;
   /** Reject unsupported or approximate content. Defaults to `strict`. */

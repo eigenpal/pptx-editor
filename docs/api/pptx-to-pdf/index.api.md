@@ -74,6 +74,7 @@ export class PdfEncodingError extends Error {
 export interface PdfExportOptions {
     readonly fidelityPolicy?: 'strict' | 'best-effort';
     readonly fonts?: PdfFontsSource;
+    readonly googleFonts?: boolean;
     readonly includeHiddenSlides?: boolean;
     readonly maxOutputBytes?: number;
     readonly maxPages?: number;

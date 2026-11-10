@@ -442,6 +442,7 @@ export interface GeometryPath {
 export interface GlyphRun {
     // (undocumented)
     readonly face: ResolvedFace;
+    readonly glyphs?: readonly PositionedGlyph[];
     // (undocumented)
     readonly kind: 'text' | 'bullet';
     readonly picture?: BulletPicture;
@@ -703,6 +704,19 @@ export function placeBaseline(emu: number): number;
 export function planStroke(commands: readonly PathCommand[], line: ResolvedLine, scale?: number): StrokePlan;
 
 // @public
+export interface PositionedGlyph {
+    // (undocumented)
+    readonly id: number;
+    readonly scaleX: number;
+    // (undocumented)
+    readonly text: string;
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @public
 export interface PresetAdjustment {
     readonly angle: boolean;
     // (undocumented)
@@ -806,6 +820,20 @@ export function sfntTable(bytes: Uint8Array, tag: string): Uint8Array | undefine
 export const sha256FontBytes: (bytes: Uint8Array) => string;
 
 // @public
+export interface ShapedGlyph {
+    // (undocumented)
+    readonly advance: number;
+    // (undocumented)
+    readonly cluster: number;
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    readonly offsetX: number;
+    // (undocumented)
+    readonly offsetY: number;
+}
+
+// @public
 export const SINGLE_LINE_FACTOR = 1.2;
 
 // @internal
@@ -903,6 +931,10 @@ export interface TextMeasurer {
     glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
     // (undocumented)
     resolve(request: FontRequest): ResolvedFace;
+    shape?(face: ResolvedFace, text: string, options: {
+        readonly rtl: boolean;
+        readonly kerning?: boolean;
+    }): readonly ShapedGlyph[];
 }
 
 // @internal

@@ -34,6 +34,8 @@ const cache = new WeakMap<XmlPart, PartFonts>();
 /** What a part names: its typefaces in document order, and its run languages. */
 interface PartFonts {
   readonly faces: readonly string[];
+  readonly arabic: boolean;
+  readonly cjk: boolean;
   /** `lang` and `altLang` of its run properties, which pick theme script fonts. */
   readonly languages: ReadonlySet<string>;
 }
@@ -48,6 +50,8 @@ function partFonts(part: XmlPart): PartFonts {
   if (hit) return hit;
   const faces: string[] = [];
   const languages = new Set<string>();
+  let arabic = false;
+  let cjk = false;
   const walk = (el: Element, depth: number): void => {
     if (depth > 256) return;
     if (el.ns === NS.a && TYPEFACE_ELEMENTS.has(el.local)) {
@@ -59,10 +63,22 @@ function partFonts(part: XmlPart): PartFonts {
         const lang = attr(el, name);
         if (lang) languages.add(lang);
       }
-    for (const c of el.children) if (c.type === 'element') walk(c, depth + 1);
+    for (const c of el.children) {
+      if (c.type === 'element') walk(c, depth + 1);
+      else if (c.type === 'text' && el.ns === NS.a && el.local === 't') {
+        if (/[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]/u.test(c.value))
+          arabic = true;
+        if (
+          /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7ff\uf900-\ufaff\uff00-\uffef\u{20000}-\u{3ffff}]/u.test(
+            c.value
+          )
+        )
+          cjk = true;
+      }
+    }
   };
   walk(part.root, 0);
-  const out = { faces, languages };
+  const out = { faces, languages, arabic, cjk };
   cache.set(part, out);
   return out;
 }
@@ -110,6 +126,22 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
       }
     }
   for (const p of parts) for (const face of p.faces) add(face);
+  // An available open Arabic face also covers Arabic in Latin-named runs.
+  if (parts.some((p) => p.arabic)) add('Amiri');
+  for (const part of parts.filter((p) => p.cjk)) {
+    const languages = part.languages.size ? [...part.languages] : ['ja'];
+    for (const language of languages) {
+      add(
+        /^ko/i.test(language)
+          ? 'Noto Sans KR'
+          : /^zh.*(?:TW|HK|Hant)/i.test(language)
+            ? 'Noto Sans TC'
+            : /^zh/i.test(language)
+              ? 'Noto Sans SC'
+              : 'Noto Sans JP'
+      );
+    }
+  }
   return [...byKey.values()];
 }
 

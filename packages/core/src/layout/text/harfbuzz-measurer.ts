@@ -25,6 +25,7 @@ import {
   type FontRequest,
   type ResolvedFace,
   type TextMeasurer,
+  type ShapedGlyph,
 } from './measurer.ts';
 import {
   harfBuzzUnsupportedRuntimeDiagnostic,
@@ -443,6 +444,27 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return out;
   };
 
+  const shape: NonNullable<TextMeasurer['shape']> = (face, text, options) => {
+    const lf = loaded.get(face.id);
+    if (!lf || !text.length || text.length > MAX_TEXT) return [];
+    buffer ??= new module.Buffer();
+    buffer.reset();
+    buffer.addText(text);
+    buffer.setDirection(options.rtl ? module.Direction.RTL : module.Direction.LTR);
+    buffer.guessSegmentProperties();
+    const kerning = options.kerning === true && (lf.kerns || face.substituted);
+    module.shape(lf.font, buffer, featuresFor(module, kerning, text));
+    const infos = buffer.getGlyphInfos();
+    const positions = buffer.getGlyphPositions();
+    return infos.map((info, i): ShapedGlyph => ({
+      id: info.codepoint,
+      cluster: info.cluster,
+      advance: positions[i].xAdvance / lf.upem,
+      offsetX: positions[i].xOffset / lf.upem,
+      offsetY: positions[i].yOffset / lf.upem,
+    }));
+  };
+
   // Glyph coverage, by face id and code point; bounded like the advance cache.
   const fallbacks = new Map<string, ResolvedFace | null>();
   const has = (entry: RegisteredFace, cp: number): boolean => {
@@ -533,5 +555,5 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return out ?? undefined;
   };
 
-  return { resolve, advances, fallbackFace, glyphOutline, faces };
+  return { resolve, advances, shape, fallbackFace, glyphOutline, faces };
 }

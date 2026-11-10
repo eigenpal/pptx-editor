@@ -182,6 +182,7 @@
       "name": "@pptx-editor.dev/pptx-to-pdf",
       "version": "0.3.1",
       "dependencies": {
+        "@docx-editor.dev/fonts": "^2.34.0",
         "@pptx-editor.dev/pro": "~0.3.1",
         "fontkit": "2.0.4",
         "pdf-lib": "1.17.1",

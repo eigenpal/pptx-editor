@@ -1,3 +1,4 @@
+import { shapeRtlRun, type PositionedGlyph } from './shaped-run.ts';
 // Slide text layout: one text body into positioned lines. DOM-free; the measurer is
 // injected. All lengths are EMU.
 //
@@ -52,6 +53,8 @@ const MAX_LINES = 10_000;
 /** One positioned glyph run on a line. */
 export interface GlyphRun {
   readonly kind: 'text' | 'bullet';
+  /** Contextual glyphs positioned relative to the run left edge and baseline. */
+  readonly glyphs?: readonly PositionedGlyph[];
   /** Display text (after caps). */
   readonly text: string;
   /**
@@ -972,7 +975,10 @@ export function layoutTextOn(
     box: frame,
     rotation,
     upright: vert === 'eaVert' ? 'eastAsian' : stackedVert ? 'all' : 'none',
-    lines: finalLines,
+    lines: finalLines.map((line) => ({
+      ...line,
+      runs: line.runs.map((run) => shapeRtlRun(run, measurer)),
+    })),
     contentHeight: needed + bp.tIns + bp.bIns,
     paragraphLengths,
     substitutions: [...substitutions],

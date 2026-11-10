@@ -10,6 +10,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/editor';
 import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 import type { FontSource } from '@pptx-editor.dev/core/layout';
+import { googleExportFonts } from './google-fonts.ts';
 import { cjkFallbackFont } from './cjk-font.ts';
 import {
   ExportResourceError,
@@ -81,9 +82,10 @@ export async function openExportSession(
         : [options.fonts as FontSource];
   // East Asian text whose font is missing draws with Noto Sans CJK JP when the optional
   // `@docx-editor.dev/fonts-cjk` is installed (`cjk-font.ts`), after the caller's fonts.
-  const cjk = await cjkFallbackFont(source);
+  const remote = options.googleFonts ? await googleExportFonts(source, signal, given) : [];
+  const cjk = options.googleFonts ? undefined : await cjkFallbackFont(source);
   if (signal?.aborted) return { ok: false, reason: 'aborted' };
-  const fonts = cjk ? [...given, cjk] : given;
+  const fonts = [...given, ...remote, ...(cjk ? [cjk] : [])];
   const opened = await openPresentation(source, {
     ...(fonts.length > 0 ? { fonts } : {}),
     ...(options.substitutes === false ? { substitutes: false } : {}),

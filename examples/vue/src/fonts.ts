@@ -21,5 +21,5 @@ export const CATALOG_FAMILIES: readonly string[] = GOOGLE_FONT_FAMILIES.filter(
 
 /** The demo's `fonts` prop: one stable value for the editor's life. Call it in `setup`. */
 export function useDemoFonts(): ReturnType<typeof useFonts> {
-  return useFonts(packagedFonts(), googleFonts());
+  return useFonts(packagedFonts(), googleFonts({ cjk: true }));
 }

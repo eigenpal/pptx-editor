@@ -56,9 +56,24 @@ export interface ResolvedFace {
   readonly metrics: FaceMetrics;
 }
 
+/** One shaped glyph, in em units with y up. */
+export interface ShapedGlyph {
+  readonly id: number;
+  readonly cluster: number;
+  readonly advance: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+}
+
 /** The measurer port. */
 export interface TextMeasurer {
   resolve(request: FontRequest): ResolvedFace;
+  /** Contextual glyphs for a directional run, with UTF-16 cluster offsets. */
+  shape?(
+    face: ResolvedFace,
+    text: string,
+    options: { readonly rtl: boolean; readonly kerning?: boolean }
+  ): readonly ShapedGlyph[];
   /**
    * Advances in em per UTF-16 code unit. A cluster's whole advance sits on its first unit and
    * the rest of the cluster's units are 0, so offsets map to positions without a cluster table.
