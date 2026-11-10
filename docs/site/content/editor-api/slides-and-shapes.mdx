@@ -62,6 +62,74 @@ Use `slide.moveTo(index)` to reorder slides. Set a shape’s `left`, `top`, `wid
 
 A shape identifier belongs to its slide. Keep the slide identifier with stored shape identifiers. A duplicate shape identifier in one slide prevents writes to that shape.
 
+## Edit line width, dashes, and endpoints
+
+Use `shape.lineFormat` to read or change line properties in either runtime. This example formats the first shape, which must be a supported line or connector:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function formatConnector(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const line = context.presentation.slides.getItemAt(0).shapes.getItemAt(0).lineFormat;
+    line.load(['weight', 'beginArrowheadStyle', 'endArrowheadStyle']);
+    await context.sync();
+    const previousWidth = line.weight;
+
+    line.weight = 2.25;
+    line.dashStyle = 'DashDot';
+    line.beginArrowheadStyle = 'Diamond';
+    line.endArrowheadStyle = 'Triangle';
+    await context.sync();
+    return previousWidth;
+  });
+}
+```
+
+The first synchronization loads the values used by the example. The second batches independent property writes. Omit the first read when you do not need previous values. Keep line proxies inside `runtime.run()`. Handle rejected synchronizations with the runtime's [error handling](/docs/editor-api/runtime).
+
+`weight` uses points. `beginArrowheadStyle` and `endArrowheadStyle` accept `None`, `Triangle`, `Open`, `Stealth`, `Oval`, or `Diamond`. These endpoint properties extend the editing API. Changing an endpoint type preserves its imported dimensions and extension content. Setting one endpoint leaves the other unchanged. Use `None` to hide a marker. `Open` maps to the DrawingML `arrow` value. These properties are SDK extensions, not members of the pinned Office.js reference.
+
+## Edit gradient and effect properties
+
+Use `shape.getFormat()` to read detailed gradient, shadow, and reflection values. Read its result after `context.sync()`. Use `shape.patchFormat()` to change specified properties while preserving unrelated XML. These methods extend the editing API and work with browser and server runtimes.
+
+This example changes the middle stop of an existing gradient on the first shape:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function adjustGradient(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const shape = context.presentation.slides.getItemAt(0).shapes.getItemAt(0);
+    const result = shape.getFormat();
+    await context.sync();
+
+    const gradient = result.value.gradient;
+    const stop = gradient?.stops[1];
+    if (!gradient || gradient.kind !== 'linear' || !stop) return false;
+
+    shape.patchFormat({
+      kind: 'gradient',
+      angle: 45,
+      stop: { id: stop.id, opacity: 0.6 },
+    });
+    await context.sync();
+    return true;
+  });
+}
+```
+
+The first synchronization reads the stop identity needed by the write. The second applies the patch. Batch independent shape patches before the same synchronization. A missing shape or unsupported edit rejects the synchronization; use the runtime's [error handling](/docs/editor-api/runtime).
+
+Patch lengths use points, angles use degrees, and positions and opacity use fractions from zero to one. A stop color accepts an RGB string or a supported theme color choice. Angles accept zero to 360 degrees; 360 writes zero. Shadow and reflection blur and distance accept zero to 150 points. Omitted properties retain their source XML. Changing opacity preserves the source color and its unrelated transforms. Changing a color intentionally replaces that color representation.
+
+Shadow patches accept `blur`, `distance`, `angle`, `opacity`, `color`, and `rotWithShape` where applicable. Reflection patches accept `blur`, `distance`, `startOpacity`, `endOpacity`, `startPosition`, `endPosition`, and `rotWithShape`. These patches edit existing effects; they do not create effects or flatten unsupported effect graphs. Gradient patches also accept `addStop` and `removeStop`. A new stop requires `position` and `color`; its optional `opacity` defaults to one. `removeStop` takes a stop identity and retains at least two stops. Adding a stop allows at most ten stops. Imported gradients with more stops remain inspectable and editable.
+
+Stop identities belong to a read result; they are not durable identifiers. Read them again after structural edits or after an inherited fill becomes an object override. Patches within the same synchronization retain the mapping to copied inherited stops.
+
+An unsupported effect graph sets `effectsReason` in the read result. Its shadow and reflection details remain unavailable, but an independent supported gradient remains readable and editable. Effect patches still refuse unsupported graphs and preserve their content.
+
 ## See also
 
 - [Text and ranges](/docs/editor-api/text-and-ranges)

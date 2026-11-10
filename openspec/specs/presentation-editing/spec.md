@@ -299,3 +299,111 @@ Case changes SHALL retain character identities. Concurrent case changes SHALL NO
 
 - **WHEN** concurrent table operations rescue text into an orphaned cell with `vMerge="1"`
 - **THEN** the table layout includes that cell and its rescued text
+
+### Requirement: Selection-aware formatting sections
+
+The Format panel SHALL expose sections for the selected object's supported edits. React and Vue SHALL use shared applicability rules. Hosts SHALL be able to order, omit, and replace sections without replacing the complete panel.
+
+#### Scenario: Format a selected object
+
+- **WHEN** a user selects a shape, picture, connector, table, chart, diagram, or equation
+- **THEN** Format shows applicable controls or editing entries
+- **AND** selecting another object does not replace an explicitly chosen Comments or Animations tab
+
+#### Scenario: Mixed object types
+
+- **WHEN** several object types are selected
+- **THEN** Format does not offer a common property that silently edits only some selected objects
+
+#### Scenario: Customize the toolbar independently
+
+- **WHEN** a host hides or replaces a toolbar control
+- **THEN** the inspector retains its independently configured control
+- **AND** inspector control rows expose `data-format-slot` for scoped selectors
+
+### Requirement: Partial gradient and effect editing
+
+Detailed gradient, shadow, and reflection edits SHALL preserve source XML for unspecified properties. Existing preset commands SHALL remain available for intentional replacement. Browser commands and server automation SHALL use the same partial operations.
+
+#### Scenario: Change one gradient stop
+
+- **WHEN** a user changes an existing stop's opacity
+- **THEN** its source color and unrelated transforms remain unchanged
+- **AND** other stops remain unchanged through save and reopen
+
+#### Scenario: Edit an inherited gradient stop
+
+- **WHEN** the first edit copies an inherited gradient into the slide
+- **THEN** the inspector retains the selected stop and field focus
+- **AND** subsequent edits and undo keep the same stop selected
+
+#### Scenario: Change a custom shadow
+
+- **WHEN** a user changes a shadow's distance
+- **THEN** scale, skew, alignment, unrelated effects, and unknown content remain unchanged
+- **AND** one undo restores the previous value
+
+### Requirement: Inspector draft targets
+
+Inspector drafts SHALL remain bound to their document, part, object, and property identities. Selection changes SHALL discard stale drafts. Invalid or unsupported edits SHALL provide a reason without changing the document.
+
+#### Scenario: Select another object before committing
+
+- **WHEN** a user enters a draft value and selects another object
+- **THEN** the draft does not change the newly selected object
+
+#### Scenario: Change documents before committing
+
+- **WHEN** a command uses a formatting target from a replaced document
+- **THEN** the command refuses without writing
+
+### Requirement: Primary inspector tasks
+
+The default inspector SHALL put the selection's primary controls before secondary controls. Host-provided section order SHALL take precedence over default ordering. Section expansion SHALL remain local to the editor instance and selection category.
+
+#### Scenario: Format multiple lines
+
+- **WHEN** compatible lines with different endpoints are selected
+- **THEN** the Line section exposes exact width, dash, Start, and End controls
+- **AND** differing endpoint values display Mixed
+- **AND** changing an endpoint type preserves its dimensions and unknown content
+
+#### Scenario: Display an imported line width
+
+- **WHEN** an imported width has more than two decimal places in points
+- **THEN** the inspector displays a rounded value without changing the source
+- **AND** mixed-value comparisons use the exact resolved widths
+- **AND** the public geometry snapshot retains its visible-only, rounded width
+
+#### Scenario: Use a custom section order
+
+- **WHEN** a host supplies an ordered section list
+- **THEN** applicable sections follow that order
+- **AND** omitted sections stay hidden
+- **AND** expansion changes do not write presentation or collaboration state
+
+### Requirement: Inspector field recovery
+
+Numeric fields SHALL show units and retain invalid drafts with an accessible reason. Enter or blur SHALL commit a valid draft once. Escape SHALL restore the source value. Selection changes SHALL discard stale drafts. Updates SHALL NOT steal field focus.
+
+#### Scenario: Correct an invalid geometry value
+
+- **WHEN** a user submits an invalid geometry value
+- **THEN** the field keeps the draft and identifies the error
+- **AND** Escape restores the document value without a document edit
+
+#### Scenario: Select a gradient stop without dragging
+
+- **WHEN** a user edits a supported gradient with a keyboard
+- **THEN** stop selection exposes Color, Position, and Opacity together
+- **AND** stop removal keeps focus in the remaining stop controls
+
+### Requirement: Picture picker targets
+
+Picture replacement and picture fill pickers SHALL capture their document and selection before opening. They SHALL validate that target after file loading and refuse stale results without writing.
+
+#### Scenario: Replace the document while a picker is open
+
+- **WHEN** a new document has matching selected node identifiers
+- **AND** an earlier picture picker returns a file
+- **THEN** the file does not change the new document

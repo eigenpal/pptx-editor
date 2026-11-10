@@ -548,7 +548,7 @@ export function geometryOf(
     ...(e.kind === 'shape' || e.kind === 'connector' || e.kind === 'picture'
       ? {
           lineColor: lineVisible ? fillName(line.fill) : 'none',
-          ...(lineVisible ? { lineWidth: Math.round((line.width / 12_700) * 100) / 100 } : {}),
+          ...(lineVisible ? { lineWidth: Math.round(line.width / 127) / 100 } : {}),
           ...(lineVisible ? { lineDash: line.dash } : {}),
           ...(e.kind === 'connector' ||
           (e.kind === 'shape' &&

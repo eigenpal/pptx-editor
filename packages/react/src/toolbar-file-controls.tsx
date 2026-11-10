@@ -3,7 +3,12 @@
 // file controls (Insert Picture, Change Picture). Split from `Toolbar.tsx` for the line cap.
 
 import { useRef } from 'react';
-import { imageFileTypes, insertImageFile, translateKeyOrText } from '@pptx-editor.dev/core/editor';
+import {
+  captureImageTarget,
+  imageFileTypes,
+  insertImageFile,
+  translateKeyOrText,
+} from '@pptx-editor.dev/core/editor';
 import { ToolButton } from './chrome.tsx';
 import { usePptxEditor, useTranslation } from './context.ts';
 import { useSlot, type SlotPartProps } from './slot.ts';
@@ -38,10 +43,13 @@ export function ImageControl({ slot, control }: SlotPartProps) {
   const { cmd, label, reason } = useSlot(slot, control);
   const editor = usePptxEditor();
   const input = useRef<HTMLInputElement>(null);
+  const pickerTarget = useRef<(() => boolean) | undefined>(undefined);
   // Insert > Picture adds a picture; Change Picture replaces the selected one's image.
   const target = control.state.kind === 'replace' ? 'replaceImage' : undefined;
   const onFile = async (file: File | undefined): Promise<void> => {
-    if (file && editor) await insertImageFile(editor, file, target);
+    const isCurrent = pickerTarget.current;
+    pickerTarget.current = undefined;
+    if (file && editor) await insertImageFile(editor, file, target, isCurrent);
   };
   return (
     <>
@@ -51,7 +59,10 @@ export function ImageControl({ slot, control }: SlotPartProps) {
         paths={control.paths}
         disabled={!cmd.isEnabled}
         disabledReason={reason}
-        onClick={() => input.current?.click()}
+        onClick={() => {
+          pickerTarget.current = editor ? captureImageTarget(editor) : undefined;
+          input.current?.click();
+        }}
       />
       <input
         ref={input}

@@ -5,6 +5,7 @@
 // store ops through the edits in `commands/`. Lengths are in points and angles in degrees, as
 // the object model shows them; the host converts to EMU (12 700 per point) at this boundary.
 
+import type { LineEndType, ShapeFormatPatch } from '../contracts/neutral.ts';
 import type { AutomationRef } from './protocol.ts';
 
 /** How a collection item is found: by position, or by the id the object model shows. */
@@ -93,6 +94,9 @@ export type AutomationBackgroundWrite =
 
 /** Outline properties a write sets. */
 export interface AutomationLineWrite {
+  /** Start/end arrowhead type. Other endpoint properties remain unchanged. */
+  readonly head?: LineEndType;
+  readonly tail?: LineEndType;
   readonly visible?: boolean;
   readonly color?: string;
   /** Points. */
@@ -365,6 +369,12 @@ export type AutomationOperation =
       readonly orNull?: boolean;
     }
   // Fill and line
+  | { readonly op: 'readShapeFormat'; readonly shape: AutomationRef }
+  | {
+      readonly op: 'patchShapeFormat';
+      readonly shape: AutomationRef;
+      readonly patch: ShapeFormatPatch;
+    }
   | {
       readonly op: 'readFill';
       readonly shape: AutomationRef;
@@ -646,6 +656,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'group',
   'ungroup',
   'setFill',
+  'patchShapeFormat',
   'setLine',
   'setBackground',
   'setThemeColor',

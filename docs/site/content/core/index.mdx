@@ -102,6 +102,53 @@ Use `onEditorEvent(editor, name, handler)` to observe a specific change. It retu
 
 Use `subscribe()` when you also need zoom or other view changes. Dispose every subscription when its consumer unmounts.
 
+## Patch selected formatting
+
+Use `shapeFormat()` to inspect one selected shape, picture, or connector in a browser editor. Pass a node identifier to inspect that object on the active part. The returned target captures the document, part, and object identities.
+
+This helper changes an existing shadow's distance without replacing its other properties:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function setShadowDistance(editor: PptxEditorInstance, points: number) {
+  const read = editor.shapeFormat();
+  if (!read.ok) return read;
+  if (!read.format.shadow) {
+    return { ok: false as const, reason: 'The object has no editable shadow.' };
+  }
+  return editor.exec({
+    type: 'patchShapeFormat',
+    target: read.format.target,
+    patch: { kind: 'shadow', distance: points },
+  });
+}
+```
+
+Check the command result before reporting success. A replaced document or removed target can invalidate the captured target. Lengths use points, angles use degrees, and opacity uses fractions from zero to one. Omitted properties stay unchanged, including source XML that the inspector does not expose. Existing preset commands remain available for intentional style replacement.
+
+If the read includes `effectsReason`, its effect details are unavailable. A supported gradient remains readable and editable independently. Effect patches refuse unsupported effect graphs without changing their content.
+
+For batched browser or server editing, use [shape formatting automation](/docs/editor-api/slides-and-shapes#edit-gradient-and-effect-properties).
+
+## Format selected lines
+
+Use the line commands to format selected lines or compatible shape outlines. This helper sets an exact width in points:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function setSelectedLineWidth(editor: PptxEditorInstance, points: number) {
+  return editor.exec({ type: 'setLineWidth', points });
+}
+```
+
+Check the returned `ok` value and display the refusal reason when the command fails. Widths must exceed zero and must not exceed 1584 points. Setting a width on an invisible outline also gives it the theme text color. Use `setLineColor` with `color: null` to remove the visible outline.
+
+Use `setLineDash` with a `LineDash` value to change its dash pattern. Use `setLineEnds` with `head`, `tail`, or both to change endpoint types. The inspector labels `head` as **Start** and `tail` as **End**. Use `none` to remove an endpoint marker. An omitted endpoint stays unchanged. Endpoint type edits retain imported endpoint dimensions and extension content. An endpoint command refuses a selection containing incompatible objects without partially editing its lines. Each change applies to the compatible selection in one undo step.
+
+Use `formatLineState(editor)` from `@pptx-editor.dev/core/editor` to read shared line values across the selection. It returns exact point widths, endpoint types, and separate mixed-value flags. Check `endsSupported` before offering endpoint controls. A null width or endpoint can mean mixed or unavailable. Do not replace it with a default value.
+
 ## See also
 
 - [Editor mount modes](/docs/core/mount-modes)

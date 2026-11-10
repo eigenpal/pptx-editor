@@ -560,7 +560,7 @@ export interface Editor {
 }
 
 // @public
-export type EditorCommand = CommentCommand | {
+export type EditorCommand = PatchShapeFormatCommand | CommentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -1333,6 +1333,18 @@ export interface FontSourceSubstitution {
 export type FormatPainterMode = 'off' | 'once' | 'sticky';
 
 // @public
+export interface GradientDetail {
+    // (undocumented)
+    readonly angle: number;
+    // (undocumented)
+    readonly kind: 'linear' | 'radial' | 'other';
+    // (undocumented)
+    readonly rotWithShape: boolean;
+    // (undocumented)
+    readonly stops: readonly GradientStopDetail[];
+}
+
+// @public
 export interface GradientFill {
     readonly angle: number;
     readonly kind: 'linear' | 'radial';
@@ -1341,6 +1353,17 @@ export interface GradientFill {
         readonly pos: number;
         readonly color: string;
     }[];
+}
+
+// @public
+export interface GradientStopDetail {
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly opacity: number;
+    // (undocumented)
+    readonly position: number;
 }
 
 // @public
@@ -1503,6 +1526,16 @@ export interface ParagraphLineSpacing {
 }
 
 // @public
+export interface PatchShapeFormatCommand {
+    // (undocumented)
+    readonly patch: ShapeFormatPatch;
+    // (undocumented)
+    readonly target: ShapeFormatTarget;
+    // (undocumented)
+    readonly type: 'patchShapeFormat';
+}
+
+// @public
 export interface PatternFill {
     readonly background: string;
     readonly foreground: string;
@@ -1593,6 +1626,24 @@ export type PictureCommand =
 
 // @public
 export type PresentationView = 'normal' | 'slideSorter' | 'slideMaster';
+
+// @public
+export interface ReflectionDetail {
+    // (undocumented)
+    readonly blur: number;
+    // (undocumented)
+    readonly distance: number;
+    // (undocumented)
+    readonly endOpacity: number;
+    // (undocumented)
+    readonly endPosition: number;
+    // (undocumented)
+    readonly rotWithShape: boolean;
+    // (undocumented)
+    readonly startOpacity: number;
+    // (undocumented)
+    readonly startPosition: number;
+}
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
@@ -1734,6 +1785,24 @@ export interface SelectionGeometry {
 }
 
 // @public
+export interface ShadowDetail {
+    // (undocumented)
+    readonly angle: number;
+    // (undocumented)
+    readonly blur: number;
+    // (undocumented)
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly distance: number;
+    // (undocumented)
+    readonly kind: 'inner' | 'outer';
+    // (undocumented)
+    readonly opacity: number;
+    // (undocumented)
+    readonly rotWithShape: boolean;
+}
+
+// @public
 export type ShadowPreset = 'outerBottomRight' | 'outerBottom' | 'outerBottomLeft' | 'outerRight' | 'outerCenter' | 'outerLeft' | 'outerTopRight' | 'outerTop' | 'outerTopLeft' | 'innerTopLeft' | 'innerTop' | 'innerTopRight' | 'innerLeft' | 'innerCenter' | 'innerRight' | 'innerBottomLeft' | 'innerBottom' | 'innerBottomRight';
 
 // @public
@@ -1790,6 +1859,64 @@ export interface ShapeEffectsState {
 export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}` | `bevel.${BevelPreset | 'none'}` | `rotation3d.${Rotation3DPreset | 'none'}`;
 
 // @public
+export interface ShapeFormatDetail {
+    readonly effectsReason?: string;
+    // (undocumented)
+    readonly gradient: GradientDetail | null;
+    // (undocumented)
+    readonly reflection: ReflectionDetail | null;
+    // (undocumented)
+    readonly shadow: ShadowDetail | null;
+    // (undocumented)
+    readonly target: ShapeFormatTarget;
+}
+
+// @public
+export type ShapeFormatPatch = {
+    readonly kind: 'gradient';
+    readonly angle?: number;
+    readonly rotWithShape?: boolean;
+    readonly addStop?: {
+        readonly position: number;
+        readonly color: ColorChoice;
+        readonly opacity?: number;
+    };
+    readonly removeStop?: string;
+    readonly stop?: {
+        readonly id: string;
+        readonly position?: number;
+        readonly color?: ColorChoice;
+        readonly opacity?: number;
+    };
+} | ({
+    readonly kind: 'shadow';
+} & Partial<Omit<ShadowDetail, 'kind'>>) | ({
+    readonly kind: 'reflection';
+} & Partial<ReflectionDetail>);
+
+// @public
+export type ShapeFormatProperties = Omit<ShapeFormatDetail, 'target'>;
+
+// @public
+export type ShapeFormatRead = {
+    readonly ok: true;
+    readonly format: ShapeFormatDetail;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export interface ShapeFormatTarget {
+    // (undocumented)
+    readonly documentId: string;
+    // (undocumented)
+    readonly nodeId: string;
+    // (undocumented)
+    readonly part: string;
+}
+
+// @public
 export interface ShapeStyleChoice {
     // (undocumented)
     readonly color: ShapeStyleColor;
@@ -1812,6 +1939,7 @@ export interface ShapeSummary {
     readonly hidden: boolean;
     // (undocumented)
     readonly kind: 'shape' | 'picture' | 'group' | 'connector' | 'graphicFrame';
+    readonly lineEnds?: boolean;
     readonly name: string;
     // (undocumented)
     readonly nodeId: string;

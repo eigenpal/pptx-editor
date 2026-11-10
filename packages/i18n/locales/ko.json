@@ -1835,5 +1835,30 @@
     "masterHint": null,
     "masterHintOne": null,
     "masterHintNone": null
+  },
+  "inspector": {
+    "blur": "흐림",
+    "distance": "거리",
+    "opacity": "불투명도",
+    "startOpacity": "시작 불투명도",
+    "endOpacity": "끝 불투명도",
+    "startPosition": "시작 위치",
+    "endPosition": "끝 위치",
+    "gradientStop": "그라데이션 중지점 {index}",
+    "mixed": "혼합",
+    "color": "색",
+    "gradient": "그라데이션",
+    "effectUnavailable": "이 효과는 유지됩니다. 이 편집기에서는 편집할 수 없습니다.",
+    "numberRange": "{min}부터 {max}까지의 숫자를 입력하세요.",
+    "numberMinimum": "{min} 이상의 숫자를 입력하세요.",
+    "selectStop": "선택한 그라데이션 중지점",
+    "stopLimit": "그라데이션에는 두 개 이상의 중지점이 필요합니다.",
+    "addStopLimit": "중지점이 10개 미만일 때 추가할 수 있습니다.",
+    "lineWidth": "너비",
+    "line": "선",
+    "outline": "윤곽선",
+    "previewUnavailable": "이 원본 색상의 미리 보기를 사용할 수 없습니다.",
+    "geometry": "크기 및 위치",
+    "numberRangeExclusive": "{min}보다 크고 {max} 이하인 숫자를 입력하세요."
   }
 }

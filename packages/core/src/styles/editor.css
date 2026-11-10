@@ -5104,3 +5104,185 @@ legend.pptx-dialog__label {
   border-color: var(--doc-primary);
   background: var(--doc-primary-light);
 }
+
+/* Selection-aware formatting uses the same controls and tokens as the toolbar. */
+.pptx-editor .pptx-format-controls,
+.pptx-editor .pptx-format-details {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.pptx-editor .pptx-format-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.pptx-editor .pptx-format-control__label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--doc-text-muted);
+}
+.pptx-editor .pptx-format-control > :last-child {
+  flex-shrink: 0;
+  max-width: 65%;
+}
+.pptx-editor .pptx-format-details:not(:empty) {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--doc-border);
+}
+.pptx-editor .pptx-format-panel .pptx-color-field {
+  min-width: 0;
+}
+.pptx-editor .pptx-format-details {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+.pptx-editor .pptx-format-details > .pptx-color-field,
+.pptx-editor .pptx-format-details > [role='alert'],
+.pptx-editor .pptx-format-detail-actions {
+  grid-column: 1 / -1;
+}
+.pptx-editor .pptx-format-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pptx-editor .pptx-format-property-group {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.pptx-editor .pptx-format-property-group legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pptx-editor .pptx-format-property-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pptx-editor .pptx-format-property-fields > .pptx-color-field {
+  grid-column: 1 / -1;
+}
+
+/* The inspector changes selection and disclosure without layout animation. */
+.pptx-editor .pptx-format-panel {
+  container-type: inline-size;
+  min-width: 0;
+}
+.pptx-editor .pptx-format-panel > .pptx-panel__title {
+  margin: 0 0 16px;
+  overflow-wrap: anywhere;
+}
+.pptx-editor .pptx-format-disclosure {
+  border-bottom: 1px solid var(--doc-border);
+  margin-bottom: 8px;
+}
+.pptx-editor .pptx-format-summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.pptx-editor .pptx-format-summary:focus-visible,
+.pptx-editor .pptx-gradient-picker__marker:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.pptx-editor .pptx-format-section-body {
+  padding: 4px 0 16px;
+  min-width: 0;
+}
+.pptx-editor .pptx-format-control > .pptx-field:only-child {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+}
+.pptx-editor .pptx-format-panel input {
+  font-variant-numeric: tabular-nums;
+}
+.pptx-editor .pptx-format-panel .pptx-field__control,
+.pptx-editor .pptx-gradient-picker select {
+  min-height: 32px;
+}
+.pptx-editor .pptx-gradient-picker {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.pptx-editor .pptx-gradient-picker__ramp {
+  height: 24px;
+  border: 1px solid var(--doc-border);
+  border-radius: 4px;
+  background-color: var(--doc-bg);
+}
+.pptx-editor .pptx-gradient-picker__markers {
+  position: relative;
+  height: 36px;
+  margin: 0 12px 4px;
+}
+.pptx-editor .pptx-gradient-picker__marker {
+  position: absolute;
+  top: 2px;
+  width: 24px;
+  height: 28px;
+  padding: 4px;
+  transform: translateX(-50%);
+  background: var(--doc-bg);
+  border: 1px solid var(--doc-border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.pptx-editor .pptx-gradient-picker__marker > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+}
+.pptx-editor .pptx-gradient-picker__marker[aria-pressed='true'] {
+  border: 2px solid var(--doc-primary);
+  padding: 3px;
+}
+.pptx-editor .pptx-gradient-picker select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  background: var(--doc-bg);
+  color: var(--doc-text);
+  padding: 4px 8px;
+  font: inherit;
+}
+.pptx-editor .pptx-format-property-fields > [role='status'] {
+  grid-column: 1 / -1;
+}
+@container (max-width: 245px) {
+  .pptx-editor .pptx-format-property-fields,
+  .pptx-editor .pptx-format-panel .pptx-panel__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (pointer: coarse) {
+  .pptx-editor .pptx-format-summary,
+  .pptx-editor .pptx-format-panel .pptx-field__control,
+  .pptx-editor .pptx-gradient-picker select {
+    min-height: 44px;
+  }
+  .pptx-editor .pptx-gradient-picker__markers {
+    height: 48px;
+  }
+  .pptx-editor .pptx-gradient-picker__marker {
+    width: 32px;
+    height: 44px;
+  }
+}

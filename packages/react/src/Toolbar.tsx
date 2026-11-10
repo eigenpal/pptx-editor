@@ -18,6 +18,8 @@ import {
   colorMenuSelection,
   arrangeToolbarGroups,
   createToolbarFitMemory,
+  formatSelectionHasLineEnds,
+  formatTargetKey,
   observeToolbarFit,
   requestDialogSection,
   runChromeRow,
@@ -743,7 +745,7 @@ function PresetToolbar({
   const { t } = useTranslation();
   useEditorState((s) => s.status);
   // Contextual controls change the width; refit when they appear or go.
-  const context = useEditorState((s) => `${s.selection.kind}|${s.geometry?.lineHead ?? ''}`);
+  const context = useEditorState((s) => `${formatTargetKey(s)}|${formatSelectionHasLineEnds(s)}`);
   const ref = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLButtonElement>(null);
   const fixed = useRef<HTMLDivElement>(null);

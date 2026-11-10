@@ -412,7 +412,11 @@ export interface AutomationLineRead {
     // (undocumented)
     readonly color: string | null;
     readonly dashStyle: string | null;
+    // (undocumented)
+    readonly head?: LineEndType;
     readonly style: string | null;
+    // (undocumented)
+    readonly tail?: LineEndType;
     // (undocumented)
     readonly transparency: number | null;
     // (undocumented)
@@ -426,7 +430,10 @@ export interface AutomationLineWrite {
     // (undocumented)
     readonly color?: string;
     readonly dashStyle?: string;
+    readonly head?: LineEndType;
     readonly style?: string;
+    // (undocumented)
+    readonly tail?: LineEndType;
     // (undocumented)
     readonly transparency?: number;
     // (undocumented)
@@ -647,6 +654,13 @@ export type AutomationOperation = {
     readonly shape: AutomationRef;
     readonly kind: 'slide' | 'slideLayout' | 'slideMaster';
     readonly orNull?: boolean;
+} | {
+    readonly op: 'readShapeFormat';
+    readonly shape: AutomationRef;
+} | {
+    readonly op: 'patchShapeFormat';
+    readonly shape: AutomationRef;
+    readonly patch: ShapeFormatPatch;
 } | {
     readonly op: 'readFill';
     readonly shape: AutomationRef;
@@ -1222,6 +1236,9 @@ export type AutomationUnsubscribe = () => void;
 
 // @public
 export type AutomationValue = {
+    readonly kind: 'shapeFormat';
+    readonly format: ShapeFormatProperties;
+} | {
     readonly kind: 'handle';
     readonly handle: AutomationHandle;
 } | {
@@ -1336,6 +1353,9 @@ export function createServerAutomationHost(bytes: Uint8Array, options?: ServerAu
 export function createStoreAutomationHost(store: PptxDocumentStore, options?: StoreAutomationOptions): AutomationHost;
 
 // @public
+export type LineEndType = 'none' | 'triangle' | 'arrow' | 'stealth' | 'oval' | 'diamond';
+
+// @public
 export const MAX_BATCH_OPERATIONS = 10000;
 
 // @public
@@ -1347,6 +1367,32 @@ export interface ServerAutomationOptions extends StoreAutomationOptions {
 export type ServerAutomationRejection = PackageRejection | {
     readonly reason: 'empty';
 };
+
+// @public
+export type ShapeFormatPatch = {
+    readonly kind: 'gradient';
+    readonly angle?: number;
+    readonly rotWithShape?: boolean;
+    readonly addStop?: {
+        readonly position: number;
+        readonly color: ColorChoice;
+        readonly opacity?: number;
+    };
+    readonly removeStop?: string;
+    readonly stop?: {
+        readonly id: string;
+        readonly position?: number;
+        readonly color?: ColorChoice;
+        readonly opacity?: number;
+    };
+} | ({
+    readonly kind: 'shadow';
+} & Partial<Omit<ShadowDetail, 'kind'>>) | ({
+    readonly kind: 'reflection';
+} & Partial<ReflectionDetail>);
+
+// @public
+export type ShapeFormatProperties = Omit<ShapeFormatDetail, 'target'>;
 
 // @public
 export interface StoreAutomationOptions {

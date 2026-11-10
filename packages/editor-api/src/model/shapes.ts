@@ -8,6 +8,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // to EMU (12,700 per point).
 
 import type {
+  ShapeFormatPatch,
+  ShapeFormatProperties,
   AutomationBox,
   AutomationHandle,
   AutomationItemKey,
@@ -314,6 +316,28 @@ export class Shape extends ModelObject {
       settleImage(this.internals, box, target, fill)
     );
     return result;
+  }
+
+  /** Read detailed formatting. Read the result after `context.sync()`. */
+  getFormat(): ClientResult<ShapeFormatProperties> {
+    const target = this.at('getFormat');
+    const { result, fill } = ClientResult.create<ShapeFormatProperties>(target);
+    this.enqueue(
+      'read',
+      'getFormat',
+      (ref) => ({ op: 'readShapeFormat', shape: ref(this.path) }),
+      (value) => fill(hydrated(value, 'shapeFormat', target).format)
+    );
+    return result;
+  }
+
+  /** Patch existing formatting. Omitted fields retain their source XML. */
+  patchFormat(patch: ShapeFormatPatch): void {
+    this.command('patchFormat', (ref) => ({
+      op: 'patchShapeFormat',
+      shape: ref(this.path),
+      patch,
+    }));
   }
 
   /** The slide the shape is on; `ItemNotFound` at the sync for a layout or master shape. */

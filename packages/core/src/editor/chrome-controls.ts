@@ -6,6 +6,7 @@
 // it renders and dispatches, never whether it is enabled. Enabled state has exactly one source,
 // `toolbarCommandState`, which asks `Editor.can`.
 
+import { formatLineSlotValue } from './format-inspector.ts';
 import { afterInsertCommand, hasPaneListener, requestPane } from './pane-requests.ts';
 import type {
   Editor,
@@ -901,23 +902,18 @@ export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): To
               : id === 'list.lineSpacing'
                 ? lineSpacingSlotValue(f)
                 : (textSlotValue(id, f) ??
-                  (id === 'shape.lineWidth' && snap.geometry?.lineWidth !== undefined
-                    ? String(snap.geometry.lineWidth)
-                    : id === 'shape.lineDash'
-                      ? snap.geometry?.lineDash
-                      : id === 'text.link'
-                        ? f?.link
-                        : id === 'paragraph.valign'
-                          ? f?.verticalAlign
-                          : id === 'paragraph.autofit'
-                            ? snap.geometry?.textFitting
-                            : id === 'shape.lineStart'
-                              ? snap.geometry?.lineHead
-                              : id === 'shape.lineEnd'
-                                ? snap.geometry?.lineTail
-                                : (slideSlotValue(id, snap) ??
-                                  shapeFormatSlotValue(id, snap) ??
-                                  tableSlotValue(id, snap, tableBorderPen(editor)))));
+                  (id === 'shape.lineDash'
+                    ? snap.geometry?.lineDash
+                    : id === 'text.link'
+                      ? f?.link
+                      : id === 'paragraph.valign'
+                        ? f?.verticalAlign
+                        : id === 'paragraph.autofit'
+                          ? snap.geometry?.textFitting
+                          : (formatLineSlotValue(editor, id) ??
+                            slideSlotValue(id, snap) ??
+                            shapeFormatSlotValue(id, snap) ??
+                            tableSlotValue(id, snap, tableBorderPen(editor)))));
   return {
     id,
     enabled: can.ok,

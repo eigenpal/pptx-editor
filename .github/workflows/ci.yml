@@ -185,12 +185,13 @@ jobs:
           bun run fidelity || gate=$?
           bun run validate:xsd || xsd=$?
           exit "$(( ${tests:-0} || ${gate:-0} || ${xsd:-0} ))"
-      # Only what needs a real browser: canvas pixels and CSS layout (e2e/browser.spec.ts). The
+      # Browser checks cover canvas pixels, CSS layout, and both adapters' format inspectors. The
       # demo flows and the open-every-deck check run in happy-dom in the unit shards (`bun run test`).
       - name: Browser checks of the demo
         if: matrix.check == 'e2e'
         run: |
           bun run test:e2e
+          bunx playwright test --config e2e/inspector.config.ts
       # A public API change must carry a changeset (docx-editor's api-changeset lane).
       - name: API change has a changeset
         if: matrix.check == 'changeset' && github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')

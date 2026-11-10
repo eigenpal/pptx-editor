@@ -1835,5 +1835,30 @@
     "masterHint": "Changes apply to every layout of this master and to its {count} slides.",
     "masterHintOne": "Changes apply to every layout of this master and to its one slide.",
     "masterHintNone": "Changes apply to every layout of this master."
+  },
+  "inspector": {
+    "blur": "Blur",
+    "distance": "Distance",
+    "opacity": "Opacity",
+    "startOpacity": "Start opacity",
+    "endOpacity": "End opacity",
+    "startPosition": "Start position",
+    "endPosition": "End position",
+    "gradientStop": "Gradient stop {index}",
+    "mixed": "Mixed",
+    "color": "Color",
+    "gradient": "Gradient",
+    "effectUnavailable": "This effect is preserved. Editing is unavailable in this editor.",
+    "numberRange": "Enter a number from {min} to {max}.",
+    "numberMinimum": "Enter a number greater than or equal to {min}.",
+    "selectStop": "Selected gradient stop",
+    "stopLimit": "A gradient requires at least two stops.",
+    "addStopLimit": "You can add stops when fewer than ten stops exist.",
+    "lineWidth": "Width",
+    "line": "Line",
+    "outline": "Outline",
+    "previewUnavailable": "Preview unavailable for this source color.",
+    "geometry": "Size and position",
+    "numberRangeExclusive": "Enter a number greater than {min} and no greater than {max}."
   }
 }

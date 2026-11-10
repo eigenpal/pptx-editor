@@ -3,6 +3,8 @@
 // automation lane imports this module, never `index.ts`, and `check:lane-boundaries` compiles it
 // without the DOM library. The one DOM-typed contract, `Editor`, lives in `editor.ts`.
 
+import type { PatchShapeFormatCommand } from './format-detail.ts';
+export type * from './format-detail.ts';
 export type {
   EditorFontErrorCode,
   FontConfiguration,
@@ -13,7 +15,7 @@ export type {
 
 export type { EditorExecOptions, HistoryGroup, HistoryGroupOptions } from './history-group.ts';
 import type { EditorRejection, EditorRemoval } from './notices.ts';
-export type { EditorRejection, EditorRemoval } from './notices.ts';
+export type { CanResult, CommandResult, EditorRejection, EditorRemoval } from './notices.ts';
 import type { ClipboardPayload } from './clipboard.ts';
 export type { ClipboardNode, ClipboardPayload, ClipboardRelationship } from './clipboard.ts';
 import type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
@@ -154,6 +156,7 @@ export type OrderMove = 'forward' | 'backward' | 'front' | 'back';
 
 /** Every editing command. Each compiles to store ops or is refused with a reason. @public */
 export type EditorCommand =
+  | PatchShapeFormatCommand
   | CommentCommand
   | { readonly type: 'undo' }
   | { readonly type: 'redo' }
@@ -578,22 +581,6 @@ export interface TransformItem {
 
 /** The command type names. @public */
 export type EditorCommandType = EditorCommand['type'];
-
-/** Whether a command can run now; when it cannot, the i18n key of the reason. @public */
-export type CanResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
-
-/**
- * The outcome of a command. A refusal with `noop` means the command had nothing to do (nothing
- * to undo, nothing selected): nothing changed, and nothing went wrong. @public
- */
-export type CommandResult =
-  | { readonly ok: true }
-  | {
-      readonly ok: false;
-      readonly reason: string;
-      readonly detail?: string;
-      readonly noop?: boolean;
-    };
 
 /** What is selected. @public */
 export type EditorSelection =

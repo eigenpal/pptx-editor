@@ -9,6 +9,8 @@ const PORT = 5297;
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
+  // These tasks use their own React and Vue servers in inspector.config.ts.
+  testIgnore: /inspector(?:-tasks|-effects)?\.spec\.ts$/,
   timeout: 60_000,
   use: {
     baseURL: `http://localhost:${PORT}`,

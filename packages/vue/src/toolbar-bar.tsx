@@ -21,6 +21,8 @@ import {
 } from 'vue';
 import {
   createToolbarFitMemory,
+  formatSelectionHasLineEnds,
+  formatTargetKey,
   observeToolbarFit,
   toolbarCollapsedIds,
 } from '@pptx-editor.dev/core/editor';
@@ -85,7 +87,7 @@ export const PresetToolbar = defineComponent({
   setup(props) {
     const { t } = useTranslation();
     // Contextual controls change the width; refit when they appear or go.
-    const context = useEditorState((s) => `${s.selection.kind}|${s.geometry?.lineHead ?? ''}`);
+    const context = useEditorState((s) => `${formatTargetKey(s)}|${formatSelectionHasLineEnds(s)}`);
     const status = useEditorState((s) => s.status);
     const root = ref<HTMLElement | null>(null);
     const more = ref<HTMLElement | null>(null);

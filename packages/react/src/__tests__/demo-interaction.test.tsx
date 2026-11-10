@@ -4,7 +4,7 @@
 // layout and stays in the browser spec).
 
 import { afterEach, describe, expect, test } from 'bun:test';
-import { act } from '@testing-library/react';
+import { act, within } from '@testing-library/react';
 import {
   IN,
   barButton,
@@ -28,6 +28,7 @@ import {
 afterEach(closeDemo);
 
 const byRole = screen.getByRole;
+const toolbar = () => within(screen.getByRole('toolbar', { name: 'Formatting' }));
 const rail = () => [...document.querySelectorAll<HTMLElement>('.pptx-rail__item')];
 const count = (selector: string) => document.querySelectorAll(selector).length;
 const chip = () => document.querySelector('.pptx-chip')?.textContent;
@@ -224,7 +225,7 @@ describe('demo interaction', () => {
 
     // One click on the button arms the painter; the slide shows the brush.
     const painter = () => byRole('button', { name: /Format painter/ });
-    const bold = () => byRole('button', { name: /^Bold/ });
+    const bold = () => toolbar().getByRole('button', { name: /^Bold/ });
     const surface = () => document.querySelector('.pptx-surface')!;
     await click(painter());
     expect(painter().getAttribute('aria-pressed')).toBe('true');

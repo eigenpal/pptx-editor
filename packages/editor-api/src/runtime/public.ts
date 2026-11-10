@@ -45,6 +45,7 @@ export {
   ShapeFontUnderlineStyle,
   ShapeLineDashStyle,
   ShapeLineStyle,
+  ShapeArrowheadStyle,
   ShapeType,
   ShapeZOrder,
   SlideBackgroundFillType,
@@ -138,3 +139,13 @@ export { Border, Borders, Margins, TableStyleSettings } from '../model/table-for
 export { Tag, TagCollection } from '../model/tags.ts';
 export { ThemeColorScheme } from '../model/theme.ts';
 export { BulletFormat, ParagraphFormat, ShapeFont, TextFrame, TextRange } from '../model/text.ts';
+
+export type {
+  LineEndType,
+  ShapeFormatPatch,
+  ShapeFormatProperties,
+  GradientDetail,
+  GradientStopDetail,
+  ShadowDetail,
+  ReflectionDetail,
+} from '@pptx-editor.dev/core/contracts';

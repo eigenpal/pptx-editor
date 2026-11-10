@@ -3,6 +3,7 @@
 // `e2e/editing-workflow.spec.ts`.
 
 import { afterEach, describe, expect, test } from 'bun:test';
+import { within } from '@testing-library/react';
 import {
   click,
   closeDemo,
@@ -19,9 +20,13 @@ import {
 afterEach(closeDemo);
 
 const byRole = screen.getByRole;
+const toolbar = () => within(screen.getByRole('toolbar', { name: 'Formatting' }));
 const slideText = () => document.querySelector('.pptx-surface__slide')!.textContent ?? '';
 const outline = () => document.querySelector('.pptx-surface__outline')!.getBoundingClientRect();
-const bold = () => byRole('button', { name: /^Bold \(/ }).getAttribute('aria-pressed');
+const bold = () =>
+  toolbar()
+    .getByRole('button', { name: /^Bold \(/ })
+    .getAttribute('aria-pressed');
 
 async function shiftArrows(key: 'ArrowRight' | 'ArrowLeft', n: number): Promise<void> {
   for (let i = 0; i < n; i += 1) await press(`Shift+${key}`);
@@ -51,8 +56,8 @@ describe('demo editing workflow', () => {
     await type('Alpha beta');
     await press('Home');
     await shiftArrows('ArrowRight', 5);
-    await click(byRole('button', { name: /^Bold \(/ }));
-    await click(screen.getAllByRole('button', { name: 'Text color' })[1]);
+    await click(toolbar().getByRole('button', { name: /^Bold \(/ }));
+    await click(toolbar().getAllByRole('button', { name: 'Text color' })[1]);
     await click(byRole('menuitem', { name: 'Red' }));
     const word = () => paintedText(/^Alpha$/)?.getAttribute('fill');
     expect(word()).toBe('#ff0000');

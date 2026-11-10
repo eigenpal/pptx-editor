@@ -421,7 +421,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply solid colors or gradients. Gradient colors, focus, tiling, and rotation can differ from the reference. Rectangle and shape gradients can show seams or bands.',
+      'Apply solid colors or gradients. Edit gradient stops, opacity, and direction without replacing unrelated properties. Gradient colors, focus, tiling, and rotation can differ from the reference. Rectangle and shape gradients can show seams or bands.',
   },
   {
     id: 'fills-lines.pattern-picture',
@@ -467,7 +467,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply or clear shadow presets on supported shapes and pictures. Groups, tables, charts, and theme effect graphs reject these edits. Perspective shadows are unavailable, and blur is measured only for small radii.',
+      'Apply or clear shadow presets on supported shapes and pictures. Edit existing shadow color, opacity, blur, distance, and direction. Groups, tables, charts, and theme effect graphs reject these edits. Perspective shadows are unavailable, and blur is measured only for small radii.',
   },
   {
     id: 'effects.glow-reflection',

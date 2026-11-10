@@ -67,6 +67,10 @@ import { FontResolverMark } from '@pptx-editor.dev/core/editor';
 import { FontSource } from '@pptx-editor.dev/core/contracts';
 import { FontSourceSubstitution } from '@pptx-editor.dev/core/contracts';
 import { FontUrlSource } from '@pptx-editor.dev/core/editor';
+import { FORMAT_SECTIONS } from '@pptx-editor.dev/core/editor';
+import { FormatSectionDefinition } from '@pptx-editor.dev/core/editor';
+import { FormatSectionId } from '@pptx-editor.dev/core/editor';
+import { formatSectionsOf } from '@pptx-editor.dev/core/editor';
 import { FunctionalComponent } from 'vue';
 import { GradientFill } from '@pptx-editor.dev/core/editor';
 import { HistoryGroupBindingOptions } from '@pptx-editor.dev/core/editor';
@@ -994,6 +998,57 @@ export { FontSource }
 export { FontSourceSubstitution }
 
 export { FontUrlSource }
+
+export { FORMAT_SECTIONS }
+
+// @public
+export const FormatPanel: vue.DefineComponent<vue.ExtractPropTypes<{
+    sections: {
+        type: PropType<readonly FormatSectionId[]>;
+        default: undefined;
+    };
+    className: {
+        type: StringConstructor;
+        default: undefined;
+    };
+}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    sections: {
+        type: PropType<readonly FormatSectionId[]>;
+        default: undefined;
+    };
+    className: {
+        type: StringConstructor;
+        default: undefined;
+    };
+}>> & Readonly<{}>, {
+    className: string;
+    sections: readonly FormatSectionId[];
+}, SlotsType<Partial<Record<"default" | FormatSectionId, () => VNodeChild>>>, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export type FormatPanelProps = ExtractPublicPropTypes<typeof formatPanelProps>;
+
+// @public
+export const FormatSection: vue.DefineComponent<vue.ExtractPropTypes<{
+    section: {
+        type: PropType<FormatSectionDefinition>;
+        required: true;
+    };
+}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    section: {
+        type: PropType<FormatSectionDefinition>;
+        required: true;
+    };
+}>> & Readonly<{}>, {}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+export { FormatSectionDefinition }
+
+export { FormatSectionId }
+
+// @public
+export type FormatSectionProps = ExtractPublicPropTypes<typeof formatSectionProps>;
+
+export { formatSectionsOf }
 
 // @public
 export const GradientDialog: vue.DefineComponent<vue.ExtractPropTypes<{

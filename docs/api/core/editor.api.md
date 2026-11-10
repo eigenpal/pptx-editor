@@ -426,6 +426,9 @@ export function canvasMenuRows(entries: readonly ChromeMenuEntry[], editor: Edit
 // @public
 export type CapsStyle = 'none' | 'small' | 'all';
 
+// @internal
+export function captureImageTarget(editor: PptxEditorInstance): () => boolean;
+
 // @public
 export type CaretAffinity = 'downstream' | 'upstream';
 
@@ -1519,6 +1522,14 @@ export function createFontSource(bytes: Uint8Array, request: FontFaceRequest & {
 };
 
 // @internal
+export function createGradientStopIdentity(): {
+    identity(stops: GradientDetail["stops"], id: string): string;
+    patched(before: GradientDetail["stops"], after: GradientDetail["stops"], patch: Extract<ShapeFormatPatch, {
+        kind: "gradient";
+    }>): void;
+};
+
+// @internal
 export function createHyperlinkPopupController(editor: Editor, clipboard?: () => {
     writeText(text: string): Promise<void>;
 } | undefined): HyperlinkPopupController;
@@ -1975,7 +1986,7 @@ export interface EditorCollaborationSession {
 }
 
 // @public
-export type EditorCommand = CommentCommand | {
+export type EditorCommand = PatchShapeFormatCommand | CommentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -2770,7 +2781,7 @@ export type FillCommand =
 };
 
 // @internal
-export function fillWithPictureFile(editor: PptxEditorInstance, file: File, from?: Element | null): Promise<void>;
+export function fillWithPictureFile(editor: PptxEditorInstance, file: File, from?: Element | null, isCurrent?: () => boolean): Promise<void>;
 
 // @internal
 export function filterFontFamilies(all: readonly string[], query: string): readonly string[];
@@ -3280,6 +3291,72 @@ export interface FontUrlSource {
 }
 
 // @public
+export const FORMAT_SECTIONS: readonly FormatSectionDefinition[];
+
+// @internal
+export function formatColorProperties(detail: ShapeFormatDetail, section: 'fill' | 'effects'): readonly FormatColorProperty[];
+
+// @internal
+export interface FormatColorProperty {
+    // (undocumented)
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly labelKey: TranslationKey;
+    // (undocumented)
+    patch(color: ColorChoice): ShapeFormatPatch;
+}
+
+// @internal
+export function formatControlMixed(editor: PptxEditorInstance | null, slot: ChromeSlotId): boolean;
+
+// @internal
+export function formatLineSlotValue(editor: Editor | null, slot: ChromeSlotId): string | undefined;
+
+// @public
+export interface FormatLineState {
+    // (undocumented)
+    readonly endsSupported: boolean;
+    // (undocumented)
+    readonly head: LineEndType | null;
+    // (undocumented)
+    readonly headMixed: boolean;
+    // (undocumented)
+    readonly tail: LineEndType | null;
+    // (undocumented)
+    readonly tailMixed: boolean;
+    // (undocumented)
+    readonly width: number | null;
+    // (undocumented)
+    readonly widthMixed: boolean;
+}
+
+// @public
+export function formatLineState(editor: Editor | null): FormatLineState | null;
+
+// @internal
+export function formatNumberProperties(detail: ShapeFormatDetail, section: 'fill' | 'effects'): readonly FormatNumberProperty[];
+
+// @internal
+export interface FormatNumberProperty {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly labelKey: TranslationKey;
+    // (undocumented)
+    readonly max?: number;
+    // (undocumented)
+    readonly min?: number;
+    // (undocumented)
+    patch(value: number): ShapeFormatPatch;
+    // (undocumented)
+    readonly unit: '%' | '°' | 'pt';
+    // (undocumented)
+    readonly value: number;
+}
+
+// @public
 export type FormatPainterMode = 'off' | 'once' | 'sticky';
 
 // @internal
@@ -3293,6 +3370,56 @@ export function formatPanelSize(geometry: Pick<SelectionGeometry, 'cx' | 'cy' | 
     cx: number;
     cy: number;
 };
+
+// @internal
+export interface FormatPropertyGroup {
+    // (undocumented)
+    readonly colors: readonly FormatColorProperty[];
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly index?: number;
+    // (undocumented)
+    readonly labelKey: TranslationKey;
+    // (undocumented)
+    readonly numbers: readonly FormatNumberProperty[];
+    // (undocumented)
+    readonly remove?: ShapeFormatPatch;
+}
+
+// @internal
+export function formatPropertyGroups(detail: ShapeFormatDetail, section: 'fill' | 'effects'): readonly FormatPropertyGroup[];
+
+// @public
+export interface FormatSectionDefinition {
+    // (undocumented)
+    readonly id: FormatSectionId;
+    // (undocumented)
+    readonly labelKey: TranslationKey;
+    // (undocumented)
+    readonly slots: readonly ChromeSlotId[];
+}
+
+// @public
+export type FormatSectionId = 'fill' | 'line' | 'effects' | 'text' | 'paragraph' | 'picture' | 'table' | 'chart' | 'diagram' | 'equation' | 'arrange' | 'geometry' | 'slide';
+
+// @public
+export function formatSectionOpen(editor: Editor | null, category: FormatSelectionCategory, id: FormatSectionId): boolean;
+
+// @public
+export function formatSectionsOf(snapshot: EditorSnapshot, order?: readonly FormatSectionId[]): readonly FormatSectionDefinition[];
+
+// @public
+export type FormatSelectionCategory = 'line' | 'shape' | 'text' | 'picture' | 'table' | 'chart' | 'diagram' | 'equation' | 'group' | 'slide' | 'mixed';
+
+// @public
+export function formatSelectionCategory(snapshot: EditorSnapshot): FormatSelectionCategory;
+
+// @internal
+export function formatSelectionHasLineEnds(snapshot: EditorSnapshot): boolean;
+
+// @internal
+export function formatTargetKey(s: EditorSnapshot): string;
 
 // @public
 export function formattingBarChromeGroups(image?: SelectedImageState | null): readonly ChromeGroup[];
@@ -3347,6 +3474,18 @@ export function gradientAngleFrom(value: string): number | null;
 // @internal
 export function gradientCss(g: GradientFill): string;
 
+// @public
+export interface GradientDetail {
+    // (undocumented)
+    readonly angle: number;
+    // (undocumented)
+    readonly kind: 'linear' | 'radial' | 'other';
+    // (undocumented)
+    readonly rotWithShape: boolean;
+    // (undocumented)
+    readonly stops: readonly GradientStopDetail[];
+}
+
 // @internal
 export function gradientDialogStart(initial: GradientFill | null | undefined): GradientFill;
 
@@ -3371,6 +3510,17 @@ export function gradientPosAt(rect: {
 } | undefined, x: number): number;
 
 // @internal
+export function gradientPreviewCss(stops: ReturnType<typeof gradientPreviewStops>): string | undefined;
+
+// @internal
+export function gradientPreviewStops(gradient: GradientDetail, rows: readonly (readonly ThemeSwatch[])[]): readonly {
+    id: string;
+    position: number;
+    color: string | null;
+    opacity: number;
+}[];
+
+// @internal
 export function gradientRemoveStop(g: GradientFill, selected: number): {
     readonly gradient: GradientFill;
     readonly selected: number;
@@ -3381,6 +3531,17 @@ export function gradientSetStop(g: GradientFill, i: number, patch: Partial<{
     pos: number;
     color: string;
 }>): GradientFill;
+
+// @public
+export interface GradientStopDetail {
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly opacity: number;
+    // (undocumented)
+    readonly position: number;
+}
 
 // @internal
 export function groupSlideSections(sections: readonly SlideSection[], slideCount: number): readonly SlideSection[] | null;
@@ -3624,7 +3785,7 @@ export type ImageStyleId = 'simpleFrameWhite' | 'simpleFrameBlack' | 'softEdgeRe
 export function inFixedView<R extends object>(r: R, view: FixedView): R;
 
 // @internal
-export function insertImageFile(editor: PptxEditorInstance, file: File, target?: 'replaceImage'): Promise<void>;
+export function insertImageFile(editor: PptxEditorInstance, file: File, target?: 'replaceImage', isCurrent?: () => boolean): Promise<void>;
 
 // @internal
 export function insertNotesText(root: HTMLElement, text: string): void;
@@ -3802,6 +3963,9 @@ export function listenContextMenuDismiss(panel: () => HTMLElement | null, onClos
 
 // @internal
 export function listenFindRequests(editor: PptxEditorInstance, scope: () => Element | null | undefined, open: (replace: boolean) => void): () => void;
+
+// @public
+export function listenFormatSectionExpansion(editor: Editor | null, listener: () => void): () => void;
 
 // @internal
 export function listenHyperlinkPopup(store: HyperlinkPopupStore, editor: object, enabled: () => boolean): () => void;
@@ -4558,6 +4722,16 @@ export function parseSeconds(text: string): number | null;
 // @internal
 export function parseToolbarSize(draft: string | null): number | null;
 
+// @public
+export interface PatchShapeFormatCommand {
+    // (undocumented)
+    readonly patch: ShapeFormatPatch;
+    // (undocumented)
+    readonly target: ShapeFormatTarget;
+    // (undocumented)
+    readonly type: 'patchShapeFormat';
+}
+
 // @internal
 export const PATTERN_CHOICES: readonly PatternPreset[];
 
@@ -4863,6 +5037,7 @@ export interface PptxEditorInstance extends Editor {
     setFontFamilies(families: readonly string[]): void;
     setFonts(fonts: PptxEditorOptions['fonts']): Promise<void>;
     setSelection(selection: EditorSelection): void;
+    shapeFormat(nodeId?: string): ShapeFormatRead;
     tableStyles(): readonly TableStyleChoice[];
 }
 
@@ -5004,6 +5179,24 @@ export function readBulletPicture(file: Blob | undefined | null): Promise<Bullet
 
 // @public
 export function readCommentThreads(pkg: PptxPackage, slidePart: string): readonly CommentThread[];
+
+// @public
+export interface ReflectionDetail {
+    // (undocumented)
+    readonly blur: number;
+    // (undocumented)
+    readonly distance: number;
+    // (undocumented)
+    readonly endOpacity: number;
+    // (undocumented)
+    readonly endPosition: number;
+    // (undocumented)
+    readonly rotWithShape: boolean;
+    // (undocumented)
+    readonly startOpacity: number;
+    // (undocumented)
+    readonly startPosition: number;
+}
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
@@ -5529,6 +5722,9 @@ export function selectSlideSection(editor: PptxEditorInstance | null, section: S
 // @internal
 export function separatorCost(bar: HTMLElement, style: CSSStyleDeclaration): number;
 
+// @public
+export function setFormatSectionOpen(editor: Editor | null, category: FormatSelectionCategory, id: FormatSectionId, open: boolean): void;
+
 // @internal
 export function setNotesTarget(editor: object, target: NotesTarget | null): void;
 
@@ -5538,6 +5734,24 @@ export function setSlideDragImage(e: {
     clientX: number;
     clientY: number;
 }, item: Element, count: number): void;
+
+// @public
+export interface ShadowDetail {
+    // (undocumented)
+    readonly angle: number;
+    // (undocumented)
+    readonly blur: number;
+    // (undocumented)
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly distance: number;
+    // (undocumented)
+    readonly kind: 'inner' | 'outer';
+    // (undocumented)
+    readonly opacity: number;
+    // (undocumented)
+    readonly rotWithShape: boolean;
+}
 
 // @public
 export type ShadowPreset = 'outerBottomRight' | 'outerBottom' | 'outerBottomLeft' | 'outerRight' | 'outerCenter' | 'outerLeft' | 'outerTopRight' | 'outerTop' | 'outerTopLeft' | 'innerTopLeft' | 'innerTop' | 'innerTopRight' | 'innerLeft' | 'innerCenter' | 'innerRight' | 'innerBottomLeft' | 'innerBottom' | 'innerBottomRight';
@@ -5619,6 +5833,64 @@ export interface ShapeEffectsState {
 export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}` | `bevel.${BevelPreset | 'none'}` | `rotation3d.${Rotation3DPreset | 'none'}`;
 
 // @public
+export interface ShapeFormatDetail {
+    readonly effectsReason?: string;
+    // (undocumented)
+    readonly gradient: GradientDetail | null;
+    // (undocumented)
+    readonly reflection: ReflectionDetail | null;
+    // (undocumented)
+    readonly shadow: ShadowDetail | null;
+    // (undocumented)
+    readonly target: ShapeFormatTarget;
+}
+
+// @public
+export type ShapeFormatPatch = {
+    readonly kind: 'gradient';
+    readonly angle?: number;
+    readonly rotWithShape?: boolean;
+    readonly addStop?: {
+        readonly position: number;
+        readonly color: ColorChoice;
+        readonly opacity?: number;
+    };
+    readonly removeStop?: string;
+    readonly stop?: {
+        readonly id: string;
+        readonly position?: number;
+        readonly color?: ColorChoice;
+        readonly opacity?: number;
+    };
+} | ({
+    readonly kind: 'shadow';
+} & Partial<Omit<ShadowDetail, 'kind'>>) | ({
+    readonly kind: 'reflection';
+} & Partial<ReflectionDetail>);
+
+// @public
+export type ShapeFormatProperties = Omit<ShapeFormatDetail, 'target'>;
+
+// @public
+export type ShapeFormatRead = {
+    readonly ok: true;
+    readonly format: ShapeFormatDetail;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export interface ShapeFormatTarget {
+    // (undocumented)
+    readonly documentId: string;
+    // (undocumented)
+    readonly nodeId: string;
+    // (undocumented)
+    readonly part: string;
+}
+
+// @public
 export interface ShapePreview {
     // (undocumented)
     readonly paths: readonly {
@@ -5673,6 +5945,7 @@ export interface ShapeSummary {
     readonly hidden: boolean;
     // (undocumented)
     readonly kind: 'shape' | 'picture' | 'group' | 'connector' | 'graphicFrame';
+    readonly lineEnds?: boolean;
     readonly name: string;
     // (undocumented)
     readonly nodeId: string;

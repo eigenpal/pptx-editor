@@ -1,8 +1,8 @@
 // `createPptxEditor`: the full Editor contract over the document session and the surface.
-//
-// Snapshot contract (same as docx-editor's facade): `snapshot()` returns the SAME object until
-// state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
+// As in DOCX Editor, `snapshot()` keeps its identity until state changes.
+// `useSyncExternalStore` selectors re-render only when their selected value changes.
 
+import { shapeFormatAt } from './format-detail.ts';
 import { pickImageInto } from './chrome-actions.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
@@ -627,7 +627,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const familySource = createFontFamilySource(options.fontFamilies ?? [], () =>
     hostFonts.supportedFamilies()
   );
-  const fontFamilies = (): readonly string[] => familySource.list(session);
 
   /** Select every shape in the current scope (the slide, or the entered group). */
   const selectAll = (): void => {
@@ -824,8 +823,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     get lastCopied() {
       return clipboard.lastCopied;
     },
-    fontFamilies,
+    fontFamilies: () => familySource.list(session),
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
+    shapeFormat: (nodeId) => shapeFormatAt(session, partAt(slide), selection, nodeId),
     ...chartReads(() => [session?.store.package, partAt(slide), selection]),
     setSelection: (next) => select(next),
     ...comments.methods(emit, () => session?.store.package),

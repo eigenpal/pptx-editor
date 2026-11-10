@@ -133,3 +133,7 @@ Automatic adoption with `--adopt` requires both checks:
 ## Why three layers of comparison
 
 `scripts/lib/shape-compare.mjs` compares normalized signatures per overload, for upstream drift. It does not use one-way TypeScript assignability, which can accept wider or narrower types. `scripts/compat-report.mjs` compares the compiler's view of the actual package exports with the full inventory, for the editing report. `generated/conformance.generated.ts` makes the compiler prove type identity for every selected member, editing or not, and the source-compatibility fixtures prove that Office.js call patterns compile.
+
+### Formatting extensions
+
+`Shape.getFormat()`, `Shape.patchFormat()`, `ShapeLineFormat.beginArrowheadStyle`, `ShapeLineFormat.endArrowheadStyle`, and `ShapeArrowheadStyle` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. Endpoint values use PascalCase. `Open` maps to DrawingML `arrow`. The endpoint names do not imply Office.js PowerPoint compatibility.

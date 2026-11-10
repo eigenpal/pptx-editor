@@ -4,6 +4,7 @@
 // only the autofit re-measurement (`refitShape`), which never refuses (its sizes are bounded
 // by `XFRM_BOUND`, and a missing `a:off` or `a:ext` is added).
 
+import { compileShapeFormatPatch } from './format-detail.ts';
 import { placeholderFor } from '../automation/commands/placeholder-fill.ts';
 import { attr, child, elements, REL, type Element, type PptxPackage } from '../store/index.ts';
 import type { LayoutItem } from '../layout/index.ts';
@@ -755,6 +756,8 @@ export function compile(
       setShapeFill(batch, slidePart(ctx), selectedIds(ctx.selection), command.color);
       return { batch, effect: { label: 'shapeFill' } };
     }
+    case 'patchShapeFormat':
+      return { batch, effect: compileShapeFormatPatch(ctx, batch, command) };
     case 'setShapeGradient': {
       setShapeGradient(batch, slidePart(ctx), selectedIds(ctx.selection), command.gradient);
       return { batch, effect: { label: 'shapeFill' } };

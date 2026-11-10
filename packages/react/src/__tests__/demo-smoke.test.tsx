@@ -27,6 +27,7 @@ import {
 afterEach(closeDemo);
 
 const byRole = screen.getByRole;
+const toolbar = () => within(screen.getByRole('toolbar', { name: 'Formatting' }));
 const items = () => [...document.querySelectorAll<HTMLElement>('.pptx-rail__item')];
 
 describe('demo smoke', () => {
@@ -49,12 +50,20 @@ describe('demo smoke', () => {
     await press('End');
     await type(' rocks');
     await press('Shift+Home');
-    await click(byRole('button', { name: /^Italic \(/ }));
-    expect(byRole('button', { name: /^Italic \(/ }).getAttribute('aria-pressed')).toBe('true');
+    await click(toolbar().getByRole('button', { name: /^Italic \(/ }));
+    expect(
+      toolbar()
+        .getByRole('button', { name: /^Italic \(/ })
+        .getAttribute('aria-pressed')
+    ).toBe('true');
 
     // Undo the italic, then redo it.
     await click(byRole('button', { name: /^Undo \(/ }));
-    expect(byRole('button', { name: /^Italic \(/ }).getAttribute('aria-pressed')).toBe('false');
+    expect(
+      toolbar()
+        .getByRole('button', { name: /^Italic \(/ })
+        .getAttribute('aria-pressed')
+    ).toBe('false');
     await click(byRole('button', { name: /^Redo \(/ }));
 
     // Insert a shape and a text box.

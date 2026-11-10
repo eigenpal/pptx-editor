@@ -16,7 +16,8 @@ import type { RequestContext } from '../../runtime/public.ts';
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 /** The decks under `fixtures/` that scenarios open. */
-export type FixtureName = 'slide-layouts' | 'tables' | 'pictures' | 'text-runs';
+export type FixtureName =
+  'slide-layouts' | 'tables' | 'pictures' | 'text-runs' | 'gradients' | 'shape-effects-presets';
 
 /** Each fixture a scenario may name, for runners that preload them. */
 export const FIXTURES: readonly FixtureName[] = [
@@ -24,6 +25,8 @@ export const FIXTURES: readonly FixtureName[] = [
   'tables',
   'pictures',
   'text-runs',
+  'gradients',
+  'shape-effects-presets',
 ];
 
 /** What a runner hands a script besides the context: decks as base64, as an add-in gets them. */

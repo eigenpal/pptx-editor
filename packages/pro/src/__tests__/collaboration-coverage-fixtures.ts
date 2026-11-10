@@ -326,6 +326,21 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
 
   // Shape format.
   setShapeFill: onA(() => ({ type: 'setShapeFill', color: '#70AD47' })),
+  patchShapeFormat: {
+    arrange: (e) => {
+      select('A')(e);
+      run(e, { type: 'setShapeEffect', effect: { kind: 'shadow', preset: 'outerBottomRight' } });
+    },
+    command: (e) => {
+      const read = e.shapeFormat();
+      if (!read.ok) throw new Error(read.reason);
+      return {
+        type: 'patchShapeFormat',
+        target: read.format.target,
+        patch: { kind: 'shadow', distance: 12 },
+      };
+    },
+  },
   setShapeGradient: onA(() => ({
     type: 'setShapeGradient',
     gradient: {

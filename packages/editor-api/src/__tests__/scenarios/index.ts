@@ -9,6 +9,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { ERROR_SCENARIOS } from './errors.ts';
 import { PLATFORM_SCENARIOS } from './platform.ts';
 import { PRESENTATION_SCENARIOS } from './presentation.ts';
+import { FORMAT_SCENARIOS } from './format.ts';
 import { SHAPE_SCENARIOS } from './shapes.ts';
 import { SLIDE_SCENARIOS } from './slides.ts';
 import { TABLE_SCENARIOS } from './tables.ts';
@@ -21,6 +22,7 @@ export const SCENARIOS: readonly Scenario[] = [
   ...PRESENTATION_SCENARIOS,
   ...SLIDE_SCENARIOS,
   ...SHAPE_SCENARIOS,
+  ...FORMAT_SCENARIOS,
   ...TEXT_SCENARIOS,
   ...TABLE_SCENARIOS,
   ...PLATFORM_SCENARIOS,

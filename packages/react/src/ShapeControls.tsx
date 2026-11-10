@@ -4,6 +4,7 @@
 
 import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
+  formatSelectionHasLineEnds,
   dialogInitialFocus,
   isDialogBackdropPoint,
   SHAPE_GALLERY,
@@ -596,7 +597,7 @@ export function LineMenuControl({ slot, control }: LineMenuControlProps) {
   const { t } = useTranslation();
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const isLine = useEditorState((s) => s.geometry?.lineHead !== undefined);
+  const isLine = useEditorState((s) => formatSelectionHasLineEnds(s));
   // Line ends draw on the side they belong to; the line tool and dash menus show their options.
   const start = lineSlotEnd(slot);
   const shown = lineSlotShown(slot, cmd.value);

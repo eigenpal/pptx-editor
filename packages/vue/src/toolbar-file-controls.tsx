@@ -5,6 +5,7 @@
 
 import { defineComponent, inject, ref, type PropType } from 'vue';
 import {
+  captureImageTarget,
   imageFileTypes,
   insertImageFile,
   requestLinkPopup,
@@ -70,6 +71,7 @@ export const ImageControl = defineComponent({
     );
     const editor = usePptxEditor();
     const input = ref<HTMLInputElement | null>(null);
+    let pickerTarget: (() => boolean) | undefined;
     return () => {
       // Insert > Picture adds a picture; Change Picture replaces the selected one's image.
       const target = props.control.state.kind === 'replace' ? 'replaceImage' : undefined;
@@ -80,7 +82,10 @@ export const ImageControl = defineComponent({
           paths={props.control.paths}
           disabled={!cmd.isEnabled.value}
           disabledReason={reason.value}
-          onClick={() => input.value?.click()}
+          onClick={() => {
+            pickerTarget = editor.value ? captureImageTarget(editor.value) : undefined;
+            input.value?.click();
+          }}
         />,
         <input
           ref={input}
@@ -92,7 +97,9 @@ export const ImageControl = defineComponent({
             const file = el.files?.[0];
             // Clear the input, so picking the same file again still fires `change`.
             el.value = '';
-            if (file && editor.value) void insertImageFile(editor.value, file, target);
+            const isCurrent = pickerTarget;
+            pickerTarget = undefined;
+            if (file && editor.value) void insertImageFile(editor.value, file, target, isCurrent);
           }}
         />,
       ];

@@ -4,6 +4,7 @@
 // position, fill, or line from its layout reads as it is drawn. A shape on a layout or master
 // reads its own values from the file: the cascade resolves slides only.
 
+import { lineEndType } from './commands/style-commands.ts';
 import {
   resolveSlide,
   toHex,
@@ -515,6 +516,8 @@ export function readFill(ctx: PlanContext, ref: Parameters<typeof targetOf>[1]):
 export function lineRead(line: ResolvedLine | undefined): AutomationLineRead {
   if (!line || line.fill.type === 'none')
     return {
+      head: lineEndType(line?.head?.type),
+      tail: lineEndType(line?.tail?.type),
       visible: false,
       color: null,
       weight: line ? toPoints(line.width) : null,
@@ -524,6 +527,8 @@ export function lineRead(line: ResolvedLine | undefined): AutomationLineRead {
     };
   const solid = line.fill.type === 'solid' ? line.fill : null;
   return {
+    head: lineEndType(line.head?.type),
+    tail: lineEndType(line.tail?.type),
     visible: true,
     color: solid ? hex(solid.color) : null,
     weight: toPoints(line.width),
@@ -545,6 +550,8 @@ export function lineElementRead(ln: Element | undefined): AutomationLineRead {
   const val = attr(color, 'val');
   const w = intAttr(ln, 'w');
   return {
+    head: lineEndType(attr(child(ln, 'a:headEnd'), 'type')),
+    tail: lineEndType(attr(child(ln, 'a:tailEnd'), 'type')),
     visible: Boolean(ln) && !child(ln, 'a:noFill'),
     color: color?.local === 'srgbClr' && val ? `#${val.toUpperCase()}` : null,
     weight: w === undefined ? null : toPoints(w),

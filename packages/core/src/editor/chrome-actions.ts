@@ -395,12 +395,22 @@ export function imageFileTypes(target?: 'replaceImage'): string {
 export async function insertImageFile(
   editor: PptxEditorInstance,
   file: File,
-  target?: 'replaceImage'
+  target?: 'replaceImage',
+  isCurrent: () => boolean = captureImageTarget(editor)
 ): Promise<void> {
   // Change Picture changes the picture selected now: a selection that moves while the file
   // loads (another picture, another slide) refuses it, so the wrong picture never changes.
-  const before = selectionKey(editor);
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (target && !isCurrent()) {
+    editor.reject('disabled.selectionChanged');
+    return;
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await file.arrayBuffer());
+  } catch {
+    editor.reject('errors.unsupported');
+    return;
+  }
   let width: number | undefined;
   let height: number | undefined;
   try {
@@ -415,7 +425,7 @@ export async function insertImageFile(
   // Change Picture reads the size from the image when the browser cannot decode it; Insert
   // Picture falls back to 4:3.
   if (target === 'replaceImage') {
-    if (selectionKey(editor) !== before) editor.reject('disabled.selectionChanged');
+    if (!isCurrent()) editor.reject('disabled.selectionChanged');
     else editor.exec({ type: target, bytes, mime: file.type, width, height });
   } else
     editor.exec({
@@ -431,7 +441,13 @@ export async function insertImageFile(
 function selectionKey(editor: PptxEditorInstance): string {
   const snap = editor.snapshot();
   const sel = snap.selection;
-  return JSON.stringify([snap.currentSlide, sel.kind, sel.kind === 'shapes' ? sel.nodeIds : []]);
+  return JSON.stringify([editor.session?.id, snap.currentSlide, sel]);
+}
+
+/** Bind a file picker to its document and selection before it opens. @internal */
+export function captureImageTarget(editor: PptxEditorInstance): () => boolean {
+  const before = selectionKey(editor);
+  return () => selectionKey(editor) === before;
 }
 
 /**
@@ -443,12 +459,13 @@ export function pickImageInto(
   doc: Document = document,
   target?: 'replaceImage'
 ): void {
+  const isCurrent = captureImageTarget(editor);
   const input = doc.createElement('input');
   input.type = 'file';
   input.accept = imageFileTypes(target);
   input.addEventListener('change', () => {
     const file = input.files?.[0];
-    if (file) void insertImageFile(editor, file, target);
+    if (file) void insertImageFile(editor, file, target, isCurrent);
   });
   input.click();
 }
@@ -464,9 +481,13 @@ export const PICTURE_FILL_TYPES = 'image/png,image/jpeg,image/gif';
 export async function fillWithPictureFile(
   editor: PptxEditorInstance,
   file: File,
-  from?: Element | null
+  from?: Element | null,
+  isCurrent: () => boolean = captureImageTarget(editor)
 ): Promise<void> {
-  const before = selectionKey(editor);
+  if (!isCurrent()) {
+    editor.reject('disabled.selectionChanged');
+    return;
+  }
   let bytes: Uint8Array;
   try {
     bytes = new Uint8Array(await file.arrayBuffer());
@@ -474,7 +495,7 @@ export async function fillWithPictureFile(
     editor.reject('errors.unsupported');
     return;
   }
-  if (selectionKey(editor) !== before) {
+  if (!isCurrent()) {
     editor.reject('disabled.selectionChanged');
     return;
   }
@@ -491,12 +512,13 @@ export function pickPictureFill(
   from?: Element | null,
   doc: Document = from?.ownerDocument ?? document
 ): void {
+  const isCurrent = captureImageTarget(editor);
   const input = doc.createElement('input');
   input.type = 'file';
   input.accept = PICTURE_FILL_TYPES;
   input.addEventListener('change', () => {
     const file = input.files?.[0];
-    if (file) void fillWithPictureFile(editor, file, from);
+    if (file) void fillWithPictureFile(editor, file, from, isCurrent);
   });
   input.click();
 }

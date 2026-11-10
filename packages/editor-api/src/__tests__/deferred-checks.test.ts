@@ -21,7 +21,12 @@ const reference = JSON.parse(
 ) as Reference;
 
 /** Public members that this API adds to an Office.js class, and that check their arguments. */
-const EXTENSIONS: ReadonlySet<string> = new Set([]);
+const EXTENSIONS: ReadonlySet<string> = new Set([
+  'getFormat',
+  'patchFormat',
+  'beginArrowheadStyle',
+  'endArrowheadStyle',
+]);
 
 /** The members of `proto` and the classes above it that check their arguments at the sync. */
 function deferredMembers(proto: object): string[] {
