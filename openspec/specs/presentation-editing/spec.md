@@ -410,7 +410,7 @@ Picture replacement and picture fill pickers SHALL capture their document and se
 
 ### Requirement: Unused picture export
 
-Saving SHALL omit unused image relationships from parsed presentation slide, layout, master, and notes parts. Saving SHALL omit image parts with no remaining relationships. Unknown relationships and opaque owners SHALL retain their image targets. Unreadable relationships SHALL prevent cleanup. Export cleanup SHALL NOT change the live document or collaboration room.
+Saving SHALL omit unused image relationships from parsed presentation slide, layout, master, and notes parts. Saving SHALL omit image parts with no remaining relationships. Unknown relationships and opaque owners SHALL retain their image targets. Unreadable relationships and unknown relationship metadata SHALL prevent cleanup. Reference scans SHALL be bounded and SHALL retain image relationships when their work limit is reached. Export cleanup SHALL NOT change the live document or collaboration room.
 
 #### Scenario: Replace a picture and undo after saving
 

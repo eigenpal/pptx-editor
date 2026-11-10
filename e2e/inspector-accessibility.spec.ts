@@ -126,3 +126,19 @@ for (const theme of ['light', 'dark']) {
     }
   });
 }
+
+test('contrast: a focused disabled control keeps the high-contrast system color', async ({
+  page,
+}) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await page.setContent(
+    '<div class="pptx-editor"><button class="pptx-toolbar__button" aria-disabled="true">Unavailable</button><span style="color:GrayText">System disabled color</span></div>'
+  );
+  await page.addStyleTag({ path: 'packages/core/src/styles/editor.css' });
+  const button = page.getByRole('button');
+  await check(button, true);
+  const disabledColor = await page
+    .locator('span')
+    .evaluate((element) => getComputedStyle(element).color);
+  await expect(button).toHaveCSS('color', disabledColor);
+});

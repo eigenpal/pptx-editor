@@ -73,7 +73,7 @@ Saving finishes any pending slide parsing. It can discover damage and return `nu
 
 ## Unused picture data
 
-Saving omits unused image relationships from parsed slides, layouts, masters, and notes. It removes image parts without remaining relationships. Shared images and images referenced by unknown relationship types or opaque parts stay in the file. Unreadable relationships disable this cleanup.
+Saving omits unused image relationships from parsed slides, layouts, masters, and notes. It removes image parts without remaining relationships. Shared images and images referenced by unknown relationship types or opaque parts stay in the file. Unreadable relationships or unknown relationship metadata disable this cleanup. Bounded reference scans retain image relationships when their work limit is reached.
 
 Cleanup changes only the saved file. The live document and collaboration room retain image data for undo and pending peer edits.
 

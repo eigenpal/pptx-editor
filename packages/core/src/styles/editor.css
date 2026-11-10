@@ -4864,7 +4864,8 @@ legend.pptx-dialog__label {
     outline-offset: 1px;
   }
 
-  /* Disabled controls: the system's disabled text color. */
+  /* Disabled controls: the system's disabled text color, including focused controls. */
+  .pptx-editor [aria-disabled='true']:focus-visible,
   .pptx-toolbar__button:is(:disabled, [aria-disabled='true']),
   .pptx-toolbar__field:is(:disabled, [aria-disabled='true']),
   .pptx-toolbar__size[aria-disabled='true'],

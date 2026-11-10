@@ -18,20 +18,49 @@ import type { Element, Node } from './tree.ts';
 
 const OWNERS = new Set(['sld', 'sldLayout', 'sldMaster', 'notes', 'notesMaster', 'handoutMaster']);
 
-/** Keep references from every namespace, including extension content and text values. */
-function referencedIds(root: Element): Set<string> {
+/** Cap reference collection and searches. Exhausting the budget retains image relationships. */
+const MAX_REFERENCE_WORK = 4 * 1024 * 1024;
+const REL_ATTRIBUTES = new Set(['Id', 'Type', 'Target', 'TargetMode']);
+const NAME_CHARACTER = /[\p{L}\p{N}\p{M}_.-]/u;
+
+/** Recognize a complete id inside extension syntax without confusing rId1 with rId10. */
+function containsId(value: string, id: string): boolean {
+  for (let at = value.indexOf(id); at >= 0; at = value.indexOf(id, at + id.length)) {
+    const before = value[at - 1];
+    const after = value[at + id.length];
+    if ((!before || !NAME_CHARACTER.test(before)) && (!after || !NAME_CHARACTER.test(after)))
+      return true;
+  }
+  return false;
+}
+
+/** Keep ids embedded in unknown attribute or text syntax, such as extension JSON. */
+function imageReferences(root: Element, references: number): ((id: string) => boolean) | null {
   const values = new Set<string>();
   const pending: Node[] = [root];
+  let remaining = MAX_REFERENCE_WORK;
+  const collect = (value: string): boolean => {
+    remaining -= value.length + 1;
+    if (remaining < 0) return false;
+    values.add(value);
+    return true;
+  };
   while (pending.length) {
+    if (--remaining < 0) return null;
     const node = pending.pop()!;
     if (node.type === 'element') {
-      for (const a of node.attrs) for (const token of a.value.split(/\s+/)) values.add(token);
+      for (const a of node.attrs) if (!collect(a.value)) return null;
       for (const child of node.children) pending.push(child);
-    } else if (node.type === 'text') {
-      for (const token of node.value.split(/\s+/)) values.add(token);
-    }
+    } else if (!collect(node.value)) return null;
   }
-  return values;
+  // Decide the budget before dropping anything. Attribute order cannot change which
+  // relationships survive on replicas with equivalent source XML.
+  if ((MAX_REFERENCE_WORK - remaining) * references > MAX_REFERENCE_WORK) return null;
+  return (id) => {
+    if (values.has(id)) return true;
+    for (const value of values) if (containsId(value, id)) return true;
+    return false;
+  };
 }
 
 /**
@@ -47,15 +76,30 @@ export function savedPictureParts(pkg: PptxPackage): PptxPackage['parts'] {
     const match = /^(.*)\/_rels\/([^/]+)\.rels$/i.exec(name);
     const source =
       asciiFold(name) === '/_rels/.rels' ? '/' : match ? `${match[1]}/${match[2]}` : null;
-    if (source === null || part.kind !== 'xml' || part.xml.root.ns !== NS.rel) return pkg.parts;
+    if (
+      source === null ||
+      part.kind !== 'xml' ||
+      part.xml.root.ns !== NS.rel ||
+      part.xml.root.local !== 'Relationships' ||
+      part.xml.root.attrs.length > 0
+    )
+      return pkg.parts;
     const owner = pkg.parts.get(equivalentPartName(pkg, source) ?? source);
+    const relationships = elements(part.xml.root);
     const used =
       owner?.kind === 'xml' && owner.xml.root.ns === NS.p && OWNERS.has(owner.xml.root.local)
-        ? referencedIds(owner.xml.root)
+        ? imageReferences(owner.xml.root, relationships.length)
         : null;
     const dropped = new Set<string>();
-    for (const rel of elements(part.xml.root)) {
+    for (const rel of relationships) {
       if (rel.ns !== NS.rel || rel.local !== 'Relationship') return pkg.parts;
+      // Extension metadata can also name another relationship. Preserve the whole package
+      // when its meaning is unknown, including metadata on external relationships.
+      if (
+        rel.children.length > 0 ||
+        rel.attrs.some((a) => a.ns !== '' || !REL_ATTRIBUTES.has(a.local))
+      )
+        return pkg.parts;
       if (attr(rel, 'TargetMode') === 'External') continue;
       const target = resolveInternalTarget(
         source === '/' ? '/x' : source,
@@ -63,7 +107,7 @@ export function savedPictureParts(pkg: PptxPackage): PptxPackage['parts'] {
       );
       if (!target.ok) return pkg.parts;
       const id = attr(rel, 'Id');
-      if (used && id && attr(rel, 'Type') === REL.image && !used.has(id)) dropped.add(rel.id);
+      if (used && id && attr(rel, 'Type') === REL.image && !used(id)) dropped.add(rel.id);
       else referenced.add(partNameKey(target.partName));
     }
     if (dropped.size)
@@ -79,9 +123,15 @@ export function savedPictureParts(pkg: PptxPackage): PptxPackage['parts'] {
       });
   }
   const removed = new Set<string>();
-  for (const name of pkg.parts.keys()) {
+  for (const [name, part] of pkg.parts) {
+    // Parsed package metadata is never image data, even under an incorrect content type.
+    if (part.kind !== 'binary') continue;
     if (!contentTypeOf(pkg, name)?.toLowerCase().startsWith('image/')) continue;
-    if (referenced.has(partNameKey(name)) || pkg.parts.has(relsPartName(name))) continue;
+    if (
+      referenced.has(partNameKey(name)) ||
+      equivalentPartName(pkg, relsPartName(name)) !== undefined
+    )
+      continue;
     parts.delete(name);
     removed.add(partNameKey(name));
   }
