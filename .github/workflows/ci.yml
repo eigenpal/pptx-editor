@@ -35,9 +35,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # The changeset check diffs against the base branch, so it needs full history (0).
+          # Changesets and the collaboration release matrix need full history (0).
           # `0` is falsy in expressions, so `x && 0 || 1` is always 1: test the other case.
-          fetch-depth: ${{ matrix.check != 'changeset' && 1 || 0 }}
+          fetch-depth: ${{ matrix.check != 'changeset' && matrix.check != 'build' && 1 || 0 }}
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -62,6 +62,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
+      - name: Collaboration compatibility policy
+        if: matrix.check == 'lint' && github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch origin "$BASE_SHA"
+          bun run collaboration:check --base "$BASE_SHA"
       - name: Lint and format
         if: matrix.check == 'lint'
         run: |
@@ -121,6 +128,9 @@ jobs:
         run: bash scripts/install-ci-chromium.sh
       # Install the packed tarballs into a fresh app; build with Vite and Bun; render in
       # Chromium. Uses the packages that the build step above made.
+      - name: Collaboration release matrix
+        if: matrix.check == 'build'
+        run: bun run collaboration:test
       - name: Consumer install
         if: matrix.check == 'build'
         run: bun run check:consumer-install

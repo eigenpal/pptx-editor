@@ -18,7 +18,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // - `>p2` delivers every update that waits for peer 2, in the order they were sent;
 // - `flush` delivers every update, and the round's checks run.
 
-import type { FuzzKnownFailure, FuzzRegression } from './fuzz-support.ts';
+import type { FuzzRegression } from './fuzz-support.ts';
 import type { EditKind, TextAction } from './yjs-text-fuzz.test.ts';
 
 const TOKEN = /^p(\d+) (\w+)(?: (\d+):(\d+)(?:\+(\d+))?(!)?)?(?: (\S))?$/u;
@@ -52,13 +52,6 @@ const historyOf =
     clients,
     actions: rounds.flatMap(decode),
   });
-
-/** A history that fails today under the stricter checks, with its issue and its problem. */
-const failing = (
-  regression: FuzzRegression<TextAction>,
-  issue: string,
-  problem: string
-): FuzzKnownFailure<TextAction> => ({ ...regression, issue, problem });
 
 const textHistory = historyOf('typing, Enter, and delete');
 const formatHistory = historyOf('with formats, undo, and redo');
@@ -381,26 +374,15 @@ export const FORMAT_HISTORIES: readonly FuzzRegression<TextAction>[] = [
       'p0 undo, p1 type 1:0 ă, p1 italic 0:4+0, p2 undo, p2 type 0:0 Ą, >p2, >p1, >p0, flush',
     ]
   ),
-];
-
-/**
- * Histories that fail today under the stricter checks, each with its issue and the problem it
- * pins (see `FuzzKnownFailure`).
- */
-export const FORMAT_HISTORY_FAILURES: readonly FuzzKnownFailure<TextAction>[] = [
-  failing(
-    formatHistory(
-      16,
-      [1001, 3003, 2002],
-      [
-        'p0 bold 0:0+3, p1 enter 1:2, p2 delete 1:3+1, >p0, >p2, >p1, flush',
-        'p0 bold 1:2+0, p1 undo, p1 italic 0:8+0, p2 delete 1:1+1, >p0, >p1, >p2, flush',
-        'p0 undo, p0 enter 1:0+1!, p1 type 1:0 Ā, p2 redo, >p2, >p1, >p0, flush',
-        'p0 redo, p1 enter 0:4+3!, p1 type 2:0 ā, p2 italic 1:0+0, >p2, >p0, >p1, flush',
-      ]
-    ),
-    '#3',
-    'p1 undo added characters it may not add: "L"'
+  formatHistory(
+    16,
+    [1001, 3003, 2002],
+    [
+      'p0 bold 0:0+3, p1 enter 1:2, p2 delete 1:3+1, >p0, >p2, >p1, flush',
+      'p0 bold 1:2+0, p1 undo, p1 italic 0:8+0, p2 delete 1:1+1, >p0, >p1, >p2, flush',
+      'p0 undo, p0 enter 1:0+1!, p1 type 1:0 Ā, p2 redo, >p2, >p1, >p0, flush',
+      'p0 redo, p1 enter 0:4+3!, p1 type 2:0 ā, p2 italic 1:0+0, >p2, >p0, >p1, flush',
+    ]
   ),
 ];
 
@@ -602,6 +584,42 @@ export const UNDO_HISTORIES: readonly FuzzRegression<TextAction>[] = [
       'p0 delete 1:1+1, p0 delete 1:0+1, p1 undo, p2 type 1:2 Ĉ, >p2, >p1, >p0, flush',
     ]
   ),
+  undoHistory(
+    733,
+    [2002, 1001, 3003],
+    [
+      'p0 enter 1:2, p1 redo, p1 type 1:2 Ā, p2 type 1:1 ā, >p0, >p2, >p1, flush',
+      'p0 undo, p1 undo, p1 delete 2:1+1, p2 redo, p2 undo, >p1, >p0, >p2, flush',
+      'p0 redo, p1 delete 1:1+3, p2 type 1:4 Ă, >p1, >p0, >p2, flush',
+      'p0 undo, p0 delete 0:0+3, p1 undo, p2 type 2:1 ă, p2 type 1:2 Ą, >p1, >p0, >p2, flush',
+      'p0 undo, p1 redo, p2 type 0:2 ą, p2 delete 0:0+2, >p0, >p1, >p2, flush',
+      'p0 enter 0:0+1!, p0 delete 1:5+1, p1 enter 2:0, p2 delete 1:4+1, >p0, >p1, >p2, flush',
+    ]
+  ),
+  undoHistory(
+    1205,
+    [2002, 1001, 3003],
+    [
+      'p0 undo, p0 undo, p1 redo, p1 enter 0:3, p2 enter 1:3, >p0, >p1, >p2, flush',
+      'p0 undo, p0 type 1:0 Ā, p1 redo, p2 redo, p2 enter 0:2, >p1, >p2, >p0, flush',
+      'p0 delete 1:0+1, p1 type 2:0 ā, p1 undo, p2 undo, >p1, >p2, >p0, flush',
+      'p0 redo, p1 delete 2:2+1, p1 undo, p2 undo, >p0, >p1, >p2, flush',
+      'p0 undo, p0 undo, p1 redo, p1 type 1:4 Ă, p2 undo, >p0, >p1, >p2, flush',
+      'p0 undo, p0 delete 3:2+1, p1 undo, p2 type 2:5 ă, p2 undo, >p1, >p0, >p2, flush',
+    ]
+  ),
+  undoHistory(
+    1919,
+    [1001, 3003, 2002],
+    [
+      'p0 redo, p1 type 1:3 Ā, p2 undo, p2 undo, >p2, >p1, >p0, flush',
+      'p0 redo, p1 type 0:6 ā, p2 type 1:3 Ă, p2 enter 0:1, >p1, >p2, >p0, flush',
+      'p0 type 1:6 ă, p0 undo, p1 enter 1:1+1!, p2 enter 0:1, p2 undo, >p0, >p2, >p1, flush',
+      'p0 delete 2:2+1, p0 type 0:1 Ą, p1 type 2:3 ą, p1 redo, p2 undo, >p0, >p2, >p1, flush',
+      'p0 type 1:1 Ć, p0 delete 1:0+1, p1 enter 1:0+1!, p2 redo, >p2, >p0, >p1, flush',
+      'p0 undo, p0 undo, p1 redo, p2 delete 0:1+1, p2 undo, >p0, >p2, >p1, flush',
+    ]
+  ),
 ];
 
 /** Typing, Enter, delete, bold, italic, undo, and redo over 6 rounds: the `FORMAT` mode. */
@@ -786,127 +804,52 @@ export const LONG_FORMAT_HISTORIES: readonly FuzzRegression<TextAction>[] = [
       'p0 bold 0:0+0, p0 italic 2:1+0, p1 redo, p2 delete 0:0+1, p2 italic 3:0+0, >p0, >p2, >p1, flush',
     ]
   ),
-];
-
-/**
- * Of those seeds, the histories that fail under the stricter checks: an undo or a redo brings
- * back a character that a peer removed (#3).
- */
-export const UNDO_HISTORY_FAILURES: readonly FuzzKnownFailure<TextAction>[] = [
-  failing(
-    undoHistory(
-      733,
-      [2002, 1001, 3003],
-      [
-        'p0 enter 1:2, p1 redo, p1 type 1:2 Ā, p2 type 1:1 ā, >p0, >p2, >p1, flush',
-        'p0 undo, p1 undo, p1 delete 2:1+1, p2 redo, p2 undo, >p1, >p0, >p2, flush',
-        'p0 redo, p1 delete 1:1+3, p2 type 1:4 Ă, >p1, >p0, >p2, flush',
-        'p0 undo, p0 delete 0:0+3, p1 undo, p2 type 2:1 ă, p2 type 1:2 Ą, >p1, >p0, >p2, flush',
-        'p0 undo, p1 redo, p2 type 0:2 ą, p2 delete 0:0+2, >p0, >p1, >p2, flush',
-        'p0 enter 0:0+1!, p0 delete 1:5+1, p1 enter 2:0, p2 delete 1:4+1, >p0, >p1, >p2, flush',
-      ]
-    ),
-    '#3',
-    'removed characters show again: "L" in ["ABCDEFGH","IJKL"]'
+  longFormatHistory(
+    1196,
+    [2002, 1001, 3003],
+    [
+      'p0 type 1:2 Ā, p0 type 0:4 ā, p1 type 1:3 Ă, p1 enter 0:6, p2 type 1:0 ă, >p0, >p1, >p2, flush',
+      'p0 type 2:1 Ą, p1 redo, p2 type 0:5 ą, >p1, >p0, >p2, flush',
+      'p0 type 2:6 Ć, p1 italic 0:2+3, p2 type 0:6 ć, p2 type 1:2 Ĉ, >p2, >p1, >p0, flush',
+      'p0 type 1:3 ĉ, p0 enter 2:6+1!, p1 delete 0:1+1, p2 enter 2:7+2!, p2 italic 0:4+2, >p2, >p1, >p0, flush',
+      'p0 undo, p0 type 3:0 Ċ, p1 bold 2:6+0, p1 italic 4:0+0, p2 enter 1:0, p2 italic 2:2+2, >p1, >p2, >p0, flush',
+      'p0 enter 0:3+3!, p1 redo, p1 type 4:1 ċ, p2 redo, >p1, >p0, >p2, flush',
+    ]
   ),
-  failing(
-    undoHistory(
-      1205,
-      [2002, 1001, 3003],
-      [
-        'p0 undo, p0 undo, p1 redo, p1 enter 0:3, p2 enter 1:3, >p0, >p1, >p2, flush',
-        'p0 undo, p0 type 1:0 Ā, p1 redo, p2 redo, p2 enter 0:2, >p1, >p2, >p0, flush',
-        'p0 delete 1:0+1, p1 type 2:0 ā, p1 undo, p2 undo, >p1, >p2, >p0, flush',
-        'p0 redo, p1 delete 2:2+1, p1 undo, p2 undo, >p0, >p1, >p2, flush',
-        'p0 undo, p0 undo, p1 redo, p1 type 1:4 Ă, p2 undo, >p0, >p1, >p2, flush',
-        'p0 undo, p0 delete 3:2+1, p1 undo, p2 type 2:5 ă, p2 undo, >p1, >p0, >p2, flush',
-      ]
-    ),
-    '#3',
-    'removed characters show again: "C" in ["ABC","ĀDEFGH","IJK","L"]'
+  longFormatHistory(
+    304,
+    [2002, 3003, 1001],
+    [
+      'p0 italic 1:3+0, p0 bold 0:4+1, p1 enter 0:1+2!, p2 bold 1:1+2, >p2, >p0, >p1, flush',
+      'p0 delete 2:1+2, p0 type 1:1 Ā, p1 italic 2:4+0, p2 type 1:2 ā, p2 redo, >p0, >p2, >p1, flush',
+      'p0 delete 1:1+2, p0 type 0:2 Ă, p1 bold 0:1+0, p1 italic 1:4+2, p2 redo, >p2, >p0, >p1, flush',
+      'p0 undo, p1 bold 0:1+1, p1 type 1:4 ă, p2 type 0:3 Ą, >p2, >p1, >p0, flush',
+      'p0 italic 2:0+2, p0 redo, p1 type 2:0 ą, p1 type 1:0 Ć, p2 undo, >p1, >p0, >p2, flush',
+      'p0 redo, p1 type 2:3 ć, p1 type 2:0 Ĉ, p2 redo, >p2, >p1, >p0, flush',
+    ]
   ),
-  failing(
-    undoHistory(
-      1919,
-      [1001, 3003, 2002],
-      [
-        'p0 redo, p1 type 1:3 Ā, p2 undo, p2 undo, >p2, >p1, >p0, flush',
-        'p0 redo, p1 type 0:6 ā, p2 type 1:3 Ă, p2 enter 0:1, >p1, >p2, >p0, flush',
-        'p0 type 1:6 ă, p0 undo, p1 enter 1:1+1!, p2 enter 0:1, p2 undo, >p0, >p2, >p1, flush',
-        'p0 delete 2:2+1, p0 type 0:1 Ą, p1 type 2:3 ą, p1 redo, p2 undo, >p0, >p2, >p1, flush',
-        'p0 type 1:1 Ć, p0 delete 1:0+1, p1 enter 1:0+1!, p2 redo, >p2, >p0, >p1, flush',
-        'p0 undo, p0 undo, p1 redo, p2 delete 0:1+1, p2 undo, >p0, >p2, >p1, flush',
-      ]
-    ),
-    '#3',
-    'p2 undo added characters it may not add: "C"'
+  longFormatHistory(
+    597,
+    [2002, 1001, 3003],
+    [
+      'p0 type 1:1 Ā, p0 type 1:4 ā, p1 enter 1:1, p1 type 1:0 Ă, p2 type 1:0 ă, >p2, >p0, >p1, flush',
+      'p0 type 0:7 Ą, p1 delete 1:3+1, p1 redo, p2 italic 0:0+3, p2 type 2:0 ą, >p1, >p2, >p0, flush',
+      'p0 redo, p1 italic 1:1+2, p2 italic 1:1+1, p2 delete 1:1+1, >p0, >p1, >p2, flush',
+      'p0 italic 0:2+1, p0 enter 2:2, p1 bold 0:0+2, p1 type 2:0 Ć, p2 bold 1:0+1, p2 type 2:5 ć, >p0, >p2, >p1, flush',
+      'p0 redo, p1 type 2:2 Ĉ, p1 bold 3:1+1, p2 undo, >p1, >p0, >p2, flush',
+      'p0 undo, p0 type 3:3 ĉ, p1 type 2:2 Ċ, p2 italic 3:3+1, p2 delete 3:2+1, >p1, >p0, >p2, flush',
+    ]
   ),
-];
-
-/** The same, with formats. */
-export const LONG_FORMAT_HISTORY_FAILURES: readonly FuzzKnownFailure<TextAction>[] = [
-  failing(
-    longFormatHistory(
-      304,
-      [2002, 3003, 1001],
-      [
-        'p0 italic 1:3+0, p0 bold 0:4+1, p1 enter 0:1+2!, p2 bold 1:1+2, >p2, >p0, >p1, flush',
-        'p0 delete 2:1+2, p0 type 1:1 Ā, p1 italic 2:4+0, p2 type 1:2 ā, p2 redo, >p0, >p2, >p1, flush',
-        'p0 delete 1:1+2, p0 type 0:2 Ă, p1 bold 0:1+0, p1 italic 1:4+2, p2 redo, >p2, >p0, >p1, flush',
-        'p0 undo, p1 bold 0:1+1, p1 type 1:4 ă, p2 type 0:3 Ą, >p2, >p1, >p0, flush',
-        'p0 italic 2:0+2, p0 redo, p1 type 2:0 ą, p1 type 1:0 Ć, p2 undo, >p1, >p0, >p2, flush',
-        'p0 redo, p1 type 2:3 ć, p1 type 2:0 Ĉ, p2 redo, >p2, >p1, >p0, flush',
-      ]
-    ),
-    '#3',
-    'removed characters show again: "Ă" in ["AFĂĄ","DāGHă","IL"]'
-  ),
-  failing(
-    longFormatHistory(
-      597,
-      [2002, 1001, 3003],
-      [
-        'p0 type 1:1 Ā, p0 type 1:4 ā, p1 enter 1:1, p1 type 1:0 Ă, p2 type 1:0 ă, >p2, >p0, >p1, flush',
-        'p0 type 0:7 Ą, p1 delete 1:3+1, p1 redo, p2 italic 0:0+3, p2 type 2:0 ą, >p1, >p2, >p0, flush',
-        'p0 redo, p1 italic 1:1+2, p2 italic 1:1+1, p2 delete 1:1+1, >p0, >p1, >p2, flush',
-        'p0 italic 0:2+1, p0 enter 2:2, p1 bold 0:0+2, p1 type 2:0 Ć, p2 bold 1:0+1, p2 type 2:5 ć, >p0, >p2, >p1, flush',
-        'p0 redo, p1 type 2:2 Ĉ, p1 bold 3:1+1, p2 undo, >p1, >p0, >p2, flush',
-        'p0 undo, p0 type 3:3 ĉ, p1 type 2:2 Ċ, p2 italic 3:3+1, p2 delete 3:2+1, >p1, >p0, >p2, flush',
-      ]
-    ),
-    '#3',
-    'removed characters show again: "ć" in ["ABCDEFGĄH","ĂI","ĆąĈJ","KāLć"]'
-  ),
-  failing(
-    longFormatHistory(
-      733,
-      [2002, 1001, 3003],
-      [
-        'p0 enter 1:2, p1 undo, p1 type 1:2 Ā, p2 type 1:1 ā, >p0, >p2, >p1, flush',
-        'p0 bold 2:2+0, p1 italic 1:1+1, p1 delete 2:1+1, p2 undo, p2 italic 0:2+1, >p1, >p0, >p2, flush',
-        'p0 undo, p1 delete 2:0+1, p2 type 2:1 Ă, >p1, >p0, >p2, flush',
-        'p0 bold 2:1+0, p0 delete 1:0+3, p1 bold 0:2+1, p2 type 2:0 ă, p2 type 1:4 Ą, >p1, >p0, >p2, flush',
-        'p0 bold 0:1+2, p1 redo, p2 type 0:4 ą, p2 delete 0:1+2, >p0, >p1, >p2, flush',
-        'p0 enter 0:0+1!, p0 delete 1:5+1, p1 enter 2:1, p2 delete 1:3+1, >p0, >p1, >p2, flush',
-      ]
-    ),
-    '#3',
-    'removed characters show again: "ā" in ["ABCDEFGH","IāJĀ","K"]'
-  ),
-  failing(
-    longFormatHistory(
-      1196,
-      [2002, 1001, 3003],
-      [
-        'p0 type 1:2 Ā, p0 type 0:4 ā, p1 type 1:3 Ă, p1 enter 0:6, p2 type 1:0 ă, >p0, >p1, >p2, flush',
-        'p0 type 2:1 Ą, p1 redo, p2 type 0:5 ą, >p1, >p0, >p2, flush',
-        'p0 type 2:6 Ć, p1 italic 0:2+3, p2 type 0:6 ć, p2 type 1:2 Ĉ, >p2, >p1, >p0, flush',
-        'p0 type 1:3 ĉ, p0 enter 2:6+1!, p1 delete 0:1+1, p2 enter 2:7+2!, p2 italic 0:4+2, >p2, >p1, >p0, flush',
-        'p0 undo, p0 type 3:0 Ċ, p1 bold 2:6+0, p1 italic 4:0+0, p2 enter 1:0, p2 italic 2:2+2, >p1, >p2, >p0, flush',
-        'p0 enter 0:3+3!, p1 redo, p1 type 4:1 ċ, p2 redo, >p1, >p0, >p2, flush',
-      ]
-    ),
-    '#3',
-    'p0 undo added characters it may not add: "ĂL"'
+  longFormatHistory(
+    733,
+    [2002, 1001, 3003],
+    [
+      'p0 enter 1:2, p1 undo, p1 type 1:2 Ā, p2 type 1:1 ā, >p0, >p2, >p1, flush',
+      'p0 bold 2:2+0, p1 italic 1:1+1, p1 delete 2:1+1, p2 undo, p2 italic 0:2+1, >p1, >p0, >p2, flush',
+      'p0 undo, p1 delete 2:0+1, p2 type 2:1 Ă, >p1, >p0, >p2, flush',
+      'p0 bold 2:1+0, p0 delete 1:0+3, p1 bold 0:2+1, p2 type 2:0 ă, p2 type 1:4 Ą, >p1, >p0, >p2, flush',
+      'p0 bold 0:1+2, p1 redo, p2 type 0:4 ą, p2 delete 0:1+2, >p0, >p1, >p2, flush',
+      'p0 enter 0:0+1!, p0 delete 1:5+1, p1 enter 2:1, p2 delete 1:3+1, >p0, >p1, >p2, flush',
+    ]
   ),
 ];

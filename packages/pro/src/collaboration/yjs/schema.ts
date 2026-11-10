@@ -17,12 +17,17 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   pptx-undone-v1    Y.Map   key an undo unlisted → where it was listed (`undo-unlisted.ts`)
 //   pptx-restored-v1  Y.Map   character an undo or redo put back → the one it stands for
 //                             (`text-identity.ts`)
+//   pptx-restored-steps-v1   Y.Map   restored character → previous id, move flag, state vector
+//   pptx-restored-starts-v1  Y.Map   restored character → source position and copy provenance
+//   pptx-case-base-v1   Y.Map   root character → original UTF-16 unit, outside undo scope
+//   pptx-delete-clock-v1    Y.Map   participant → clock of its latest explicit deletion
 //
 // A node record holds `p` (its part name), `k` (its own key, checked on read), and either an
 // element (`s` shell: name and namespace declarations, `a` Y.Map of attributes, `c` Y.Array of
 // child keys) or a text node (`x` Y.Text). Split and move lineage adds the optional fields of
-// `LINEAGE` in `text-lineage.ts` (`sf`, `sb`, `sa`, `sl`, `sg`, `se`, `sk`, `mf`, `mi`, `mq`,
+// `LINEAGE` in `text-lineage.ts` (`sf`, `sb`, `sa`, `sl`, `sg`, `se`, `sk`, `cw`, `mf`, `mi`, `mq`,
 // `mt`, `mo`, `rw`), character identity the fields of `IDENTITY` in `text-identity.ts` (`ci`, `cp`, `rr.<key>`), and
+// case choices `cc.<root-client>:<root-clock>:<author>` ([logical order, UTF-16 unit]), and
 // merged cells the fields of `MERGED` in `merged-cells.ts` (`mh`, `cv.<client>`).
 // Keys are logical ids shared by every peer; store node ids stay replica-local. Everything read
 // from the room is untrusted: it reaches the store only through `buildReplicaPart`.
@@ -30,9 +35,14 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import * as Y from 'yjs';
 
 /**
- * The room format. A replica attaches only to a room of its own format, so a replica of another
- * format refuses the room and keeps its own deck (`schema-version-mismatch`).
+ * Shared schema counter and legacy format history. The complete four-field format lives in
+ * `format.ts`. A session checks every field and keeps its own deck on a mismatch.
  *
+ * - 8: undo updates carry restored character identities and causal deletion metadata together.
+ *   Copies retain their source position through formatting, paragraph edits, and undo.
+ *   Case choices retain character identities and independent participant undo.
+ *   Table undo retains peer content and selective deletion intent. Format 7 uses different
+ *   copy ordering and rescue rules, so it cannot share a room with format 8.
  * - 7: comment lists and author lists are XML trees in the room, and a save joins the lists that
  *   two peers added at once and points copied threads at their slide (`comment-repair.ts` in
  *   `@pptx-editor.dev/core`). A replica of format 6 saves the room without that step, so its file
@@ -61,7 +71,7 @@ import * as Y from 'yjs';
  *
  * No format before 3 was published.
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const META_KEY = 'pptx-meta-v1';
 export const PARTS_KEY = 'pptx-parts-v1';

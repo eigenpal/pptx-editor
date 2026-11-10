@@ -884,7 +884,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Synchronize edits, typing, and peer selections through Yjs with @pptx-editor.dev/pro under the EigenPal Pro License. Undo applies to your own changes, with limits when peers edit the same content. Some concurrent text and table edits can duplicate, reorder, or lose content; see the collaboration guide.',
+      'Synchronize edits, typing, and peer selections through Yjs with @pptx-editor.dev/pro under the EigenPal Pro License. Undo applies to your own changes, with limits when peers edit the same content. Concurrent case changes preserve character identities. Peer formatting preserves carets and selections. Rescued text remains visible in orphaned vertical merge cells. Concurrent undo can reorder text; see the collaboration guide.',
     docsLink: '/docs/pro/collaboration',
   },
   {

@@ -398,6 +398,18 @@ export function copyShapes(
   return { version: 1, document, slidePart, shapes: kept, relationships: [...carried.values()] };
 }
 
+/**
+ * Whether `payload` carries every shape of `nodeIds`. `copySelection` writes one payload entry
+ * for each selected shape that can travel, so a shorter payload left a shape out. A cut deletes
+ * only a selection that its copy carries in full.
+ */
+export function carriesAll(
+  payload: ClipboardPayload | null | undefined,
+  nodeIds: readonly string[]
+): boolean {
+  return nodeIds.length > 0 && payload?.shapes.length === nodeIds.length;
+}
+
 /** Plain text of copied shapes, one paragraph per line. */
 export function clipboardText(payload: ClipboardPayload): string {
   const lines: string[] = [];

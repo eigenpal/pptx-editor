@@ -33,6 +33,28 @@ Each user action SHALL be one history entry, and typing SHALL group by intent.
 - **WHEN** a user types a word and presses undo
 - **THEN** the whole word is removed in one step
 
+#### Scenario: Undo text copied by a peer
+
+- **WHEN** a participant undoes typing after another participant formats or splits that text
+- **THEN** known copies of those typed characters are removed, and unrelated characters remain
+
+#### Scenario: Deliver an undo in separate updates
+
+- **WHEN** a provider delivers updates for an undo separately
+- **THEN** each restored character arrives with its identity and deletion metadata
+
+#### Scenario: Concurrent table removal and text editing
+
+- **WHEN** a row or cell disappears while another participant edits its text
+- **THEN** surviving cells retain peer text, and explicit text deletions still apply
+
+#### Scenario: Recover into a cell without a text body
+
+- **WHEN** a concurrent row or column deletion removes a cell with unseen peer typing
+- **AND** the surviving destination cell has no text body
+- **THEN** recovery places the source text body and typing into that cell before another edit
+- **AND** text already observed by the deletion does not qualify the paragraph for recovery
+
 ### Requirement: Group scope
 
 The editor SHALL let a user enter a group and edit its children, and SHALL keep the group's bounds fitted to its children.
@@ -241,3 +263,39 @@ A long deck SHALL show its start slide and take input before its other slides pa
 
 - **WHEN** the user deletes a slide that has not parsed yet and does not parse
 - **THEN** the deck is not refused, and saves without it, unless an undo brings the slide back and a reader reads it
+
+### Requirement: Collaboration format compatibility
+
+Rooms SHALL record protocol, shared schema, repair, and canonical model versions. Sessions SHALL reject mismatched fields before applying room content and after metadata changes. Format inspection SHALL preserve shared state and SHALL support legacy version strings. Hosts SHALL check connection compatibility before synchronization.
+
+#### Scenario: Upgrade an incompatible saved room
+
+- **WHEN** a release changes the collaboration format
+- **THEN** release checks restore a published baseline, refuse incompatible admission, and export through the compatible release
+- **AND** the candidate seeds a new room with preserved presentation content and empty undo history
+
+#### Scenario: Capture a stable release
+
+- **WHEN** a stable package release is published
+- **THEN** the post-release workflow captures immutable package integrity, installation locks, and a saved room fixture
+- **AND** missing baseline evidence blocks the next stable publication
+
+### Requirement: Concurrent case changes and selection continuity
+
+Case changes SHALL retain character identities. Concurrent case changes SHALL NOT duplicate characters. Each participant's undo SHALL remove only that participant's case choice. Formatting from a peer SHALL preserve caret positions and both endpoints of text selections through run splits.
+
+#### Scenario: Two peers capitalize the same text
+
+- **WHEN** two disconnected peers change the same text to uppercase and synchronize
+- **THEN** each original character appears once
+- **AND** undoing either case change preserves the other participant's case choice
+
+#### Scenario: A peer formats text around a caret
+
+- **WHEN** formatting from a peer splits the run containing a caret or selection endpoint
+- **THEN** the endpoint follows its character into the visible run
+
+#### Scenario: A rescued cell retains vertical merge continuation
+
+- **WHEN** concurrent table operations rescue text into an orphaned cell with `vMerge="1"`
+- **THEN** the table layout includes that cell and its rescued text

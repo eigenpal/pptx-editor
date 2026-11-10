@@ -1,0 +1,59 @@
+name: Capture collaboration baseline
+
+# Release baseline capture follows DOCX Editor's post-release catalog workflow.
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    secrets:
+      RELEASE_PAL_APP_ID:
+        required: true
+      RELEASE_PAL_PRIVATE_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published stable package version to capture
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: collaboration-baseline
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Mint release-pal App token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ secrets.RELEASE_PAL_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PAL_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: pptx-editor
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.token.outputs.token }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Capture published packages and open baseline PR
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          HUSKY: '0'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node scripts/collaboration/post-release.mjs

@@ -1,0 +1,18 @@
+{
+  "impact": "migration-required",
+  "fields": ["protocolVersion", "sharedSchemaVersion", "repairVersion", "canonicalModelVersion"],
+  "before": "pptx-collaboration-7",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Character copies, case choices, restored identities, and table recovery require matching deterministic rules. Introduce separate protocol, shared schema, repair, and canonical model fields.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-format.test.ts",
+    "packages/pro/src/__tests__/yjs-font-format.test.ts",
+    "packages/pro/src/__tests__/yjs-text-lineage.test.ts",
+    "packages/pro/src/__tests__/yjs-removed-table-content.test.ts",
+    "packages/pro/src/__tests__/yjs-text-fuzz.test.ts",
+    "packages/pro/src/__tests__/yjs-table-fuzz.test.ts",
+    "scripts/collaboration/test.mjs"
+  ],
+  "changeset": ".changeset/collaboration-keeps-character-identities.md",
+  "migration": "docs/site/content/pro/collaboration-versions.mdx"
+}

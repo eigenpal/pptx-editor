@@ -67,7 +67,7 @@ describe('a peer edits text that an undo put back', () => {
       });
 
   for (const swap of ORDERS)
-    test(`a delete reaches no copy of what a concurrent undo put back (${order(swap)})`, async () => {
+    test(`a concurrent delete survives an undo of Enter (${order(swap)})`, async () => {
       const { a, b, sync } = await replicas(oneRun('IJKL'), swap);
       sync.pause();
       selectIn(a, 0, 3, 4);
@@ -76,8 +76,8 @@ describe('a peer edits text that an undo put back', () => {
       ok(b.input('paragraph'));
       ok(b.exec({ type: 'undo' }));
       sync.flush();
-      expect(converged(a, b)).toEqual(['IJKL']);
-      // Both copy the "L" that B's undo put back: it stays once.
+      expect(converged(a, b)).toEqual(['IJK']);
+      // Later splits keep the independently deleted character absent.
       sync.pause();
       selectIn(a, 0, 3);
       ok(a.input('paragraph'));
@@ -85,7 +85,7 @@ describe('a peer edits text that an undo put back', () => {
       ok(b.input('paragraph'));
       sync.flush();
       const text = converged(a, b).join('');
-      expect(text).toContain('L');
+      expect(text).not.toContain('L');
       expect(text.length).toBe(new Set(text).size);
     });
 });
@@ -166,8 +166,9 @@ describe('a character two undos put back shows once', () => {
       expect(converged(...editors)).toEqual(['A', 'BCDEFGH']);
     });
 
-  // One undo puts the character back in the run the Enter cut, the other in the Enter's copy:
-  // two texts hold it, and the twin with the smallest id stays.
+  // The undo of the Enter does not put back the character that the peer deleted at the same
+  // time (`undo-moves.ts`). The peer's undo of its delete then puts it back in the Enter's
+  // copy, and it shows once.
   for (const ids of FOUR)
     test(`an undo of an Enter and an undo of a delete of its copy show it once (client ids ${ids.join(', ')})`, async () => {
       const { editors, sync } = await peers(oneRun('ABCDEFGH'), ids);
@@ -179,7 +180,7 @@ describe('a character two undos put back shows once', () => {
       ok(a.input('deleteBackward'));
       ok(c.exec({ type: 'undo' }));
       sync.flush();
-      expect(converged(...editors)).toEqual(['ABCDEFGH']);
+      expect(converged(...editors)).toEqual(['ABDEFGH']);
       ok(a.exec({ type: 'undo' }));
       const text = converged(...editors).join('');
       expect([...text].sort().join('')).toBe('ABCDEFGH');

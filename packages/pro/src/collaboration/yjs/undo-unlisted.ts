@@ -23,10 +23,15 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // ignored, and each read looks at no more than `MAX_UNDONE` entries and `MAX_DEPTH` levels.
 
 import * as Y from 'yjs';
+import { readText } from './text-case.ts';
+import { savedListings } from './undo-listings-history.ts';
 import type { ReplicaElementSpec, ReplicaTextSpec } from '@pptx-editor.dev/core/store';
-import { F, type Room } from './schema.ts';
-import { IDENTITY } from './text-identity.ts';
-import { isRemoved } from './text-lineage.ts';
+import { F, partEntryOf, type Room } from './schema.ts';
+import { IDENTITY, itemOf } from './text-identity.ts';
+import { isRemoved, LINEAGE } from './text-lineage.ts';
+import { removalSnapshot, removalsSawAnywhere } from './removal-snapshots.ts';
+import { rehomeUndone, type RehomeSource } from './undo-rehome.ts';
+import { rehomeStranded } from './undo-stranded.ts';
 import { forEachItem, holderItem, mapItems, sequenceItems, type StepRanges } from './yjs-items.ts';
 
 /** The room map of undone listings: key → `{ p, u, a, c, q }` (see `UndoneEntry`). */
@@ -58,6 +63,16 @@ interface UndoneEntry {
    * the parent it showed in. The node shows here again only while that parent is listed.
    */
   readonly shownIn: string | null;
+  /**
+   * For a paragraph or a text body that the step moved between table cells (`m`): the undo
+   * puts it back in the cell it came from. It shows here again only when a peer removed that
+   * cell without seeing it there, with all of its content.
+   */
+  readonly moved: boolean;
+  readonly redo: boolean;
+  readonly table: string | null;
+  /** The room state before an undo of a move, to distinguish earlier removals. */
+  readonly seen: ReadonlyMap<number, number>;
 }
 
 /**
@@ -77,7 +92,57 @@ function entryOf(key: string, value: unknown, partName?: string): UndoneEntry | 
   const clock = Number.isSafeInteger(v.q) && (v.q as number) >= 0 ? (v.q as number) : Infinity;
   const before = typeof v.n === 'string' ? v.n : '';
   const shownIn = typeof v.s === 'string' ? v.s : null;
-  return { key, parent: v.u, after: v.a, before, client: v.c as number, clock, shownIn };
+  const moved = v.m === 1;
+  const seen = new Map<number, number>();
+  if (Array.isArray(v.v) && v.v.length <= 8192 && v.v.length % 2 === 0)
+    for (let i = 0; i < v.v.length; i += 2) {
+      const [client, count] = v.v.slice(i, i + 2) as unknown[];
+      if (
+        typeof client === 'number' &&
+        Number.isSafeInteger(client) &&
+        client >= 0 &&
+        typeof count === 'number' &&
+        Number.isSafeInteger(count) &&
+        count >= 0
+      )
+        seen.set(client, count);
+    }
+  return {
+    key,
+    parent: v.u,
+    after: v.a,
+    before,
+    client: v.c as number,
+    clock,
+    shownIn,
+    moved,
+    seen,
+    redo: v.d === 1,
+    table: typeof v.t === 'string' ? v.t : null,
+  };
+}
+
+/** The deepest chain of entries put back again that `liveRedone` follows. */
+const MAX_REDONE = 64;
+
+/** `item`, or the live item that an undo or a redo put back for it, or null. */
+function liveRedone(doc: Y.Doc, item: Y.Item): Y.Item | null {
+  let at: Y.Item | null = item;
+  for (let depth = 0; at && at.deleted && depth < MAX_REDONE; depth += 1)
+    at = at.redone ? itemOf(doc, at.redone) : null;
+  return at && !at.deleted ? at : null;
+}
+
+/**
+ * Whether an undo took the node `key` out of the document without seeing the write of `item`:
+ * an undo recorded where it listed the node (not a tidied listing), and another client wrote
+ * `item`, or the undoing client wrote it after the undo. The move rescue reads a move into such a
+ * node as a move into a node a peer removed without seeing it (`move-rescue.ts`).
+ */
+export function undoneWithout(room: Room, key: string, item: Y.Item | undefined): boolean {
+  if (!item) return false;
+  const e = entryOf(key, room.doc.getMap(UNDONE_KEY).get(key));
+  return e !== null && e.shownIn === null && !e.moved && isForeign(item, e);
 }
 
 /**
@@ -88,7 +153,8 @@ export function noteUndoneListings(
   room: Room,
   step: StepRanges,
   transact: (write: () => void) => void,
-  moved: ReadonlySet<string> = new Set()
+  moved: ReadonlySet<string> = new Set(),
+  redo = false
 ): void {
   const nodes: unknown = room.nodes;
   const listed = new Map<Y.Array<unknown>, Set<string>>();
@@ -98,9 +164,27 @@ export function noteUndoneListings(
     if (item.parent === (room.parts as unknown) && item.parentSub !== null && !item.deleted)
       created.add(item.parentSub);
   });
-  forEachItem(room.doc, step.insertions, (item) => {
+  // A paragraph or a text body whose listing the step deleted from a text body or a table cell
+  // (a merge moved it) goes back to that list, which the undo restores. Its entry (`m`) shows it
+  // here only when a peer removed that place without seeing it there (`UndoneEntry.moved`).
+  const movedOut = new Map<string, string>();
+  forEachItem(room.doc, step.deletions, (item) => {
     const list = item.parent;
-    if (item.deleted || !(list instanceof Y.Array)) return;
+    if (!(list instanceof Y.Array) || !(item.content instanceof Y.ContentAny)) return;
+    const holder = list.parent;
+    const shell: unknown = holder instanceof Y.Map ? holder.get(F.shell) : undefined;
+    const local = (shell as { local?: unknown } | undefined)?.local;
+    if (local !== 'txBody' && local !== 'tc') return;
+    const from = (holder as Y.Map<unknown>).get(F.key);
+    if (typeof from !== 'string') return;
+    for (const k of item.content.getContent()) if (typeof k === 'string') movedOut.set(k, from);
+  });
+  forEachItem(room.doc, step.insertions, (inserted) => {
+    // An entry that a later undo or redo put back (a peer's join, then its undo) is the entry
+    // the undo deletes, as Yjs follows it (`Item.redone`).
+    const item = liveRedone(room.doc, inserted) ?? inserted;
+    const list = item?.parent;
+    if (!item || !(list instanceof Y.Array)) return;
     const record = list.parent;
     if (!(record instanceof Y.Map) || holderItem(record)?.parent !== nodes) return;
     if (record.get(F.children) !== list) return;
@@ -109,6 +193,12 @@ export function noteUndoneListings(
     if (!keys) listed.set(list, (keys = new Set()));
     for (const k of item.content.getContent()) if (typeof k === 'string') keys.add(k);
   });
+  const saved = savedListings(step);
+  for (const [list, history] of saved) {
+    const keys = listed.get(list) ?? new Set<string>();
+    for (const key of history.keys) keys.add(key);
+    listed.set(list, keys);
+  }
   if (listed.size === 0) return;
   // A peer's run that a repair moved after this replica's Enter as part of the step
   // (`followEnter` in `text-repair.ts`): the undo lists it at its old place again.
@@ -116,8 +206,39 @@ export function noteUndoneListings(
   const undone = room.doc.getMap(UNDONE_KEY);
   const client = room.doc.clientID;
   const clock = Y.getState(room.doc.store, client);
-  type Value = { p: string; u: string; a: string; n: string; c: number; q: number };
+  type Value = {
+    p: string;
+    u: string;
+    a: string;
+    n: string;
+    c: number;
+    q: number;
+    m?: 1;
+    v?: number[];
+    t?: string;
+    d?: 1;
+  };
   const writes: [string, Value][] = [];
+  const tables = new Map<string, string>();
+  {
+    let remaining = MAX_SCAN;
+    const walk = (key: string, table: string | undefined, depth: number): void => {
+      if (--remaining < 0 || depth > MAX_DEPTH || tables.has(key)) return;
+      const rec = room.nodes.get(key);
+      if (!(rec instanceof Y.Map)) return;
+      const shell = rec.get(F.shell) as { ns?: unknown; local?: unknown } | undefined;
+      if (shell?.ns === NS_A && shell.local === 'tbl') table = key;
+      if (table) tables.set(key, table);
+      const children = rec.get(F.children);
+      if (children instanceof Y.Array)
+        for (const child of children.toArray())
+          if (typeof child === 'string') walk(child, table, depth + 1);
+    };
+    for (const value of room.parts.values()) {
+      const part = partEntryOf(value);
+      if (part?.kind === 'xml') walk(part.root, undefined, 0);
+    }
+  }
   for (const [list, keys] of listed) {
     const record = list.parent;
     if (!(record instanceof Y.Map) || record.get(F.children) !== list) continue;
@@ -125,10 +246,33 @@ export function noteUndoneListings(
     const part = record.get(F.part);
     if (typeof parent !== 'string' || typeof part !== 'string' || created.has(part)) continue;
     const siblings = list.toArray().filter((k): k is string => typeof k === 'string');
+    for (const key of saved.get(list)?.siblings ?? [])
+      if (keys.has(key) && !siblings.includes(key)) siblings.push(key);
     siblings.forEach((k, i) => {
       if (!keys.has(k)) return;
+      if (redo) {
+        const rec = room.nodes.get(k);
+        const shell =
+          rec instanceof Y.Map
+            ? (rec.get(F.shell) as { ns?: unknown; local?: unknown } | undefined)
+            : undefined;
+        if (shell?.ns !== NS_A || (shell.local !== 'tr' && shell.local !== 'tc')) return;
+      }
+      // A paragraph that an earlier undo unlisted from another cell, and that this step listed
+      // in a text body (a merge moved it): the undo of this step gives it back to that rule.
+      const shell: unknown = record.get(F.shell);
+      const inBody = (shell as { local?: unknown } | undefined)?.local === 'txBody';
+      if (inBody && (entryOf(k, undone.get(k))?.parent ?? parent) !== parent) return;
       const n = siblings[i + 1] ?? '';
-      const value = { p: part, u: parent, a: siblings[i - 1] ?? '', n, c: client, q: clock };
+      const value: Value = { p: part, u: parent, a: siblings[i - 1] ?? '', n, c: client, q: clock };
+      value.t = tables.get(parent);
+      if (redo) value.d = 1;
+      if (movedOut.has(k)) {
+        value.m = 1;
+        value.v = [...Y.decodeStateVector(Y.encodeStateVector(room.doc))].flatMap(
+          ([client, count]) => [client, count]
+        );
+      }
       if (JSON.stringify(undone.get(k)) !== JSON.stringify(value)) writes.push([k, value]);
     });
   }
@@ -190,8 +334,16 @@ export function forgetUndoneListings(
   forEachItem(room.doc, step.deletions, (item) => {
     const list = item.parent;
     if (!(list instanceof Y.Array) || !(item.content instanceof Y.ContentAny)) return;
+    // Only a listing in the parent that the entry names: an entry of another parent stays for
+    // a later undo of this step (`noteUndoneListings`).
+    const parent = list.parent instanceof Y.Map ? list.parent.get(F.key) : undefined;
     for (const k of item.content.getContent())
-      if (typeof k === 'string' && undone.has(k)) keys.add(k);
+      if (
+        typeof k === 'string' &&
+        entryOf(k, undone.get(k))?.parent === parent &&
+        !entryOf(k, undone.get(k))?.redo
+      )
+        keys.add(k);
   });
   if (keys.size > 0)
     transact(() => {
@@ -204,8 +356,9 @@ export function forgetUndoneListings(
  * repair that moved it) stays listed, by the peer's entry, though the undo took all of its
  * content. Such a node that holds nothing now leaves every list of its part, as the undo meant.
  * Only an element record with no attribute and no child that the read still shows (`shows`)
- * counts, so the search runs only then. Call inside a transaction; returns whether it wrote
- * anything.
+ * counts, so the search runs only then. A node whose undone child shows again (a run whose text
+ * a peer typed into) is not empty: it stays. Call inside a transaction; returns whether it
+ * wrote anything.
  */
 export function unlistEmptied(
   room: Room,
@@ -213,6 +366,14 @@ export function unlistEmptied(
   shows: (part: string, key: string) => boolean
 ): boolean {
   const emptied = new Map<string, Set<string>>();
+  const listings = new Map<string, UndoneListings | null>();
+  const listingsOf = (part: string): UndoneListings | null => {
+    if (!listings.has(part)) {
+      const entry = partEntryOf(room.parts.get(part));
+      listings.set(part, entry?.kind === 'xml' ? UndoneListings.of(room, part, entry.root) : null);
+    }
+    return listings.get(part)!;
+  };
   forEachItem(room.doc, step.insertions, (item) => {
     if ((item.parent as unknown) !== room.nodes || item.parentSub === null) return;
     if (!(item.content instanceof Y.ContentType) || !(item.content.type instanceof Y.Map)) return;
@@ -224,6 +385,8 @@ export function unlistEmptied(
     if (typeof part !== 'string' || !(attrs instanceof Y.Map) || !(children instanceof Y.Array))
       return;
     if (attrs.size > 0 || children.length > 0 || !shows(part, item.parentSub)) return;
+    // A node whose undone child shows again (a peer typed into the run's text) is not empty.
+    if (listingsOf(part)?.showsUnder(item.parentSub)) return;
     let keys = emptied.get(part);
     if (!keys) emptied.set(part, (keys = new Set()));
     keys.add(item.parentSub);
@@ -242,6 +405,18 @@ export function unlistEmptied(
     for (let i = entries.length - 1; i >= 0; i -= 1) {
       const entry = entries[i];
       if (typeof entry === 'string' && keys.has(entry)) {
+        // The undo can empty a node that a peer moved into another parent. A later peer
+        // edit belongs at that moved place, even after this empty listing leaves it.
+        const undone = room.doc.getMap(UNDONE_KEY);
+        const previous = undone.get(entry);
+        const parent = rec.get(F.key);
+        if (entryOf(entry, previous) && typeof parent === 'string')
+          undone.set(entry, {
+            ...(previous as Record<string, unknown>),
+            u: parent,
+            a: typeof entries[i - 1] === 'string' ? entries[i - 1] : '',
+            n: typeof entries[i + 1] === 'string' ? entries[i + 1] : '',
+          });
         list.delete(i, 1);
         wrote = true;
       }
@@ -298,6 +473,23 @@ function undoneOfPart(room: Room, partName: string): Map<string, Map<string, Und
 
 type Spec = ReplicaElementSpec | ReplicaTextSpec;
 
+/** The keys the room lists under a part's root. */
+function reachedKeys(room: Room, partName: string, rootKey: string): Set<string> {
+  const reached = new Set<string>();
+  const stack = [rootKey];
+  while (stack.length > 0) {
+    const key = stack.pop()!;
+    if (reached.has(key)) continue;
+    reached.add(key);
+    const rec = room.nodes.get(key);
+    if (!(rec instanceof Y.Map) || rec.get(F.part) !== partName) continue;
+    const list: unknown = rec.get(F.children);
+    if (!(list instanceof Y.Array)) continue;
+    for (const c of list.toArray()) if (typeof c === 'string' && !reached.has(c)) stack.push(c);
+  }
+  return reached;
+}
+
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 /**
  * Elements whose attributes and children are all optional in the schema, so a part of their
@@ -333,6 +525,12 @@ function standsAlone(node: Spec): boolean {
   return PARTIAL_OK.has(node.local) && (kids.length > 0 || (node.attrs ?? []).length > 0);
 }
 
+/** Whether a node as read holds a character. */
+function holdsText(node: Spec): boolean {
+  if ('text' in node) return node.text.length > 0;
+  return (node.children ?? []).some(holdsText);
+}
+
 /**
  * One part read's view of the undone listings: which nodes show again, under which parent, and
  * after which key. Built per part read; null when the part has no undone listing.
@@ -345,13 +543,26 @@ export class UndoneListings {
   readonly #foreign = new Map<string, boolean>();
   /** The keys this read placed: no list holds them, and a write does not list them. */
   readonly shown = new Set<string>();
+  /** The paragraphs this read moved out of an undone cell or row (`undo-rehome.ts`). */
+  readonly rehomed = new Set<string>();
+  /**
+   * The parent each placed key shows in. A write that puts the node in another parent lists it
+   * there: the user moved it.
+   */
+  readonly shownIn = new Map<string, string>();
+
+  readonly #partName: string;
+  /** The keys a removal saw, read on first use (`removalsSawAnywhere`). */
+  readonly #seenRemoved = new Map<UndoneEntry, ReadonlySet<string> | 'all'>();
 
   private constructor(
     room: Room,
+    partName: string,
     byParent: Map<string, Map<string, UndoneEntry>>,
     reached: Set<string>
   ) {
     this.#room = room;
+    this.#partName = partName;
     this.#byParent = byParent;
     this.#reached = reached;
   }
@@ -361,20 +572,18 @@ export class UndoneListings {
     if (room.doc.getMap(UNDONE_KEY).size === 0) return null;
     const byParent = undoneOfPart(room, partName);
     if (byParent.size === 0) return null;
-    // The keys the room lists under the part's root.
-    const reached = new Set<string>();
-    const stack = [rootKey];
-    while (stack.length > 0) {
-      const key = stack.pop()!;
-      if (reached.has(key)) continue;
-      reached.add(key);
-      const rec = room.nodes.get(key);
-      if (!(rec instanceof Y.Map) || rec.get(F.part) !== partName) continue;
-      const list: unknown = rec.get(F.children);
-      if (!(list instanceof Y.Array)) continue;
-      for (const c of list.toArray()) if (typeof c === 'string' && !reached.has(c)) stack.push(c);
-    }
-    return new UndoneListings(room, byParent, reached);
+    return new UndoneListings(room, partName, byParent, reachedKeys(room, partName, rootKey));
+  }
+
+  /** Keep moved paragraphs when both the undo's old and new table cell disappear. */
+  withStranded(
+    spec: ReplicaElementSpec,
+    read: (key: string, seen: Set<string>, depth: number) => ReplicaElementSpec | null
+  ): ReplicaElementSpec {
+    const entries = [...this.#byParent.keys()]
+      .flatMap((parent) => this.#shown(parent))
+      .filter((e) => e.moved || this.#holdsForeign(e.key, e, 0));
+    return rehomeStranded(this.#room, spec, entries, read, this.shownIn, this.rehomed);
   }
 
   /** Whether a node holds content that the undo of `e` did not take, here or below. */
@@ -401,6 +610,14 @@ export class UndoneListings {
     const children = rec.get(F.children);
     if (children instanceof Y.Array)
       for (const item of sequenceItems(children)) if (foreign(item)) return true;
+    const shell = rec.get(F.shell) as { ns?: string; local?: string } | undefined;
+    if (
+      shell?.ns === NS_A &&
+      (shell.local === 'p' || shell.local === 'r' || shell.local === 't') &&
+      children instanceof Y.Array
+    )
+      for (const child of children.toArray().slice(0, MAX_PLACED))
+        if (typeof child === 'string' && this.#holdsForeign(child, e, depth + 1)) return true;
     // A run a write removed from the node while a peer typed into it shows again with that
     // text (`withRemovedRuns` in `removed-content.ts`), so it counts as content of the node.
     // The fields in one order on every replica, so each looks at the same runs.
@@ -411,13 +628,65 @@ export class UndoneListings {
     return this.#shown(key).some((child) => this.#holdsForeign(child.key, child, depth + 1));
   }
 
+  /**
+   * Whether an undone listing under `parent` shows again: a node an undo took out of it that
+   * holds another client's content.
+   */
+  showsUnder(parent: string): boolean {
+    return this.#shown(parent).some((child) => this.#holdsForeign(child.key, child, 1));
+  }
+
+  /** Whether a paragraph's run or text descendants hold restored child listings. */
+  showsBelow(parent: string): boolean {
+    const pending = [parent];
+    const seen = new Set<string>();
+    while (pending.length > 0 && seen.size < MAX_PLACED) {
+      const key = pending.pop()!;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (this.showsUnder(key)) return true;
+      const rec = this.#room.nodes.get(key);
+      if (!(rec instanceof Y.Map) || rec.get(F.part) !== this.#partName) continue;
+      const shell = rec.get(F.shell) as { ns?: string; local?: string } | undefined;
+      const children = rec.get(F.children);
+      if (
+        shell?.ns !== NS_A ||
+        !['p', 'r', 't'].includes(shell.local ?? '') ||
+        !(children instanceof Y.Array)
+      )
+        continue;
+      for (const child of children.slice(0, MAX_PLACED))
+        if (typeof child === 'string') pending.push(child);
+      const removed = [...rec.keys()]
+        .filter((field) => field.startsWith(IDENTITY.removedRun))
+        .sort()
+        .slice(0, MAX_PLACED);
+      for (const field of removed) pending.push(field.slice(IDENTITY.removedRun.length));
+    }
+    return false;
+  }
+
   /** The undone listings under `parent` that may show: no list holds them, none was removed. */
   #shown(parent: string): UndoneEntry[] {
     return [...(this.#byParent.get(parent)?.values() ?? [])].filter((e) => {
       if (this.#reached.has(e.key)) return false;
-      if (e.shownIn !== null && !this.#reached.has(e.shownIn)) return false;
+      if (e.shownIn !== null && !this.#reached.has(e.shownIn)) {
+        const removed = removalSnapshot(this.#room.nodes.get(e.shownIn));
+        if (!removed || removed === 'all' || removed.has(e.key)) return false;
+      }
       const rec = this.#room.nodes.get(e.key);
-      return rec instanceof Y.Map && !isRemoved(rec as Y.Map<unknown>);
+      if (!(rec instanceof Y.Map)) return false;
+      if (!e.redo && isRemoved(rec as Y.Map<unknown>)) {
+        const shell = rec.get(F.shell) as { ns?: string; local?: string } | undefined;
+        if (shell?.ns !== NS_A || (shell.local !== 'p' && shell.local !== 'r')) return false;
+      }
+      if (!e.moved) return true;
+      let removed = this.#seenRemoved.get(e);
+      if (!removed) {
+        removed = removalsSawAnywhere(this.#room, this.#partName, e.seen);
+        this.#seenRemoved.set(e, removed);
+      }
+      return removed !== 'all' && !removed.has(e.key);
     });
   }
 
@@ -436,7 +705,7 @@ export class UndoneListings {
     // Key order, so every replica places nodes that follow one key in the same order, whatever
     // order its map holds the entries in.
     const entries = this.#shown(parent)
-      .filter((e) => !seen.has(e.key) && this.#holdsForeign(e.key, e, 0))
+      .filter((e) => !seen.has(e.key) && (e.moved || this.#holdsForeign(e.key, e, 0)))
       .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0))
       .slice(0, MAX_PLACED);
     if (entries.length === 0) return children;
@@ -448,6 +717,8 @@ export class UndoneListings {
       [...(this.#byParent.get(parent)?.values() ?? [])].map((e) => [e.key, e.after])
     );
     const pending = new Set(entries.map((e) => e.key));
+    // Undone cells and rows that cannot show again: their peer's text goes to a cell that stays.
+    const orphans: UndoneEntry[] = [];
     const END = '\u0000';
     // Each pass places the nodes whose anchor shows or is gone; a node whose anchor still waits
     // goes in a later pass, and a cycle of waiting anchors (a hostile room) goes last.
@@ -479,7 +750,12 @@ export class UndoneListings {
         pending.delete(e.key);
         progress = true;
         const node = this.#read(e.key, partName, seen, read);
-        if (!node || !standsAlone(node)) continue;
+        if (!node || !standsAlone(node)) {
+          orphans.push(e);
+          continue;
+        }
+        const record = this.#room.nodes.get(e.key);
+        if (record instanceof Y.Map && isRemoved(record) && !holdsText(node)) continue;
         const index =
           next !== null
             ? out.findIndex((c) => c.key === next)
@@ -491,10 +767,70 @@ export class UndoneListings {
         out.splice(index, 0, node);
         present.add(e.key);
         this.shown.add(e.key);
+        this.shownIn.set(e.key, parent);
       }
       if (!progress) force = true;
     }
-    return out;
+    if (orphans.length === 0) return out;
+    const placed = new Map<string, string>();
+    const next = rehomeUndone(
+      out,
+      orphans,
+      after,
+      this.#rehomeSource(partName, seen, read),
+      placed
+    );
+    for (const [k, body] of placed) {
+      [this.shown, this.rehomed].forEach((set) => set.add(k));
+      this.shownIn.set(k, body);
+    }
+    return next;
+  }
+
+  /** The room, as the rule of `undo-rehome.ts` reads it in this part read. */
+  #rehomeSource(
+    partName: string,
+    seen: Set<string>,
+    read: (key: string) => ReplicaElementSpec | null
+  ): RehomeSource<UndoneEntry> {
+    const nodes = this.#room.nodes;
+    return {
+      localOf: (key) => {
+        const rec = nodes.get(key);
+        const shell: unknown = rec instanceof Y.Map ? rec.get(F.shell) : undefined;
+        const { ns, local } = (typeof shell === 'object' && shell !== null ? shell : {}) as {
+          ns?: unknown;
+          local?: unknown;
+        };
+        return ns === NS_A && typeof local === 'string' ? local : undefined;
+      },
+      childrenOf: (key) => {
+        const rec = nodes.get(key);
+        const list: unknown = rec instanceof Y.Map ? rec.get(F.children) : undefined;
+        const listed = list instanceof Y.Array ? list.toArray() : [];
+        // A paragraph that a write removed while a peer typed into it records its place on
+        // the body (`removed-content.ts`): it holds that peer's text too.
+        const removed: string[] = [];
+        if (rec instanceof Y.Map)
+          for (const f of rec.keys())
+            if (f.startsWith(IDENTITY.removedRun))
+              removed.push(f.slice(IDENTITY.removedRun.length));
+        return [
+          ...listed.filter((k): k is string => typeof k === 'string'),
+          ...this.#shown(key).map((e) => e.key),
+          ...removed.sort(),
+        ];
+      },
+      holdsForeign: (key, e) => this.#holdsForeign(key, e, 0),
+      readParagraph: (key) => {
+        // A paragraph that a peer moved in goes back by the move rescue (`move-rescue.ts`).
+        const rec = nodes.get(key);
+        if (seen.has(key) || !(rec instanceof Y.Map)) return null;
+        if (typeof rec.get(LINEAGE.movedFrom) === 'string') return null;
+        const node = this.#read(key, partName, seen, read);
+        return node && holdsText(node) ? node : null;
+      },
+    };
   }
 
   #read(
@@ -508,7 +844,7 @@ export class UndoneListings {
     const text = rec.get(F.text);
     if (text instanceof Y.Text) {
       seen.add(key);
-      return { key, text: text.toString() };
+      return { key, text: readText(text) };
     }
     // Only a node that can stand alone is read, so a node that cannot show (a shape, a row)
     // neither marks its subtree as seen nor refuses the part.

@@ -9,8 +9,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // (bold, italic, color) in one text box. The relay holds every update back and delivers parts of
 // it at random; a round ends with a flush, or keeps the held updates for the next round. The
 // harness is `fuzz-support.ts`; its header lists the environment knobs. Two modes, each with its
-// prefix: `TEXT` (no formats) and `FORMAT` (with formats). `yjs-text-fuzz-regressions.ts` holds
-// fixed histories.
+// prefix: `TEXT` (no formats) and `FORMAT` (with formats). Recorded histories live in
+// `yjs-text-fuzz-regressions.ts`; reduced histories live in the two `*-fuzz-fixed.ts` modules.
 //
 // Invariants:
 // - Each edit changes only what it may on its own replica: a delete removes exactly its
@@ -25,6 +25,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // - At the end, each replica's save reopens to the same deck, a second save keeps it, and the
 //   saved deck passes the part checks.
 
+import { FIXED_TEXT } from './yjs-text-fuzz-fixed.ts';
+import { FIXED_FORMAT } from './yjs-format-fuzz-fixed.ts';
 import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import {
@@ -48,19 +50,15 @@ import {
   type Delivery,
   type DeliveryTo,
   type FuzzKnownFailure,
-  type FuzzRegression,
   type FuzzKnownSeed,
   type Relay,
 } from './fuzz-support.ts';
 import { IN, paragraphs, selectIn } from './lineage-support.ts';
 import {
   FORMAT_HISTORIES,
-  FORMAT_HISTORY_FAILURES,
   LONG_FORMAT_HISTORIES,
-  LONG_FORMAT_HISTORY_FAILURES,
   TEXT_HISTORIES,
   UNDO_HISTORIES,
-  UNDO_HISTORY_FAILURES,
 } from './yjs-text-fuzz-regressions.ts';
 
 const FILE = 'packages/pro/src/__tests__/yjs-text-fuzz.test.ts';
@@ -410,230 +408,12 @@ async function runSeed(seed: number, mode: Mode) {
 }
 
 /** Histories that once failed, kept as regressions after their issue was fixed. */
-const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
-  text: [
-    {
-      name: 'text typed into a paragraph that a peer empties and joins stays',
-      seed: 163,
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 5, length: 0 },
-        { kind: 'deliver', from: 2, to: 0, count: 1 },
-        { kind: 'edit', peer: 2, edit: 'join', paragraph: 1, offset: 3, length: 3 },
-        { kind: 'deliver', from: 2, to: 0, count: 1 },
-        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 4, length: 1 },
-        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 5, length: 1 },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 1, offset: 0, length: 3 },
-        { kind: 'edit', peer: 2, edit: 'type', paragraph: 1, offset: 0, length: 3, letter: 'Ă' },
-        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 2 },
-      ],
-    },
-    {
-      name: 'a run that a join moved into a paragraph that a peer deletes at once shows there',
-      seed: 184,
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 0, length: 2, over: true },
-        { kind: 'deliver', from: 2, to: 0, count: 1 },
-        { kind: 'deliver', from: 2, to: 1, count: 1 },
-        { kind: 'edit', peer: 0, edit: 'join', paragraph: 2, offset: 0, length: 3 },
-        { kind: 'edit', peer: 1, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 2 },
-      ],
-    },
-    {
-      name: 'text typed into a run that a peer deleted before it removes the paragraph stays',
-      seed: 121,
-      actions: [
-        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 8, length: 0 },
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 4, length: 0 },
-        { kind: 'edit', peer: 1, edit: 'join', paragraph: 2, offset: 1, length: 2 },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 2, edit: 'deleteAcross', paragraph: 1, offset: 0, length: 3 },
-        { kind: 'edit', peer: 2, edit: 'join', paragraph: 0, offset: 0, length: 2 },
-        { kind: 'edit', peer: 1, edit: 'type', paragraph: 1, offset: 4, length: 2, letter: 'Ć' },
-      ],
-    },
-    {
-      name: 'a deleted character stays deleted after a peer that saw the delete presses Enter',
-      seed: 8,
-      actions: [
-        { kind: 'edit', peer: 0, edit: 'type', paragraph: 0, offset: 8, length: 2, letter: 'ā' },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 2, edit: 'delete', paragraph: 0, offset: 3, length: 1 },
-        { kind: 'deliver', from: 2, to: 1, count: 1 },
-        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 1, length: 0 },
-        { kind: 'flush' },
-      ],
-    },
-    {
-      name: 'a character that a peer types and deletes while another peer splits its run stays deleted',
-      seed: 41,
-      actions: [
-        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 1, offset: 2, length: 3 },
-        { kind: 'edit', peer: 0, edit: 'type', paragraph: 1, offset: 4, length: 1, letter: 'Ā' },
-        { kind: 'deliver', from: 0, to: 2, count: 1 },
-        { kind: 'edit', peer: 2, edit: 'delete', paragraph: 1, offset: 5, length: 1 },
-      ],
-    },
-    {
-      name: 'an undo of Enter keeps the text that a peer typed into the new paragraph',
-      seed: 29,
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 5, length: 0 },
-        { kind: 'deliver', from: 2, to: 1, count: 1 },
-        { kind: 'edit', peer: 1, edit: 'type', paragraph: 1, offset: 0, length: 3, letter: 'ă' },
-        { kind: 'deliver', from: 1, to: 2, count: 1 },
-        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 1, offset: 2, length: 1 },
-      ],
-    },
-    {
-      name: 'an undo of a join after a concurrent Enter keeps the joined text',
-      seed: 88,
-      actions: [
-        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 2, offset: 0, length: 0 },
-        { kind: 'edit', peer: 2, edit: 'join', paragraph: 1, offset: 9, length: 0 },
-        { kind: 'flush' },
-        {
-          kind: 'edit',
-          peer: 0,
-          edit: 'type',
-          paragraph: 1,
-          offset: 0,
-          length: 1,
-          over: true,
-          letter: 'ċ',
-        },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 5, offset: 1, length: 3 },
-      ],
-    },
-    {
-      name: 'two concurrent joins of neighboring paragraphs keep both paragraphs',
-      seed: 253,
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 2, length: 1 },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 0, edit: 'join', paragraph: 2, offset: 4, length: 0 },
-        { kind: 'edit', peer: 1, edit: 'join', paragraph: 1, offset: 5, length: 0 },
-        { kind: 'flush' },
-      ],
-    },
-  ],
-  format: [],
-};
+const FIXED = { text: FIXED_TEXT, format: FIXED_FORMAT };
 
 /** Histories that fail today, each with its issue and the problem it pins. */
 const KNOWN_FAILURES: Readonly<Record<Mode, readonly FuzzKnownFailure<TextAction>[]>> = {
-  text: [
-    {
-      name: "an undo of a peer's Enter and a delete across it keep text typed beside them",
-      issue: '#3',
-      seed: 62,
-      problem: 'characters that no peer removed are lost: "ĉ" in ["Ă","","","L"]',
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 1, length: 2, over: true },
-        { kind: 'edit', peer: 1, edit: 'type', paragraph: 0, offset: 7, length: 0, letter: 'Ă' },
-        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 3 },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 1, edit: 'type', paragraph: 0, offset: 1, length: 2, letter: 'Ć' },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 1, length: 3 },
-        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 2, length: 0 },
-        { kind: 'deliver', from: 1, to: 2, count: 1 },
-        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 0, length: 3 },
-        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 1, length: 0 },
-        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 0, length: 0 },
-        { kind: 'edit', peer: 2, edit: 'type', paragraph: 3, offset: 0, length: 3, letter: 'ĉ' },
-        { kind: 'deliver', from: 2, to: 0, count: 5 },
-        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 1, length: 2 },
-      ],
-    },
-    {
-      name: 'an undo of Enter after a redo of a join keeps text typed into the joined run',
-      issue: '#3',
-      seed: 73,
-      problem: 'characters that no peer removed are lost: "Ċ" in ["ĉAEFGH"]',
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'join', paragraph: 0, offset: 5, length: 2 },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 1, length: 3, over: true },
-        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 9, length: 3 },
-        { kind: 'edit', peer: 2, edit: 'redo', paragraph: 1, offset: 2, length: 0 },
-        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 1, offset: 0, length: 2 },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 2, edit: 'type', paragraph: 0, offset: 0, length: 0, letter: 'ĉ' },
-        { kind: 'edit', peer: 2, edit: 'deleteAcross', paragraph: 0, offset: 2, length: 0 },
-        { kind: 'edit', peer: 1, edit: 'type', paragraph: 0, offset: 2, length: 1, letter: 'Ċ' },
-        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 3, offset: 5, length: 1 },
-      ],
-    },
-  ],
-  format: [
-    {
-      name: 'two formats of one run after a peer typed into it show each character once',
-      issue: '#16',
-      seed: 42,
-      problem: 'characters show more than once: "JKL" in ["ABCDEFGH","IJKĀLJKL"]',
-      actions: [
-        { kind: 'edit', peer: 0, edit: 'type', paragraph: 1, offset: 3, length: 1, letter: 'Ā' },
-        { kind: 'edit', peer: 2, edit: 'bold', paragraph: 1, offset: 0, length: 1 },
-        { kind: 'edit', peer: 0, edit: 'bold', paragraph: 1, offset: 1, length: 1 },
-        { kind: 'flush' },
-      ],
-    },
-    {
-      name: 'an edit at a run that a peer splits at the same time lands in place',
-      issue: '#17',
-      seed: 71,
-      problem: 'characters show more than once: "Ă" in ["ABĂ","CĂDEFGH","IJKL"]',
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'type', paragraph: 0, offset: 3, length: 0, letter: 'Ă' },
-        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 2, length: 3 },
-        { kind: 'deliver', from: 2, to: 0, count: 1 },
-        {
-          kind: 'edit',
-          peer: 0,
-          edit: 'color',
-          paragraph: 0,
-          offset: 0,
-          length: 2,
-          color: 'accent6',
-        },
-        { kind: 'flush' },
-      ],
-    },
-    {
-      name: 'an undo of a format keeps the text that a peer typed over the formatted text deleted',
-      issue: '#3',
-      seed: 20,
-      problem: 'p0 undo added characters it may not add: "KL"',
-      actions: [
-        { kind: 'edit', peer: 0, edit: 'bold', paragraph: 1, offset: 2, length: 3 },
-        {
-          kind: 'edit',
-          peer: 1,
-          edit: 'type',
-          paragraph: 1,
-          offset: 1,
-          length: 3,
-          over: true,
-          letter: 'Ĉ',
-        },
-        { kind: 'flush' },
-        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 2, offset: 6, length: 2 },
-      ],
-    },
-    {
-      name: 'an undo of a format keeps the text that a peer deletes at the same time deleted',
-      issue: '#3',
-      seed: 9,
-      problem: 'removed characters show again: "CD" in ["ABCDEFGH","IJKL"]',
-      actions: [
-        { kind: 'edit', peer: 2, edit: 'italic', paragraph: 0, offset: 2, length: 3 },
-        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 1, offset: 4, length: 3 },
-        { kind: 'edit', peer: 1, edit: 'delete', paragraph: 0, offset: 2, length: 2 },
-      ],
-    },
-  ],
+  text: [],
+  format: [],
 };
 
 /**
@@ -642,24 +422,7 @@ const KNOWN_FAILURES: Readonly<Record<Mode, readonly FuzzKnownFailure<TextAction
  */
 const KNOWN_SEEDS: Readonly<Record<Mode, Readonly<Record<number, FuzzKnownSeed>>>> = {
   text: {},
-  format: {
-    4: {
-      issue: '#16',
-      problem: 'characters show more than once: "KĂ" in ["āABąFG","ĄăIJKĂKĂ",""]',
-    },
-    7: {
-      issue: '#16',
-      problem: 'characters show more than once: "Ā" in ["ąăĀĄā","Ā",""]',
-    },
-    17: {
-      issue: '#16',
-      problem: 'characters show more than once: "Ā" in ["ABCĂEFH","","IĀJāĀ",""]',
-    },
-    20: {
-      issue: '#3',
-      problem: 'p1 join paragraph 1 [0, 0) removed characters it may not remove: "Ąă"',
-    },
-  },
+  format: {},
 };
 
 const TITLES: Readonly<Record<Mode, string>> = {
@@ -682,10 +445,7 @@ for (const mode of ['text', 'format'] as const)
         : [...FORMAT_HISTORIES, ...LONG_FORMAT_HISTORIES]),
       ...FIXED[mode],
     ],
-    knownFailures:
-      mode === 'text'
-        ? [...KNOWN_FAILURES.text, ...UNDO_HISTORY_FAILURES]
-        : [...KNOWN_FAILURES.format, ...FORMAT_HISTORY_FAILURES, ...LONG_FORMAT_HISTORY_FAILURES],
+    knownFailures: mode === 'text' ? KNOWN_FAILURES.text : KNOWN_FAILURES.format,
     knownSeeds: KNOWN_SEEDS[mode],
     summary: () => `${mode} fuzz checks: ${JSON.stringify(STATS[mode])}`,
   });

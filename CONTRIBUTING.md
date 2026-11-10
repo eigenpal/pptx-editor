@@ -117,7 +117,7 @@ The checks:
 
 - Each edit changes only what it may on its own replica. For example, a delete removes exactly its selection, and an undo removes only text that its own peer typed.
 - After each flush, every session is `ready`, and all replicas hold the same package.
-- The text keeps each character exactly once (`packages/pro/src/__tests__/fuzz-ledger.ts`). A character shows unless a peer removed it, and stays removed unless a peer brought it back. The only exemption is a character placed at the same time as a peer's removal of its paragraph, row, or column. The summary line of each run counts the exemptions.
+- The text keeps each character exactly once (`packages/pro/src/__tests__/fuzz-ledger.ts`). A character shows unless a peer removed it, and stays removed unless a peer brought it back. The summary line reports exemptions and blind checks. Both counts must stay at zero.
 - The table fuzzer also compares the grid that the canvas draws with the grid of the saved deck.
 - At the end, every replica's save reopens to the same deck and passes the part checks.
 
@@ -269,3 +269,7 @@ Use a [GitHub issue](https://github.com/eigenpal/pptx-editor/issues) for reprodu
 Use PPTX, presentation, or reference PDF in product prose, and follow "Naming" in [Agent instructions](AGENTS.md). Keep technical identifiers, source attribution, and legal notices exact.
 
 Run `node scripts/check-public-terminology.mjs` after you edit public wording. The check covers root consumer docs, package READMEs, site pages, locale catalogs, and demo text sources. It does not cover engine code, generated API snapshots, legal notices, or third-party references, so review those by hand.
+
+## Collaboration release compatibility
+
+Record compatibility decisions for Core and Pro implementation changes. Follow [the compatibility policy](docs/architecture/collaboration-compatibility.md). Run `bun run collaboration:check --base origin/main` and, after building packages and notices, `bun run collaboration:test`. Stable releases capture published installations and saved rooms through the post-release baseline workflow. Merge the capture pull request before the next stable publication.

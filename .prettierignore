@@ -10,3 +10,6 @@ LICENSE
 CLA.md
 reference/
 fixtures/
+
+# Published collaboration baselines retain their captured bytes and hashes.
+.collaboration/releases/

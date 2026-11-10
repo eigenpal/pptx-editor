@@ -8,6 +8,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // runs a read showed by the move rescue (`rescuedParents`).
 
 import * as Y from 'yjs';
+import { readText, writeCase } from './text-case.ts';
 import type {
   Element,
   Node,
@@ -16,7 +17,20 @@ import type {
   ReplicaElementSpec,
 } from '@pptx-editor.dev/core/store';
 import { specKeys } from './move-rescue.ts';
+import { inSchemaOrder } from './singleton-children.ts';
 import { liveIds, type TextWrite } from './text-identity.ts';
+
+/** One part's write: its key mapping, and its nodes before the change. */
+export interface PartWrite {
+  readonly partName: string;
+  readonly caseChange: boolean;
+  readonly ids: { readonly keyOf: Map<NodeId, string>; readonly idOf: Map<string, NodeId> };
+  readonly before: Map<NodeId, Node>;
+  /** What the write did to each text record's `Y.Text` (`text-identity.ts`). */
+  readonly texts: Map<string, TextWrite>;
+  readonly materialize: Set<string>;
+  readonly force: Set<NodeId>;
+}
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 
@@ -171,9 +185,15 @@ export function shownParentKey(
  * changed span keeps its length, one replace per changed character. Returns what it deleted
  * and inserted, for the identity of moved text (`text-identity.ts`).
  */
-export function syncText(text: Y.Text, value: string, created: boolean): TextWrite | undefined {
-  const old = text.toString();
+export function syncText(
+  text: Y.Text,
+  value: string,
+  created: boolean,
+  caseChange = false
+): TextWrite | undefined {
+  const old = readText(text);
   if (old === value) return undefined;
+  if (caseChange && !created && writeCase(text, old, value)) return { created, deleted: [] };
   let start = 0;
   while (start < old.length && start < value.length && old[start] === value[start]) start++;
   let end = 0;
@@ -191,7 +211,7 @@ export function syncText(text: Y.Text, value: string, created: boolean): TextWri
   if (end > 0 && low(old.charCodeAt(old.length - end))) end--;
   const removed = old.length - start - end;
   const added = value.length - start - end;
-  // The same length (Change Case): replace each changed character in place, so a peer's
+  // The same length: replace each changed character in place, so a peer's
   // concurrent insert between two characters stays between them, not at the span's edge.
   // A span with a surrogate pair is replaced whole, so a replace never splits a pair.
   if (
@@ -262,3 +282,48 @@ export function rescuedParents(spec: ReplicaElementSpec, placed: ReadonlySet<str
 }
 
 const INLINE = new Set(['r', 'br', 'fld']);
+
+/**
+ * The child list to write: `desired`, unless it differs from the room's list only by the
+ * schema order that a read puts children in (`inSchemaOrder`). Then the room's order stays,
+ * and each new key goes before the next key of `desired` that the room holds. A write of a pure reorder
+ * would move a peer's child, and an undo of that write would bring back a child that the
+ * peer deleted in the meantime.
+ */
+export function inRoomOrder(
+  parent: Element,
+  current: readonly string[],
+  desired: readonly string[],
+  nameOf: (key: string) => { ns: string; local: string } | undefined
+): readonly string[] {
+  const inDesired = new Set(desired);
+  const inCurrent = new Set(current);
+  const common = current.filter((k) => inDesired.has(k));
+  const desiredCommon = desired.filter((k) => inCurrent.has(k));
+  const same = (x: readonly string[], y: readonly string[]) =>
+    x.length === y.length && x.every((k, i) => k === y[i]);
+  if (same(common, desiredCommon)) return desired;
+  if (!same(inSchemaOrder(parent, common, nameOf), desiredCommon)) return desired;
+  // Each new key goes before the next key of `desired` that the room holds, so it keeps its
+  // place against a peer's child that the read moved; a key with none after it goes last.
+  const before = new Map<string, string[]>();
+  const tail: string[] = [];
+  let next: string | undefined;
+  for (let i = desired.length - 1; i >= 0; i--) {
+    const k = desired[i]!;
+    if (inCurrent.has(k)) next = k;
+    else if (next === undefined) tail.unshift(k);
+    else {
+      let list = before.get(next);
+      if (!list) before.set(next, (list = []));
+      list.unshift(k);
+    }
+  }
+  const out: string[] = [];
+  for (const k of common) {
+    for (const n of before.get(k) ?? []) out.push(n);
+    out.push(k);
+  }
+  for (const n of tail) out.push(n);
+  return out;
+}

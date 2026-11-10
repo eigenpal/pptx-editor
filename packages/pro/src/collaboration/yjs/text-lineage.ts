@@ -8,23 +8,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `packages/pro/src/collaboration/document/split-dedup.ts` and
 // `packages/pro/src/collaboration/document/materialize-orphans.ts` at 5ffe9674 (its #581): PPTX
 // Editor's `splitRunAt` keeps the origin run, so the winner rule and the text comparison differ.
-// The names differ too, because these functions work on replica specs and one module holds both
-// rules: `markLineage` and `dropLosingSplits` stand for `SplitDedupIndex.record` and `loserRuns`
-// with `splitWinnerOrder`, and `rescueMoved` and `placeEditedPieces` stand for `reportOrphans` and
-// `adoptLooseMembers`. DOCX Editor takes the first replica id in string order as the winner; this
-// module takes the earliest first cut, then the smaller numeric client id.
-//
-// Split lineage. Formatting part of a run splits it: the run keeps the text before the cut, and
-// new runs take the rest. Two peers that split one run at once each mint their own new runs,
-// and the merge keeps both, so the text shows twice ("worldworld") or scrambled ("Hellllo").
-// A run that a split mints records the run it came from (`sf`), that run's text before the
-// split (`sb`), where in it the new run starts (`sa`), how long its text was (`sl`), and its
-// generation (`sg`). Each split also enters its first cut in the room's split index, which no
-// undo reverts, so the read knows every peer that split one run at once, also after a peer
-// deleted its pieces. When more than one peer split one run at once, a paragraph read keeps
-// the pieces of the peer whose first cut is the earliest (then the smaller client id), because
-// only its pieces hold all the text the merged deletes took from the run. A piece the user
-// edited is never dropped: duplicated text is better than lost text.
+// Split metadata records each source run, cut, and generation. The earliest first cut wins,
+// then the smaller client id. Edited pieces and pieces holding otherwise missing characters
+// remain visible. Character identity rules remove duplicate copies.
 //
 // Rescue. Moving a node records where it came from (`mf`) and the chain of parents it went to
 // (`mt`); removing a node records the keys its subtree held at that moment (`rw`). A node that
@@ -47,6 +33,7 @@ import type {
 } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
 import { clientOf } from './singleton-children.ts';
+import { shownPieces } from './shown-pieces.ts';
 
 /** The record fields this module writes. Short names, as the other record fields. */
 export const LINEAGE = Object.freeze({
@@ -56,6 +43,7 @@ export const LINEAGE = Object.freeze({
   splitLength: 'sl',
   splitGeneration: 'sg',
   splitEdited: 'se',
+  copyWinner: 'cw',
   splitBreak: 'sk',
   movedFrom: 'mf',
   movedIndex: 'mi',
@@ -472,6 +460,7 @@ export interface Lineage {
   /** Where in the run of origin the piece starts. */
   readonly at: number;
   readonly edited: boolean;
+  readonly copyWinner: boolean;
 }
 
 export function lineageOf(rec: unknown): Lineage | null {
@@ -489,6 +478,7 @@ export function lineageOf(rec: unknown): Lineage | null {
     original: base.slice(at, at + length),
     at,
     edited: rec.get(LINEAGE.splitEdited) === true,
+    copyWinner: rec.get(LINEAGE.copyWinner) === true,
   };
 }
 
@@ -626,14 +616,15 @@ export function dropLosingSplits(
     // them (a paragraph join while the formats were in flight), the loser's pieces hold the text.
     if (winner === undefined || clientOf(key) === winner || unseenWinners.has(p.group)) continue;
     const text = full(key);
-    if (text !== null && onlyDeletes(text, p.original)) losers.add(key);
+    if (text !== null && onlyDeletes(text, p.original) && !(p.copyWinner && text.length > 0))
+      losers.add(key);
   }
   if (losers.size === 0) return children;
   // The pieces a dropped piece was split into go with it: its text counted them.
   const queue = [...losers];
   while (queue.length > 0)
     for (const sub of subs.get(queue.pop()!) ?? [])
-      if (!losers.has(sub)) {
+      if (!losers.has(sub) && !(pieces.get(sub)?.copyWinner && (texts.get(sub)?.length ?? 0) > 0)) {
         losers.add(sub);
         queue.push(sub);
       }
@@ -779,14 +770,7 @@ export function placeEditedPieces(
   const full = fullText(subsOf(pieces), (k) => pieces.get(k), textOf);
   // The winner's last shown piece of each split group, in document order: a peer may have
   // split the paragraph, so the pieces can sit in different paragraphs.
-  const lastShown = new Map<string, { key: string; order: number }>();
-  for (const [key, p] of pieces) {
-    if (clientOf(key) !== winnerOf(p.group)) continue;
-    const order = where.get(key)?.order;
-    if (order === undefined) continue;
-    const best = lastShown.get(p.group);
-    if (!best || order > best.order) lastShown.set(p.group, { key, order });
-  }
+  const shown = shownPieces(pieces, where, winnerOf);
   const targets = new Map<string, string>();
   // Pieces that go right after the piece (or run) they came from, in the order of its text.
   const follow = (key: string): void => {
@@ -805,8 +789,10 @@ export function placeEditedPieces(
       continue;
     }
     const text = full(key);
-    if (text !== null && onlyDeletes(text, p.original)) continue;
-    const after = lastShown.get(p.group)?.key ?? (where.has(p.from) ? p.from : undefined);
+    if (text !== null && onlyDeletes(text, p.original) && !(p.copyWinner && text.length > 0))
+      continue;
+    const after =
+      shown.preceding(p.group, p.at) ?? (where.has(p.from) ? p.from : shown.last.get(p.group));
     if (after !== undefined && after !== key) targets.set(key, after);
   }
   const rescuedSet = new Set(rescued);
