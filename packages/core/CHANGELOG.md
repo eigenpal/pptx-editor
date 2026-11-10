@@ -1,5 +1,22 @@
 # @pptx-editor.dev/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 8120c72: Accept font configurations, promises, and ordered resolvers in PDF export. Replace `googleFonts: true` with `fonts: googleFonts({ cjk: true })`. Raw font arrays now require `createFontSource` and `{ sources }`. Export waits for deferred fonts and shares the editor's font validation.
+- 3246ed4: Preserve contextual RTL glyphs, Arabic marks, and searchable words in PDF export. Add opt-in Google Fonts resolution with Arabic and CJK fallbacks. Enable network font fallback in demo PDF exports.
+- 91482da: Add customizable selection-aware inspectors for React and Vue, with safe drafts and matching automation APIs. Edit line widths, endpoints, gradients, shadows, and reflections while preserving unedited XML. Keep picture pickers bound to their original document and selection. Line endpoint commands now refuse mixed line and non-line selections without changing any object.
+
+### Patch Changes
+
+- 25628fb: Improve keyboard focus and form field contrast in both themes. Saved presentations omit unused picture data while the live document retains images for undo and collaboration. Preserve image targets of shared and unknown relationships.
+- 1742572: Add `readCollaborationFormatVersion()` and `COLLABORATION_FORMAT_VERSION` to `@pptx-editor.dev/pro`, so a participant who joins can wait until the Y.Doc holds the room and never seeds a second copy. `CollaborationFailureCode` gains `not-initialized`, for a Y.Doc that holds no room yet; an exhaustive switch over the codes needs a case for it.
+- 58af1e4: Keep shapes that a cut cannot copy. Ctrl/Cmd+X deleted every selected shape even when the clipboard could not carry one of them, such as a chart whose parts cannot travel. A cut now deletes only a selection that its copy carries in full; otherwise it is refused with a reason, and the clipboard stays as it was.
+- 1742572: Show the name on a collaborator's caret and selection at a readable size. The label text was drawn too small to read.
+- 58af1e4: Fix collaborative table edits that lost text no peer removed. Merged text now survives concurrent row and column deletes, undo of an insert, and merges that overlap, and a covered cell shows text that a peer typed into it. A table command no longer adds a text body to a cell that has none, so its undo keeps a peer's typing.
+- Updated dependencies: @pptx-editor.dev/i18n@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes

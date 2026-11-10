@@ -1,5 +1,16 @@
 # @pptx-editor.dev/pptx-to-pdf
 
+## 0.4.0
+
+### Minor Changes
+
+- 8120c72: Accept font configurations, promises, and ordered resolvers in PDF export. Replace `googleFonts: true` with `fonts: googleFonts({ cjk: true })`. Raw font arrays now require `createFontSource` and `{ sources }`. Export waits for deferred fonts and shares the editor's font validation.
+- 3246ed4: Preserve contextual RTL glyphs, Arabic marks, and searchable words in PDF export. Add opt-in Google Fonts resolution with Arabic and CJK fallbacks. Enable network font fallback in demo PDF exports.
+
+### Patch Changes
+
+- Updated dependencies: @pptx-editor.dev/core@0.4.0, @pptx-editor.dev/pro@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes
