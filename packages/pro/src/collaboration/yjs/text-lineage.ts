@@ -33,6 +33,7 @@ import type {
 } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
 import { clientOf } from './singleton-children.ts';
+import { shownPieces } from './shown-pieces.ts';
 
 /** The record fields this module writes. Short names, as the other record fields. */
 export const LINEAGE = Object.freeze({
@@ -769,14 +770,7 @@ export function placeEditedPieces(
   const full = fullText(subsOf(pieces), (k) => pieces.get(k), textOf);
   // The winner's last shown piece of each split group, in document order: a peer may have
   // split the paragraph, so the pieces can sit in different paragraphs.
-  const lastShown = new Map<string, { key: string; order: number }>();
-  for (const [key, p] of pieces) {
-    if (clientOf(key) !== winnerOf(p.group)) continue;
-    const order = where.get(key)?.order;
-    if (order === undefined) continue;
-    const best = lastShown.get(p.group);
-    if (!best || order > best.order) lastShown.set(p.group, { key, order });
-  }
+  const shown = shownPieces(pieces, where, winnerOf);
   const targets = new Map<string, string>();
   // Pieces that go right after the piece (or run) they came from, in the order of its text.
   const follow = (key: string): void => {
@@ -797,16 +791,8 @@ export function placeEditedPieces(
     const text = full(key);
     if (text !== null && onlyDeletes(text, p.original) && !(p.copyWinner && text.length > 0))
       continue;
-    const preceding = [...pieces]
-      .filter(
-        ([other, candidate]) =>
-          candidate.group === p.group &&
-          clientOf(other) === winner &&
-          candidate.at <= p.at &&
-          where.has(other)
-      )
-      .sort(([a, x], [b, y]) => y.at - x.at || where.get(b)!.order - where.get(a)!.order)[0]?.[0];
-    const after = preceding ?? (where.has(p.from) ? p.from : lastShown.get(p.group)?.key);
+    const after =
+      shown.preceding(p.group, p.at) ?? (where.has(p.from) ? p.from : shown.last.get(p.group));
     if (after !== undefined && after !== key) targets.set(key, after);
   }
   const rescuedSet = new Set(rescued);

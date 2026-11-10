@@ -240,7 +240,7 @@ All chrome CSS and tokens (`--doc-*`, shadcn HSL names shared with DOCX Editor).
 | Files | Purpose |
 | --- | --- |
 | `session.ts`, `mirror.ts`, `mirror-support.ts`, `room-events.ts` | Session lifecycle, local history, package synchronization, and changed-part detection |
-| `text-identity.ts`, `text-case.ts`, `text-position.ts`, `copy-order.ts`, `copy-events.ts`, `text-repair.ts`, `piece-place.ts` | Character identities, participant-owned case choices, deterministic copy selection, deferred copy metadata, deletion propagation, and formatted run placement |
+| `text-identity.ts`, `shown-pieces.ts`, `text-case.ts`, `text-position.ts`, `copy-order.ts`, `copy-events.ts`, `text-repair.ts`, `piece-place.ts` | Character identities, participant-owned case choices, deterministic copy selection, deferred copy metadata, deletion propagation, and formatted run placement |
 | `pending-content.ts`, `removal-snapshots.ts`, `move-rescue.ts`, `removed-table-content.ts` (retains concurrent typing when an emptied row or cell is removed), `removed-content.ts` | Content placement during partial delivery and concurrent paragraph or table removal |
 | `undo-moves.ts`, `undo-restore.ts`, `undo-unlisted.ts`, `undo-listings-history.ts` | Undo identities, copied typing, restored text, and child listings retained before garbage collection |
 | `undo-rehome.ts`, `undo-stranded.ts`, `merged-cells.ts` | Peer text recovery in surviving table cells and merged text normalization |
