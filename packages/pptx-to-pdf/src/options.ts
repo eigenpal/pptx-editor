@@ -49,25 +49,24 @@ export function validateOptions(options: PdfExportOptions): {
   const policy = options.fidelityPolicy;
   if (policy !== undefined && policy !== 'strict' && policy !== 'best-effort')
     throw new RangeError('Invalid fidelityPolicy: expected strict, best-effort');
-  for (const name of ['substitutes', 'includeHiddenSlides', 'googleFonts'] as const) {
+  for (const name of ['substitutes', 'includeHiddenSlides'] as const) {
     if (options[name] !== undefined && typeof options[name] !== 'boolean')
       throw new TypeError(`${name} must be boolean`);
   }
+  if ('googleFonts' in options)
+    throw new TypeError('Use fonts: googleFonts() instead of googleFonts: true');
   const fonts = options.fonts;
   if (fonts !== undefined) {
     const list = Array.isArray(fonts) ? fonts : [fonts];
-    for (const f of list)
+    for (const origin of list) {
+      if (origin === undefined) continue;
       if (
-        !f ||
-        typeof f !== 'object' ||
-        !(f.bytes instanceof Uint8Array) ||
-        typeof f.family !== 'string' ||
-        !f.family ||
-        // Core matches faces with `===` on these, so any other value would never match a face.
-        (f.bold !== undefined && typeof f.bold !== 'boolean') ||
-        (f.italic !== undefined && typeof f.italic !== 'boolean')
+        !origin ||
+        (typeof origin !== 'object' && typeof origin !== 'function') ||
+        (typeof origin === 'object' && ('bytes' in origin || Array.isArray(origin)))
       )
-        throw new TypeError('fonts must be a font source or an array of font sources');
+        throw new TypeError('fonts must be a font configuration, resolver, or ordered list');
+    }
   }
   const signal = options.signal;
   if (

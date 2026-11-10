@@ -23,13 +23,14 @@ Sources are `Uint8Array` values. Node.js `Buffer` values also work. An open resu
 | --------------------- | ------------------- | ------------------------------------ |
 | `fonts`               | No additional faces | `exportPdf`, `openDocumentForExport` |
 | `substitutes`         | `true`              | `exportPdf`, `openDocumentForExport` |
-| `googleFonts`         | `false`             | `exportPdf`, `openDocumentForExport` |
 | `fidelityPolicy`      | `strict`            | `exportPdf`, `exportPdfFrom`         |
 | `includeHiddenSlides` | `false`             | `exportPdf`, `exportPdfFrom`         |
 | `timeoutMs`           | `60000`             | `exportPdf`, `exportPdfFrom`         |
 | `maxPages`            | `10000`             | `exportPdf`, `exportPdfFrom`         |
 | `maxOutputBytes`      | `67108864`          | `exportPdf`, `exportPdfFrom`         |
 | `signal`              | None                | All three functions                  |
+
+`fonts` accepts a `PdfFontOrigin` or an ordered array of origins. Origins include configurations, configuration promises, and marked resolvers such as `googleFonts()`. See [PDF fonts](/docs/export/pdf/fonts) for source priority and migration examples.
 
 `maxPages` accepts integers from 1 to 10000. `maxOutputBytes` accepts integers from 1 to 67108864. `timeoutMs` accepts integers from 1 to 2147483647 and provides a cooperative deadline. Internal paint and image limits also apply; increasing output limits does not disable them.
 

@@ -11,7 +11,7 @@ import type {
   OpenError,
   SubstituteFontFailure,
 } from '@pptx-editor.dev/core/editor';
-import type { FontSource } from '@pptx-editor.dev/core/layout';
+import type { FontOrigin } from '@pptx-editor.dev/core/layout';
 
 /** A bounded explanation of content the PDF cannot reproduce. @public */
 export interface PdfDiagnostic {
@@ -31,22 +31,21 @@ export interface PdfDiagnostic {
   readonly severity: 'unsupported' | 'approximation' | 'information';
 }
 
-/** One font face or several. Earlier faces win. @public */
-export type PdfFontsSource = FontSource | readonly FontSource[];
+/** A font configuration, resolver, or configuration promise. @public */
+export type PdfFontOrigin = FontOrigin;
+
+/** One font origin or an ordered list. Earlier origins win. @public */
+export type PdfFontsSource = PdfFontOrigin | readonly PdfFontOrigin[];
 
 /** Node conversion controls. @public */
 export interface PdfExportOptions {
-  /** Font faces tried before embedded and substitute fonts. */
+  /** Composable font sources. Direct faces precede embedded fonts; substitutions follow them. */
   readonly fonts?: PdfFontsSource;
   /**
    * Load the metric-compatible substitutes from `@docx-editor.dev/fonts`. Defaults to true.
    * DOCX Editor configures this through its font sources instead.
    */
   readonly substitutes?: boolean;
-  /** Resolve fonts from the pinned Google Fonts catalog, including Arabic and CJK fallbacks.
-   * Makes network requests. Defaults to false. Supplied fonts keep precedence.
-   */
-  readonly googleFonts?: boolean;
   /** Include slides marked hidden (`p:sld/@show="0"`). Defaults to false. */
   readonly includeHiddenSlides?: boolean;
   /** Reject unsupported or approximate content. Defaults to `strict`. */
@@ -75,7 +74,7 @@ export interface PdfExportTimings {
 
 /** The faces the conversion drew with, and the families it substituted. @public */
 export interface PdfFontResolution {
-  /** Each face drawn with: its family, and its origin (for example `embedded`, `provided`, or `substitute`). */
+  /** Each face drawn with: its family, and its origin (for example `embedded`, `host`, or `substitute`). */
   readonly faces: readonly { readonly family: string; readonly origin: string }[];
   /** Families the deck asked for that no face covered, with the family used instead. */
   readonly substitutions: readonly FontSubstitution[];

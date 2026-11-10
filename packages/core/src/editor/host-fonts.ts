@@ -136,8 +136,8 @@ export function reportFontError(
     );
 }
 
-/** The faces a set of fragments brings, admitted, and every face refused. */
-function admit(layers: readonly FontConfigurationFragment[]): {
+/** Admit configuration fragments with the shared font resource limits. @public */
+export function admitFontConfiguration(layers: readonly FontConfigurationFragment[]): {
   faces: HostFaces;
   refused: EditorFontError[];
 } {
@@ -340,7 +340,7 @@ export function createHostFonts(
   const apply = (session: DocumentSession): void => {
     const layers = [base, ...picked].filter((l): l is FontConfigurationFragment => l !== undefined);
     if (layers.length === 0) return session.clearHostFaces();
-    const { faces, refused } = admit(layers);
+    const { faces, refused } = admitFontConfiguration(layers);
     for (const error of refused) report(error);
     session.setHostFaces(faces);
   };

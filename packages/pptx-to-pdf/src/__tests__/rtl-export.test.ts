@@ -3,6 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+import { fontConfiguration } from '../../../../scripts/fixtures/font-configuration.ts';
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -54,7 +56,10 @@ for (const text of [
   'مرحبا hello 123 بالعالم',
 ]) {
   test(`Arabic export preserves searchable words: ${text}`, async () => {
-    const result = await exportPdf(deck(text), { fonts, fidelityPolicy: 'best-effort' });
+    const result = await exportPdf(deck(text), {
+      fonts: fontConfiguration(fonts),
+      fidelityPolicy: 'best-effort',
+    });
     expect(result.diagnostics.some((d) => d.code === 'text.missing-glyph')).toBe(false);
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     try {
@@ -89,51 +94,21 @@ test('layout retains contextual glyphs and their mark offsets', async () => {
   }
 });
 
-test('Google font intake verifies hashes and keeps caller fonts first', async () => {
-  const { googleExportFonts } = await import('../google-fonts.ts');
-  const { sha256FontBytes } = await import('@pptx-editor.dev/core/layout');
-  const bytes = fonts[0].bytes;
-  const face = {
-    id: 'arabic',
-    request: { family: 'Amiri', weight: 400, style: 'normal' as const },
-    faceIndex: 0,
-    bytes,
-    hash: sha256FontBytes(bytes),
-  };
-  const supplied = { ...fonts[0], family: 'Amiri' };
-  expect(await googleExportFonts(deck('مرحبا'), undefined, [], { sources: [face] })).toHaveLength(
-    1
-  );
-  expect(
-    await googleExportFonts(deck('مرحبا'), undefined, [supplied], { sources: [face] })
-  ).toEqual([]);
-  await expect(
-    googleExportFonts(deck('مرحبا'), undefined, [], {
-      sources: [{ ...face, hash: 'sha256:incorrect' }],
-    })
-  ).rejects.toThrow('admission');
-  const controller = new AbortController();
-  controller.abort();
-  expect(
-    await googleExportFonts(deck('مرحبا'), controller.signal, [], { sources: [face] })
-  ).toEqual([]);
-});
-
 test('CJK text requests an open fallback even when no East Asian font is declared', () => {
   const read = readPptx(deck('日本語', 'Arial'));
   if (!read.ok) throw new Error('fixture');
   expect(deckFontRequest(read.pkg).families).toContain('Noto Sans JP');
 });
 
-test('Google Fonts opt-in accepts only booleans', async () => {
-  await expect(
-    exportPdf(deck('مرحبا'), { googleFonts: 'true' as unknown as boolean })
-  ).rejects.toThrow('googleFonts must be boolean');
+test('legacy Google Fonts boolean gives a migration error', async () => {
+  await expect(exportPdf(deck('مرحبا'), { googleFonts: true } as never)).rejects.toThrow(
+    'Use fonts: googleFonts()'
+  );
 });
 
 test('Arabic fallback preserves spaces across Latin-font space runs', async () => {
   const result = await exportPdf(deck('مرحبا بالعالم الحقيقي', 'Arial'), {
-    fonts,
+    fonts: fontConfiguration(fonts),
     fidelityPolicy: 'best-effort',
   });
   const task = getDocument({ data: result.bytes.slice(), useSystemFonts: false });
@@ -171,7 +146,7 @@ test('font downloads cancelled during session open return a typed refusal', asyn
   const fetch = spyOn(globalThis, 'fetch').mockImplementation(delayedFetch);
   try {
     const opening = openDocumentForExport(deck('مرحبا'), {
-      googleFonts: true,
+      fonts: googleFonts({ cjk: true }),
       signal: controller.signal,
     });
     await started;
@@ -247,7 +222,7 @@ test('a refused shaping operation retains text for nominal paint', async () => {
 
 test('Arabic script fonts use fallback punctuation instead of omitting it', async () => {
   const result = await exportPdf(deck('مرحبا (123) بالعالم!'), {
-    fonts,
+    fonts: fontConfiguration(fonts),
     fidelityPolicy: 'best-effort',
   });
   expect(result.diagnostics.some((d) => d.code === 'text.missing-glyph')).toBe(false);
@@ -288,7 +263,10 @@ test('Arabic gradient text and its shadow keep one searchable copy of the marks'
       },
     ],
   });
-  const result = await exportPdf(bytes, { fonts, fidelityPolicy: 'best-effort' });
+  const result = await exportPdf(bytes, {
+    fonts: fontConfiguration(fonts),
+    fidelityPolicy: 'best-effort',
+  });
   expect(result.diagnostics.some((d) => d.code === 'text.missing-glyph')).toBe(false);
   const task = getDocument({ data: result.bytes.slice(), useSystemFonts: false });
   try {

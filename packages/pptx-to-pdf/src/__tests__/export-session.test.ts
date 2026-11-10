@@ -3,6 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
+import { fontConfiguration } from '../../../../scripts/fixtures/font-configuration.ts';
 // `openDocumentForExport` and `exportPdfFrom`: one layout, many exports (DOCX Editor's
 // reusable session).
 
@@ -225,11 +226,13 @@ describe('openDocumentForExport and exportPdfFrom', () => {
       bytes: carlito.bytes,
       origin: 'host-font',
     };
-    const withFont = await openDocumentForExport(deck('text-runs'), { fonts: font });
+    const withFont = await openDocumentForExport(deck('text-runs'), {
+      fonts: fontConfiguration([font]),
+    });
     if (!withFont.ok) throw new Error('fixture');
     expect(withFont.session.fontResolution.faces[0]).toEqual({
       family: 'Calibri',
-      origin: 'host-font',
+      origin: 'host',
     });
     withFont.session.dispose();
     const bare = await openDocumentForExport(deck('text-runs'), { substitutes: false });
@@ -245,9 +248,9 @@ describe('openDocumentForExport and exportPdfFrom', () => {
       { family: 'F', bold: 'yes', bytes: new Uint8Array(4) },
     ]) {
       const options = { fonts: bad } as unknown as PdfExportOptions;
-      await expect(exportPdf(bytes, options)).rejects.toThrow('fonts must be a font source');
+      await expect(exportPdf(bytes, options)).rejects.toThrow('fonts must be a font configuration');
       await expect(openDocumentForExport(bytes, options)).rejects.toThrow(
-        'fonts must be a font source'
+        'fonts must be a font configuration'
       );
     }
   });

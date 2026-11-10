@@ -1,0 +1,8 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "PDF font source composition and shared font admission affect derived layout only. Shared operations, room metadata, and document storage remain unchanged.",
+  "tests": ["packages/pptx-to-pdf/src/__tests__/font-origins.test.ts"]
+}

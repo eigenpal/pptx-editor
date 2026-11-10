@@ -8,54 +8,71 @@ Enable Google Fonts for open fallback faces, or supply font bytes for offline ex
 
 ## Use Google Fonts
 
-Set `googleFonts: true` to resolve fonts from the pinned Google Fonts catalog. The exporter requests Amiri for Arabic text and regional Noto Sans faces for CJK text. Supplied fonts keep precedence. Substitutes can change line breaks.
+Install the resolver package in your application:
+
+```bash
+npm install @docx-editor.dev/fonts
+```
+
+Set `fonts: googleFonts({ cjk: true })` to resolve fonts from the pinned Google Fonts catalog. The exporter requests Amiri for Arabic text and regional Noto Sans faces for CJK text. Supplied fonts keep precedence. Substitutes can change line breaks.
 
 ```ts
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 import { readFile, writeFile } from 'node:fs/promises';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
 const result = await exportPdf(await readFile('deck.pptx'), {
-  googleFonts: true,
+  fonts: googleFonts({ cjk: true }),
   fidelityPolicy: 'best-effort',
 });
 console.log(result.diagnostics);
 await writeFile('deck.pdf', result.bytes);
 ```
 
-This option makes network requests and defaults to `false`. It uses a closed catalog with pinned URLs and verified font hashes. It does not fetch URLs from the presentation. Network failures can leave missing glyphs; inspect `diagnostics` before serving the PDF. For offline exports, supply font bytes through `fonts`.
+The resolver makes network requests through pinned URLs and verifies font hashes. It does not fetch presentation URLs. Without this resolver, export makes no Google Fonts requests. Export waits for deferred fonts, including CJK faces, before layout. Resolver and admission failures reject the export. Handle the rejection before serving a PDF.
 
 Arabic export uses contextual glyphs and mark positions from the layout engine. Its text layer preserves words and spaces for search and copy.
 
 ## Supply font faces
 
-Pass regular and styled faces separately. Use fonts that permit embedding:
+Create a source from font bytes. Supply each weight and style separately. This Node.js example uses an open font stored with your application:
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises';
+import { createFontSource } from '@pptx-editor.dev/core/editor';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
+const admitted = createFontSource(await readFile('fonts/NotoSansArabic-Regular.ttf'), {
+  family: 'Noto Sans Arabic',
+  weight: 400,
+  style: 'normal',
+});
+if ('failure' in admitted) throw new Error(admitted.failure.reason);
+
 const result = await exportPdf(await readFile('deck.pptx'), {
-  fonts: [
-    {
-      family: 'Example Sans',
-      bold: false,
-      italic: false,
-      origin: 'provided',
-      bytes: await readFile('fonts/ExampleSans-Regular.ttf'),
-    },
-    {
-      family: 'Example Sans',
-      bold: true,
-      italic: false,
-      origin: 'provided',
-      bytes: await readFile('fonts/ExampleSans-Bold.ttf'),
-    },
-  ],
+  fonts: { sources: [admitted.source] },
+  fidelityPolicy: 'best-effort',
 });
 await writeFile('deck.pdf', result.bytes);
 ```
 
-Replace the example family and paths with your licensed font files. Earlier supplied faces take priority, followed by permitted embedded fonts, enabled Google Fonts, and packaged substitutes. Set `substitutes: false` to disable packaged substitutes.
+## Compose font sources
+
+Pass configurations, configuration promises, or marked resolvers in priority order. For example, keep the source from the previous example before network fonts:
+
+```ts
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+import type { PdfFontsSource } from '@pptx-editor.dev/pptx-to-pdf';
+
+// `admitted.source` comes from the preceding example.
+const fonts: PdfFontsSource = [{ sources: [admitted.source] }, googleFonts({ cjk: true })];
+```
+
+Earlier origins win for each family, weight, and style. Direct faces precede permitted embedded faces. Configured substitutions follow embedded faces. Packaged substitutes come last. Set `substitutes: false` to disable those packaged substitutes. Use `defineFontResolver` from `@pptx-editor.dev/core/layout` for your own request-based resolver. The request includes document families, earlier face coverage, and an abort signal. Substitutions can change line breaks.
+
+### Migrate the previous API
+
+Replace `googleFonts: true` with `fonts: googleFonts({ cjk: true })`. Replace raw `{ family, bold, italic, bytes }` entries with `createFontSource` and `{ sources }`. Both `exportPdf` and `openDocumentForExport` accept the new form.
 
 ## Deploy font assets
 
@@ -67,7 +84,7 @@ For East Asian fallback fonts, install the optional package:
 npm install @docx-editor.dev/fonts-cjk
 ```
 
-With `googleFonts` disabled, East Asian text can use Noto Sans CJK JP from this package. Keep its assets in your deployment output.
+East Asian text can use Noto Sans CJK JP from this package. Keep its assets in your deployment output.
 
 ## Inspect font resolution
 

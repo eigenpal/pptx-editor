@@ -1,3 +1,4 @@
+import { fontConfiguration } from '../fixtures/font-configuration.ts';
 // Score one deck: print it to PDF with the editor's own paint, and compare our PDF with the
 // reference PDF page by page (pixels, line breaks, baselines). pdf.js draws and reads both PDFs
 // (`pdf.ts`). Then save, reopen, and paint again: every slide must paint the same markup. The
@@ -97,7 +98,7 @@ async function exportDeck(
   const result = await exportPdf(deck, {
     ...EXPORT_SETTINGS,
     ...SESSION_SETTINGS,
-    fonts: exportFonts(fonts),
+    fonts: fontConfiguration(exportFonts(fonts)),
   });
   const pages = result.slideNumbers.map((n) => n - 1);
   if (pages.join() !== visible.join())

@@ -5,6 +5,7 @@
     "": {
       "name": "pptx-editor-monorepo",
       "dependencies": {
+        "@docx-editor.dev/fonts": "^2.34.0",
         "@pptx-editor.dev/pptx-to-pdf": "workspace:*",
       },
       "devDependencies": {
