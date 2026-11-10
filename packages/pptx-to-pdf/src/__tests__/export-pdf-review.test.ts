@@ -3,6 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
+import { fontConfiguration } from '../../../../scripts/fixtures/font-configuration.ts';
 // Limits, cancellation, metadata, fonts, pictures, and diagnostics placement.
 
 import { missingFontsDeck } from '../../../core/src/editor/__tests__/font-test-helpers.ts';
@@ -162,8 +163,11 @@ describe('cancellation and limits', () => {
 
   test('fonts accepts one source as well as an array', async () => {
     const face = await substituteFace();
-    const one = await exportPdf(deck('text-runs'), { ...BEST, fonts: face });
-    const many = await exportPdf(deck('text-runs'), { ...BEST, fonts: [face] });
+    const one = await exportPdf(deck('text-runs'), { ...BEST, fonts: fontConfiguration([face]) });
+    const many = await exportPdf(deck('text-runs'), {
+      ...BEST,
+      fonts: [fontConfiguration([face])],
+    });
     expect(one.bytes.byteLength).toBe(many.bytes.byteLength);
   });
 });
@@ -212,11 +216,13 @@ describe('fonts', () => {
     const bytes = buildPptx({
       slides: [textSlide('Locked words', '<a:latin typeface="Locked Font"/>')],
     });
-    const result = await exportPdf(bytes, { ...BEST, fonts: restricted });
+    const result = await exportPdf(bytes, { ...BEST, fonts: fontConfiguration([restricted]) });
     expect(result.diagnostics.map((d) => d.code)).toContain('font.not-embedded');
     const [page] = await pdfText(result);
     expect(page.map((i) => i.str).join('')).not.toContain('Locked');
-    await expect(exportPdf(bytes, { fonts: restricted })).rejects.toBeInstanceOf(PdfFidelityError);
+    await expect(
+      exportPdf(bytes, { fonts: fontConfiguration([restricted]) })
+    ).rejects.toBeInstanceOf(PdfFidelityError);
   });
 
   test('rotated text is drawn rotated; flipped text is not mirrored', async () => {

@@ -42,9 +42,10 @@ export type {
   PdfExportTimings,
   PdfFontResolution,
   PdfFontsSource,
+  PdfFontOrigin,
   PdfProjectionOptions,
 } from './types.ts';
-export type { FontSource } from '@pptx-editor.dev/core/layout';
+export type { FontOrigin, FontConfigurationFragment } from '@pptx-editor.dev/core/layout';
 export type {
   FontSubstitution,
   OpenError,

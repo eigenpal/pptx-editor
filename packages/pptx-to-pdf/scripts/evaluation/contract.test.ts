@@ -190,7 +190,7 @@ describe('the evaluation contract', () => {
     expect(validate(contract.commands.export!.stdout!.exported!, report)).toEqual([]);
     expect(report.fontPlan).toMatchObject({ faces: 1 });
     const resolution = report.fontResolution as { faces: { family: string; origin: string }[] };
-    expect(resolution.faces).toContainEqual({ family: 'Calibri', origin: 'plan' });
+    expect(resolution.faces).toContainEqual({ family: 'Calibri', origin: 'host' });
     // A collection or a non-font file is refused with a message, never measured.
     writeFileSync(join(folder, 'face.ttf'), 'ttcf');
     const refused = run('export', values, true);

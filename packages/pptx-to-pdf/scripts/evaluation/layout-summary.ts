@@ -3,6 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
+import { fontConfiguration } from '../../../../scripts/fixtures/font-configuration.ts';
 // Adapted from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/layout-summary.ts`, commit
 // 398963c7f67207cebf3c38dcc41d5f0bd1339b5f. PPTX changes: one page per visible slide, the
 // page-to-slide map, the engine's layout notes per page, and the font plan (`--fonts`).
@@ -42,7 +43,7 @@ export async function summarizePages(
   const deadline = protocolDeadline(timeoutMs);
   const opened = await openExportSession(source, {
     ...SESSION_SETTINGS,
-    ...(plan ? { fonts: plan.fonts } : {}),
+    ...(plan ? { fonts: fontConfiguration(plan.fonts) } : {}),
   });
   if (!opened.ok) throw openFailure(opened);
   try {

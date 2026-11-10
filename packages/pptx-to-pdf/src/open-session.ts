@@ -9,8 +9,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/editor';
 import { installDrawing } from '@pptx-editor.dev/pro/drawing';
-import type { FontSource } from '@pptx-editor.dev/core/layout';
-import { googleExportFonts } from './google-fonts.ts';
+import { exportFonts } from './font-provisioning.ts';
 import { cjkFallbackFont } from './cjk-font.ts';
 import {
   ExportResourceError,
@@ -74,25 +73,16 @@ export async function openExportSession(
   // PDF export always draws charts and paints every effect (`@pptx-editor.dev/pro/drawing`), as DOCX Editor's
   // `docx-to-pdf` always installs its drawing module. Installing again is silent.
   installDrawing();
-  const given: readonly FontSource[] =
-    options.fonts === undefined
-      ? []
-      : Array.isArray(options.fonts)
-        ? options.fonts
-        : [options.fonts as FontSource];
-  // East Asian text whose font is missing draws with Noto Sans CJK JP when the optional
-  // `@docx-editor.dev/fonts-cjk` is installed (`cjk-font.ts`), after the caller's fonts.
-  let remote: FontSource[] = [];
+  let configured: Awaited<ReturnType<typeof exportFonts>>;
   try {
-    if (options.googleFonts) remote = await googleExportFonts(source, signal, given);
+    configured = await exportFonts(source, options.fonts, signal);
   } catch (error) {
-    // A resolver aborts by rejecting. Session opens expose the typed refusal instead.
     if (signal?.aborted) return { ok: false, reason: 'aborted' };
     throw error;
   }
-  const cjk = options.googleFonts ? undefined : await cjkFallbackFont(source);
+  const cjk = await cjkFallbackFont(source);
   if (signal?.aborted) return { ok: false, reason: 'aborted' };
-  const fonts = [...given, ...remote, ...(cjk ? [cjk] : [])];
+  const fonts = [...configured.faces, ...(cjk ? [cjk] : [])];
   const opened = await openPresentation(source, {
     ...(fonts.length > 0 ? { fonts } : {}),
     ...(options.substitutes === false ? { substitutes: false } : {}),
@@ -105,6 +95,9 @@ export async function openExportSession(
   if (!opened.ok) {
     const detail = 'detail' in opened.error ? String(opened.error.detail) : undefined;
     return { ok: false, reason: opened.error.reason, ...(detail ? { detail } : {}) };
+  }
+  if (configured.substitutions.length) {
+    opened.session.setHostFaces({ faces: [], substitutions: configured.substitutions });
   }
   const state: SessionState = {
     document: opened.session,

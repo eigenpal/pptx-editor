@@ -20,10 +20,10 @@ Convert PPTX files to searchable PDFs on Node.js using the editor's layout engin
 
 ## Install
 
-Install the exporter and its engine peer:
+Install the exporter, its engine peer, and the font resolver package:
 
 ```bash
-npm install @pptx-editor.dev/pptx-to-pdf @pptx-editor.dev/core
+npm install @pptx-editor.dev/pptx-to-pdf @pptx-editor.dev/core @docx-editor.dev/fonts
 ```
 
 Use Node.js 20.16 or later within version 20, or Node.js 22.3 or later. Keep this package out of browser bundles.
@@ -33,11 +33,12 @@ Use Node.js 20.16 or later within version 20, or Node.js 22.3 or later. Keep thi
 This example loads open font fallbacks and writes a PDF with conversion diagnostics:
 
 ```ts
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 import { readFile, writeFile } from 'node:fs/promises';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
 const result = await exportPdf(await readFile('deck.pptx'), {
-  googleFonts: true,
+  fonts: googleFonts({ cjk: true }),
   fidelityPolicy: 'best-effort',
 });
 for (const diagnostic of result.diagnostics) {
@@ -48,7 +49,7 @@ for (const diagnostic of result.diagnostics) {
 await writeFile('deck.pdf', result.bytes);
 ```
 
-`googleFonts` enables network requests through a pinned, hash-verified catalog. It supplies Amiri for Arabic text and regional Noto Sans faces for CJK text. Supplied fonts and usable embedded faces keep precedence. Substitution can change line breaks. Omit this option for offline exports and supply bytes through `fonts`.
+`googleFonts()` enables network requests through a pinned, hash-verified catalog. It supplies Amiri for Arabic text and regional Noto Sans faces for CJK text. Earlier font origins take priority. Substitution can change line breaks. Omit the resolver for offline exports and supply configurations through `fonts`.
 
 The default fidelity policy is `strict`, which throws `PdfFidelityError` for unsupported or approximate content. Use `best-effort` only when you can accept the reported differences. See [PDF fonts](https://pptx-editor.dev/docs/export/pdf/fonts) for offline assets and embedding permissions.
 
@@ -57,11 +58,12 @@ The default fidelity policy is `strict`, which throws `PdfFidelityError` for uns
 Open one session to export the same presentation with different page options:
 
 ```ts
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 import { readFile, writeFile } from 'node:fs/promises';
 import { exportPdfFrom, openDocumentForExport } from '@pptx-editor.dev/pptx-to-pdf';
 
 const opened = await openDocumentForExport(await readFile('deck.pptx'), {
-  googleFonts: true,
+  fonts: googleFonts({ cjk: true }),
 });
 if (!opened.ok) throw new Error(`Cannot open: ${opened.reason}`);
 try {

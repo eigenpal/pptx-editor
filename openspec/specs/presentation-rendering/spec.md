@@ -176,11 +176,11 @@ PDF export SHALL use the layout engine's contextual RTL glyphs and mark offsets.
 
 ### Requirement: Explicit network fonts
 
-PDF export SHALL make Google Fonts requests only when `googleFonts` is enabled. It SHALL resolve names through the pinned catalog, verify font hashes, and preserve supplied and permitted embedded faces before network fallback faces.
+PDF export SHALL accept configurations, configuration promises, and marked resolvers through `fonts`, with earlier origins taking priority. It SHALL make Google Fonts requests only through an explicitly supplied resolver. It SHALL await deferred fonts, enforce cancellation and font admission limits, and reject resolver or admission failures. Direct configured faces SHALL precede embedded faces; configured substitutions SHALL follow embedded faces.
 
 #### Scenario: Offline default
 
-- **WHEN** an export omits `googleFonts`
+- **WHEN** an export supplies no network font resolver
 - **THEN** font resolution makes no Google Fonts requests
 
 #### Scenario: Invalid network bytes

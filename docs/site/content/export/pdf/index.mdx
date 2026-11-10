@@ -8,10 +8,10 @@ Use `@pptx-editor.dev/pptx-to-pdf` to convert presentation bytes to PDF on Node.
 
 ## Install the package
 
-Install the exporter and its engine peer:
+Install the exporter, its engine peer, and the font resolver package:
 
 ```bash
-npm install @pptx-editor.dev/pptx-to-pdf @pptx-editor.dev/core
+npm install @pptx-editor.dev/pptx-to-pdf @pptx-editor.dev/core @docx-editor.dev/fonts
 ```
 
 Use Node.js 20.16 or later within version 20, or Node.js 22.3 or later. The package is a Node.js exporter; do not bundle it into browser code.
@@ -21,11 +21,12 @@ Use Node.js 20.16 or later within version 20, or Node.js 22.3 or later. The pack
 This example exports `deck.pptx` and reports content that the PDF approximates or omits:
 
 ```ts
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 import { readFile, writeFile } from 'node:fs/promises';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
 const result = await exportPdf(await readFile('deck.pptx'), {
-  googleFonts: true,
+  fonts: googleFonts({ cjk: true }),
   fidelityPolicy: 'best-effort',
 });
 await writeFile('deck.pdf', result.bytes);
@@ -36,7 +37,7 @@ for (const diagnostic of result.diagnostics) {
 }
 ```
 
-`googleFonts: true` enables network font resolution, including Arabic and CJK fallbacks. Omit it for offline conversion with [supplied fonts](/docs/export/pdf/fonts).
+`fonts: googleFonts({ cjk: true })` enables network font resolution, including Arabic and CJK fallbacks. Omit it for offline conversion with [supplied fonts](/docs/export/pdf/fonts).
 
 `best-effort` returns the PDF with diagnostics. Review those diagnostics before presenting the output as complete. The default policy is `strict`. It throws `PdfFidelityError` for any unsupported or approximate content. Information diagnostics, such as font substitution, do not block strict export.
 

@@ -3,6 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 /**
  * `POST /api/convert`: the demo's PDF export, after DOCX Editor's `api/convert.ts`. DOCX Editor
  * commit adf0e178.
@@ -212,7 +213,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       // The demo exports what the editor shows, so approximations become diagnostics.
       return exportPdf(bytes, {
         fidelityPolicy: 'best-effort',
-        googleFonts: true,
+        fonts: googleFonts({ cjk: true }),
         timeoutMs: DEADLINE_MS,
         maxOutputBytes: MAX_OUTPUT,
         signal: abort.signal,

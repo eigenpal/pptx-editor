@@ -97,6 +97,7 @@
     "collaboration:check": "node scripts/collaboration/check.mjs"
   },
   "dependencies": {
+    "@docx-editor.dev/fonts": "^2.34.0",
     "@pptx-editor.dev/pptx-to-pdf": "workspace:*"
   },
   "devDependencies": {

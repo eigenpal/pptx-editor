@@ -58,18 +58,19 @@ If you add your own key handlers, ignore events with `isComposing` set or with k
 Enable Google Fonts on the Node.js exporter to load regional CJK fallbacks:
 
 ```ts
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 import { readFile, writeFile } from 'node:fs/promises';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
 const result = await exportPdf(await readFile('deck.pptx'), {
-  googleFonts: true,
+  fonts: googleFonts({ cjk: true }),
   fidelityPolicy: 'best-effort',
 });
 console.log(result.diagnostics);
 await writeFile('deck.pdf', result.bytes);
 ```
 
-Browser fonts do not transfer to the server. For offline export, supply font bytes or install `@docx-editor.dev/fonts-cjk` for Noto Sans CJK JP. The optional package is used when `googleFonts` is disabled. See [PDF fonts](/docs/export/pdf/fonts) for deployment and diagnostics.
+Browser fonts do not transfer to the server. For offline export, supply font bytes or install `@docx-editor.dev/fonts-cjk` for Noto Sans CJK JP. The optional package supplies additional fallback faces. See [PDF fonts](/docs/export/pdf/fonts) for deployment and diagnostics.
 
 ## Interface language
 

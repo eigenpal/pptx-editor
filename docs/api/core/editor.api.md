@@ -19,6 +19,12 @@ export function addSectionAt(editor: PptxEditorInstance, command: EditorCommand,
 export function addSectionCommand(index: number, t: Translate): EditorCommand;
 
 // @public
+export function admitFontConfiguration(layers: readonly FontConfigurationFragment[]): {
+    faces: HostFaces;
+    refused: EditorFontError[];
+};
+
+// @public
 export interface AltText {
     readonly decorative: boolean;
     // (undocumented)

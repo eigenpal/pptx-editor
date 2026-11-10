@@ -3,6 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
+import { fontConfiguration } from '../../../../scripts/fixtures/font-configuration.ts';
 // After DOCX Editor `packages/docx-to-pdf/scripts/evaluation/export.ts`, commit
 // 398963c7f67207cebf3c38dcc41d5f0bd1339b5f. PPTX changes: the font plan (`--fonts`), the
 // page-to-slide map, the deck's hidden slides, a typed error `code`, one deadline for the open
@@ -40,7 +41,7 @@ export async function exportForEvaluation(
   const deadline = protocolDeadline(timeoutMs);
   const opened = await openExportSession(source, {
     ...SESSION_SETTINGS,
-    ...(plan ? { fonts: plan.fonts } : {}),
+    ...(plan ? { fonts: fontConfiguration(plan.fonts) } : {}),
   });
   if (!opened.ok) throw openFailure(opened);
   // exportPdfFrom does not open the deck, so its openMs is 0; the protocol reports the open.

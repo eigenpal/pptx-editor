@@ -4,7 +4,8 @@
 
 ```ts
 
-import { FontSource } from '@pptx-editor.dev/core/layout';
+import { FontConfigurationFragment } from '@pptx-editor.dev/core/layout';
+import { FontOrigin } from '@pptx-editor.dev/core/layout';
 import { FontSubstitution } from '@pptx-editor.dev/core/editor';
 import { OpenError } from '@pptx-editor.dev/core/editor';
 import { SubstituteFontFailure } from '@pptx-editor.dev/core/editor';
@@ -21,7 +22,9 @@ export class ExportResourceError extends Error {
     readonly code: 'disposed' | 'aborted';
 }
 
-export { FontSource }
+export { FontConfigurationFragment }
+
+export { FontOrigin }
 
 export { FontSubstitution }
 
@@ -74,7 +77,6 @@ export class PdfEncodingError extends Error {
 export interface PdfExportOptions {
     readonly fidelityPolicy?: 'strict' | 'best-effort';
     readonly fonts?: PdfFontsSource;
-    readonly googleFonts?: boolean;
     readonly includeHiddenSlides?: boolean;
     readonly maxOutputBytes?: number;
     readonly maxPages?: number;
@@ -115,6 +117,9 @@ export class PdfFidelityError extends Error {
 }
 
 // @public
+export type PdfFontOrigin = FontOrigin;
+
+// @public
 export interface PdfFontResolution {
     readonly faces: readonly {
         readonly family: string;
@@ -126,7 +131,7 @@ export interface PdfFontResolution {
 }
 
 // @public
-export type PdfFontsSource = FontSource | readonly FontSource[];
+export type PdfFontsSource = PdfFontOrigin | readonly PdfFontOrigin[];
 
 // @public
 export class PdfOutputLimitError extends PdfEncodingError {
