@@ -68,7 +68,7 @@ export function verifyCatalog() {
     readFileSync(resolve(root, 'docs/site/content/pro/collaboration-versions.mdx'), 'utf8')
   );
   const versions = JSON.parse(
-    run('npm', ['view', '@pptx-editor.dev/pro', 'versions', '--json'])
+    run('npm', ['view', '@pptx-editor.dev/pro', 'versions', '--json', '--prefer-online'])
   ).filter((version) => stable(version) && compare(version, baseline) >= 0);
   assert.deepEqual(
     catalog.releases.map((entry) => entry.version),

@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { capture, verifyCatalog } from './catalog.mjs';
 import { run, stable } from './common.mjs';
+import { waitForPublishedPackages } from './registry-ready.mjs';
 const version = process.env.RELEASE_VERSION;
 if (!version || !stable(version)) throw new Error('RELEASE_VERSION must be a stable version');
+await waitForPublishedPackages(version);
 const branch = `automation/collaboration-baseline-${version}`;
 const remote = run('git', ['ls-remote', '--heads', 'origin', branch]);
 if (remote) {

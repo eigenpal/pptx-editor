@@ -29,7 +29,7 @@ export function run(command, args, cwd = root, trim = true) {
   return trim ? result.stdout.trim() : result.stdout;
 }
 export const registry = (name, version) =>
-  JSON.parse(run('npm', ['view', `${name}@${version}`, '--json']));
+  JSON.parse(run('npm', ['view', `${name}@${version}`, '--json', '--prefer-online']));
 export function install(directory, locked = false) {
   run('npm', [locked ? 'ci' : 'install', '--ignore-scripts', '--no-audit', '--no-fund'], directory);
   const lock = read(resolve(directory, 'package-lock.json'));
