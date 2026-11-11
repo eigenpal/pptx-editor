@@ -56,7 +56,8 @@ export async function waitForPublishedPackages(
           }
           if (!response.ok) {
             retryDelay = Math.max(retryDelay, retryAfter(response, now()));
-            await response.body?.cancel();
+            // A disconnected error body must not turn a retryable status into a failure.
+            await response.body?.cancel().catch(() => {});
             if (TRANSIENT.has(response.status)) return;
             throw new Error(`Registry refused ${name}@${version}: HTTP ${response.status}`);
           }

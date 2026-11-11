@@ -43,7 +43,7 @@ test('waits for every exact version, including propagation beyond five minutes',
   expect(time.now()).toBeLessThan(PUBLICATION_TIMEOUT_MS);
 });
 
-for (const status of [404, 408, 429, 500, 502, 503, 504, 'network', 'body']) {
+for (const status of [404, 408, 429, 500, 502, 503, 504, 'network', 'body', 'cancel']) {
   test(`temporary ${status} failure stops at one shared deadline`, async () => {
     const time = clock();
     await expect(
@@ -52,6 +52,17 @@ for (const status of [404, 408, 429, 500, 502, 503, 504, 'network', 'body']) {
         timeoutMs: 12_000,
         request: async () => {
           if (status === 'network') throw new Error('offline');
+          if (status === 'cancel')
+            return {
+              ok: false,
+              status: 503,
+              headers: new Headers(),
+              body: {
+                cancel: async () => {
+                  throw new Error('disconnected');
+                },
+              },
+            };
           if (status === 'body')
             return {
               ok: true,
