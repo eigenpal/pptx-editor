@@ -1001,6 +1001,9 @@ export type UnderlineRing = readonly (readonly [number, number])[];
 // @internal
 export function underlineRings(style: string, origin: number, x0: number, x1: number, y: number, top: number, thickness: number): UnderlineRing[];
 
+// @internal
+export function unmeasuredDashStart(commands: readonly PathCommand[], line: ResolvedLine): boolean;
+
 // @public
 export interface WarpedRun {
     readonly glyphs: readonly PathCommand[];

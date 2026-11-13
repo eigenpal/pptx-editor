@@ -119,8 +119,14 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['pattern-bitmaps', 'fill-rotation', 'tiled-pictures'],
   },
   'fills-lines.lines': {
-    fixtures: ['lines-arrows', 'line-ends-dashes', 'fills-lines', 'picture-adjustments'],
-    approximations: ['inset-lines', 'dash-complexity', 'compound-lines'],
+    fixtures: [
+      'lines-arrows',
+      'line-ends-dashes',
+      'fills-lines',
+      'picture-adjustments',
+      'closed-dashes',
+    ],
+    approximations: ['inset-lines', 'dash-complexity', 'closed-curve-dashes', 'compound-lines'],
   },
   'fills-lines.theme-colors': {
     fixtures: ['colors', 'follow-ups'],

@@ -147,6 +147,7 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Inset lines.** `a:ln/@algn="in"` draws as a centered line. A picture's border always draws outside the picture.
 - **Hyperlink text.** Link text draws in the theme `hlink` color with a single underline, unless the run states otherwise.
 - **Dash complexity.** Outlines and table borders render solid when their estimated dash count exceeds 100,000. SVG and PDF use the same limit. Save preserves the original dash pattern.
+- **Dashes on closed curves.** On a closed path that ends at its first point, such as an ellipse, dashes with round or square caps start at the last chord of the last curve. The chord length is estimated from measured circles and an ellipse, so on other curves the dashes can sit slightly off along the outline.
 - **Compound lines.** Compound line widths are measured on closed paths and straight lines. Curved, counterclockwise, self-crossing, capped, and dashed paths remain approximate. Complex open thick-thin lines can render as equal-width double lines.
 - **Paths without a move.** A custom geometry path renders only if its first drawing command is `a:moveTo`. Later move commands do not repair an invalid start.
 - **Text in flipped shapes.** Glyphs are never mirrored. Under a net horizontal flip, text stays upright. Under a net vertical flip, it turns 180°.

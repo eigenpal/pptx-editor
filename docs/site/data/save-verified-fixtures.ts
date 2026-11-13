@@ -15,7 +15,7 @@
  * `three-d-turned-effects`, 2 copies and a copy with bevels set and removed on theme-styled
  * shapes, no prompt. On 8 November 2026: `equation-lines`, 2 copies, no prompt. On 13 November
  * 2026: `underline-styles` and `caps-scripts`, 4 copies, no prompt; `picture-adjustments`, 2
- * copies, no prompt; `group-effects`, 2 copies, no prompt.
+ * copies, no prompt; `group-effects`, 2 copies, no prompt; `closed-dashes`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -27,6 +27,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'chart-data',
   'chart-sizes',
   'charts',
+  'closed-dashes',
   'colors',
   'custom-geometry',
   'diagram-editing',
