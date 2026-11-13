@@ -1,7 +1,8 @@
 // The budgets of one slide paint: the tile images of tiled pictures (`TileBudget`) and the band
-// work of shape gradients (`ShapeBandBudget`). Each bounds what one paint of a slide writes. A
-// painter that keeps its `Defs` across paints (`SlidePainter`) starts new budgets for each paint,
-// so the paints and edits before it do not use them up.
+// work of shape gradients (`ShapeBandBudget`). Each bounds what one paint of a slide writes. The
+// slide's `Defs` holds the budgets of its paint in progress (`paintBudgets`). A painter that keeps
+// its `Defs` across paints (`SlidePainter`) starts new budgets for each paint, so the paints and
+// edits before it do not use them up.
 
 import { MAX_SHAPE_BANDS } from './paint-gradient.ts';
 import type { Defs } from './svg.ts';
@@ -118,17 +119,12 @@ export class PaintBudgets {
   }
 }
 
-/** The budgets of the slide paint in progress, by the painter's `Defs`. */
-const work = new WeakMap<Defs, PaintBudgets>();
-
 /**
- * The budgets of the paint in progress with `defs`: a fresh `paintSlide` makes new `Defs`, so its
- * first tiled picture or shape gradient makes them.
+ * The budgets of the paint in progress with `defs` (`Defs.budgets`). A fresh `paintSlide` makes
+ * new `Defs`, so its first tiled picture or shape gradient starts whole budgets.
  */
 export function paintBudgets(defs: Defs): PaintBudgets {
-  let budgets = work.get(defs);
-  if (!budgets) work.set(defs, (budgets = new PaintBudgets()));
-  return budgets;
+  return (defs.budgets ??= new PaintBudgets());
 }
 
 /**
@@ -137,7 +133,5 @@ export function paintBudgets(defs: Defs): PaintBudgets {
  * same budgets and draws the same tiles and bands.
  */
 export function startPaintBudgets(defs: Defs): PaintBudgets {
-  const budgets = new PaintBudgets();
-  work.set(defs, budgets);
-  return budgets;
+  return (defs.budgets = new PaintBudgets());
 }
