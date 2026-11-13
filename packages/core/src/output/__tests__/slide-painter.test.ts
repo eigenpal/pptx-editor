@@ -13,7 +13,7 @@ import {
   type SlideLayout,
 } from '../../layout/index.ts';
 import { readPptx } from '../../store/index.ts';
-import { paintSlide, type PaintOptions } from '../paint.ts';
+import { paintSlide, paintWeight, type PaintOptions } from '../paint.ts';
 import { MAX_SLIDE_TILE_IMAGES } from '../paint-budgets.ts';
 import { SlidePainter } from '../slide-painter.ts';
 
@@ -441,4 +441,123 @@ test('a kept item paints again only for the budgets it read', () => {
   const before = svg.querySelector('[data-node-id]')!;
   painter.paint({ ...layout, items: [tiledLayout(star('star5')).items[0]!, custom] });
   expect(svg.querySelectorAll('[data-node-id]')[1]).toBe(before);
+});
+
+/** A tiled box of 40 × 40 tiles at `x`. */
+const tiledBox = (id: number, x: number) =>
+  shape({ id, x, y: 0, cx: 9_525 * 40, cy: 9_525 * 40, fill: TILE(781, 1041) });
+/** A star with a shape gradient at `x`. */
+const bandedStar = (id: number, x: number) =>
+  shape({ id, x, y: 0, cx: IN, cy: IN, prst: 'star5', fill: SHAPE_GRADIENT });
+
+/** Paint `layout` a frame at a time until nothing is pending, and expect a fresh paint. */
+function settles(painter: SlidePainter, layout: SlideLayout, budget: number, max: number) {
+  let svg = painter.paint(layout, budget);
+  for (let n = 1; painter.pending && n < max; n += 1) svg = painter.paint(layout, budget);
+  expect(painter.pending).toBe(false);
+  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, layout, TILE_OPTS)));
+  return svg;
+}
+
+test('a group painted in part paints again when the items before it change', () => {
+  const all = tiledLayout(
+    tiledBox(2, 0) + tiledBox(3, IN) + heavyGroup(10, 0, 2_100, tiledBox(5_000, 0))
+  );
+  const [box1, box2, g] = all.items;
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  // The group's box finds 896 tiles left after the two boxes: it draws the pattern.
+  painter.paint({ ...all, items: [box1!, box2!, g!] }, 2_000);
+  expect(painter.pending).toBe(true);
+  // Alone, it has every tile: its earlier children paint again with them.
+  const svg = settles(painter, { ...all, items: [g!] }, 2_000, 10);
+  expect(svg.querySelectorAll('image').length).toBe(1_600);
+});
+
+test('a group that paints again in part goes back to its node when the reason goes', () => {
+  const all = tiledLayout(
+    tiledBox(2, 0) + tiledBox(3, IN) + heavyGroup(10, 0, 2_100, tiledBox(5_000, 0))
+  );
+  const [box1, box2, g] = all.items;
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  const svg = painter.paint({ ...all, items: [g!] });
+  const node = svg.querySelector('[data-kind="group"]');
+  painter.paint({ ...all, items: [box1!, box2!, g!] }, 2_000);
+  expect(painter.pending).toBe(true);
+  settles(painter, { ...all, items: [g!] }, 2_000, 10);
+  // Its first paint fits again: it stays, and later paints keep it.
+  expect(svg.querySelector('[data-kind="group"]')).toBe(node);
+  painter.paint({ ...all, items: [g!] }, 2_000);
+  expect(painter.pending).toBe(false);
+  expect(svg.querySelector('[data-kind="group"]')).toBe(node);
+});
+
+test('a group that painted again for its budgets is kept by later paints', () => {
+  const all = tiledLayout(bandedStar(2, 0) + heavyGroup(10, 0, 2_100, bandedStar(5_000, 0)));
+  const [star, g] = all.items;
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  painter.paint({ ...all, items: [star!, g!] }, 2_000);
+  const svg = settles(painter, { ...all, items: [g!] }, 2_000, 10);
+  const node = svg.querySelector('[data-kind="group"]');
+  for (let i = 0; i < 3; i += 1) {
+    painter.paint({ ...all, items: [g!] }, 2_000);
+    expect(painter.pending).toBe(false);
+    expect(svg.querySelector('[data-kind="group"]')).toBe(node);
+  }
+});
+
+/** A seeded linear congruential generator in [0, 1). */
+function seeded(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1_664_525 + 1_013_904_223) >>> 0;
+    return s / 2 ** 32;
+  };
+}
+
+test('edits painted over frames of any budget settle to a fresh paint, and stay', () => {
+  const pool = tiledLayout(
+    tiledBox(2, 0) +
+      tiledBox(3, IN) +
+      tiledBox(4, 2 * IN) +
+      customBanded(20, 1_500) +
+      customBanded(21, 1_500) +
+      bandedStar(23, 4 * IN) +
+      heavyGroup(100, 0, 60, tiledBox(99, 0)) +
+      heavyGroup(300, 2 * IN, 60, bandedStar(299, 0)) +
+      heavyGroup(600, 3 * IN, 2_100, tiledBox(599, 3 * IN))
+  ).items;
+  const base = tiledLayout('');
+  const budgets = [1, 3, 2_000, Infinity];
+  for (let trial = 0; trial < 6; trial += 1) {
+    const random = seeded(trial * 7_919 + 1);
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
+    const painter = new SlidePainter(doc, TILE_OPTS);
+    let items = pool.filter(() => random() < 0.4);
+    painter.paint({ ...base, items }, pick(budgets));
+    for (let step = 0; step < 6; step += 1) {
+      const op = random();
+      const out = pool.filter((i) => !items.includes(i));
+      if (op < 0.4 && out.length > 0) {
+        const at = Math.floor(random() * (items.length + 1));
+        items = [...items.slice(0, at), pick(out), ...items.slice(at)];
+      } else if (op < 0.7 && items.length > 0) {
+        const at = Math.floor(random() * items.length);
+        items = items.filter((_, i) => i !== at);
+      } else items = [...items].sort(() => random() - 0.5);
+      const count = 1 + Math.floor(random() * 2);
+      for (let k = 0; k < count; k += 1) painter.paint({ ...base, items }, pick(budgets));
+    }
+    const layout = { ...base, items };
+    const budget = pick(budgets);
+    const weight = items.reduce((n, i) => n + paintWeight(i), 0);
+    // Each item paints at most twice: once for the edits, once more for the budgets it read.
+    const max = 2 * Math.ceil(weight / budget) + 2 * items.length + 4;
+    const svg = settles(painter, layout, budget, max);
+    const before = [...svg.querySelectorAll('[data-kind="content"] > *')];
+    for (const b of budgets) {
+      painter.paint(layout, b);
+      expect(painter.pending).toBe(false);
+      expect([...svg.querySelectorAll('[data-kind="content"] > *')]).toEqual(before);
+    }
+  }
 });

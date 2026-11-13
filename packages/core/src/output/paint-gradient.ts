@@ -480,54 +480,6 @@ export function shapeGradientBands(
 }
 
 /**
- * The most paths of one shape that draw a `path="shape"` gradient (fill or overlay) as outline
- * bands; a shape with more paths uses the rectangle construction, so a file cannot multiply the
- * bands.
- */
-const MAX_BANDED_PATHS = 16;
-/** The most path commands of one shape that draw outline bands: bands repeat every command. */
-const MAX_BANDED_COMMANDS = 2000;
-/**
- * The band work (path commands × `MAX_SHAPE_BANDS`) one slide may spend. Later shapes use the
- * rectangle construction, so many shapes cannot multiply the bands either.
- */
-const MAX_SLIDE_BAND_WORK = 512_000;
-
-/**
- * The shape gradient band work of one slide. A shape whose paths take `paths` and `commands`
- * draws outline bands when `allow` returns true; otherwise it uses the rectangle construction.
- * The SVG paint and `pptx-to-pdf` share the limits.
- */
-export class ShapeBandBudget {
-  #spent = 0;
-  #asks = 0;
-  /** How many shapes read the budget (`allow`) where the answer depended on what is left. */
-  get asks(): number {
-    return this.#asks;
-  }
-  /** The band work still allowed, never below zero. */
-  get left(): number {
-    return Math.max(0, MAX_SLIDE_BAND_WORK - this.#spent);
-  }
-  /** The band work spent so far, past the budget too. */
-  get spent(): number {
-    return this.#spent;
-  }
-  spend(n: number): void {
-    this.#spent += n;
-  }
-  allow(paths: number, commands: number): boolean {
-    // A shape past the limits of one shape uses the rectangle construction, whatever is left.
-    if (paths > MAX_BANDED_PATHS || commands > MAX_BANDED_COMMANDS) return false;
-    this.#asks += 1;
-    const cost = commands * MAX_SHAPE_BANDS;
-    const ok = cost <= this.left;
-    if (ok) this.#spent += cost;
-    return ok;
-  }
-}
-
-/**
  * A shape path gradient (`ST_PathShadeType` `shape`; design D3): `shapeBands` copies of the
  * outline, scaled about the focus center from 1 down, each filled with the color at the middle of
  * its band (linear in the scale), outside in. The outline is defined once; each band is a `<use>`.

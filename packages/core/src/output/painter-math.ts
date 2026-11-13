@@ -28,8 +28,8 @@ import {
   paintStops,
   rectGeometry,
   shapeGradientBands as bandsOf,
-  ShapeBandBudget,
 } from './paint-gradient.ts';
+import { ShapeBandBudget } from './paint-budgets.ts';
 
 export { applyBlipColorSteps, blipColorSteps, LUMA_WEIGHTS, lumTransfer, tileGeometry };
 export type { BlipColorStep, TileGeometry };
