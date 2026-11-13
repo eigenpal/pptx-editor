@@ -13,7 +13,7 @@ import {
   type ViewRect,
 } from './paint.ts';
 import { groupPaintsEffects } from './paint-effects.ts';
-import { startPaintBudgets, type BudgetSpend } from './paint-budgets.ts';
+import { startPaintBudgets, type BudgetAmounts } from './paint-budgets.ts';
 import type { PaintContext } from './paint-fill.ts';
 import { Defs, svg, SVG_NS } from './svg.ts';
 
@@ -31,13 +31,14 @@ interface PaintedItem {
    * What it spent of the paint budgets (`PaintBudgets`: tile images and shape gradient bands): a
    * later paint that keeps it spends them.
    */
-  spent: BudgetSpend;
+  spent: BudgetAmounts;
   /**
-   * What was left of the budgets when it began to paint, and whether a fill in it read them. Its
-   * paint depends on nothing else of them, so a later paint keeps it only with as much left.
+   * What was left of each budget when it began to paint, and which budgets a fill in it read. Its
+   * paint depends on nothing else of them, so a later paint keeps it only with as much left of
+   * each budget it read.
    */
-  budgetLeft: string;
-  budgeted: boolean;
+  readonly startLeft: BudgetAmounts;
+  reads: { tiles: boolean; bands: boolean };
   /** A group painted in part (`paint`'s budget): the index of its first child left out. */
   rest?: number;
 }
@@ -190,15 +191,15 @@ export class SlidePainter {
     const budgets = startPaintBudgets(this.#defs);
     /** Run `paint` and count what it spent of the budgets, and whether it read them. */
     const counted = <T>(paint: () => T) => {
-      const [from, asks, budgetLeft] = [budgets.spent, budgets.asks, budgets.state];
+      const [from, asks, startLeft] = [budgets.spent, budgets.asks, budgets.left];
       const fresh = this.#defs.capture(paint);
-      const to = budgets.spent;
+      const [to, now] = [budgets.spent, budgets.asks];
       return {
         value: fresh.value,
         defs: [...fresh.defs],
         spent: { tiles: to.tiles - from.tiles, bands: to.bands - from.bands },
-        budgetLeft,
-        budgeted: budgets.asks > asks,
+        startLeft,
+        reads: { tiles: now.tiles > asks.tiles, bands: now.bands > asks.bands },
       };
     };
     /** The painted item of a counted paint. */
@@ -206,16 +207,22 @@ export class SlidePainter {
       node: fresh.value,
       defs: fresh.defs,
       spent: fresh.spent,
-      budgetLeft: fresh.budgetLeft,
-      budgeted: fresh.budgeted,
+      startLeft: fresh.startLeft,
+      reads: fresh.reads,
     });
     /**
-     * Whether a kept item paints otherwise now: a fill in it read the budgets with something else
+     * Whether a kept item paints otherwise now: a fill in it read a budget with something else
      * left. An item before it in paint order changed what it spent, so it paints again, as a fresh
      * paint draws it. A group painted in part goes on with its children instead.
      */
-    const repaints = (painted: PaintedItem | undefined): boolean =>
-      !!painted?.budgeted && painted.rest === undefined && painted.budgetLeft !== budgets.state;
+    const repaints = (painted: PaintedItem | undefined): boolean => {
+      if (!painted || painted.rest !== undefined) return false;
+      const { reads, startLeft } = painted;
+      return (
+        (reads.tiles && startLeft.tiles !== budgets.tiles.left) ||
+        (reads.bands && startLeft.bands !== budgets.bands.left)
+      );
+    };
     // The background is one rectangle: it paints each time.
     const drop = dropPainted;
     if (this.#background) drop(this.#background);
@@ -257,7 +264,10 @@ export class SlidePainter {
         tiles: painted.spent.tiles + more.spent.tiles,
         bands: painted.spent.bands + more.spent.bands,
       };
-      painted.budgeted ||= more.budgeted;
+      painted.reads = {
+        tiles: painted.reads.tiles || more.reads.tiles,
+        bands: painted.reads.bands || more.reads.bands,
+      };
       if (more.value.next < item.children.length) painted.rest = more.value.next;
       else delete painted.rest;
       return more.value.spent;
@@ -271,8 +281,10 @@ export class SlidePainter {
     let current: Set<LayoutItem> | null = null;
     for (const item of layout.items) {
       let painted: PaintedItem;
-      const stale =
-        this.#stale?.has(item) === true || (!next.has(item) && repaints(this.#items.get(item)));
+      // An item that paints otherwise for its budgets is stale, as after `invalidate`: its earlier
+      // node stays on screen until it paints again, a heavy group over several frames.
+      if (!next.has(item) && repaints(this.#items.get(item))) (this.#stale ??= new Set()).add(item);
+      const stale = this.#stale?.has(item) === true;
       const kept = next.has(item) || stale ? undefined : this.#items.get(item);
       if (kept) {
         // A group painted in part goes on with its children.

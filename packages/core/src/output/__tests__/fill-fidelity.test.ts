@@ -15,7 +15,8 @@ import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { MAX_OVERLAY_PATHS as REPORTED_OVERLAY_PATHS } from '../../layout/approximations.ts';
 import { paintSlide } from '../index.ts';
 import { MAX_OVERLAY_PATHS } from '../paint.ts';
-import { MAX_SLIDE_TILE_IMAGES, tilePlacements } from '../paint-fill.ts';
+import { MAX_SLIDE_TILE_IMAGES } from '../paint-budgets.ts';
+import { tilePlacements } from '../paint-fill.ts';
 import {
   colorAt,
   linearEnds,

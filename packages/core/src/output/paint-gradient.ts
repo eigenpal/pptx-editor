@@ -501,7 +501,7 @@ const MAX_SLIDE_BAND_WORK = 512_000;
 export class ShapeBandBudget {
   #spent = 0;
   #asks = 0;
-  /** How many shapes read the budget (`allow`). */
+  /** How many shapes read the budget (`allow`) where the answer depended on what is left. */
   get asks(): number {
     return this.#asks;
   }
@@ -517,9 +517,11 @@ export class ShapeBandBudget {
     this.#spent += n;
   }
   allow(paths: number, commands: number): boolean {
+    // A shape past the limits of one shape uses the rectangle construction, whatever is left.
+    if (paths > MAX_BANDED_PATHS || commands > MAX_BANDED_COMMANDS) return false;
     this.#asks += 1;
     const cost = commands * MAX_SHAPE_BANDS;
-    const ok = paths <= MAX_BANDED_PATHS && commands <= MAX_BANDED_COMMANDS && cost <= this.left;
+    const ok = cost <= this.left;
     if (ok) this.#spent += cost;
     return ok;
   }

@@ -39,8 +39,8 @@ export class TileBudget {
   }
 }
 
-/** What a paint spent of each budget. */
-export interface BudgetSpend {
+/** An amount of each budget: spent, or left. */
+export interface BudgetAmounts {
   readonly tiles: number;
   readonly bands: number;
 }
@@ -49,19 +49,22 @@ export interface BudgetSpend {
 export class PaintBudgets {
   readonly tiles = new TileBudget();
   readonly bands = new ShapeBandBudget();
-  /** How many fills read a budget. */
-  get asks(): number {
-    return this.tiles.asks + this.bands.asks;
+  /**
+   * How many fills read each budget, where the answer depended on it: a paint that reads a
+   * budget depends on nothing else of it than what is left.
+   */
+  get asks(): BudgetAmounts {
+    return { tiles: this.tiles.asks, bands: this.bands.asks };
   }
-  /** What is left of each budget: a paint that reads them depends on nothing else of them. */
-  get state(): string {
-    return `${this.tiles.left} ${this.bands.left}`;
+  /** What is left of each budget. */
+  get left(): BudgetAmounts {
+    return { tiles: this.tiles.left, bands: this.bands.left };
   }
   /** What is spent of each budget so far. */
-  get spent(): BudgetSpend {
+  get spent(): BudgetAmounts {
     return { tiles: this.tiles.spent, bands: this.bands.spent };
   }
-  spend(s: BudgetSpend): void {
+  spend(s: BudgetAmounts): void {
     this.tiles.spend(s.tiles);
     this.bands.spend(s.bands);
   }

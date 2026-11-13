@@ -3,13 +3,18 @@
 
 import { afterAll, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
-import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
+import { buildPptx, group, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor } from '../../editor/index.ts';
 import { resolveSlide } from '../../cascade/index.ts';
-import { createFixedMeasurer, layoutSlide, type LayoutItem } from '../../layout/index.ts';
+import {
+  createFixedMeasurer,
+  layoutSlide,
+  type LayoutItem,
+  type SlideLayout,
+} from '../../layout/index.ts';
 import { readPptx } from '../../store/index.ts';
 import { paintSlide, type PaintOptions } from '../paint.ts';
-import { MAX_SLIDE_TILE_IMAGES } from '../paint-fill.ts';
+import { MAX_SLIDE_TILE_IMAGES } from '../paint-budgets.ts';
 import { SlidePainter } from '../slide-painter.ts';
 
 const win = new GlobalWindow();
@@ -337,10 +342,10 @@ test('each paint of a slide has the whole band budget: a shape gradient keeps it
 const unnumbered = (svg: Element): string =>
   normalized(svg).replace(/id\d+/g, 'id').split('\n').sort().join('\n');
 
-test('a banded shape added in front leaves the kept shapes as a fresh paint draws them', () => {
-  // Each 1,500-command outline costs 96,000 of the 512,000 band work: five fit, the sixth not.
-  const points = Array.from({ length: 1_499 }, (_, i) => {
-    const t = (i / 1_499) * 2 * Math.PI;
+/** A shape with a shape gradient on a custom outline of `count` commands, at `id` × 300,000. */
+function customBanded(id: number, count: number): string {
+  const points = Array.from({ length: count - 1 }, (_, i) => {
+    const t = (i / (count - 1)) * 2 * Math.PI;
     const x = Math.round(50_000 + 50_000 * Math.cos(t));
     return `<a:lnTo><a:pt x="${x}" y="${Math.round(50_000 + 50_000 * Math.sin(t))}"/></a:lnTo>`;
   }).join('');
@@ -348,11 +353,15 @@ test('a banded shape added in front leaves the kept shapes as a fresh paint draw
     '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/>' +
     '<a:pathLst><a:path w="100000" h="100000"><a:moveTo><a:pt x="100000" y="50000"/></a:moveTo>' +
     `${points}</a:path></a:pathLst></a:custGeom>`;
-  const banded = (id: number): string =>
-    shape({ id, x: id * 300_000, y: 0, cx: IN, cy: IN, fill: SHAPE_GRADIENT }).replace(
-      /<a:prstGeom[\s\S]*?<\/a:prstGeom>/,
-      custom
-    );
+  return shape({ id, x: id * 300_000, y: 0, cx: IN, cy: IN, fill: SHAPE_GRADIENT }).replace(
+    /<a:prstGeom[\s\S]*?<\/a:prstGeom>/,
+    custom
+  );
+}
+
+test('a banded shape added in front leaves the kept shapes as a fresh paint draws them', () => {
+  // Each 1,500-command outline costs 192,000 of the 512,000 band work: two fit, the rest not.
+  const banded = (id: number): string => customBanded(id, 1_500);
   const layout = tiledLayout([2, 3, 4, 5, 6].map(banded).join(''));
   const painter = new SlidePainter(doc, TILE_OPTS);
   painter.paint(layout);
@@ -361,4 +370,75 @@ test('a banded shape added in front leaves the kept shapes as a fresh paint draw
   expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, added, TILE_OPTS)));
   painter.paint(layout);
   expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, layout, TILE_OPTS)));
+});
+
+/** A group at `x` of `count` plain shapes, with `first` as its first child. */
+const heavyGroup = (id: number, x: number, count: number, first: string): string =>
+  group(
+    { id, x, y: 2 * IN, cx: IN, cy: IN },
+    first +
+      Array.from({ length: count - 1 }, (_, i) =>
+        shape({ id: id + 1 + i, x, y: 2 * IN, cx: 9_525, cy: 9_525 })
+      ).join('')
+  );
+
+/** Paint `layout` a frame at a time with `budget`: the frames it takes, at most `max`. */
+function frames(painter: SlidePainter, layout: SlideLayout, budget: number, max = 40): number {
+  for (let n = 1; n <= max; n += 1) {
+    painter.paint(layout, budget);
+    if (!painter.pending) return n;
+  }
+  return Infinity;
+}
+
+test('a heavy group that paints again for its band budget finishes over frames', () => {
+  const star = (id: number, x: number) =>
+    shape({ id, x, y: 0, cx: IN, cy: IN, prst: 'star5', fill: SHAPE_GRADIENT });
+  const layout = tiledLayout(heavyGroup(10, 2 * IN, 2_100, star(5_000, 2 * IN)));
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  const svg = painter.paint(layout);
+  // A shape gradient added behind the group leaves the group's star less band work.
+  const added = { ...layout, items: [tiledLayout(star(2, 0)).items[0]!, ...layout.items] };
+  expect(frames(painter, added, 2_000)).toBeLessThan(10);
+  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, added, TILE_OPTS)));
+});
+
+test('heavy groups that paint again for their tile budget finish as a fresh paint', () => {
+  const box = (id: number, x: number) =>
+    shape({ id, x, y: 0, cx: 9_525 * 40, cy: 9_525 * 40, fill: TILE(781, 1041) });
+  const layout = tiledLayout(
+    heavyGroup(10, 0, 2_100, box(5_000, 0)) + heavyGroup(6_000, 2 * IN, 2_100, box(9_000, 2 * IN))
+  );
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  const svg = painter.paint(layout);
+  expect(svg.querySelectorAll('image').length).toBe(2 * 1_600);
+  const added = { ...layout, items: [tiledLayout(box(2, 4 * IN)).items[0]!, ...layout.items] };
+  expect(frames(painter, added, 2_000)).toBeLessThan(10);
+  expect(svg.querySelectorAll('image').length).toBe(2 * 1_600 + 1);
+  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, added, TILE_OPTS)));
+});
+
+test('a kept item paints again only for the budgets it read', () => {
+  const box = shape({ id: 2, x: 0, y: 0, cx: 9_525 * 40, cy: 9_525 * 40, fill: TILE(781, 1041) });
+  const star = (prst: string) =>
+    shape({ id: 3, x: 2 * IN, y: 0, cx: IN, cy: IN, prst, fill: SHAPE_GRADIENT });
+  for (const prst of ['star5', 'star32']) {
+    const layout = tiledLayout(star(prst));
+    const painter = new SlidePainter(doc, TILE_OPTS);
+    const svg = painter.paint(layout);
+    const node = () => svg.querySelector('[data-node-id]:last-child');
+    const before = node();
+    // A tiled shape in front spends tiles, not band work: the star keeps its node.
+    painter.paint({ ...layout, items: [tiledLayout(box).items[0]!, ...layout.items] });
+    expect(node()).toBe(before);
+  }
+  // A banded shape in front spends band work: a star past the limits of one shape (more than
+  // 2,000 commands) draws the rectangle construction whatever is left, and keeps its node.
+  const custom = tiledLayout(customBanded(3, 2_400)).items[0]!;
+  const layout = { ...tiledLayout(''), items: [custom] };
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  const svg = painter.paint(layout);
+  const before = svg.querySelector('[data-node-id]')!;
+  painter.paint({ ...layout, items: [tiledLayout(star('star5')).items[0]!, custom] });
+  expect(svg.querySelectorAll('[data-node-id]')[1]).toBe(before);
 });

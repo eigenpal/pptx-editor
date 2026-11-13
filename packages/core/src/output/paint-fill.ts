@@ -26,8 +26,6 @@ import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 import { Defs, matrixParts, num, svg } from './svg.ts';
 import { paintBudgets } from './paint-budgets.ts';
 
-export { MAX_SLIDE_TILE_IMAGES } from './paint-budgets.ts';
-
 /** Resolves a picture fill's relationship id to a displayable URL (never a remote fetch). */
 export type ImageUrlPort = (sourcePart: string, rId: string) => string | undefined;
 
