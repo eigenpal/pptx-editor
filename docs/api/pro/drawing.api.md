@@ -23,6 +23,9 @@ export function innerShadowShift(dist: number, dir: number): {
 // @public
 export function installDrawing(options?: ProLicenseOptions): void;
 
+// @internal
+export const MAX_MORPH_SPREAD = 1270000;
+
 // @public
 export interface ProLicenseOptions {
     readonly licenseKey?: string;
@@ -46,6 +49,9 @@ export interface ReflectionFade {
 
 // @internal
 export function reflectionFade(ref: NonNullable<ResolvedEffects['reflection']>, shape: Matrix, w: number, h: number): ReflectionFade;
+
+// @internal
+export function softEdgeSpread(rad: number): SpreadBlur;
 
 // @internal
 export interface SpreadBlur {

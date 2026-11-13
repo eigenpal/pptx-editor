@@ -25,7 +25,10 @@ import {
   TWO_STOP_STEPS,
   MAX_SHAPE_BANDS,
   MIN_SHAPE_BANDS,
+  rectGeometry,
   shapeBands,
+  ShapeBandBudget,
+  shapeGradientBands,
 } from '../paint-gradient.ts';
 
 const win = new GlobalWindow();
@@ -189,6 +192,57 @@ describe('gradient colors (design D2)', () => {
       { pos: 1, color: gray(100) },
     ];
     expect(shapeBands(three)).toBe(60);
+  });
+
+  test('shape gradient bands run outside in about the focus center (shared with pptx-to-pdf)', () => {
+    const gray = (v: number): GradientStop['color'] => ({ r: v, g: v, b: v, a: 1 });
+    const stops: GradientStop[] = [
+      { pos: 0, color: gray(100) },
+      { pos: 1, color: gray(110) },
+    ];
+    const fill = {
+      type: 'path',
+      path: 'shape',
+      stops,
+      fillToRect: { l: 0.25, t: 0.5, r: 0.75, b: 0.5 },
+    } as unknown as Extract<ResolvedFill, { type: 'path' }>;
+    const { cx, cy, bands } = shapeGradientBands(fill, stops, 100, 40);
+    expect([cx, cy]).toEqual([25, 20]);
+    expect(bands).toHaveLength(MIN_SHAPE_BANDS);
+    expect(bands[0].scale).toBe(1);
+    expect(bands[0].color).toEqual(colorAt(stops, 1 - 0.5 / MIN_SHAPE_BANDS));
+    expect(bands[bands.length - 1].scale).toBeCloseTo(1 / MIN_SHAPE_BANDS);
+  });
+
+  test('the shape band budget bounds paths, commands, and the work of a slide', () => {
+    const budget = new ShapeBandBudget();
+    expect(budget.allow(17, 10)).toBe(false);
+    expect(budget.allow(1, 2001)).toBe(false);
+    // 512,000 commands × bands per slide: two shapes of 2,000 commands fit, a third does not.
+    expect(budget.allow(1, 2000)).toBe(true);
+    expect(budget.allow(1, 2000)).toBe(true);
+    expect(budget.allow(1, 2000)).toBe(false);
+    expect(budget.allow(1, 1)).toBe(false);
+  });
+
+  test('a rectangle gradient reaches the tile rectangle grown to hold the focus', () => {
+    const fill = {
+      type: 'path',
+      path: 'rect',
+      stops: [],
+      fillToRect: { l: 0.5, t: 0.5, r: 0.5, b: 0.5 },
+      tileRect: { l: 0.1, t: 0, r: 0.1, b: 0 },
+    } as unknown as Extract<ResolvedFill, { type: 'path' }>;
+    expect(rectGeometry(fill, 100, 40)).toEqual({
+      l: 50,
+      t: 20,
+      r: 50,
+      b: 20,
+      x0: 10,
+      y0: 0,
+      x1: 90,
+      y1: 40,
+    });
   });
 
   test('a tile rectangle with negative insets extends the box; an empty one falls back', () => {
