@@ -3,7 +3,7 @@
 // The rules of glow, inner shadow, reflection, and soft edge are in `@pptx-editor.dev/pro/drawing`
 // (`packages/pro/src/drawing/effects-math.ts`), which reuses `effectMatrix` and `blurSigma`.
 
-import type { EffectAlign, EffectPlacement } from '../cascade/index.ts';
+import type { BlipEffect, EffectAlign, EffectPlacement } from '../cascade/index.ts';
 import { apply, invert, multiply, type Matrix } from '../layout/index.ts';
 
 const DEG = Math.PI / 180;
@@ -19,6 +19,91 @@ export function lumTransfer(
 ): { readonly slope: number; readonly intercept: number } {
   const slope = contrast >= 0 ? 1 / Math.max(0.0001, 1 - contrast) : 1 + contrast;
   return { slope, intercept: bright + 0.5 - 0.5 * slope };
+}
+
+/**
+ * The Rec. 709 luminance weights of red, green, and blue. The specification gives no weights.
+ * @internal
+ */
+export const LUMA_WEIGHTS = [0.2126, 0.7152, 0.0722] as const;
+
+/**
+ * One step of a picture's color effects on sRGB channels in [0, 1]. Each step clamps its result
+ * to [0, 1], as an SVG filter primitive does.
+ * - `gray`: every channel takes the luminance (`LUMA_WEIGHTS`).
+ * - `table`: each channel maps linearly from `from` (at 0) to `to` (at 1).
+ * - `linear`: every channel is `slope` × channel + `intercept`.
+ * @internal
+ */
+export type BlipColorStep =
+  | { readonly op: 'gray' }
+  | {
+      readonly op: 'table';
+      readonly from: readonly [number, number, number];
+      readonly to: readonly [number, number, number];
+    }
+  | { readonly op: 'linear'; readonly slope: number; readonly intercept: number };
+
+/** The slope of the bi-level ramp: one 8-bit step is the whole range. */
+const BI_LEVEL_SLOPE = 10_000;
+
+/**
+ * The color steps of a picture's blip effects, in document order: grayscale, duotone, luminance,
+ * and bi-level. Transparency (`alphaModFix`) and unsupported effects add no step. The SVG paint
+ * builds its filter from these steps, and the PDF export builds its color function from them.
+ * @internal
+ */
+export function blipColorSteps(effects: readonly BlipEffect[]): BlipColorStep[] {
+  const steps: BlipColorStep[] = [];
+  for (const e of effects) {
+    if (e.kind === 'grayscale') steps.push({ op: 'gray' });
+    else if (e.kind === 'duotone')
+      steps.push(
+        { op: 'gray' },
+        {
+          op: 'table',
+          from: [e.dark.r / 255, e.dark.g / 255, e.dark.b / 255],
+          to: [e.light.r / 255, e.light.g / 255, e.light.b / 255],
+        }
+      );
+    else if (e.kind === 'lum') {
+      // Brightness shifts, contrast scales around mid-gray (ECMA-376 §20.1.8.42).
+      steps.push({ op: 'linear', ...lumTransfer(e.bright, e.contrast) });
+    } else if (e.kind === 'biLevel')
+      // Black below the threshold, white from it (ECMA-376 Part 1, 20.1.8.11).
+      steps.push(
+        { op: 'gray' },
+        { op: 'linear', slope: BI_LEVEL_SLOPE, intercept: 1 - BI_LEVEL_SLOPE * e.threshold }
+      );
+  }
+  return steps;
+}
+
+/** One sRGB color in [0, 1] through color steps, as the SVG filter computes it. @internal */
+export function applyBlipColorSteps(
+  steps: readonly BlipColorStep[],
+  rgb: readonly [number, number, number]
+): [number, number, number] {
+  const clamp = (v: number): number => Math.max(0, Math.min(1, v));
+  let [r, g, b] = rgb;
+  for (const s of steps) {
+    if (s.op === 'gray') {
+      const y = clamp(LUMA_WEIGHTS[0] * r + LUMA_WEIGHTS[1] * g + LUMA_WEIGHTS[2] * b);
+      [r, g, b] = [y, y, y];
+    } else if (s.op === 'table') {
+      [r, g, b] = [r, g, b].map((c, i) => clamp(s.from[i]! + c * (s.to[i]! - s.from[i]!))) as [
+        number,
+        number,
+        number,
+      ];
+    } else
+      [r, g, b] = [r, g, b].map((c) => clamp(s.slope * c + s.intercept)) as [
+        number,
+        number,
+        number,
+      ];
+  }
+  return [r, g, b];
 }
 
 /** One pixel at 96 dpi, in EMU: filter regions keep it so they never clip antialiased edges. */

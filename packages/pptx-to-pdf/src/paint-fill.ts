@@ -45,15 +45,21 @@ import {
 } from '@pptx-editor.dev/core/layout';
 import {
   adjustForPathMode,
+  blipColorSteps,
   circleGradientGeometry,
   gradientPaintStops,
   linearGradientEnds,
+  LUMA_WEIGHTS,
   metafilePng,
   patternBitmap,
   PATTERN_PIXEL,
+  tileGeometry,
+  type BlipColorStep,
+  type TileGeometry,
 } from '@pptx-editor.dev/core/output';
 import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import {
+  clip,
   clipEvenOdd,
   EMU_PER_PT,
   endPath,
@@ -613,6 +619,152 @@ async function smoothImage(image: PDFImage, p: PageOps): Promise<void> {
   if (mask instanceof PDFRawStream) mask.dict.set(PDFName.of('Interpolate'), PDFBool.True);
 }
 
+/** A rectangle path. */
+function rectOps(x: number, y: number, w: number, h: number): PDFOperator[] {
+  return [moveTo(x, y), lineTo(x + w, y), lineTo(x + w, y + h), lineTo(x, y + h), closePath()];
+}
+
+/**
+ * At most this many color steps are drawn. Each step is about 150 bytes of function code that a
+ * viewer runs for every pixel, and a file decides how many effects a picture has. A picture with
+ * each effect once takes 7 steps.
+ */
+export const MAX_COLOR_STEPS = 64;
+
+/** A number for a PostScript calculator function: plain decimal notation, bounded. */
+function psNumber(v: number): string {
+  const x = Number.isFinite(v) ? Math.max(-1e6, Math.min(1e6, v)) : 0;
+  const s = x.toFixed(6).replace(/\.?0+$/, '');
+  return s === '-0' || s === '' ? '0' : s;
+}
+
+/**
+ * The PostScript calculator code (ISO 32000-1, 7.10.5) of color steps, from `inputs` (1 or 3)
+ * components in [0, 1] to red, green, and blue: each step as the SVG filter primitive computes
+ * it, clamped to [0, 1].
+ */
+export function colorStepsCode(steps: readonly BlipColorStep[], inputs: 1 | 3): string {
+  const clamp = 'dup 0 lt { pop 0 } if dup 1 gt { pop 1 } if';
+  const code: string[] = inputs === 1 ? ['dup dup'] : [];
+  const [wr, wg, wb] = LUMA_WEIGHTS.map(psNumber);
+  for (const s of steps) {
+    if (s.op === 'gray') {
+      // r g b → r·wr + g·wg + b·wb, three times.
+      code.push(`${wb} mul exch ${wg} mul add exch ${wr} mul add ${clamp} dup dup`);
+      continue;
+    }
+    // Blue, then green, then red: each channel on the top, mapped, and rolled under the others.
+    for (const i of [2, 1, 0]) {
+      const slope = s.op === 'table' ? s.to[i]! - s.from[i]! : s.slope;
+      const intercept = s.op === 'table' ? s.from[i]! : s.intercept;
+      code.push(`${psNumber(slope)} mul ${psNumber(intercept)} add ${clamp} 3 1 roll`);
+    }
+  }
+  return `{ ${code.join(' ')} }`;
+}
+
+/**
+ * The image with color steps applied: a copy of its image dictionary and its encoded data, in a
+ * `DeviceN` color space whose tint transform is the steps' PostScript function. A viewer maps each
+ * decoded pixel through the function, so the export never decodes a picture for its effects, and
+ * a JPEG stays a JPEG. The alpha (`SMask`) is the original's. Written once per image and steps.
+ * An image in a color space other than RGB and gray (a CMYK JPEG) is drawn without the effects.
+ */
+function recolored(image: PDFImage, allSteps: readonly BlipColorStep[], p: PageOps): PDFRef {
+  if (allSteps.length === 0) return image.ref;
+  if (allSteps.length > MAX_COLOR_STEPS)
+    p.diag.add(
+      'picture.color-effects',
+      'approximation',
+      `Pictures with more than ${MAX_COLOR_STEPS} color effect steps are drawn with the first ${MAX_COLOR_STEPS}.`
+    );
+  const steps = allSteps.slice(0, MAX_COLOR_STEPS);
+  const key = `${image.ref.toString()}|${JSON.stringify(steps)}`;
+  const cache = (p.res.recolored ??= new Map());
+  const known = cache.get(key);
+  const ctx = p.res.doc.context;
+  const source = ctx.lookup(image.ref);
+  const space = source instanceof PDFRawStream ? source.dict.get(PDFName.of('ColorSpace')) : null;
+  const inputs = space === PDFName.of('DeviceRGB') ? 3 : space === PDFName.of('DeviceGray') ? 1 : 0;
+  if (known === null || !(source instanceof PDFRawStream) || inputs === 0) {
+    // Reported on each slide that draws the picture.
+    p.diag.add(
+      'picture.color-effects',
+      'approximation',
+      'Picture color effects on a CMYK picture are not drawn.'
+    );
+    cache.set(key, null);
+    return image.ref;
+  }
+  if (known) return known;
+  const code = colorStepsCode(steps, inputs);
+  const fn = ctx.register(
+    ctx.stream(code, {
+      FunctionType: 4,
+      Domain: Array.from({ length: inputs }, () => [0, 1]).flat(),
+      Range: [0, 1, 0, 1, 0, 1],
+    })
+  );
+  const names = inputs === 3 ? ['PptxRed', 'PptxGreen', 'PptxBlue'] : ['PptxGray'];
+  const dict = source.dict.clone(ctx);
+  dict.set(
+    PDFName.of('ColorSpace'),
+    ctx.obj(['DeviceN', names.map((n) => PDFName.of(n)), 'DeviceRGB', fn])
+  );
+  // The encoded picture is written a second time.
+  p.res.work.reserveContent(source.contents.length + code.length + dict.sizeInBytes());
+  const ref = ctx.register(PDFRawStream.of(dict, source.contents));
+  cache.set(key, ref);
+  return ref;
+}
+
+/**
+ * The tiling pattern of a tiled picture (ISO 32000-1, 8.7.3.3): one cell of 1 tile, or 2 or 4
+ * tiles mirrored by `flip`, as the SVG paint's pattern (`core/output`, `tilePaint`). The pattern
+ * space is the box's, with the grid's origin at `g.x`, `g.y`. Written once per picture and
+ * geometry.
+ */
+function tilePattern(image: PDFRef, g: TileGeometry, p: PageOps): PDFRef {
+  const { width: tw, height: th, flipX: fx, flipY: fy } = g;
+  const cw = fx ? 2 * tw : tw;
+  const ch = fy ? 2 * th : th;
+  const key = `tile|${image.toString()}|${[g.x, g.y, tw, th, fx, fy].join(',')}`;
+  let ref = p.res.patterns.get(key);
+  if (ref) return ref;
+  const ctx = p.res.doc.context;
+  // The image space is the unit square with y up; a tile is tw × th with y down.
+  const placements: number[][] = [[tw, 0, 0, -th, 0, th]];
+  if (fx) placements.push([-tw, 0, 0, -th, 2 * tw, th]);
+  if (fy) placements.push([tw, 0, 0, th, 0, th]);
+  if (fx && fy) placements.push([-tw, 0, 0, th, 2 * tw, th]);
+  const ops: PDFOperator[] = [];
+  for (const m of placements)
+    ops.push(
+      pushGraphicsState(),
+      concatTransformationMatrix(m[0]!, m[1]!, m[2]!, m[3]!, m[4]!, m[5]!),
+      drawObject('Im'),
+      popGraphicsState()
+    );
+  const dict = ctx.obj({
+    Type: 'Pattern',
+    PatternType: 1,
+    PaintType: 1,
+    TilingType: 1,
+    BBox: [0, 0, cw, ch],
+    XStep: cw,
+    YStep: ch,
+    Matrix: [1, 0, 0, 1, g.x, g.y],
+    Resources: ctx.obj({ XObject: ctx.obj({ Im: image }) }),
+  });
+  let bytes = dict.sizeInBytes();
+  for (const op of ops) bytes += op.sizeInBytes() + 1;
+  p.res.work.count(ops.length);
+  p.res.work.reserveContent(bytes);
+  ref = ctx.register(PDFContentStream.of(dict, ops, false));
+  p.res.patterns.set(key, ref);
+  return ref;
+}
+
 /** Whether a picture fill has an image this writer draws (the image is embedded once). */
 export async function canDrawPicture(
   sourcePart: string,
@@ -640,8 +792,6 @@ export async function drawPicture(
     p.diag.add('picture.missing', 'unsupported', 'A picture part is missing or external.');
     return;
   }
-  if (fill.mode === 'tile')
-    p.diag.add('picture.tile', 'approximation', 'Tiled pictures are drawn stretched.');
   // The fallback is the deck's own raster picture of the SVG, so it is reported, not refused.
   if (fill.svgRId)
     p.diag.add(
@@ -649,14 +799,37 @@ export async function drawPicture(
       'information',
       'SVG pictures are drawn from their PNG fallback.'
     );
-  if (fill.effects.some((e) => e.kind !== 'alphaModFix'))
+  // The SVG paint draws no other effect either, so the export reports them as the editor shows.
+  const unsupported = fill.effects.find((e) => e.kind === 'unsupported');
+  if (unsupported)
     p.diag.add(
       'picture.color-effects',
       'approximation',
-      'Picture color effects (grayscale, duotone, brightness, black and white) are not drawn.'
+      `The picture color effect ${clip(unsupported.name)} is not drawn.`
     );
   const image = await imageFor(target, p);
   if (!image) return;
+  const ref = recolored(image, blipColorSteps(fill.effects), p);
+  const alpha = fill.effects.reduce((a, e) => (e.kind === 'alphaModFix' ? a * e.amount : a), 1);
+  if (fill.mode === 'tile' && fill.tile) {
+    // The tiles sit on the box, so a pattern in the space of a form drawn at the box's matrix.
+    const g = tileGeometry(fill.tile, p.res.imageSize?.(sourcePart, fill.rId), w, h);
+    const pattern = p.name('Pattern', tilePattern(ref, g, p));
+    const bbox = around(w, h);
+    const form = p.form(
+      [
+        PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
+        PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [pattern]),
+        ...rectOps(bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]),
+        fillEvenOdd(),
+      ],
+      bbox
+    );
+    p.push(pushGraphicsState());
+    p.alpha(alpha, 1);
+    p.push(drawObject(p.name('XObject', form)), popGraphicsState());
+    return;
+  }
   const fr = fill.fillRect;
   const bx = fr.l * w;
   const by = fr.t * h;
@@ -675,8 +848,7 @@ export async function drawPicture(
   };
   const iw = bw / (1 - sr.l - sr.r);
   const ih = bh / (1 - sr.t - sr.b);
-  const alpha = fill.effects.reduce((a, e) => (e.kind === 'alphaModFix' ? a * e.amount : a), 1);
-  const name = p.name('XObject', image.ref);
+  const name = p.name('XObject', ref);
   p.push(pushGraphicsState());
   p.alpha(alpha, 1);
   // The image space is the unit square with y up; the picture is iw × ih EMU with y down.

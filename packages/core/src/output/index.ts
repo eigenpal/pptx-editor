@@ -16,14 +16,20 @@ export { metafilePng, MAX_METAFILE_RASTER_EDGE } from './metafile-png.ts';
 // Internal: the pure rules that `pptx-to-pdf` and `pro/drawing` share with this paint.
 export {
   adjustForPathMode,
+  applyBlipColorSteps,
+  blipColorSteps,
   blurSigma,
   circleGradientGeometry,
   effectMatrix,
   finiteFacet,
   gradientPaintStops,
   linearGradientEnds,
+  LUMA_WEIGHTS,
   lumTransfer,
   threeDColor,
+  tileGeometry,
+  type BlipColorStep,
+  type TileGeometry,
 } from './painter-math.ts';
 export { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 export {

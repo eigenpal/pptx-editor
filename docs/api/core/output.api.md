@@ -14,6 +14,25 @@ export type AltTextPort = (part: string, nodeId: string) => {
 } | undefined;
 
 // @internal
+export function applyBlipColorSteps(steps: readonly BlipColorStep[], rgb: readonly [number, number, number]): [number, number, number];
+
+// @internal
+export type BlipColorStep = {
+    readonly op: 'gray';
+} | {
+    readonly op: 'table';
+    readonly from: readonly [number, number, number];
+    readonly to: readonly [number, number, number];
+} | {
+    readonly op: 'linear';
+    readonly slope: number;
+    readonly intercept: number;
+};
+
+// @internal
+export function blipColorSteps(effects: readonly BlipEffect[]): BlipColorStep[];
+
+// @internal
 export function blurSigma(blurRad: number): number;
 
 // @internal
@@ -90,6 +109,9 @@ export function linearGradientEnds(angle: number, scaled: boolean, w: number, h:
     x2: number;
     y2: number;
 };
+
+// @internal
+export const LUMA_WEIGHTS: readonly [0.2126, 0.7152, 0.0722];
 
 // @internal
 export function lumTransfer(bright: number, contrast: number): {
@@ -174,6 +196,24 @@ export const SVG_NS = "http://www.w3.org/2000/svg";
 
 // @internal
 export function threeDColor(fill: ResolvedFill): Rgba;
+
+// @internal
+export interface TileGeometry {
+    readonly flipX: boolean;
+    readonly flipY: boolean;
+    readonly height: number;
+    readonly width: number;
+    readonly x: number;
+    readonly y: number;
+}
+
+// @internal
+export function tileGeometry(tile: NonNullable<Extract<ResolvedFill, {
+    type: 'picture';
+}>['tile']>, natural: {
+    readonly cx: number;
+    readonly cy: number;
+} | undefined, w: number, h: number): TileGeometry;
 
 // @public
 export interface ViewRect {

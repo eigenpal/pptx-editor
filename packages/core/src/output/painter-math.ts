@@ -6,14 +6,19 @@
 import type { EffectPlacement, GradientStop, ResolvedFill, Rgba } from '../cascade/index.ts';
 import type { GeometryPath, Matrix, ThreeDFacet } from '../layout/index.ts';
 import {
+  applyBlipColorSteps,
+  blipColorSteps,
   blurSigma as sigmaFor,
   effectMatrix as placementOf,
+  LUMA_WEIGHTS,
   lumTransfer,
+  type BlipColorStep,
 } from './effect-transforms.ts';
-import { adjustForPathMode as adjusted } from './paint-fill.ts';
+import { adjustForPathMode as adjusted, tileGeometry, type TileGeometry } from './paint-fill.ts';
 import { circleGeometry, linearEnds, paintStops } from './paint-gradient.ts';
 
-export { lumTransfer };
+export { applyBlipColorSteps, blipColorSteps, LUMA_WEIGHTS, lumTransfer, tileGeometry };
+export type { BlipColorStep, TileGeometry };
 
 /**
  * Lighten or darken a color for a preset path fill mode (`a:path/@fill`), as the SVG paint does.
