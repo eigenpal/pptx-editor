@@ -60,6 +60,7 @@ import {
   drawShadows,
   drawInnerShadow,
   drawReflection,
+  drawBlur,
   drawSoftEdge,
   effectDiagnostics,
 } from './paint-effects.ts';
@@ -516,17 +517,20 @@ async function drawItem(
   const drawContent = async (): Promise<void> => {
     if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
     // The soft edge fades the body (the geometry, its bevel, and the inner shadow), not the text,
-    // as in the SVG paint.
-    await drawSoftEdge(item, p, local, groupScale, async () => {
-      p.push(pushGraphicsState());
-      p.matrix(item.matrix);
-      if (threeD) fillFacets(threeD.under, p);
-      await drawGeometry(threeDFaceItem(item, threeD), p, local, groupScale);
-      if (threeD) fillFacets(threeD.over, p);
-      p.push(popGraphicsState());
-      // Over the geometry and under the text, in slide space.
-      if (shown) await drawInnerShadow(item, p, local);
-    });
+    // as in the SVG paint. The blur fades the body after the soft edge.
+    const drawBody = (): Promise<void> =>
+      drawSoftEdge(item, p, local, groupScale, async () => {
+        p.push(pushGraphicsState());
+        p.matrix(item.matrix);
+        if (threeD) fillFacets(threeD.under, p);
+        await drawGeometry(threeDFaceItem(item, threeD), p, local, groupScale);
+        if (threeD) fillFacets(threeD.over, p);
+        p.push(popGraphicsState());
+        // Over the geometry and under the text, in slide space.
+        if (shown) await drawInnerShadow(item, p, local);
+      });
+    if (shown) await drawBlur(item, p, local, groupScale, drawBody);
+    else await drawBody();
     // An empty body's caret line draws nothing: no operators for it.
     if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
       p.push(pushGraphicsState());

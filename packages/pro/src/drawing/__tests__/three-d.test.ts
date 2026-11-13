@@ -114,6 +114,61 @@ describe('3-D polygons', () => {
     expect(new Set(flat.over.map((f) => f.color.g))).toEqual(new Set([0x72]));
   });
 
+  test('the light shades the face, and the highlight follows the view', () => {
+    const face = (fx: ResolvedEffects) => threeDPaint(input(fx))!.faceColor!;
+    const bevel = { bevelTop: { w: 76_200, h: 76_200, preset: 'angle' as const } };
+    // The face of a lit shape is brighter than its fill: the reference shows 4B7BD0.
+    const front = face(effects(bevel));
+    expect(Math.abs(front.r - 0x4b)).toBeLessThan(6);
+    expect(Math.abs(front.g - 0x7b)).toBeLessThan(6);
+    expect(Math.abs(front.b - 0xd0)).toBeLessThan(6);
+    // A flat material keeps the fill.
+    expect(face(effects({ ...bevel, material: 'flat' }))).toEqual(input(effects({})).color);
+    // Two cameras with the same face normal on screen: only the highlight tells them apart
+    // (the reference shows 4878CD and 7BABFF).
+    const up = face(effects({ camera: 'isometricTopUp', extrusionH: 228_600 }));
+    const down = face(effects({ camera: 'isometricTopDown', extrusionH: 228_600 }));
+    expect(down.g - up.g).toBeGreaterThan(40);
+    // The harsh rig is darker than the three-point rig.
+    expect(face(effects({ ...bevel, lightRig: 'harsh' })).g).toBeLessThan(front.g - 20);
+  });
+
+  test('the sides take the light of their normals in the shape axes', () => {
+    const paint = threeDPaint(
+      input(effects({ camera: 'isometricOffAxis2Left', extrusionH: 228_600 }))
+    )!;
+    // Four sides, far ones first, and the front cap. The top side (normal up) and the right
+    // side (normal right) show: the reference shows 335592 on top and 0D131D on the right.
+    const greens = polygons(paint.behind).map((q) => q.color.g);
+    expect(greens).toHaveLength(5);
+    expect(greens.some((g) => Math.abs(g - 0x55) < 12)).toBe(true);
+    expect(greens.some((g) => Math.abs(g - 0x13) < 12)).toBe(true);
+  });
+
+  test('a turned extrusion has its back at the turned depth axis', () => {
+    const turned = threeDPaint(
+      input(effects({ cameraRot: { lat: 0, lon: 30, rev: 0 }, extrusionH: IN }))
+    )!;
+    // A turn of 30 degrees about the vertical axis moves the back by sin 30 of the depth.
+    expect(turned.backOffset!.x).toBeCloseTo(Math.sin(Math.PI / 6) * IN, 3);
+    expect(turned.backOffset!.y).toBeCloseTo(0, 6);
+    expect(threeDPaint(input(effects({ extrusionH: IN })))?.backOffset).toBeUndefined();
+    const flatTurn = threeDPaint(input(effects({ cameraRot: { lat: 0, lon: 30, rev: 0 } })))!;
+    expect(flatTurn.backOffset).toBeUndefined();
+  });
+
+  test('a measured profile rises and falls by its slopes', () => {
+    // The soft round bevel rises at the outer edge, then falls toward the face: its inner strips
+    // face inward, so the top edge's inner strips are darker than its outer ones.
+    const paint = threeDPaint(
+      input(effects({ bevelTop: { w: 76_200, h: 76_200, preset: 'softRound' } }))
+    )!;
+    const strips = polygons(paint.over);
+    expect(strips).toHaveLength(4 * 12);
+    // Strip k of the top edge is polygon 4k.
+    expect(strips[4 * 6]!.color.g).toBeLessThan(strips[4]!.color.g);
+  });
+
   test('an outline past the point limit draws flat', () => {
     const many: GeometryPath[] = [
       {

@@ -9,9 +9,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // A bevel is a band along the outline, cut into strips. Each strip is tilted by the slope of
 // the preset's profile, and the light of the scene shades it (`three-d-scene.ts`). The profiles
 // of `ST_BevelPresetType` (20.1.10.9) are measured on the reference PDF of the `three-d-effects`
-// fixture: `circle` and `angle` follow their names, and the others are slope tables. An extrusion shows only
-// when the camera turns: its sides are the outline swept along the turned depth. The face of a
-// turned shape is the flat shape under the camera's linear transform, about its center.
+// fixture: `circle` and `angle` follow their names, and the others are slope tables. The light
+// also shades the face itself (`faceColor`). An extrusion shows only when the camera turns: its
+// sides are the outline swept along the turned depth. The face of a turned shape is the flat
+// shape under the camera's linear transform, about its center.
 
 import type { ResolvedThreeD, Rgba, BevelPresetType } from '@pptx-editor.dev/core/cascade';
 import {

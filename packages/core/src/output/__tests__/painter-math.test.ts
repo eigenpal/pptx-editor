@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test';
+import type { ResolvedFill, Rgba } from '../../cascade/index.ts';
+import type { LayoutItem, ThreeDPaint } from '../../layout/index.ts';
 import {
   applyBlipColorSteps,
   blipColorSteps,
   LUMA_WEIGHTS,
+  threeDFaceItem,
   tileGeometry,
 } from '../painter-math.ts';
+import { matrixAttr } from '../svg.ts';
 
 // The color steps of picture effects and the tile geometry of tiled pictures: the rules that the
 // SVG paint and the PDF export share.
@@ -101,5 +105,43 @@ describe('tileGeometry', () => {
   test('a tile is the box without a natural size', () => {
     const g = tileGeometry(tile, undefined, 70_000, 30_000);
     expect([g.width, g.height]).toEqual([70_000, 30_000]);
+  });
+});
+
+describe('threeDFaceItem', () => {
+  const item = (fill: ResolvedFill) =>
+    ({ kind: 'shape', element: { fill } }) as unknown as Extract<LayoutItem, { kind: 'shape' }>;
+  const paint = (faceColor?: Rgba): ThreeDPaint => ({
+    front: [1, 0, 0, 1, 0, 0],
+    showsFace: true,
+    ...(faceColor ? { faceColor } : {}),
+    behind: [],
+    under: [],
+    over: [],
+  });
+  const lit = { r: 75, g: 123, b: 208, a: 1 };
+
+  test('a solid face takes the lit color of the paint', () => {
+    const solid = item({ type: 'solid', color: { r: 68, g: 114, b: 196, a: 1 } });
+    expect(threeDFaceItem(solid, paint(lit)).element.fill).toEqual({ type: 'solid', color: lit });
+    // No paint, or a paint with no face color, keeps the item.
+    expect(threeDFaceItem(solid, null)).toBe(solid);
+    expect(threeDFaceItem(solid, paint())).toBe(solid);
+  });
+
+  test('other fills and a face color that is not finite keep the item', () => {
+    const none = item({ type: 'none' });
+    expect(threeDFaceItem(none, paint(lit))).toBe(none);
+    const solid = item({ type: 'solid', color: { r: 68, g: 114, b: 196, a: 1 } });
+    expect(threeDFaceItem(solid, paint({ ...lit, g: Number.NaN }))).toBe(solid);
+  });
+});
+
+describe('matrixAttr', () => {
+  test('keeps the linear part to 1e-6 and the offset to 0.01', () => {
+    // A turned face: a coefficient rounded to 0.01 moves a point at 5,000,000 EMU by 25,000.
+    expect(matrixAttr([0.898794, -0.135, 0.0000004, 0.951057, 616936.114, -0.004])).toBe(
+      'matrix(0.898794 -0.135 0 0.951057 616936.11 0)'
+    );
   });
 });

@@ -13,9 +13,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // projected outlines of 12 isometric presets fall within 0.03 in. The perspective presets draw
 // as parallel projections.
 //
-// The light is fitted to the bevel cross-sections of that fixture (slide 1): the three-point rig
-// from the top, on the warm matte and plastic materials, within 7 levels of 255 in the green
-// channel. Other rigs, directions, and materials are approximate.
+// The light lies in the shape's own axes and is fitted to that fixture: the three-point rig from
+// the top on the warm matte material, over bevels, faces, and extrusion sides under many cameras.
+// The highlight depends on the view. Other rigs, directions, and materials are approximate.
 
 import type { ResolvedThreeD } from '@pptx-editor.dev/core/cascade';
 
@@ -169,11 +169,13 @@ interface Lobe extends Light {
 
 /**
  * The three-point rig from the top, in the shape's own axes: a camera turn moves the view, not
- * the light. An ambient term, three lights (from above, from below, and from behind), and two
- * highlights at the half vector of the light and the view (Blinn). Fitted together to the
- * fixture: the angle bevels (slides 1 and 2), the faces under 18 cameras (slides 3 and 4), the
- * extrusion sides (slides 3 and 4), and the turned faces (`three-d-turned-effects`, slide 1),
- * within 3.3 levels of 255 on average.
+ * the light. An ambient term, three lights (from above, from below, and from behind), and
+ * highlights at the half vector of the light and the view (Blinn). The lights and the first two
+ * highlights are fitted together to the fixture: the angle bevels (slides 1 and 2), the faces
+ * under 18 cameras (slides 3 and 4), the extrusion sides (slides 3 and 4), and the turned faces
+ * (`three-d-turned-effects`, slide 1), within 3.3 levels of 255 on average. The third, a rim
+ * light from below and behind, is fitted to the outer strips of the bevels of slide 1, which
+ * catch light at the bottom edge.
  */
 const AMBIENT = 0.1253;
 const LIGHTS: readonly Light[] = [
@@ -184,16 +186,17 @@ const LIGHTS: readonly Light[] = [
 const HIGHLIGHTS: readonly Lobe[] = [
   { dir: [-0.355, -0.749, 0.559], k: 0.484, power: 28.5 },
   { dir: [-0.457, 0.459, -0.762], k: 1.125, power: 82.4 },
+  { dir: [0, 0.485, -0.875], k: 0.13, power: 24 },
 ];
 
 /**
  * How far the rig turns the light about the view axis, by `dir`, in degrees. The top-left
- * direction is measured (the bevel of slide 2 lit from the left); the others follow the compass
+ * direction is fitted to the bevel of slide 2 of the fixture; the others follow the compass
  * and are approximate.
  */
 const DIR_TURN: Readonly<Record<string, number>> = {
   t: 0,
-  tl: -75,
+  tl: -55,
   l: -90,
   bl: -135,
   b: 180,
