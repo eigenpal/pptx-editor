@@ -15,7 +15,7 @@ import type { BlipEffect } from '@pptx-editor.dev/core/cascade';
 import { applyBlipColorSteps, blipColorSteps } from '@pptx-editor.dev/core/output';
 import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
-import { colorStepsCode, MAX_COLOR_STEPS } from '../paint-picture.ts';
+import { colorStepsCode, MAX_COLOR_STEPS, PATTERN_CELL_SCALE } from '../paint-picture.ts';
 
 const IN = 914_400;
 const BEST = { fidelityPolicy: 'best-effort' } as const;
@@ -286,8 +286,11 @@ describe('tiled pictures in the PDF', () => {
     expect(rest).toHaveLength(0);
     const tw = 19_050;
     const th = 9_525;
-    // A mirrored cell holds 2 × 2 tiles.
-    expect(pattern!.step).toEqual([2 * tw, 2 * th]);
+    // A mirrored cell holds 2 × 2 tiles. The step is one millionth under the cell, so a viewer
+    // that rounds the cell up to whole pixels gets no extra pixel to resample the tiles into.
+    expect(pattern!.step[0]).toBeCloseTo(2 * tw * PATTERN_CELL_SCALE, 3);
+    expect(pattern!.step[1]).toBeCloseTo(2 * th * PATTERN_CELL_SCALE, 3);
+    expect(pattern!.step[0]).toBeLessThan(2 * tw);
     expect(pattern!.draws).toBe(4);
     const [a, b, c, d, e, f] = pattern!.matrix;
     expect([a, b, c, d]).toEqual([1, 0, 0, 1]);
@@ -298,7 +301,8 @@ describe('tiled pictures in the PDF', () => {
   test('one tile per cell without mirroring, from the top-left corner', async () => {
     const tile = '<a:tile tx="0" ty="0" sx="100000" sy="100000" flip="none" algn="tl"/>';
     const [pattern] = await tilePatterns((await exportPdf(pictureDeck('', tile), BEST)).bytes);
-    expect(pattern!.step).toEqual([25_400, 12_700]);
+    expect(pattern!.step[0]).toBeCloseTo(25_400 * PATTERN_CELL_SCALE, 3);
+    expect(pattern!.step[1]).toBeCloseTo(12_700 * PATTERN_CELL_SCALE, 3);
     expect(pattern!.draws).toBe(1);
     expect(pattern!.matrix).toEqual([1, 0, 0, 1, 0, 0]);
   });

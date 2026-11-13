@@ -249,10 +249,19 @@ function recolored(image: PDFImage, allSteps: readonly BlipColorStep[], p: PageO
 }
 
 /**
+ * The scale of a pattern cell's step and box: one millionth under the cell. A viewer draws a cell
+ * into a bitmap of whole pixels, rounded up, in single-precision floats. A cell that is a whole
+ * number of pixels can come out one pixel larger (192 px of tiles at 2 px per point and EMU
+ * coordinates come out 193 px), and the viewer then resamples every tile to fit. One millionth
+ * of a cell moves no tile by a visible amount.
+ */
+export const PATTERN_CELL_SCALE = 1 - 1e-6;
+
+/**
  * The tiling pattern of a tiled picture (ISO 32000-1, 8.7.3.3): one cell of 1 tile, or 2 or 4
- * tiles mirrored by `flip`, as the SVG paint's pattern (`core/output`, `tilePaint`). The pattern
- * space is the box's, with the grid's origin at `g.x`, `g.y`. Written once per picture and
- * geometry.
+ * tiles mirrored by `flip`, with the tile geometry of the SVG paint (`core/output`,
+ * `tileGeometry`). The pattern space is the box's, with the grid's origin at `g.x`, `g.y`. Written
+ * once per picture and geometry.
  */
 function tilePattern(image: PDFRef, g: TileGeometry, p: PageOps): PDFRef {
   const { width: tw, height: th, flipX: fx, flipY: fy } = g;
@@ -280,9 +289,9 @@ function tilePattern(image: PDFRef, g: TileGeometry, p: PageOps): PDFRef {
     PatternType: 1,
     PaintType: 1,
     TilingType: 1,
-    BBox: [0, 0, cw, ch],
-    XStep: cw,
-    YStep: ch,
+    BBox: [0, 0, cw * PATTERN_CELL_SCALE, ch * PATTERN_CELL_SCALE],
+    XStep: cw * PATTERN_CELL_SCALE,
+    YStep: ch * PATTERN_CELL_SCALE,
     Matrix: [1, 0, 0, 1, g.x, g.y],
     Resources: ctx.obj({ XObject: ctx.obj({ Im: image }) }),
   });
