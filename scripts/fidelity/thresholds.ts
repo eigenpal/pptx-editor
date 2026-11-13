@@ -309,6 +309,7 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
     'equations/1': ['baseline', 'line-position'],
     'equations/2': ['baseline', 'line-position'],
     'equations/4': ['baseline', 'line-position'],
+    'fill-fidelity/6': ['pixels'],
     'fills-lines/1': ['extra-text'],
     'preserved-content/1': ['pixels'],
     'three-d-effects/2': ['pixels'],

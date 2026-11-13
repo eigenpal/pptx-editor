@@ -31,6 +31,11 @@ describe('image header sizes', () => {
     expect(hi.dpiX).toBe(150);
     // 144 DPI is 5669.29 pixels per metre: the whole count reads back as whole DPI.
     expect(imageSize(png(128, 96, 5669))!.dpiY).toBe(144);
+    // A count beyond that rounding keeps its exact DPI: 5680 per metre is 144.272 DPI.
+    expect(imageSize(png(128, 96, 5680))!.dpiX).toBeCloseTo(144.272, 6);
+    // A tiny count stays rejected: 20 and 39 per metre are under 1 DPI.
+    expect(imageSize(png(128, 96, 20))).toEqual({ width: 128, height: 96 });
+    expect(imageSize(png(128, 96, 39))).toEqual({ width: 128, height: 96 });
     expect(imageSizeEmu(imageSize(png(96, 48))!)).toEqual({ cx: 914_400, cy: 457_200 });
   });
 

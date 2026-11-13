@@ -36,11 +36,18 @@ const dpi = (v: number): number | undefined =>
   Number.isFinite(v) && v >= 1 && v <= 10_000 ? v : undefined;
 
 /**
- * A resolution stated in whole pixels per metre (PNG `pHYs`, BMP), in whole DPI. A whole count
- * per metre cannot hold most DPI values (144 DPI is 5669.29 per metre), so the stated count is
- * the DPI rounded: a reference PDF tiles a 128-pixel image at 5669 per metre exactly 64 pt wide.
+ * A resolution stated in whole pixels per metre (PNG `pHYs`, BMP). A whole count per metre cannot
+ * hold most DPI values (144 DPI is 5669.29 per metre), so a writer rounds the count: a count
+ * within that rounding (half a pixel per metre, 0.0127 DPI) of a whole DPI reads as that DPI. A
+ * reference PDF tiles a 128-pixel image at 5669 per metre exactly 64 pt wide. Any other count
+ * keeps its exact DPI, and a count under 1 DPI stays rejected.
  */
-const perMetre = (v: number): number | undefined => dpi(Math.round(v * 0.0254));
+const perMetre = (v: number): number | undefined => {
+  const exact = dpi(v * 0.0254);
+  if (exact === undefined) return undefined;
+  const whole = Math.round(exact);
+  return Math.abs(exact - whole) <= 0.5 * 0.0254 + 1e-9 ? whole : exact;
+};
 
 function png(b: Uint8Array): ImageSize | null {
   if (b.length < 33 || u32be(b, 12) !== 0x49484452) return null; // IHDR

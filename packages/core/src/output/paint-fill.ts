@@ -17,6 +17,7 @@ import {
   multiply,
   strokeCap,
   strokeWidth,
+  type GeometryPath,
   type Matrix,
 } from '../layout/index.ts';
 import { ALIGN_POINTS, blipColorSteps } from './effect-transforms.ts';
@@ -464,7 +465,7 @@ function pictureAlpha(fill: Extract<ResolvedFill, { type: 'picture' }>): number 
 
 /**
  * A tiled picture as an SVG pattern (`tileGeometry`), recolored by the blip effects: the paint
- * of an outline, text, a table cell, and a box with more than `MAX_TILE_IMAGES` tiles. Without a
+ * of an outline, text, a table cell, and the tiles past a slide's `MAX_SLIDE_TILE_IMAGES`. Without a
  * size port, a tile is the box.
  */
 function tilePaint(
@@ -501,10 +502,34 @@ function tilePaint(
 }
 
 /**
- * The most tiles that `tilePlacements` places in one box. A box with more tiles fills with the
- * pattern of `tilePaint`, so a file cannot make the paint write millions of elements.
+ * The most tile images that the paint draws on one slide (`TileBudget`). A slide with more tiles
+ * fills the rest with the pattern of `tilePaint`, so a file cannot make the paint write millions
+ * of elements, with many shapes or many filled paths.
  */
-export const MAX_TILE_IMAGES = 2048;
+export const MAX_SLIDE_TILE_IMAGES = 4096;
+
+/** The tile images left on one slide. */
+class TileBudget {
+  #left = MAX_SLIDE_TILE_IMAGES;
+  /** The images still allowed. */
+  get left(): number {
+    return this.#left;
+  }
+  spend(n: number): void {
+    this.#left -= n;
+  }
+}
+
+/** The tile image budget of each slide, by its `Defs`. */
+const tileWork = new WeakMap<Defs, TileBudget>();
+
+/** A rectangle in a fill box's space, by its edges. */
+export interface TileArea {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
 
 /** One tile of a tiled picture: its top-left corner in the box, and how it is mirrored. */
 export interface TilePlacement {
@@ -518,26 +543,24 @@ export interface TilePlacement {
   readonly mirrorY: boolean;
 }
 
-/**
- * Every tile of `g` that meets the `w`×`h` box, row by row, or undefined when there are more than
- * `MAX_TILE_IMAGES`.
- */
+/** Every tile of `g` that meets `area`, row by row, or undefined when there are more than `max`. */
 export function tilePlacements(
   g: TileGeometry,
-  w: number,
-  h: number
+  area: TileArea,
+  max: number
 ): readonly TilePlacement[] | undefined {
   const { width: tw, height: th, flipX: fx, flipY: fy } = g;
   const cw = fx ? 2 * tw : tw;
   const ch = fy ? 2 * th : th;
-  const i0 = Math.floor(-g.x / cw);
-  const i1 = Math.ceil((w - g.x) / cw);
-  const j0 = Math.floor(-g.y / ch);
-  const j1 = Math.ceil((h - g.y) / ch);
+  const i0 = Math.floor((area.x0 - g.x) / cw);
+  const i1 = Math.ceil((area.x1 - g.x) / cw);
+  const j0 = Math.floor((area.y0 - g.y) / ch);
+  const j1 = Math.ceil((area.y1 - g.y) / ch);
   const per = (fx ? 2 : 1) * (fy ? 2 : 1);
-  if (!((i1 - i0) * (j1 - j0) * per <= MAX_TILE_IMAGES)) return undefined;
+  if (!(Math.max(0, i1 - i0) * Math.max(0, j1 - j0) * per <= max)) return undefined;
   const out: TilePlacement[] = [];
-  const meets = (x: number, y: number): boolean => x < w && x + tw > 0 && y < h && y + th > 0;
+  const meets = (x: number, y: number): boolean =>
+    x < area.x1 && x + tw > area.x0 && y < area.y1 && y + th > area.y0;
   for (let j = j0; j < j1; j += 1)
     for (let i = i0; i < i1; i += 1) {
       const x = g.x + i * cw;
@@ -550,24 +573,67 @@ export function tilePlacements(
   return out;
 }
 
+/** The bounds of `paths` and the `w`×`h` box: the box grown to every point and control point. */
+export function pathBounds(paths: readonly GeometryPath[], w: number, h: number): TileArea {
+  let x0 = 0;
+  let y0 = 0;
+  let x1 = w;
+  let y1 = h;
+  for (const p of paths)
+    for (const c of p.commands) {
+      if (c.op === 'Z') continue;
+      const pts =
+        c.op === 'C'
+          ? [c.x1, c.y1, c.x2, c.y2, c.x, c.y]
+          : c.op === 'Q'
+            ? [c.x1, c.y1, c.x, c.y]
+            : [c.x, c.y];
+      for (let i = 0; i < pts.length; i += 2) {
+        x0 = Math.min(x0, pts[i]);
+        x1 = Math.max(x1, pts[i]);
+        y0 = Math.min(y0, pts[i + 1]);
+        y1 = Math.max(y1, pts[i + 1]);
+      }
+    }
+  return { x0, y0, x1, y1 };
+}
+
 /**
- * A tiled picture (`tileGeometry`) as one image for each tile that meets the `w`×`h` box
+ * Where a tiled picture fills one path: its bounds (`pathBounds`), at most one box size past each
+ * edge of the box, the area that the PDF export's tile pattern covers.
+ */
+export function tileArea(path: GeometryPath, w: number, h: number): TileArea {
+  const b = pathBounds([path], w, h);
+  return {
+    x0: Math.max(b.x0, -Math.abs(w)),
+    y0: Math.max(b.y0, -Math.abs(h)),
+    x1: Math.min(b.x1, 2 * Math.abs(w)),
+    y1: Math.min(b.y1, 2 * Math.abs(h)),
+  };
+}
+
+/**
+ * A tiled picture (`tileGeometry`) as one image for each tile that meets `area`
  * (`tilePlacements`), recolored by the blip effects. A browser prints an SVG pattern as one
- * bitmap at 72 DPI; it prints an image with its own pixels. Undefined when the box holds more
- * than `MAX_TILE_IMAGES` tiles. The caller clips the images.
+ * bitmap at 72 DPI; it prints an image with its own pixels. Undefined when the slide's tile
+ * budget (`MAX_SLIDE_TILE_IMAGES`) cannot hold the tiles. The caller clips the images.
  */
 function tileImages(
   fill: Extract<ResolvedFill, { type: 'picture' }>,
   url: string,
   w: number,
   h: number,
+  area: TileArea,
   ctx: PaintContext
 ): SVGElement | undefined {
   const { defs } = ctx;
   const doc = defs.doc;
   const g = tileGeometry(fill.tile!, ctx.imageSize?.(ctx.sourcePart, fill.rId), w, h);
-  const tiles = tilePlacements(g, w, h);
+  let budget = tileWork.get(defs);
+  if (!budget) tileWork.set(defs, (budget = new TileBudget()));
+  const tiles = tilePlacements(g, area, budget.left);
   if (!tiles) return undefined;
+  budget.spend(tiles.length);
   const images = tiles.map((t) =>
     tileImage(doc, url, g.width, g.height, t.x, t.y, t.mirrorX, t.mirrorY)
   );
@@ -584,26 +650,31 @@ function tileImages(
 }
 
 /**
- * A tiled picture fill as its tile images over the `w`×`h` box (`tileImages`), not as a paint
- * server. The caller clips them to the filled path. Undefined for any other fill, an image that
- * does not resolve, or a box of too many tiles: those fill with `fillPaint`.
+ * A tiled picture fill as its tile images (`tileImages`) over `area` of the `w`×`h` box (the box
+ * itself by default), not as a paint server. The caller clips them to the filled path. Undefined
+ * for any other fill, an image that does not resolve, or tiles that the slide's budget cannot
+ * hold: those fill with `fillPaint`.
  */
 export function tiledPictureContent(
   fill: ResolvedFill,
   w: number,
   h: number,
-  ctx: PaintContext
+  ctx: PaintContext,
+  area: TileArea = { x0: 0, y0: 0, x1: w, y1: h }
 ): SVGElement | undefined {
   if (fill.type === 'group')
     return ctx.groupFill && ctx.groupFill.type !== 'group'
-      ? tiledPictureContent(ctx.groupFill, w, h, {
-          ...ctx,
-          sourcePart: ctx.groupSourcePart ?? ctx.sourcePart,
-        })
+      ? tiledPictureContent(
+          ctx.groupFill,
+          w,
+          h,
+          { ...ctx, sourcePart: ctx.groupSourcePart ?? ctx.sourcePart },
+          area
+        )
       : undefined;
   if (fill.type !== 'picture' || fill.mode !== 'tile' || !fill.tile) return undefined;
   const url = pictureUrl(ctx, fill);
-  return url ? tileImages(fill, url, w, h, ctx) : undefined;
+  return url ? tileImages(fill, url, w, h, area, ctx) : undefined;
 }
 
 /** Stroke attributes for a resolved outline. `scale` corrects for group scaling. */
