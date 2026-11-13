@@ -21,6 +21,7 @@ import { chartDataDeck } from './chart-data.ts';
 import { diagramEditingDeck } from './diagram-editing.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
 import { pictureBulletsDeck } from './picture-bullets.ts';
+import { pictureAdjustmentsDeck } from './picture-adjustments.ts';
 import { textWarpFixtures } from './text-warp.ts';
 import { equationFixtures } from './equations.ts';
 import { THREE_D_EFFECT_STYLES, threeDFixtures } from './three-d.ts';
@@ -863,6 +864,8 @@ writeFileSync(`${OUT}/slide-layouts.pptx`, buildPptx(slideLayoutsDeck()));
 writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
 // Picture bullets at several sizes, levels, and alignments.
 writeFileSync(`${OUT}/picture-bullets.pptx`, buildPptx(pictureBulletsDeck()));
+// Picture borders with dashes and caps, and picture corrections.
+writeFileSync(`${OUT}/picture-adjustments.pptx`, buildPptx(pictureAdjustmentsDeck()));
 // East Asian faces from the theme script fonts, by each run's language.
 writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFontsDeck()));
 // Custom kinsoku lists, and justified and distributed East Asian text.
@@ -880,4 +883,4 @@ writeFileSync(`${OUT}/diagram-editing.pptx`, buildPptx(diagramEditingDeck()));
 // Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.
 const roundTrip = buildRoundTripDecks(image);
 for (const [name, bytes] of Object.entries(roundTrip)) writeFileSync(`${OUT}/${name}.pptx`, bytes);
-console.log(`${Object.keys(fixtures).length + 8 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);
+console.log(`${Object.keys(fixtures).length + 9 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);

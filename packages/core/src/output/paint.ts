@@ -14,9 +14,8 @@ import {
   ARROW_MITER_LIMIT,
   drawingRenderers,
   hasCharacters,
-  outsideDashArray,
+  pictureBorder,
   planStroke,
-  strokeWidth,
   type GeometryPath,
   type PathCommand,
   type StrokePlan,
@@ -330,64 +329,71 @@ export function paintBackground(
 }
 
 /**
- * A picture's outline. It lies outside the picture, not centered on its edge,
- * as reference PDFs show. So the stroke is twice as wide, and a mask hides the half inside the
- * geometry. Its dashes come from `outsideDashArray`, as in the PDF export: the dash period of a
- * centered line stays, and round dots draw as squares. Dashes outside a picture are not checked
- * against a reference PDF (approximation `picture-border-dots`).
+ * A picture's outline. It lies outside the picture, as reference PDFs show: the outline of the
+ * geometry grown by the line width, with a shape's dashes, caps, and joins, as in the PDF export
+ * (`layout/line-strokes.ts`, `pictureBorder`). A solid border on a geometry other than a
+ * rectangle is a stroke twice as wide, of which a mask hides the half inside the geometry.
+ * Dashes outside a geometry other than a rectangle are not checked against a reference PDF
+ * (approximation `picture-border-dots`).
  */
 function outsideOutline(
   doc: Document,
   ctx: PaintContext,
+  item: Extract<LayoutItem, { kind: 'picture' }>,
   d: string,
-  stroke: Record<string, string | number | undefined>,
+  stroke: Record<string, string | undefined>,
   line: ResolvedLine,
-  groupScale: number,
-  w: number,
-  h: number
-): SVGElement {
+  groupScale: number
+): SVGElement[] {
+  const { geometry, xfrm } = item.element;
+  const { cx: w, cy: h } = xfrm;
+  const rect = geometry.kind === 'preset' && geometry.preset === 'rect';
+  const paths = item.geometry.paths.map((path) => path.commands);
+  const border = pictureBorder(paths, rect, line, w, h, groupScale);
   const width = Number(stroke['stroke-width']) || 0;
-  const pad = width * 2 + Math.max(w, h);
-  const id = ctx.defs.id('outside');
-  ctx.defs.add(
-    svg(
-      doc,
-      'mask',
-      {
-        id,
-        maskUnits: 'userSpaceOnUse',
-        x: -pad,
-        y: -pad,
-        width: w + 2 * pad,
-        height: h + 2 * pad,
-      },
-      [
-        svg(doc, 'rect', {
-          x: -pad,
-          y: -pad,
-          width: w + 2 * pad,
-          height: h + 2 * pad,
-          fill: '#fff',
-        }),
-        svg(doc, 'path', { d, fill: '#000' }),
-      ]
-    )
+  const mask = (): string => {
+    const pad = width * 2 + Math.max(w, h);
+    const box = { x: -pad, y: -pad, width: w + 2 * pad, height: h + 2 * pad };
+    const id = ctx.defs.id('outside');
+    const shapes = [
+      svg(doc, 'rect', { ...box, fill: '#fff' }),
+      svg(doc, 'path', { d, fill: '#000' }),
+    ];
+    ctx.defs.add(svg(doc, 'mask', { id, maskUnits: 'userSpaceOnUse', ...box }, shapes));
+    return `url(#${id})`;
+  };
+  if (border.kind === 'doubled')
+    return [
+      svg(doc, 'path', {
+        d,
+        fill: 'none',
+        ...stroke,
+        'stroke-width': num(width * 2),
+        mask: mask(),
+      }),
+    ];
+  const clip = border.clip ? mask() : undefined;
+  return border.paths.map((plan) =>
+    svg(doc, 'path', {
+      d: pathData({ commands: plan.commands, fill: 'none', stroke: true }),
+      fill: 'none',
+      ...withDashPhase(stroke, plan),
+      mask: clip,
+    })
   );
-  const dashes = outsideDashArray(line, strokeWidth(line, groupScale));
-  return svg(doc, 'path', {
-    d,
-    fill: 'none',
-    ...stroke,
-    'stroke-width': num(width * 2),
-    ...(dashes ? { 'stroke-linecap': 'butt', 'stroke-dasharray': dashes.map(num).join(' ') } : {}),
-    mask: `url(#${id})`,
-  });
 }
 
-/**
- * The context with the matrix of a shape's box to the slide, for pattern tiles that sit on the
- * slide's grid, square to the slide.
- */
+/** The stroke attributes of a path whose dash pattern starts at `plan.dashPhase`. */
+function withDashPhase(
+  stroke: Record<string, string | undefined>,
+  plan: StrokePlan | undefined
+): Record<string, string | undefined> {
+  return plan?.dashPhase && stroke['stroke-dasharray']
+    ? { ...stroke, 'stroke-dashoffset': num(plan.dashPhase) }
+    : stroke;
+}
+
+/** The context with a shape's box-to-slide matrix, for pattern tiles on the slide's grid. */
 function withFillMatrix(
   item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
   ctx: PaintContext
@@ -467,7 +473,7 @@ function paintGeometry(
         })
       );
     if (line && stroke.stroke !== 'none')
-      out.push(outsideOutline(doc, ctx, d, stroke, line, groupScale, w, h));
+      out.push(...outsideOutline(doc, ctx, item, d, stroke, line, groupScale));
     return out;
   }
   // A picture fill whose image does not resolve (a missing or damaged part) fills the geometry
@@ -485,6 +491,7 @@ function paintGeometry(
     const strokeD =
       plan && plan.commands !== path.commands ? pathData({ ...path, commands: plan.commands }) : d;
     const extras = plan ? strokeExtras(doc, plan, stroke) : [];
+    const pathStroke = withDashPhase(stroke, plan);
     // A tiled picture draws as images inside the path (`tiledPictureContent`); the stroke follows.
     const content =
       path.fill === 'none' || lostPicture
@@ -521,7 +528,7 @@ function paintGeometry(
             ctx.defs,
             strokeD,
             line.compound,
-            stroke,
+            pathStroke,
             w,
             h,
             plan?.commands ?? path.commands
@@ -542,7 +549,7 @@ function paintGeometry(
           })
         );
       if (compound) out.push(compound);
-      else if (path.stroke) out.push(svg(doc, 'path', { d: strokeD, fill: 'none', ...stroke }));
+      else if (path.stroke) out.push(svg(doc, 'path', { d: strokeD, fill: 'none', ...pathStroke }));
       out.push(...extras);
       continue;
     }
@@ -552,7 +559,7 @@ function paintGeometry(
         fill: own.paint,
         'fill-opacity': own.opacity < 1 ? num(own.opacity) : undefined,
         'fill-rule': 'evenodd',
-        ...(path.stroke ? stroke : { stroke: 'none' }),
+        ...(path.stroke ? pathStroke : { stroke: 'none' }),
       }),
       ...extras
     );

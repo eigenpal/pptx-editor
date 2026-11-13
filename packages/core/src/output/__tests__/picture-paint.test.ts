@@ -7,14 +7,14 @@ import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { paintSlide } from '../index.ts';
 
 // Picture paint: the exact `a:biLevel` threshold (ECMA-376 Part 1, 20.1.8.11) and the outline
-// drawn outside a picture, as reference PDFs show, with its dash rhythm.
+// drawn outside a picture, as the reference PDF of `picture-adjustments` shows, with its dashes.
 
 const win = new GlobalWindow();
 const doc = win.document as unknown as Document;
 afterAll(() => win.happyDOM.close());
 const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
 
-function paint(blip: string, spPr = '', srcRect = ''): SVGSVGElement {
+function paint(blip: string, spPr = '', srcRect = '', prst = 'rect'): SVGSVGElement {
   const r = readPptx(
     buildPptx({
       slides: [
@@ -25,7 +25,7 @@ function paint(blip: string, spPr = '', srcRect = ''): SVGSVGElement {
             '<p:pic><p:nvPicPr><p:cNvPr id="2" name="P"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
             `<p:blipFill><a:blip r:embed="rIdImg">${blip}</a:blip>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
             '<p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm>' +
-            `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${spPr}</p:spPr></p:pic>`,
+            `<a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom>${spPr}</p:spPr></p:pic>`,
         },
       ],
       media: [
@@ -53,13 +53,21 @@ describe('picture paint', () => {
     }
   });
 
-  test('a picture outline is drawn outside the picture', () => {
-    const svg = paint(
-      '',
-      '<a:ln w="38100"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:ln>'
-    );
-    const outline = [...svg.querySelectorAll('path')].find((p) => p.getAttribute('mask'))!;
-    // Twice the line width, with the inside masked away: the visible band is outside.
+  const SOLID = '<a:ln w="38100"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:ln>';
+  const outlineOf = (svg: SVGSVGElement): Element =>
+    [...svg.querySelectorAll('path')].find((p) => p.hasAttribute('stroke-width'))!;
+
+  test("a rectangle picture's outline is the rectangle grown by the line width", () => {
+    const outline = outlineOf(paint('', SOLID));
+    expect(Number(outline.getAttribute('stroke-width'))).toBe(38_100);
+    expect(outline.getAttribute('mask')).toBeNull();
+    // Half a width out on each side of the 1828800 × 914400 box.
+    expect(outline.getAttribute('d')).toStartWith('M-19050 -19050L1847850 -19050');
+  });
+
+  test('a solid outline off a rectangle is twice as wide, with the inside masked away', () => {
+    const svg = paint('', SOLID, '', 'ellipse');
+    const outline = outlineOf(svg);
     expect(Number(outline.getAttribute('stroke-width'))).toBe(76_200);
     const mask = svg.querySelector(`mask${outline.getAttribute('mask')!.slice(4, -1)}`)!;
     expect(mask.querySelector('path')!.getAttribute('fill')).toBe('#000');
@@ -73,18 +81,20 @@ describe('picture paint', () => {
     expect(Number(image.getAttribute('x'))).toBe(0);
   });
 
-  test('a dotted picture outline keeps the dot rhythm with butt caps', () => {
-    // A round dot (`sysDot`, cap="rnd") is one line width long, one line width apart. The
-    // wider outside stroke would make its round caps reach twice as far.
+  test('a dotted picture outline draws round dots, as a shape outline does', () => {
+    // A round dot (`sysDot`, cap="rnd") is a round cap every two line widths. On a closed path
+    // the pattern starts at the closing segment, one width in.
     const svg = paint(
       '',
       '<a:ln w="38100" cap="rnd"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill><a:prstDash val="sysDot"/></a:ln>'
     );
-    const outline = [...svg.querySelectorAll('path')].find((p) => p.getAttribute('mask'))!;
-    expect(outline.getAttribute('stroke-linecap')).toBe('butt');
+    const outline = outlineOf(svg);
+    expect(outline.getAttribute('stroke-linecap')).toBe('round');
     const [dash, gap] = outline.getAttribute('stroke-dasharray')!.split(' ').map(Number);
-    expect(dash).toBeCloseTo(38_100, 0);
-    expect(gap).toBeCloseTo(38_100, 0);
+    expect(dash).toBeCloseTo(0, 0);
+    expect(gap).toBeCloseTo(76_200, 0);
+    expect(Number(outline.getAttribute('stroke-dashoffset'))).toBeCloseTo(38_100, 0);
+    expect(outline.getAttribute('d')).toStartWith('M-19050 933450L-19050 -19050');
   });
 
   test('a picture draws its stored pixels: the browser ignores EXIF orientation', () => {

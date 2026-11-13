@@ -667,9 +667,6 @@ export function multiply(m: Matrix, n: Matrix): Matrix;
 // @public
 export function normalizeFontResolverResult(result: FontConfigurationBase | null | undefined): FontConfigurationBase | undefined;
 
-// @internal
-export function outsideDashArray(line: ResolvedLine, width: number): number[] | undefined;
-
 // @public
 export function paragraphSpacingPt(spacing: {
     pct: number;
@@ -702,6 +699,19 @@ export type PathCommand = {
 
 // @public
 export const PICTURE_BULLET_SCALE = 0.7;
+
+// @internal
+export type PictureBorder = {
+    readonly kind: 'grown';
+    readonly paths: readonly StrokePlan[];
+    readonly clip: boolean;
+} | {
+    readonly kind: 'doubled';
+    readonly paths: readonly (readonly PathCommand[])[];
+};
+
+// @internal
+export function pictureBorder(paths: readonly (readonly PathCommand[])[], rect: boolean, line: ResolvedLine, w: number, h: number, scale?: number): PictureBorder;
 
 // @internal
 export function placeBaseline(emu: number): number;
@@ -888,6 +898,7 @@ export function strokeCap(line: ResolvedLine): 'butt' | 'round' | 'square';
 export interface StrokePlan {
     readonly caps: readonly (readonly PathCommand[])[];
     readonly commands: readonly PathCommand[];
+    readonly dashPhase?: number;
     readonly ends: readonly LineEndShape[];
 }
 

@@ -158,11 +158,12 @@ class Collector {
       this.add('fill-rotation');
   }
 
-  line(line: ResolvedLine | undefined, picture = false): void {
+  /** `outsidePicture` is true for the border of a picture whose geometry is not a rectangle. */
+  line(line: ResolvedLine | undefined, outsidePicture = false): void {
     if (!line || line.fill.type === 'none') return;
     this.fill(line.fill, false);
-    // Any dash on a picture border: dashes outside a picture are not checked against a reference PDF.
-    if (picture && line.dash !== 'solid') this.add('picture-border-dots');
+    // Dashes outside a geometry other than a rectangle are not checked against a reference PDF.
+    if (outsidePicture && line.dash !== 'solid') this.add('picture-border-dots');
     if (line.compound !== 'sng') this.add('compound-lines');
   }
 
@@ -283,7 +284,9 @@ class Collector {
         const rotated = el.xfrm.rot % 360 !== 0;
         this.effects(item.element.effects, item.geometry.paths.length <= MAX_OVERLAY_PATHS);
         this.fill(item.element.fill, rotated, unscaled(item.matrix));
-        this.line(item.element.line, item.kind === 'picture');
+        const { geometry } = item.element;
+        const rect = geometry.kind === 'preset' && geometry.preset === 'rect';
+        this.line(item.element.line, item.kind === 'picture' && !rect);
         for (const p of item.geometry.paths)
           if (p.fill !== 'norm' && p.fill !== 'none') this.add('path-fill-modes');
         if (item.kind === 'shape' && item.text && hasCharacters(item.text)) {

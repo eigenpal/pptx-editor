@@ -289,6 +289,15 @@
         540
       ]
     },
+    "picture-adjustments": {
+      "deck": "4506d320b58f6fc7098b7f556e917c8529f9bd15b7aa7c5deaed225091485900",
+      "pdf": "47097e815c1a4c4f02514139d39f2bf2b1ee6c96c285b2a225680c29d6f20bf8",
+      "pages": 5,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "picture-bullets": {
       "deck": "de76b4500c7541bc28b67947f36b3d8fe9172769fd9823c7cc8ad2dc5140a7e3",
       "pdf": "18745850ea8bbfc446b91ed1e3ee710cbc371915a4ba6269155322baed51c118",
