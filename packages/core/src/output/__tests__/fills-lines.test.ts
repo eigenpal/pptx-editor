@@ -5,7 +5,12 @@ import { resolveSlide } from '../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { readPptx } from '../../store/index.ts';
 import type { PathCommand } from '../../layout/index.ts';
-import { compoundBandLines, compoundBands, MAX_OFFSET_BAND_POINTS } from '../compound-lines.ts';
+import {
+  compoundBandLines,
+  compoundBands,
+  compoundPlan,
+  MAX_OFFSET_BAND_POINTS,
+} from '../compound-lines.ts';
 import { paintSlide } from '../index.ts';
 import {
   PATTERN_PIXEL,
@@ -177,6 +182,55 @@ describe('compound line bands', () => {
       [20, 30],
       [0, 10],
     ]);
+  });
+});
+
+describe('compound line plan (shared with pptx-to-pdf)', () => {
+  const square: PathCommand[] = [
+    { op: 'M', x: 0, y: 0 },
+    { op: 'L', x: 100, y: 0 },
+    { op: 'L', x: 100, y: 100 },
+    { op: 'L', x: 0, y: 100 },
+    { op: 'Z' },
+  ];
+  const open: PathCommand[] = [
+    { op: 'M', x: 0, y: 0 },
+    { op: 'L', x: 100, y: 0 },
+  ];
+
+  test('a solid line draws offset bands', () => {
+    const plan = compoundPlan('tri', 12, true, false, 'miter', 4, square)!;
+    expect(plan.kind).toBe('offset');
+    if (plan.kind === 'offset') expect(plan.bands).toHaveLength(3);
+  });
+
+  test('a dashed closed line draws masked bands from its closing segment', () => {
+    const plan = compoundPlan('tri', 12, true, true, 'miter', 4, square)!;
+    expect(plan.kind).toBe('masked');
+    if (plan.kind !== 'masked') return;
+    expect(plan.closed).toBe(true);
+    expect(plan.commands?.slice(0, 2)).toEqual([
+      { op: 'M', x: 0, y: 100 },
+      { op: 'L', x: 0, y: 0 },
+    ]);
+    // The middle band straddles the center line: one part on each side.
+    expect(plan.outer).toHaveLength(2);
+    expect(plan.inner).toHaveLength(2);
+  });
+
+  test('a dashed open line: asymmetric types offset, symmetric types mask both sides', () => {
+    expect(compoundPlan('thickThin', 12, false, true, 'miter', 4, open)!.kind).toBe('offset');
+    const dbl = compoundPlan('dbl', 12, false, true, 'miter', 4, open)!;
+    expect(dbl).toMatchObject({ kind: 'masked', closed: false, inner: [] });
+    if (dbl.kind === 'masked')
+      for (const band of dbl.outer)
+        expect(band).toEqual({ a: expect.closeTo(2), b: expect.closeTo(6) });
+  });
+
+  test('a single line, an unknown type, or no width has no plan', () => {
+    expect(compoundPlan('sng', 12, true, false, 'miter', 4, square)).toBeNull();
+    expect(compoundPlan('__proto__', 12, true, false, 'miter', 4, square)).toBeNull();
+    expect(compoundPlan('dbl', 0, true, false, 'miter', 4, square)).toBeNull();
   });
 });
 

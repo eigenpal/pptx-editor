@@ -82,7 +82,9 @@ export {
   innerShadowShift,
   reflectionBlurSigma,
   reflectionFade,
+  softEdgeSpread,
   type ReflectionFade,
   type SpreadBlur,
 } from './effects-math.ts';
+export { MAX_MORPH_SPREAD } from './effects-renderer.ts';
 export type { ProLicenseOptions } from '../license.ts';

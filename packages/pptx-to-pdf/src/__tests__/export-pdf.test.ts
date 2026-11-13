@@ -103,8 +103,8 @@ describe('exportPdf', () => {
     const result = await exportPdf(deck('fills-lines'), { fidelityPolicy: 'best-effort' });
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).not.toContain('fill.pattern');
-    // The dashed compound line draws as one line; the solid ones draw their bands.
-    expect(result.diagnostics.filter((d) => d.code === 'line.compound')).toHaveLength(1);
+    // Every compound line draws its bands, the dashed one too.
+    expect(codes).not.toContain('line.compound');
     for (const d of result.diagnostics) {
       expect(d.pageNumber).toBe((d.pageIndex ?? 0) + 1);
       expect(['unsupported', 'approximation', 'information']).toContain(d.severity);
@@ -112,7 +112,7 @@ describe('exportPdf', () => {
   });
 
   test('strict policy refuses a deck with content it cannot draw', async () => {
-    const run = exportPdf(deck('fills-lines'));
+    const run = exportPdf(deck('effects'));
     await expect(run).rejects.toBeInstanceOf(PdfFidelityError);
   });
 

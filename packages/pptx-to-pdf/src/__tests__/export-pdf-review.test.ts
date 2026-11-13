@@ -341,7 +341,7 @@ describe('pictures', () => {
     expect(widths[0]).toBeCloseTo(76_200, 0);
   });
 
-  test('a picture cropped to a shape is clipped to it; effects are reported', async () => {
+  test('a picture cropped to a shape is clipped to it; its effects are drawn', async () => {
     const deck = buildPptx({
       slides: [
         {
@@ -353,7 +353,7 @@ describe('pictures', () => {
       media: [{ name: 'img.png', bytes: tinyPng(), contentType: 'image/png' }],
     });
     const result = await exportPdf(deck, BEST);
-    expect(result.diagnostics.map((d) => d.code)).toContain('picture.color-effects');
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('picture.color-effects');
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     const { fnArray } = await (await pdf.getPage(1)).getOperatorList();
     // A nonzero clip to the ellipse comes before the image.
@@ -439,6 +439,74 @@ describe('diagnostics placement', () => {
     expect(missing.map((d) => [d.slideNumber, d.message])).toEqual([
       [1, 'A diagram is not drawn: it has no saved drawing.'],
     ]);
+  });
+
+  test('a subscript run reads as its own text item, below the baseline', async () => {
+    const bytes = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 6 * IN,
+            cy: IN,
+            text: para(
+              run('H', 'sz="1800"') +
+                run('2', 'sz="1800" baseline="-25000"') +
+                run('O', 'sz="1800"')
+            ),
+          }),
+        },
+      ],
+    });
+    const [page] = await pdfText(await exportPdf(bytes, BEST));
+    expect(page.map((i) => i.str)).toEqual(['H', '2', 'O']);
+    const [h, two, o] = page;
+    // pdf.js y is up: the subscript sits lower, and the runs around it share one baseline.
+    expect(two.transform[5]).toBeLessThan(h.transform[5] - 1);
+    expect(o.transform[5]).toBeCloseTo(h.transform[5], 3);
+    // The subscript is drawn at its smaller size, left to right after the H.
+    expect(two.transform[3]).toBeLessThan(h.transform[3]);
+    expect(two.transform[4]).toBeGreaterThan(h.transform[4]);
+    expect(o.transform[4]).toBeGreaterThan(two.transform[4]);
+  });
+
+  test('stacked vertical letters draw upright, one below the other', async () => {
+    const bytes = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: IN,
+            cy: 4 * IN,
+            bodyPr: '<a:bodyPr vert="wordArtVert" wrap="square"/>',
+            text: para(run('ABC', 'sz="2400"')),
+          }),
+        },
+      ],
+    });
+    const result = await exportPdf(bytes, BEST);
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('text.upright');
+    const [page] = await pdfText(result);
+    const letters = ['A', 'B', 'C'].map((c) => page.find((i) => i.str === c));
+    for (const item of letters) {
+      if (!item) throw new Error('letter not found');
+      // Upright: no turn in the text transform.
+      expect(item.transform[0]).toBeGreaterThan(0);
+      expect(Math.abs(item.transform[1])).toBeLessThan(0.01);
+      expect(Math.abs(item.transform[2])).toBeLessThan(0.01);
+      expect(item.transform[3]).toBeGreaterThan(0);
+    }
+    const [a, b, c] = letters as { transform: number[] }[];
+    // One column: the same center line, and each letter lower than the one before.
+    expect(b.transform[5]).toBeLessThan(a.transform[5]);
+    expect(c.transform[5]).toBeLessThan(b.transform[5]);
+    expect(Math.abs(b.transform[4] - a.transform[4])).toBeLessThan(5);
   });
 
   test('diagnostic codes are fixed strings, not file text', async () => {

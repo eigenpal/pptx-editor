@@ -14,6 +14,25 @@ export type AltTextPort = (part: string, nodeId: string) => {
 } | undefined;
 
 // @internal
+export function applyBlipColorSteps(steps: readonly BlipColorStep[], rgb: readonly [number, number, number]): [number, number, number];
+
+// @internal
+export type BlipColorStep = {
+    readonly op: 'gray';
+} | {
+    readonly op: 'table';
+    readonly from: readonly [number, number, number];
+    readonly to: readonly [number, number, number];
+} | {
+    readonly op: 'linear';
+    readonly slope: number;
+    readonly intercept: number;
+};
+
+// @internal
+export function blipColorSteps(effects: readonly BlipEffect[]): BlipColorStep[];
+
+// @internal
 export function blurSigma(blurRad: number): number;
 
 // @internal
@@ -28,6 +47,14 @@ export function circleGradientGeometry(fill: Extract<ResolvedFill, {
 };
 
 // @internal
+export interface CompoundBand {
+    // (undocumented)
+    readonly a: number;
+    // (undocumented)
+    readonly b: number;
+}
+
+// @internal
 export interface CompoundBandLine {
     // (undocumented)
     readonly lines: readonly CompoundPolyline[];
@@ -37,6 +64,21 @@ export interface CompoundBandLine {
 
 // @internal
 export function compoundBandLines(commands: readonly PathCommand[], cmpd: string, width: number, join: string, miterLimit: number): CompoundBandLine[] | null;
+
+// @internal
+export type CompoundPlan = {
+    readonly kind: 'offset';
+    readonly bands: readonly CompoundBandLine[];
+} | {
+    readonly kind: 'masked';
+    readonly closed: boolean;
+    readonly commands?: readonly PathCommand[];
+    readonly outer: readonly CompoundBand[];
+    readonly inner: readonly CompoundBand[];
+};
+
+// @internal
+export function compoundPlan(cmpd: string, width: number, closed: boolean, dashed: boolean, join: string, miterLimit: number, commands?: readonly PathCommand[]): CompoundPlan | null;
 
 // @internal
 export type CompoundPoint = {
@@ -54,6 +96,16 @@ export interface CompoundPolyline {
 
 // @internal
 export function createSvgDocument(): Document;
+
+// @internal
+export function effectBoxCorners(item: Extract<LayoutItem, {
+    kind: 'shape';
+} | {
+    kind: 'picture';
+}>): {
+    x: number;
+    y: number;
+}[];
 
 // @internal
 export function effectMatrix(e: EffectPlacement, shape: Matrix, w: number, h: number): Matrix;
@@ -92,6 +144,9 @@ export function linearGradientEnds(angle: number, scaled: boolean, w: number, h:
 };
 
 // @internal
+export const LUMA_WEIGHTS: readonly [0.2126, 0.7152, 0.0722];
+
+// @internal
 export function lumTransfer(bright: number, contrast: number): {
     readonly slope: number;
     readonly intercept: number;
@@ -99,6 +154,9 @@ export function lumTransfer(bright: number, contrast: number): {
 
 // @internal
 export const MAX_METAFILE_RASTER_EDGE = 4096;
+
+// @internal
+export const MAX_OVERLAY_PATHS = 64;
 
 // @internal
 export function metafilePng(bytes: Uint8Array, fonts?: readonly Uint8Array[], signal?: AbortSignal): Promise<Uint8Array | null | undefined>;
@@ -143,6 +201,20 @@ export const PATTERN_PIXEL = 12700;
 // @internal
 export function patternBitmap(preset: string): number[][] | undefined;
 
+// @internal
+export function rectGradientGeometry(fill: Extract<ResolvedFill, {
+    type: 'path';
+}>, w: number, h: number): {
+    l: number;
+    t: number;
+    r: number;
+    b: number;
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+};
+
 // @public
 export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[], options?: RegisterFontFacesOptions): FontFaceHandle;
 
@@ -154,6 +226,23 @@ export interface RegisterFontFacesOptions {
 
 // @internal
 export function serializeSvgElement(root: Element): string;
+
+// @internal
+export function shapeBandBudget(): {
+    allow(paths: number, commands: number): boolean;
+};
+
+// @internal
+export function shapeGradientBands(fill: Extract<ResolvedFill, {
+    type: 'path';
+}>, stops: readonly GradientStop[], w: number, h: number): {
+    cx: number;
+    cy: number;
+    bands: {
+        scale: number;
+        color: Rgba;
+    }[];
+};
 
 // @internal
 export class SlidePainter {
@@ -174,6 +263,24 @@ export const SVG_NS = "http://www.w3.org/2000/svg";
 
 // @internal
 export function threeDColor(fill: ResolvedFill): Rgba;
+
+// @internal
+export interface TileGeometry {
+    readonly flipX: boolean;
+    readonly flipY: boolean;
+    readonly height: number;
+    readonly width: number;
+    readonly x: number;
+    readonly y: number;
+}
+
+// @internal
+export function tileGeometry(tile: NonNullable<Extract<ResolvedFill, {
+    type: 'picture';
+}>['tile']>, natural: {
+    readonly cx: number;
+    readonly cy: number;
+} | undefined, w: number, h: number): TileGeometry;
 
 // @public
 export interface ViewRect {

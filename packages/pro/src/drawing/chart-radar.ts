@@ -16,6 +16,7 @@ import {
   type Box,
   type ValueInfo,
 } from './chart-axes.ts';
+import { verticalTickRoom } from './chart-axes.ts';
 import { LABEL_LIFT } from './chart-cartesian.ts';
 import { dataLabelBlock } from './chart-data-label.ts';
 import { dataLabelFor, elementText } from './chart-labels.ts';
@@ -115,7 +116,7 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
     dataMin: empty ? 0 : info.dataMin,
     dataMax: empty ? 1 : info.dataMax,
     lengthPt: radius,
-    minIntervalPt: 1.6 * valueStyle.sizePt,
+    minIntervalPt: verticalTickRoom(valueStyle),
     fixedMin: valueAxis?.min ?? null,
     fixedMax: valueAxis?.max ?? null,
     fixedMajor: valueAxis?.majorUnit ?? null,

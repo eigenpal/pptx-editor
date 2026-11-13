@@ -297,6 +297,30 @@ export function circleGradient(
 }
 
 /**
+ * The construction of a rectangular path gradient over a `w`×`h` fill box (see `rectGradient`):
+ * the focus rectangle (`l`, `t`, `r`, `b`), where the first stop is, and the outer rectangle
+ * (`x0`, `y0`, `x1`, `y1`), the tile rectangle grown to hold the focus, where the last stop is.
+ */
+export function rectGeometry(
+  fill: PathFill,
+  w: number,
+  h: number
+): { l: number; t: number; r: number; b: number; x0: number; y0: number; x1: number; y1: number } {
+  const { l, t, r, b } = focusRect(fill, fillBox(w, h));
+  const tile = tileBox(fill.tileRect, w, h);
+  return {
+    l,
+    t,
+    r,
+    b,
+    x0: Math.min(tile.x, l),
+    y0: Math.min(tile.y, t),
+    x1: Math.max(tile.x + tile.w, r),
+    y1: Math.max(tile.y + tile.h, b),
+  };
+}
+
+/**
  * A rectangular path gradient (`ST_PathShadeType` `rect`; design D1 of `fill-and-line-fidelity`):
  * concentric rectangles from the focus rectangle (the first stop) to the edge of the tile rectangle
  * (the last stop; the fill box by default), from four trapezoids with linear gradients, in a
@@ -310,12 +334,7 @@ export function rectGradient(
   h: number
 ): string {
   const doc = defs.doc;
-  const { l, t, r, b } = focusRect(fill, fillBox(w, h));
-  const tile = tileBox(fill.tileRect, w, h);
-  const x0 = Math.min(tile.x, l);
-  const y0 = Math.min(tile.y, t);
-  const x1 = Math.max(tile.x + tile.w, r);
-  const y1 = Math.max(tile.y + tile.h, b);
+  const { l, t, r, b, x0, y0, x1, y1 } = rectGeometry(fill, w, h);
   const painted = paintStops(stops);
   const first = stops[0].color;
   const last = stops[stops.length - 1].color;
@@ -432,6 +451,63 @@ export function rectGradient(
   return defs.add(pattern);
 }
 
+/** One band of a shape path gradient: the outline scaled by `scale` about the focus center. */
+export interface ShapeBand {
+  readonly scale: number;
+  readonly color: Rgba;
+}
+
+/**
+ * The bands of a shape path gradient over a `w`×`h` fill box (see `shapeGradient`), outside in:
+ * `shapeBands` copies of the outline, scaled about (`cx`, `cy`), the focus center, from 1 down,
+ * each in the color at the middle of its band (linear in the scale). The SVG paint and
+ * `pptx-to-pdf` share it.
+ */
+export function shapeGradientBands(
+  fill: PathFill,
+  stops: readonly GradientStop[],
+  w: number,
+  h: number
+): { cx: number; cy: number; bands: ShapeBand[] } {
+  const f = focusRect(fill, fillBox(w, h));
+  const count = shapeBands(stops);
+  const bands: ShapeBand[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const scale = 1 - i / count;
+    bands.push({ scale, color: colorAt(stops, scale - 0.5 / count) });
+  }
+  return { cx: (f.l + f.r) / 2, cy: (f.t + f.b) / 2, bands };
+}
+
+/**
+ * The most paths of one shape that draw a `path="shape"` gradient (fill or overlay) as outline
+ * bands; a shape with more paths uses the rectangle construction, so a file cannot multiply the
+ * bands.
+ */
+const MAX_BANDED_PATHS = 16;
+/** The most path commands of one shape that draw outline bands: bands repeat every command. */
+const MAX_BANDED_COMMANDS = 2000;
+/**
+ * The band work (path commands × `MAX_SHAPE_BANDS`) one slide may spend. Later shapes use the
+ * rectangle construction, so many shapes cannot multiply the bands either.
+ */
+const MAX_SLIDE_BAND_WORK = 512_000;
+
+/**
+ * The shape gradient band work of one slide. A shape whose paths take `paths` and `commands`
+ * draws outline bands when `allow` returns true; otherwise it uses the rectangle construction.
+ * The SVG paint and `pptx-to-pdf` share the limits.
+ */
+export class ShapeBandBudget {
+  #left = MAX_SLIDE_BAND_WORK;
+  allow(paths: number, commands: number): boolean {
+    const cost = commands * MAX_SHAPE_BANDS;
+    const ok = paths <= MAX_BANDED_PATHS && commands <= MAX_BANDED_COMMANDS && cost <= this.#left;
+    if (ok) this.#left -= cost;
+    return ok;
+  }
+}
+
 /**
  * A shape path gradient (`ST_PathShadeType` `shape`; design D3): `shapeBands` copies of the
  * outline, scaled about the focus center from 1 down, each filled with the color at the middle of
@@ -446,28 +522,19 @@ export function shapeGradient(
   fillPath: string
 ): string {
   const doc = defs.doc;
-  const f = focusRect(fill, fillBox(w, h));
-  const cx = (f.l + f.r) / 2;
-  const cy = (f.t + f.b) / 2;
-  const count = shapeBands(stops);
+  const { cx, cy, bands: plan } = shapeGradientBands(fill, stops, w, h);
   const pathId = defs.id('fillpath');
   // The bands follow the shape's own fill rule (paint fills shapes with `evenodd`).
   defs.add(svg(doc, 'path', { id: pathId, d: fillPath, 'fill-rule': 'evenodd' }));
   // Bands nest, so each paints opaque; stop alpha goes into a luminance mask of the same bands.
   const bands = (paint: (c: Rgba) => string): SVGElement[] => {
-    const out: SVGElement[] = [];
-    for (let i = 0; i < count; i += 1) {
-      const outer = 1 - i / count;
-      const c = colorAt(stops, outer - 0.5 / count);
-      out.push(
-        svg(doc, 'use', {
-          href: `#${pathId}`,
-          transform: `translate(${num(cx)} ${num(cy)}) scale(${fine(outer)}) translate(${num(-cx)} ${num(-cy)})`,
-          fill: paint(c),
-        })
-      );
-    }
-    return out;
+    return plan.map(({ scale, color }) =>
+      svg(doc, 'use', {
+        href: `#${pathId}`,
+        transform: `translate(${num(cx)} ${num(cy)}) scale(${fine(scale)}) translate(${num(-cx)} ${num(-cy)})`,
+        fill: paint(color),
+      })
+    );
   };
   const opaque = bands((c) => toCss({ ...c, a: 1 }));
   const content = stops.some((s) => s.color.a < 1)

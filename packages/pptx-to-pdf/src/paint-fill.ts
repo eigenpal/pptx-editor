@@ -5,8 +5,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Fills as PDF paint, from the same resolved fills the editor's SVG paint reads
 // (`packages/core/src/output/paint-fill.ts`): solid colors, linear and path gradients as PDF
-// shadings, and pictures cropped by `srcRect` and placed by `fillRect`. A fill other than a
-// solid color clips to its path and paints the shape's local box, as an SVG paint server does.
+// shadings (a `path="shape"` gradient as the SVG paint's outline bands), and pictures cropped by
+// `srcRect` and placed by `fillRect`. A fill other than a solid color clips to its path and
+// paints the shape's local box, as an SVG paint server does.
 
 import {
   closePath,
@@ -16,6 +17,7 @@ import {
   moveTo,
   popGraphicsState,
   pushGraphicsState,
+  setFillingGrayscaleColor,
   setFillingRgbColor,
   setDashPattern,
   setLineCap,
@@ -29,10 +31,6 @@ import {
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
-  PDFBool,
-  type PDFDocument,
-  type PDFImage,
-  PDFRawStream,
   type PDFRef,
 } from 'pdf-lib';
 import type { GradientStop, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
@@ -48,12 +46,13 @@ import {
   circleGradientGeometry,
   gradientPaintStops,
   linearGradientEnds,
-  metafilePng,
+  rectGradientGeometry,
+  shapeGradientBands,
   patternBitmap,
   PATTERN_PIXEL,
 } from '@pptx-editor.dev/core/output';
-import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import {
+  around,
   clipEvenOdd,
   EMU_PER_PT,
   endPath,
@@ -64,14 +63,7 @@ import {
   type PageOps,
   type StopFunctions,
 } from './page-ops.ts';
-import { fontEmbeddingDecision } from './pdf-font-embedding.ts';
-
-/**
- * The largest picture this writer decodes. `pdf-lib` decodes every PNG pixel, so a small file
- * that declares a huge size could exhaust memory; the header is read first and checked here.
- */
-export const MAX_IMAGE_PIXELS = 25_000_000;
-const MAX_IMAGE_SIDE = 20_000;
+import { drawPicture } from './paint-picture.ts';
 
 /** Where a fill's pictures resolve, and the enclosing group's fill for `a:grpFill`. */
 export interface FillScope {
@@ -81,7 +73,6 @@ export interface FillScope {
   readonly groupSourcePart?: string;
 }
 
-type PictureFill = Extract<ResolvedFill, { type: 'picture' }>;
 type PathGradient = Extract<ResolvedFill, { type: 'path' }>;
 
 /** A fill with `a:grpFill` replaced by the enclosing group's fill, as the SVG paint does. */
@@ -99,7 +90,9 @@ export function ownFill(
 /**
  * Fill the path that `trace` draws, over a `w` × `h` local box. A solid color fills the path;
  * any other fill clips to it (even-odd, as the SVG `fill-rule`) and paints the box. `mode` is
- * the preset path fill mode (`a:path/@fill`). Returns false when the fill paints nothing.
+ * the preset path fill mode (`a:path/@fill`). With `banded`, a `path="shape"` gradient draws as
+ * bands of the path that `trace` draws (`shapeBandBudget` decides, as in the SVG paint); without
+ * it, as a rectangle gradient. Returns false when the fill paints nothing.
  */
 export async function paintFill(
   fill: ResolvedFill,
@@ -109,7 +102,8 @@ export async function paintFill(
   p: PageOps,
   scope: FillScope,
   what: string,
-  mode: GeometryPath['fill'] = 'norm'
+  mode: GeometryPath['fill'] = 'norm',
+  banded = false
 ): Promise<boolean> {
   const own = ownFill(fill, scope);
   const f = own.fill;
@@ -133,7 +127,7 @@ export async function paintFill(
     trace();
     p.push(clipEvenOdd(), endPath());
     if (f.type === 'picture') await drawPicture(own.sourcePart, f, w, h, p);
-    else gradientBox(f, w, h, p, mode);
+    else gradientBox(f, w, h, p, mode, banded ? trace : undefined);
   }
   p.push(popGraphicsState());
   return true;
@@ -240,18 +234,26 @@ function patternRef(
   return ref;
 }
 
-/** Paint a gradient over a `w` × `h` box at the origin, inside the current clip. */
+/**
+ * Paint a gradient over a `w` × `h` box at the origin, inside the current clip. `outline` traces
+ * the filled path, for the bands of a `path="shape"` gradient; without it, that gradient paints
+ * as a rectangle gradient, as the SVG paint does without a fill path.
+ */
 export function gradientBox(
   f: Extract<ResolvedFill, { type: 'linear' | 'path' }>,
   w: number,
   h: number,
   p: PageOps,
-  mode: GeometryPath['fill'] = 'norm'
+  mode: GeometryPath['fill'] = 'norm',
+  outline?: () => void
 ): void {
+  const adjusted = f.stops.map((s) => ({ ...s, color: adjustForPathMode(s.color, mode) }));
+  if (f.type === 'path' && f.path === 'shape' && outline) {
+    shapeGradient(f, adjusted, w, h, p, outline);
+    return;
+  }
   // The SVG paint's stop colors, so a two-stop gradient bends.
-  const stops = gradientPaintStops(
-    f.stops.map((s) => ({ ...s, color: adjustForPathMode(s.color, mode) }))
-  );
+  const stops = gradientPaintStops(adjusted);
   if (f.type === 'linear') linearGradient(f.angle, f.scaled, stops, w, h, p);
   else if (f.path === 'circle') radialGradient(f, stops, w, h, p);
   else rectGradient(f, stops, w, h, p);
@@ -391,6 +393,26 @@ function stopFunctions(stops: readonly GradientStop[], p: PageOps): StopFunction
   return fns;
 }
 
+/** The fill operator of a type 2 (axial) or 3 (radial) shading with `coords` in local space. */
+function shadingOp(
+  type: 2 | 3,
+  coords: number[],
+  space: 'DeviceRGB' | 'DeviceGray',
+  fn: PDFRef,
+  p: PageOps
+): PDFOperator {
+  const ctx = p.res.doc.context;
+  const dict = ctx.obj({
+    ShadingType: type,
+    ColorSpace: space,
+    Coords: coords,
+    Function: fn,
+    Extend: [true, true],
+  });
+  p.res.work.reserveContent(dict.sizeInBytes());
+  return shadingFill(p.name('Shading', ctx.register(dict)));
+}
+
 /**
  * Paint a shading over the current clip: type 2 (axial) or 3 (radial) with `coords` in local
  * space. Stops with different alphas paint through a luminosity soft mask of the same shading.
@@ -403,37 +425,60 @@ function shade(
   bbox: [number, number, number, number],
   p: PageOps
 ): void {
-  const ctx = p.res.doc.context;
-  const shading = (space: 'DeviceRGB' | 'DeviceGray', fn: PDFRef): PDFName => {
-    const dict = ctx.obj({
-      ShadingType: type,
-      ColorSpace: space,
-      Coords: coords,
-      Function: fn,
-      Extend: [true, true],
-    });
-    p.res.work.reserveContent(dict.sizeInBytes());
-    return p.name('Shading', ctx.register(dict));
-  };
-  if (fns.alpha) {
-    const form = p.form([shadingFill(shading('DeviceGray', fns.alpha))], bbox, {
-      S: 'Transparency',
-      CS: 'DeviceGray',
-    });
-    p.state(`smask:${form.toString()}`, () =>
-      ctx.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: form } })
-    );
-  } else p.alpha(fns.flatAlpha, 1);
-  p.push(shadingFill(shading('DeviceRGB', fns.color)));
+  withStopAlpha(
+    fns.alpha ? null : fns.flatAlpha,
+    bbox,
+    p,
+    (gray) =>
+      p.push(
+        gray
+          ? shadingOp(type, coords, 'DeviceGray', fns.alpha!, p)
+          : shadingOp(type, coords, 'DeviceRGB', fns.color, p)
+      ),
+    false
+  );
 }
 
-/** The local box grown by its own size on every side, for soft-mask bounds. */
-const around = (w: number, h: number): [number, number, number, number] => [
-  -Math.abs(w),
-  -Math.abs(h),
-  2 * Math.abs(w),
-  2 * Math.abs(h),
-];
+/**
+ * Paint `draw` with the stop alpha of a gradient, as the SVG paint's luminance masks: one
+ * `flatAlpha` for every stop, or, when it is null, a luminosity soft mask that `draw(true)` paints
+ * in gray (the stop alpha as luminance). `draw(false)` paints the colors opaque. The alpha of a
+ * graphics state applies to each paint operator, so a construction of overlapping parts
+ * (`grouped`) paints into a transparency group first, and the alpha applies once, to the group.
+ * `bbox` bounds the mask and the group in local space.
+ */
+function withStopAlpha(
+  flatAlpha: number | null,
+  bbox: [number, number, number, number],
+  p: PageOps,
+  draw: (gray: boolean) => void,
+  grouped = true
+): void {
+  if (flatAlpha === null) {
+    const ops = p.captureNow(() => draw(true));
+    const form = p.form(ops, bbox, { S: 'Transparency', CS: 'DeviceGray' });
+    p.state(`smask:${form.toString()}`, () =>
+      p.res.doc.context.obj({
+        Type: 'ExtGState',
+        SMask: { Type: 'Mask', S: 'Luminosity', G: form },
+      })
+    );
+  } else p.alpha(flatAlpha, 1);
+  if (!grouped || flatAlpha === 1) {
+    draw(false);
+    return;
+  }
+  const group = p.form(
+    p.captureNow(() => draw(false)),
+    bbox,
+    { S: 'Transparency' }
+  );
+  p.push(drawObject(p.name('XObject', group)));
+}
+
+/** Set the fill color of a construction part: the color, or its alpha as gray for a mask. */
+const partColor = (c: Rgba, gray: boolean): PDFOperator =>
+  gray ? setFillingGrayscaleColor(Math.max(0, Math.min(1, c.a))) : setFillingRgbColor(...rgb(c));
 
 /** `a:lin`: the SVG paint's gradient line (`linearGradientEnds`, ECMA-376 §20.1.8.41). */
 function linearGradient(
@@ -466,9 +511,10 @@ function radialGradient(
 }
 
 /**
- * `a:path path="rect"` (and `shape`, which the SVG paint draws the same way): concentric
- * rectangles from `fillToRect` (the first stop) to the box edge (the last stop), as four
- * trapezoids with linear gradients over a base of the last color.
+ * `a:path path="rect"`, and `shape` without bands: the SVG paint's construction
+ * (`rectGradientGeometry`), concentric rectangles from `fillToRect` (the first stop) to the edge
+ * of the tile rectangle (the last stop), as four trapezoids with linear gradients over a base of
+ * the last color. Stop alpha masks the whole construction.
  */
 function rectGradient(
   fill: PathGradient,
@@ -479,209 +525,94 @@ function rectGradient(
 ): void {
   const fns = stopFunctions(stops, p);
   if (!fns) return;
-  const f = fill.fillToRect;
-  const l = Math.min(f.l * w, w);
-  const t = Math.min(f.t * h, h);
-  const r = Math.max(l, w - f.r * w);
-  const b = Math.max(t, h - f.b * h);
-  const solid = (c: Rgba, x: number, y: number, rw: number, rh: number): void => {
-    // The SVG paint draws the base and the center opaque.
-    p.push(setFillingRgbColor(...rgb(c)));
-    traceRect(x, y, rw, rh, p);
-    p.push(fillEvenOdd());
-  };
-  solid(stops[stops.length - 1].color, 0, 0, w, h);
-  const trapezoid = (pts: [number, number][], coords: number[]): void => {
-    p.push(pushGraphicsState(), moveTo(pts[0][0], pts[0][1]));
-    for (const [x, y] of pts.slice(1)) p.push(lineTo(x, y));
-    p.push(closePath(), clipEvenOdd(), endPath());
-    shade(2, coords, fns, around(w, h), p);
-    p.push(popGraphicsState());
-  };
-  const [tl, tr, br, bl]: [number, number][] = [
-    [0, 0],
-    [w, 0],
-    [w, h],
-    [0, h],
-  ];
-  trapezoid([tl, tr, [r, t], [l, t]], [0, t, 0, 0]);
-  trapezoid([[l, b], [r, b], br, bl], [0, b, 0, h]);
-  trapezoid([tl, [l, t], [l, b], bl], [l, 0, 0, 0]);
-  trapezoid([[r, t], tr, br, [r, b]], [r, 0, w, 0]);
-  if (r > l && b > t) solid(stops[0].color, l, t, r - l, b - t);
-}
-
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const isPng = (b: Uint8Array): boolean => PNG_SIGNATURE.every((v, i) => b[i] === v);
-const isJpeg = (b: Uint8Array): boolean => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-
-/** Embed a picture part once per document: the format from its signature, its size checked first. */
-async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
-  const cached = p.res.images.get(target);
-  if (cached !== undefined) return cached;
-  let image: PDFImage | null = null;
-  let bytes = binaryPartOf(p.res.pkg, target);
-  // An EMF or WMF picture draws as its PNG, converted as in the editor.
-  const metafile = bytes !== undefined && metafileFormat(bytes) !== undefined;
-  if (bytes && metafile) {
-    // Metafile text draws only with fonts that their embedding permission lets the PDF carry.
-    const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()]
-      .filter((f) => {
-        const face = {
-          identity: f.id,
-          bytes: f.bytes,
-          faceIndex: 0,
-          request: { family: f.family },
-        };
-        return fontEmbeddingDecision(face).kind !== 'refuse';
-      })
-      .map((f) => f.bytes));
-    let png = await metafilePng(bytes, fonts, p.res.work.signal);
-    // When the export's signal or deadline stopped the conversion, the export fails.
-    p.res.work.check();
-    // A picture that the converter's own time limit stopped tries once more (a busy machine),
-    // then reports `picture.metafile`.
-    if (png === undefined) png = await metafilePng(bytes, fonts, p.res.work.signal);
-    p.res.work.check();
-    bytes = png ?? undefined;
-  }
-  const png = bytes ? isPng(bytes) : false;
-  if (!bytes && metafile)
-    p.diag.add('picture.metafile', 'unsupported', 'An EMF or WMF picture does not convert.');
-  else if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
-  else if (!png && !isJpeg(bytes))
-    p.diag.add('picture.format', 'unsupported', 'A picture is not PNG, JPEG, EMF, or WMF.');
-  else {
-    const size = imageSize(bytes);
-    if (!size || size.width <= 0 || size.height <= 0)
-      p.diag.add('picture.unreadable', 'unsupported', 'A picture header cannot be read.');
-    else if (
-      size.width > MAX_IMAGE_SIDE ||
-      size.height > MAX_IMAGE_SIDE ||
-      size.width * size.height > MAX_IMAGE_PIXELS
-    )
-      p.diag.add(
-        'picture.too-large',
-        'unsupported',
-        `A ${size.width} × ${size.height} picture exceeds the ${MAX_IMAGE_PIXELS} pixel limit.`
+  const { l, t, r, b, x0, y0, x1, y1 } = rectGradientGeometry(fill, w, h);
+  withStopAlpha(fns.alpha ? null : fns.flatAlpha, around(w, h), p, (gray) => {
+    const solid = (c: Rgba, x: number, y: number, rw: number, rh: number): void => {
+      p.push(partColor(c, gray));
+      traceRect(x, y, rw, rh, p);
+      p.push(fillEvenOdd());
+    };
+    // The base hides antialiasing seams between the trapezoids.
+    solid(stops[stops.length - 1].color, 0, 0, w, h);
+    const trapezoid = (pts: [number, number][], coords: number[]): void => {
+      p.push(pushGraphicsState(), moveTo(pts[0][0], pts[0][1]));
+      for (const [x, y] of pts.slice(1)) p.push(lineTo(x, y));
+      p.push(closePath(), clipEvenOdd(), endPath());
+      p.push(
+        gray
+          ? shadingOp(2, coords, 'DeviceGray', fns.alpha!, p)
+          : shadingOp(2, coords, 'DeviceRGB', fns.color, p)
       );
-    else {
-      // The picture's file bytes become PDF content once per document. pdf-lib keeps a PNG
-      // decoded until the save, and only the pixel limit above bounds each one. DOCX Editor
-      // passes a PNG through without decoding it.
-      p.res.work.reserveContent(bytes.length);
-      try {
-        image = png ? await p.res.doc.embedPng(bytes) : await p.res.doc.embedJpg(bytes);
-        await smoothImage(image, p);
-      } catch {
-        // An image that fails to embed is neither drawn nor saved: the save embeds every image
-        // again, and the failed one would fail the whole export.
-        if (image) forgetImage(p.res.doc, image);
-        image = null;
-        p.diag.add('picture.unreadable', 'unsupported', 'A picture cannot be decoded.');
-      }
-    }
-  }
-  p.res.images.set(target, image);
-  return image;
+      p.push(popGraphicsState());
+    };
+    trapezoid(
+      [
+        [x0, y0],
+        [x1, y0],
+        [r, t],
+        [l, t],
+      ],
+      [0, t, 0, y0]
+    );
+    trapezoid(
+      [
+        [l, b],
+        [r, b],
+        [x1, y1],
+        [x0, y1],
+      ],
+      [0, b, 0, y1]
+    );
+    trapezoid(
+      [
+        [x0, y0],
+        [l, t],
+        [l, b],
+        [x0, y1],
+      ],
+      [l, 0, x0, 0]
+    );
+    trapezoid(
+      [
+        [r, t],
+        [x1, y0],
+        [x1, y1],
+        [r, b],
+      ],
+      [r, 0, x1, 0]
+    );
+    if (r > l && b > t) solid(stops[0].color, l, t, r - l, b - t);
+  });
 }
 
 /**
- * Remove an image from the list that `PDFDocument.save` embeds. `pdf-lib` keeps the list private
- * (`images`) and keeps a failed embed's rejected task, so the save would throw the same error.
+ * `a:path path="shape"`: the SVG paint's bands (`shapeGradientBands`), copies of the outline that
+ * `outline` traces, scaled about the focus center from 1 down, each filled in one color, outside
+ * in. `stops` are the fill's stops after the path fill mode. Stop alpha masks all the bands.
  */
-function forgetImage(doc: PDFDocument, image: PDFImage): void {
-  const list = (doc as unknown as { images?: unknown }).images;
-  if (!Array.isArray(list)) return;
-  const at = list.indexOf(image);
-  if (at >= 0) list.splice(at, 1);
-}
-
-/**
- * Mark an embedded picture for smooth sampling (`/Interpolate`, ISO 32000-1, 8.9.5.3), as the
- * editor's paint samples it. Without the flag, a PDF viewer can draw an enlarged picture with
- * hard pixel edges. The picture is embedded now, so its image dictionary exists.
- */
-async function smoothImage(image: PDFImage, p: PageOps): Promise<void> {
-  await image.embed();
-  const ctx = p.res.doc.context;
-  const dict = ctx.lookup(image.ref);
-  if (!(dict instanceof PDFRawStream)) return;
-  dict.dict.set(PDFName.of('Interpolate'), PDFBool.True);
-  // A PNG with alpha keeps it in a soft mask image: smooth its edges too.
-  const mask = ctx.lookup(dict.dict.get(PDFName.of('SMask')));
-  if (mask instanceof PDFRawStream) mask.dict.set(PDFName.of('Interpolate'), PDFBool.True);
-}
-
-/** Whether a picture fill has an image this writer draws (the image is embedded once). */
-export async function canDrawPicture(
-  sourcePart: string,
-  fill: PictureFill,
-  p: PageOps
-): Promise<boolean> {
-  const target = relTarget(p.res.pkg, sourcePart, fill.rId);
-  return target ? (await imageFor(target, p)) !== null : false;
-}
-
-/**
- * Draw a picture fill over a `w` × `h` box, as the SVG `pictureImage`: `fillRect` places the
- * picture in the box, and `srcRect` crops it, so the picture's visible part fills that place.
- * The caller clips to the shape.
- */
-export async function drawPicture(
-  sourcePart: string,
-  fill: PictureFill,
+function shapeGradient(
+  fill: PathGradient,
+  stops: readonly GradientStop[],
   w: number,
   h: number,
-  p: PageOps
-): Promise<void> {
-  const target = relTarget(p.res.pkg, sourcePart, fill.rId);
-  if (!target) {
-    p.diag.add('picture.missing', 'unsupported', 'A picture part is missing or external.');
-    return;
-  }
-  if (fill.mode === 'tile')
-    p.diag.add('picture.tile', 'approximation', 'Tiled pictures are drawn stretched.');
-  // The fallback is the deck's own raster picture of the SVG, so it is reported, not refused.
-  if (fill.svgRId)
-    p.diag.add(
-      'picture.svg-fallback',
-      'information',
-      'SVG pictures are drawn from their PNG fallback.'
-    );
-  if (fill.effects.some((e) => e.kind !== 'alphaModFix'))
-    p.diag.add(
-      'picture.color-effects',
-      'approximation',
-      'Picture color effects (grayscale, duotone, brightness, black and white) are not drawn.'
-    );
-  const image = await imageFor(target, p);
-  if (!image) return;
-  const fr = fill.fillRect;
-  const bx = fr.l * w;
-  const by = fr.t * h;
-  const bw = w * (1 - fr.l - fr.r);
-  const bh = h * (1 - fr.t - fr.b);
-  // A crop that leaves nothing visible on an axis (two concurrent crops merged edge by edge)
-  // draws uncropped on that axis, as the SVG paint and the crop commands read it.
-  const raw = fill.srcRect;
-  const okW = 1 - raw.l - raw.r >= 0.001;
-  const okH = 1 - raw.t - raw.b >= 0.001;
-  const sr = {
-    l: okW ? raw.l : 0,
-    r: okW ? raw.r : 0,
-    t: okH ? raw.t : 0,
-    b: okH ? raw.b : 0,
-  };
-  const iw = bw / (1 - sr.l - sr.r);
-  const ih = bh / (1 - sr.t - sr.b);
-  const alpha = fill.effects.reduce((a, e) => (e.kind === 'alphaModFix' ? a * e.amount : a), 1);
-  const name = p.name('XObject', image.ref);
-  p.push(pushGraphicsState());
-  p.alpha(alpha, 1);
-  // The image space is the unit square with y up; the picture is iw × ih EMU with y down.
-  p.push(concatTransformationMatrix(iw, 0, 0, -ih, bx - sr.l * iw, by - sr.t * ih + ih));
-  p.push(drawObject(name), popGraphicsState());
+  p: PageOps,
+  outline: () => void
+): void {
+  if (stops.length === 0) return;
+  const { cx, cy, bands } = shapeGradientBands(fill, stops, w, h);
+  const alphas = stops.map((s) => s.color.a);
+  const flat = alphas.every((a) => a === alphas[0]);
+  withStopAlpha(flat ? alphas[0]! : null, around(w, h), p, (gray) => {
+    for (const { scale: k, color } of bands) {
+      p.push(
+        pushGraphicsState(),
+        concatTransformationMatrix(k, 0, 0, k, cx - k * cx, cy - k * cy),
+        partColor(color, gray)
+      );
+      outline();
+      p.push(fillEvenOdd(), popGraphicsState());
+    }
+  });
 }
 
 /** The PDF line cap of an SVG `stroke-linecap` value. */
