@@ -20,7 +20,9 @@ const VERTICAL_GAP_3D = 1.4;
 /**
  * The least distance between the ticks of an upright 2-D value axis, radar axes included: one
  * line of the tick label, so the labels of neighbouring ticks do not overlap. An automatic
- * major unit takes the finest round step whose intervals keep this room.
+ * major unit (no `c:majorUnit`, ECMA-376 Part 1, 21.2) takes the finest round step
+ * whose intervals keep this room. The `chart-sizes` reference PDFs show steps whose ticks are
+ * less than 1.5 sizes but more than one label line apart.
  */
 export function verticalTickRoom(style: ChartTextStyle): number {
   return lineHeight(style);

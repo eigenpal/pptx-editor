@@ -149,24 +149,15 @@ function fitsInSlice(
 
 /** How far inside the circle a best-fit label keeps its farthest corner, in points. */
 const INSIDE_MARGIN = 4;
-/**
- * The reference renderings put the left edge of a best-fit label inside its slice on a whole
- * 1/96-inch pixel of the chart, truncated: every one of 69 measured labels sits on that grid.
- * The engine's own position differs from the reference by more than a pixel can resolve, so
- * it takes the mean truncation, half a pixel to the left, and does not snap.
- */
-const PIXEL = 0.75;
 
 /**
- * The centre of a best-fit label inside its slice of a pie. The label sits at the angle where
- * its box is as far from one straight edge of the slice as from the other, so a wide label in a
- * slice near a diagonal turns towards the level line. It then moves out until its farthest
- * corner is `INSIDE_MARGIN` inside the circle. A slice of exactly half the pie, whose edges lie
- * on one line, keeps its middle angle. Measured on 69 best-fit labels of reference renderings
- * (slices of 36 to 182 degrees, labels of 12 to 20 pt, pies of 80 to 162 pt radius), the angle
- * puts every label within 0.6 pt of the reference along the arc. Along the radius, 48 of the
- * 69 labels are within 0.5 pt; a label at the top or bottom of a wide slice sits up to 2.7 pt
- * deeper in the reference.
+ * The centre of a best-fit label inside its slice of a pie (`c:dLblPos val="bestFit"`,
+ * ECMA-376 Part 1, 21.2). The label sits at the angle where its box is as far from one
+ * straight edge of the slice as from the other, so a wide label in a slice near a diagonal
+ * turns towards the level line. It then moves out until its farthest corner is
+ * `INSIDE_MARGIN` inside the circle. A slice of exactly half the pie, whose edges lie on one
+ * line, keeps its middle angle. The `charts` and `chart-sizes` reference PDFs place their
+ * best-fit labels this way.
  */
 export function bestFitInside(
   width: number,
@@ -216,7 +207,7 @@ export function bestFitInside(
     }
   }
   const point = at(chosen);
-  return { x: geometry.cx + point.x - PIXEL / 2, y: geometry.cy - point.y };
+  return { x: geometry.cx + point.x, y: geometry.cy - point.y };
 }
 
 /** Paint a pie or doughnut plot inside `box`. */
@@ -309,17 +300,20 @@ export function paintPie(plot: ChartPlot, box: Box, context: PieContext): void {
           const geometry = { cx: ox, cy: oy, inner, outer, from: angle, sweep };
           const inside = position === 'ctr' || doughnut ? (inner + outer) / 2 : outer - extent - 4;
           let outside = position === 'outEnd';
+          // A best-fit label in a pie sits between its slice edges; in a doughnut, on its ring.
+          const fitted =
+            position === 'bestFit' && !doughnut ? bestFitInside(width, height, geometry) : null;
           if (position === 'bestFit') {
-            // A label that does not fit inside its slice moves out, next to the slice.
-            outside = !fitsInSlice(ox + inside * sin, oy - inside * cos, width, height, geometry);
+            // A label that does not fit inside its slice where it would draw moves out, next to
+            // the slice.
+            const test = fitted ?? { x: ox + inside * sin, y: oy - inside * cos };
+            outside = !fitsInSlice(test.x, test.y, width, height, geometry);
           }
           // Outside-end labels keep a little gap; best-fit ones that move out sit at the edge.
           const distance = outside ? outer + extent + (position === 'outEnd' ? 6 : 0) : inside;
           const frame = block.frame;
           const natural =
-            position === 'bestFit' && !outside && !doughnut
-              ? bestFitInside(width, height, geometry)
-              : { x: ox + distance * sin, y: oy - distance * cos };
+            fitted && !outside ? fitted : { x: ox + distance * sin, y: oy - distance * cos };
           const placed = movedLabel(
             spec.moved,
             context.bounds,
