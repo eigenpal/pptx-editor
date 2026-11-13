@@ -1,8 +1,9 @@
 // Where a context menu opens (`placeInViewport`) and where a slide menu is anchored
-// (`slideMenuPoint`). The React and Vue context menus share both.
+// (`slideMenuPoint`, `canvasMenuPoint`). The React and Vue context menus share them.
 
-import { describe, expect, test } from 'bun:test';
-import { placeInViewport } from '../menu-arrangement.ts';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { GlobalWindow } from 'happy-dom';
+import { canvasMenuPoint, placeInViewport } from '../menu-arrangement.ts';
 import { slideMenuPoint } from '../pane-support.ts';
 
 describe('context menu placement', () => {
@@ -41,5 +42,32 @@ describe('context menu placement', () => {
     } as unknown as HTMLElement;
     expect(slideMenuPoint(item, { x: 77, y: 530 })).toEqual({ x: 77, y: 530 });
     expect(slideMenuPoint(item, null)).toEqual({ x: 52, y: 572 });
+  });
+});
+
+describe('canvas menu point', () => {
+  const win = new GlobalWindow();
+  const doc = win.document as unknown as Document;
+  afterAll(() => win.happyDOM.close());
+  const rect = (left: number, top: number, width: number, height: number) =>
+    ({ left, top, width, height, right: left + width, bottom: top + height }) as DOMRect;
+
+  test('a keyboard open in edited text opens below the caret; else at the selection', () => {
+    const owner = doc.createElement('div');
+    const outline = doc.createElement('div');
+    outline.className = 'pptx-surface__outline';
+    outline.getBoundingClientRect = () => rect(100, 100, 200, 80);
+    const input = doc.createElement('textarea');
+    input.className = 'pptx-surface__input';
+    // The input sits on the caret line (`placeInput`).
+    input.getBoundingClientRect = () => rect(240.4, 130, 1, 24);
+    owner.append(outline, input);
+    doc.body.append(owner);
+    // A pointer open stays at the pointer.
+    expect(canvasMenuPoint(owner, { x: 5, y: 6 })).toEqual({ x: 5, y: 6 });
+    // No text caret: the middle of the selection outline.
+    expect(canvasMenuPoint(owner, null)).toEqual({ x: 200, y: 140 });
+    input.focus();
+    expect(canvasMenuPoint(owner, null)).toEqual({ x: 240, y: 154 });
   });
 });

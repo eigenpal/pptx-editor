@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The composition preview lays out a package copy and never writes to the store. A keyboard deletion range writes through the existing checked text replacement. Shared operations, room metadata, and document storage remain unchanged.",
+  "tests": [
+    "packages/core/src/editor/__tests__/composition-preview.test.ts",
+    "packages/core/src/editor/__tests__/input-method-deletion.test.ts",
+    "packages/core/src/editor/__tests__/composition-place.test.ts"
+  ]
+}

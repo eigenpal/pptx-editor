@@ -34,7 +34,8 @@ import {
   lineEnds,
 } from '../automation/commands/placement.ts';
 import { bindSurfaceInput, type SurfaceInputHost } from './surface-input.ts';
-import { bindPresses, selectForContextMenu } from './surface-context-menu.ts';
+import { CompositionLayer, placeInput, type CompositionLayerHost } from './surface-composition.ts';
+import { bindPresses, menuCaret, selectForContextMenu } from './surface-context-menu.ts';
 import { guideElements, SNAP_PX } from './surface-guides.ts';
 import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.ts';
 import type { CropDrag, CropHandle } from './surface-crop.ts';
@@ -60,7 +61,7 @@ import { CursorLayer, NextFrame, PAINT_BUDGET, setAttr, setStyle } from './surfa
 const EMU_PER_PX = 9_525;
 
 /** What the surface asks of the editor. Input and clipboard calls are in `SurfaceInputHost`. */
-export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost {
+export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost, CompositionLayerHost {
   /** Unique to the editor instance: SVG ids of two editors on one page never collide. */
   readonly idPrefix: string;
   readonly layout: () => SlideLayout | undefined;
@@ -140,6 +141,8 @@ export class SlideSurface {
   readonly #placeholderChrome: PlaceholderChrome;
   readonly #commentMarkers: CommentMarkers;
   readonly #inputBinding: ReturnType<typeof bindSurfaceInput>;
+  /** The text an IME composes, laid out in the slide (`composition-preview.ts`). */
+  readonly #composition: CompositionLayer;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
@@ -202,7 +205,7 @@ export class SlideSurface {
     host.append(this.root);
     bindPresses(this.root, this.#stage, this.#onPointerDown, (e) =>
       selectForContextMenu(e, editor, this.#hit.bind(this), this.#slidePoint.bind(this), (id, p) =>
-        this.#cellCaret(id, p)
+        menuCaret(editor, id, p, (l) => this.#table.cellItemAt(l, id, p))
       )
     );
     this.#stage.addEventListener('dblclick', this.#onDoubleClick);
@@ -223,7 +226,12 @@ export class SlideSurface {
       },
       doc
     );
-    this.#inputBinding = bindSurfaceInput(this.#input, this.root, editor);
+    this.#composition = new CompositionLayer(editor);
+    this.#inputBinding = bindSurfaceInput(this.#input, this.root, editor, (preview) => {
+      const shown = this.#composition.set(preview);
+      this.render();
+      return shown;
+    });
     this.root.tabIndex = 0;
     this.root.setAttribute('role', 'group');
     // Pinch (ctrl + wheel on trackpads) and Ctrl/Cmd + wheel zoom around the pointer.
@@ -320,7 +328,9 @@ export class SlideSurface {
       this.host.scrollLeft += st.left + keep.fx * st.width - keep.client.x;
       this.host.scrollTop += st.top + keep.fy * st.height - keep.client.y;
     }
-    const painted = this.editor.paintLayout?.(layout) ?? layout;
+    // While an IME composes, the slide shows the composed text in place.
+    const shown = this.#composition.view()?.layout ?? layout;
+    const painted = this.editor.paintLayout?.(shown) ?? shown;
     const paintKey = this.editor.paintKey?.();
     // Converted pictures, new faces, or a wider view: paint again, the old nodes standing in.
     if (this.#painter?.invalidate(paintKey)) this.#paintKey = null;
@@ -351,7 +361,7 @@ export class SlideSurface {
     }
     paint.sizeAll([this.#stage.querySelector('.pptx-surface__slide'), this.#overlay], w, h);
     setAttr(this.#overlay, 'viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
-    this.#renderOverlay(this.#drag.overlayLayout(layout), zoom);
+    this.#renderOverlay(this.#drag.overlayLayout(shown), zoom);
     if (this.#fitSlide !== `${layout.slide.width}x${layout.slide.height}`) this.#reportFit();
   }
 
@@ -364,7 +374,7 @@ export class SlideSurface {
       outsideVeil(doc, layout.slide.width, layout.slide.height),
       ...this.#placeholderChrome.elements(doc, layout, px),
     ];
-    const sel = this.editor.selection();
+    const sel = this.#composition.selection(this.editor.selection());
     const ids = sel.kind === 'shapes' ? sel.nodeIds : sel.kind === 'none' ? [] : [sel.nodeId];
     const scope = selectionScope(layout.items, sel);
     const scopeItem = scope ? itemById(layout, scope) : undefined;
@@ -452,7 +462,8 @@ export class SlideSurface {
           const ghost =
             item.kind === 'shape' ? ghostBullet(doc, item, sel, textFrameMatrix(item)) : null;
           if (ghost) parts.push(ghost);
-          this.#placeInput(caret, zoom / EMU_PER_PX);
+          parts.push(...this.#composition.marks(doc, item, px, caret.color));
+          placeInput(this.#input, caret, zoom / EMU_PER_PX);
           this.#caretScroll.follow(
             JSON.stringify([sel.nodeId, sel.cell, sel.focus]),
             caret,
@@ -463,29 +474,6 @@ export class SlideSurface {
       }
     }
     this.#overlay.replaceChildren(...withHalos(parts));
-  }
-
-  /**
-   * Keep the hidden input on the caret, as tall as the caret line: the stage holds it, so this
-   * follows zoom and scroll, and an IME candidate window opens under the caret.
-   */
-  #placeInput(caret: { x1: number; y1: number; x2: number; y2: number }, scale: number): void {
-    const top = Math.min(caret.y1, caret.y2) * scale;
-    const height = Math.max(1, Math.abs(caret.y2 - caret.y1) * scale);
-    const style = this.#input.style;
-    style.left = `${Math.min(caret.x1, caret.x2) * scale}px`;
-    style.top = `${top}px`;
-    style.height = `${height}px`;
-    style.fontSize = style.lineHeight = `${height}px`;
-  }
-
-  /** A caret in the table cell under `p`, for a right-click; none in view mode. */
-  #cellCaret(id: string, p: { x: number; y: number }) {
-    const layout = this.editor.layout();
-    const at = layout && !this.editor.readOnly() ? this.#table.cellItemAt(layout, id, p) : null;
-    const point = at ? pointAt(at.item, p.x, p.y) : undefined;
-    if (!at || !point) return undefined;
-    return { kind: 'text' as const, nodeId: id, cell: at.cell, anchor: point, focus: point };
   }
 
   /** The picture in crop mode, when it is on this slide. */
@@ -532,6 +520,9 @@ export class SlideSurface {
   #onPointerDown = (e: PointerEvent): void => {
     // On a Mac, Ctrl+click is a right-click: the context menu handles it, not a press.
     if (e.button !== 0 || (e.ctrlKey && /Mac|iP(hone|ad)/.test(navigator.platform))) return;
+    // The slide shows composed text the model does not hold yet: it goes in first, so the
+    // press lands on the text the user sees.
+    if (this.#composition.view()) this.#inputBinding.endComposition();
     const layout = this.editor.layout();
     if (!layout) return;
     this.#pressed = true;

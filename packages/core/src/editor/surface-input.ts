@@ -33,6 +33,7 @@ import {
   type CompositionState,
 } from './composition.ts';
 import { createCompositionOverlay } from './composition-overlay.ts';
+import type { CompositionPreview } from './composition-preview.ts';
 import {
   fieldEdit,
   type ContextEdit,
@@ -42,6 +43,7 @@ import {
   type TypingContext,
 } from './replacement-text.ts';
 import { holdsSelection } from './paragraph-place.ts';
+import { segmentGraphemes } from '@eigenpal/ooxml-core';
 
 /** What the input wiring asks of the editor. */
 export interface SurfaceInputHost {
@@ -229,6 +231,35 @@ export function replacementTarget(
   return text ? { text, after: 0, paragraph: null } : null;
 }
 
+/**
+ * The text a `deleteContentBackward` deletes in the input's context, when the event names
+ * more than one character: the system selected it in the input, or its one target range lies
+ * in the input's text, ends at the caret, and covers more than one grapheme. A keyboard that
+ * deletes through the platform text service (on Android, `deleteSurroundingText`) names the
+ * characters it means that way, and one event can name several presses or a word. Null for
+ * any other event, which deletes as the key does: a range away from the caret cannot be
+ * trusted, as the keyboard's copy of the text can drift. After DOCX Editor
+ * `surface-ime-deletion.ts` at 59809e234, where the range counts only at a caret too.
+ */
+export function deletionTarget(
+  e: InputEvent,
+  input: InputField,
+  context: TypingContext | null
+): ReplacementTarget | null {
+  if (e.inputType !== 'deleteContentBackward' || !context) return null;
+  const selected = inputTarget(input, context);
+  if (selected) return selected === UNUSABLE ? null : selected;
+  const ranges = typeof e.getTargetRanges === 'function' ? e.getTargetRanges() : [];
+  if (ranges.length !== 1) return null;
+  const range = ranges[0]!;
+  const node = range.startContainer;
+  const { value } = input;
+  if (node !== range.endContainer || node.nodeType !== 3 || node.textContent !== value) return null;
+  if (range.endOffset !== value.length) return null;
+  const target = contextTarget(context, value, range.startOffset, range.endOffset);
+  return target && segmentGraphemes(target.text).length > 1 ? target : null;
+}
+
 /** Apply one `beforeinput` event. Exported for tests. */
 export function dispatchBeforeInput(
   host: SurfaceInputHost,
@@ -257,8 +288,36 @@ export function dispatchBeforeInput(
   host.refuse('errors.inputUnsupported', type);
 }
 
-/** The class the input takes while an IME composes: it shows the text being composed. */
+/**
+ * What a composition changed so far, for the slide to show (`composition-preview.ts`), or
+ * null when it has none to show. Null when no composition shows text.
+ */
+export function compositionPreview(
+  state: CompositionState,
+  input: InputField
+): CompositionPreview | null {
+  if (state.phase === 'idle' || state.lost) return null;
+  const { place } = state;
+  const { value, selectionEnd } = input;
+  if (!place.context)
+    return place.selection ? { kind: 'range', text: value, caret: selectionEnd } : null;
+  const key = place.context.key;
+  const edit = partialEdit(place, value) ?? {
+    target: { text: '', after: 0, between: '', paragraph: key },
+    text: '',
+  };
+  // Where the change starts in the field: the IME caret counts from there.
+  const lead = place.value.length - edit.target.after - edit.target.text.length;
+  return { kind: 'caret', edit, caret: selectionEnd - lead };
+}
+
+/** The class the input takes while an IME composes. */
 export const COMPOSING_CLASS = 'pptx-surface__input--composing';
+/**
+ * The class the input takes while the slide shows the composed text in place
+ * (`compositionPreview`): the input stays hidden. Without it, the input shows the text.
+ */
+export const PREVIEWED_CLASS = 'pptx-surface__input--previewed';
 
 /**
  * Whether a key belongs to an IME composition: during one, and the key that ends one (some
@@ -290,7 +349,9 @@ export interface SurfaceInputBinding {
 export function bindSurfaceInput(
   input: HTMLTextAreaElement,
   root: HTMLElement,
-  host: SurfaceInputHost
+  host: SurfaceInputHost,
+  /** Show a composition's text in the slide (null: none); whether the slide shows it. */
+  show?: (preview: CompositionPreview | null) => boolean
 ): SurfaceInputBinding {
   /** The context the input holds (during a composition: the context when it started). */
   let context: TypingContext | null = null;
@@ -305,10 +366,19 @@ export function bindSurfaceInput(
   let echo: string | null = null;
   const overlay = createCompositionOverlay(input);
   const composing = (): boolean => composition.phase !== 'idle';
-  const fit = (): void =>
-    composition.phase === 'idle'
-      ? overlay(null, 0)
-      : overlay(composition.place.value, composition.width);
+  /**
+   * Show the composed text: in the slide, where it goes (`show`), else in the input over the
+   * caret. With no composition, neither.
+   */
+  const fit = (): void => {
+    const preview = compositionPreview(composition, input);
+    const slide = show?.(preview) === true && preview !== null;
+    const state = composition;
+    input.classList.toggle(COMPOSING_CLASS, state.phase !== 'idle');
+    input.classList.toggle(PREVIEWED_CLASS, slide);
+    if (state.phase !== 'idle' && !slide) overlay(state.place.value, state.width);
+    else overlay(null, 0);
+  };
   // A screen reader reads the input's value: it says that the value is the text up to the
   // caret, not the whole text of the shape.
   const description = host.label?.('canvas.inputDescription');
@@ -384,7 +454,6 @@ export function bindSurfaceInput(
   /** End the composition `state`: its change goes in at its place. Then the input syncs. */
   const finish = (state: CompositionState, edit: ContextEdit | null, data: string): void => {
     composition = IDLE;
-    input.classList.remove(COMPOSING_CLASS);
     fit();
     if (state.phase === 'idle') return sync();
     const { place } = state;
@@ -451,6 +520,12 @@ export function bindSurfaceInput(
       if (fieldShows(e)) return;
       echo = e.inputType;
     } else e.preventDefault();
+    // A deletion the keyboard names as a range deletes that range, checked against the model.
+    const deletion = e.cancelable && host.replaceText ? deletionTarget(e, input, context) : null;
+    if (deletion && host.replaceText) {
+      host.replaceText(deletion, '');
+      return sync();
+    }
     const target =
       e.inputType === 'insertReplacementText'
         ? replacementTarget(e, input, context)
@@ -486,9 +561,9 @@ export function bindSurfaceInput(
     // With no text caret (a selected range, a shape), the place is the selection.
     const range = context ? undefined : (host.selectionPlace?.() ?? undefined);
     composition = startComposition(context, value, selectionStart, selectionEnd, width, range);
-    input.classList.add(COMPOSING_CLASS);
     // The candidate window opens at the caret: the end of a long context.
     input.scrollLeft = input.scrollWidth;
+    fit();
   };
   const onCompositionEnd = (e: CompositionEvent): void => {
     const state = composition;

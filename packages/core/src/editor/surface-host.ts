@@ -39,6 +39,7 @@ import { isCaretKey, moveTextSelection, type TextInputKind } from './text-input.
 import { zoomKeyAction } from './zoom.ts';
 import { createAnimationsSource } from './animation-command-table.ts';
 import { createSystemText } from './replacement-text.ts';
+import { compositionView } from './composition-preview.ts';
 import { animationMarks } from './surface-animation-marks.ts';
 
 /** The surface calls the editor passes through as they are. */
@@ -77,7 +78,11 @@ export interface SurfaceHostState {
   readonly views: ViewSettings;
   readonly groups: EditorHistoryGroups;
   /** The caret format that waits for the next typed text (`CaretArm`). */
-  readonly arm: { follow(update: () => void): void };
+  readonly arm: {
+    follow(update: () => void): void;
+    /** The armed format and the package it makes, which typed text takes. */
+    current(): { readonly pkg: PptxPackage } | null;
+  };
   /** Publish the editor state. */
   emit(): void;
   /** One drag step: the steps of one gesture are one undo step. */
@@ -100,6 +105,9 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
       textInput: (kind, data, before) => base.textInput(kind, data, before),
     }),
     ...(s.commentMarkers ? { commentMarkers: s.commentMarkers } : {}),
+    // The text an IME composes, laid out in the slide before it commits.
+    compositionView: (preview) =>
+      compositionView({ ...s, layout: base.layout, armed: () => s.arm.current()?.pkg }, preview),
     paintLayout: (l) => s.prompts.paint(s.session(), l, s.selection(), s.viewing()) ?? l,
     selection: () => s.selection(),
     readOnly: () => s.viewing(),

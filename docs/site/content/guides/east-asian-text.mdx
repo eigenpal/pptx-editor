@@ -49,8 +49,10 @@ A justified (`algn="just"`) or distributed (`algn="dist"`) line with East Asian 
 The canvas takes text from input methods (IME) for Chinese, Japanese, and Korean:
 
 - The candidate window opens at the caret.
-- The text being composed shows at the caret, underlined.
+- The text being composed shows in place, underlined, in the font, size, and color of the text at the caret. The text after it moves to make room. In a diagram, the text being composed shows over the caret.
 - The result goes in once, at composition end, as one undo step. It replaces the selected text.
+- The text being composed is not in the document until composition end. It makes no undo step and no collaboration change, and `editor.snapshot()` does not include it.
+- A click or a tap during a composition ends it first, then acts on the text you see.
 - Keys during a composition, and the Enter that ends one, run no editor shortcut.
 
 If you add your own key handlers, ignore events with `isComposing` set or with key code 229.

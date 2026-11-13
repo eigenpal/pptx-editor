@@ -86,7 +86,7 @@ While you edit text, Tab and Shift+Tab change the list level at the start of a l
 
 In right-to-left and mixed-direction text, Left and Right move the caret one place on screen, not in reading order. Alt/Ctrl+Left and Alt/Ctrl+Right move past one word on screen. Cmd+Left and Cmd+Right move to the left or the right edge of the line. Home and End move to the start and the end of the line in reading order, wherever they show on screen. A selection holds the text between its two ends in reading order, so on a mixed-direction line it can show as several highlighted parts.
 
-The editor makes no automatic capitals, curly quotes, dashes, or spelling corrections of its own. Mobile keyboards, and systems and browsers that offer such changes, apply them. The editor replaces the text that each change targets. Undo removes the change, together with any text you type right after it. Browser spelling tools and browser extensions that write to the text input change the document in the same way as typing. Many desktop browsers offer no such changes. In those browsers, the editor adds no curly quotes or capitals while you type.
+The editor makes no automatic capitals, curly quotes, dashes, or spelling corrections of its own. Mobile keyboards, and systems and browsers that offer such changes, apply them. The editor replaces the text that each change targets. Undo removes the change, together with any text you type right after it. When a keyboard deletes several characters or a word in one step, as some mobile keyboards do, the editor deletes those characters at the caret as one undo step. Browser spelling tools and browser extensions that write to the text input change the document in the same way as typing. Many desktop browsers offer no such changes. In those browsers, the editor adds no curly quotes or capitals while you type.
 
 AutoCorrect still makes these changes:
 
@@ -104,7 +104,8 @@ In the speaker notes field, Ctrl/Cmd+B, I, and U format the text. The other keys
 - The ribbon tabs are a `tablist`. The Left and Right arrow keys, Home, and End move between tabs.
 - The menu bar is one Tab stop. Escape closes a menu and keeps focus on its menu bar item.
 - A popover, such as a color or font picker, returns focus to its trigger on Escape.
-- A context menu returns focus to where it was on Escape. Shift+F10 and the context menu key open it from the keyboard.
+- A context menu returns focus to where it was on Escape. Shift+F10 and the context menu key open it from the keyboard. While you edit text, the menu opens below the caret.
+- A right-click in the text you edit keeps the selection when you click inside it. Elsewhere in the text, it moves the caret to the click, so the menu acts on the text under the pointer.
 - A dialog keeps Tab inside it. Escape closes it, and focus goes back to the control that opened it.
 
 ### Slide list and slide sorter

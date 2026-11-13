@@ -747,3 +747,38 @@ test('long deck: slide edits leave no thumbnail in view empty', async ({ page })
     await page.evaluate(() => (window as unknown as { __emptyInView: number }).__emptyInView)
   ).toBe(0);
 });
+
+test('IME: the slide shows the composing text in place, and the model takes it once', async ({
+  page,
+}) => {
+  // Chromium's own composition through the DevTools protocol: real `composition*` and
+  // `insertCompositionText` events, and real layout of the composed text.
+  await ready(page);
+  const title = page.locator('.pptx-surface__slide [data-kind="shape"]', {
+    hasText: 'PPTX Editor',
+  });
+  const id = await title.first().getAttribute('data-node-id');
+  await page.evaluate((nodeId) => {
+    const at = { paragraph: 0, offset: 4 };
+    window.__pptxEditor.setSelection({ kind: 'text', nodeId: nodeId!, anchor: at, focus: at });
+    document.querySelector<HTMLElement>('.pptx-surface__input')!.focus();
+  }, id);
+  const revision = () => page.evaluate(() => window.__pptxEditor.snapshot().revision);
+  const before = await revision();
+  const slide = page.locator('.pptx-surface__slide');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.imeSetComposition', {
+    text: ' にほん',
+    selectionStart: 4,
+    selectionEnd: 4,
+  });
+  await expect(slide).toContainText('PPTX にほん Editor');
+  await expect(page.locator('.pptx-surface__composition line')).toHaveCount(1);
+  // The composed text is not in the model yet: no revision, so no undo step and no peer op.
+  expect(await revision()).toBe(before);
+  await cdp.send('Input.insertText', { text: ' 日本' });
+  await expect(slide).toContainText('PPTX 日本 Editor');
+  await expect(page.locator('.pptx-surface__composition line')).toHaveCount(0);
+  expect(await revision()).toBe(before + 1);
+  expect(await page.evaluate(() => window.__pptxEditor.find.matches('日本').length)).toBe(1);
+});
