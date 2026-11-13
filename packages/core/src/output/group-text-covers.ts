@@ -4,9 +4,9 @@
 // to the outside of each later body over it. The SVG paint and the PDF export clip with the same
 // paths.
 
-import type { ResolvedFill } from '../cascade/index.ts';
+import type { ResolvedEffects, ResolvedFill } from '../cascade/index.ts';
 import type { LayoutItem, PathCommand } from '../layout/index.ts';
-import { boundsOf, grow, type Bounds } from './effect-transforms.ts';
+import { blurSigma, boundsOf, grow, type Bounds } from './effect-transforms.ts';
 import { boxCorners, textCorners } from './item-corners.ts';
 import { mapCommands } from './path-data.ts';
 
@@ -76,6 +76,14 @@ function opaque(fill: ResolvedFill): boolean {
 }
 
 /**
+ * Whether effects fade a body: a soft edge or a blur with a radius, as the paints draw them (the
+ * SVG blur filters any positive `blurSigma`). A radius of 0 leaves the body opaque.
+ */
+function fades(fx: ResolvedEffects | undefined): boolean {
+  return (fx?.softEdge?.radius ?? 0) > 0 || (fx?.blur ? blurSigma(fx.blur.radius) > 0 : false);
+}
+
+/**
  * The body of a shape that surely hides the text under it: the filled paths of its geometry, in
  * slide space, under an opaque fill. A picture, a table, a shape whose fill lets text show
  * through, a shape whose soft edge or blur fades its body, and a 3-D shape, whose face can paint
@@ -84,7 +92,7 @@ function opaque(fill: ResolvedFill): boolean {
 function bodyOf(item: BoxItem): Body | undefined {
   if (item.kind !== 'shape' || !opaque(item.element.fill)) return undefined;
   const fx = item.element.effects;
-  if (fx?.softEdge || fx?.blur || fx?.threeD) return undefined;
+  if (fades(fx) || fx?.threeD) return undefined;
   const filled = item.geometry.paths.filter((p) => p.fill !== 'none');
   if (filled.length === 0) return undefined;
   let outlines: PathCommand[][] | undefined;
@@ -117,9 +125,8 @@ export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): 
     if (item.element.hidden) return;
     switch (item.kind) {
       case 'group': {
-        const fx = item.element.effects;
-        const fades = faded || !!fx?.softEdge || !!fx?.blur;
-        for (const child of item.children) walk(child, fades);
+        const fading = faded || fades(item.element.effects);
+        for (const child of item.children) walk(child, fading);
         return;
       }
       case 'frame': {

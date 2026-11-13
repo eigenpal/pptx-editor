@@ -371,5 +371,18 @@ describe('text under a later body in a group', () => {
           )
       )
     ).toEqual(['11']);
+    // A soft edge or a blur of radius 0 fades nothing, on the group or on the shape.
+    const zero = '<a:effectLst><a:blur rad="0"/><a:softEdge rad="0"/></a:effectLst>';
+    expect(await covered(under + fadedBy(zero))).toEqual(['11']);
+    const flat = shape({
+      id: 12,
+      x: 2 * IN,
+      y: IN,
+      cx: 2 * IN,
+      cy: IN,
+      fill: solid('0070C0'),
+      effects: zero,
+    });
+    expect(await covered(under + flat)).toEqual(['11']);
   });
 });
