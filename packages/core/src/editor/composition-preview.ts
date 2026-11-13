@@ -21,7 +21,13 @@ type TextSelection = Extract<EditorSelection, { kind: 'text' }>;
 /** What a composition changed so far, and where the IME caret is in its text. */
 export type CompositionPreview =
   /** At a caret: the change to the caret's context (`partialEdit`). */
-  | { readonly kind: 'caret'; readonly edit: ContextEdit; readonly caret: number }
+  | {
+      readonly kind: 'caret';
+      readonly edit: ContextEdit;
+      readonly caret: number;
+      /** The composed region, from the start of the change; the whole change by default. */
+      readonly mark?: readonly [number, number];
+    }
   /** Over a selected range: the text that replaces the range. */
   | { readonly kind: 'range'; readonly text: string; readonly caret: number };
 
@@ -82,13 +88,15 @@ export function compositionView(
     const point = { paragraph: from.paragraph, offset };
     return { ...sel, anchor: point, focus: point };
   };
-  const end = from.offset + text.length;
-  const shown = { from, to: { paragraph: from.paragraph, offset: end } };
+  const [markFrom, markTo] =
+    preview.kind === 'caret' && preview.mark ? preview.mark : [0, text.length];
+  const point = (offset: number) => ({ paragraph: from.paragraph, offset: Math.max(0, offset) });
+  const shown = { from: point(from.offset + markFrom), to: point(from.offset + markTo) };
   const at = caret(from.offset + Math.max(0, Math.min(preview.caret, text.length)));
   // Nothing composed yet: the slide as it is.
   if (!text && comparePoints(from, to) === 0) return { layout, ...shown, selection: at };
   try {
-    const batch = session.batch(text ? host.armed() : undefined);
+    const batch = session.probeBatch(text ? host.armed() : undefined);
     const over: TextSelection = { ...sel, anchor: from, focus: to };
     const txBody = selectionBody(batch, part, over);
     if (!txBody) return undefined;

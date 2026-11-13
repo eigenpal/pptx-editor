@@ -3,7 +3,14 @@
 
 import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
-import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  buildPptx,
+  cell,
+  para,
+  run,
+  shape,
+  table,
+} from '../../../../../scripts/fixtures/builder.ts';
 import { attr, elements, find, textOf, xmlPartOf, type Element } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import {
@@ -36,15 +43,26 @@ const deck = (): Uint8Array =>
   buildPptx({
     slides: [
       {
-        shapes: shape({
-          id: 2,
-          name: 'T',
-          x: IN,
-          y: IN,
-          cx: 6 * IN,
-          cy: IN,
-          text: para(run('AB', 'altLang="ja-JP" sz="2400"')),
-        }),
+        shapes:
+          shape({
+            id: 2,
+            name: 'T',
+            x: IN,
+            y: IN,
+            cx: 6 * IN,
+            cy: IN,
+            text: para(run('AB', 'altLang="ja-JP" sz="2400"')),
+          }) +
+          table({
+            id: 3,
+            x: IN,
+            y: 4 * IN,
+            cx: 2 * IN,
+            cy: 370_840,
+            columns: [2 * IN],
+            tblPr: '<a:tblPr/>',
+            rows: `<a:tr h="370840">${cell('xy')}</a:tr>`,
+          }),
       },
     ],
   });
@@ -66,6 +84,9 @@ const root = (e: PptxEditorInstance): Element =>
 const shapeId = (e: PptxEditorInstance): string =>
   elements(find(root(e), 'p:spTree')!).find((c) => attr(find(c, 'p:cNvPr'), 'name') === 'T')!.id;
 const stored = (e: PptxEditorInstance): string => textOf(find(root(e), 'p:txBody'));
+const cellText = (e: PptxEditorInstance): string => textOf(find(root(e), 'a:tc'));
+const tableId = (e: PptxEditorInstance): string =>
+  elements(find(root(e), 'p:spTree')!).find((c) => c.local === 'graphicFrame')!.id;
 /** The text the slide paints. */
 const painted = (host: HTMLElement): string =>
   host.querySelector('.pptx-surface__slide')?.textContent?.replace(/\s+/g, '') ?? '';
@@ -177,5 +198,105 @@ describe('the composition preview', () => {
     fire(input, composition('compositionend', '日本'));
     expect(shown.at(-1)).toBeNull();
     expect(input.style.width).toBe('');
+  });
+
+  test('undo, redo, and the snapshot see nothing of a composition until it ends', async () => {
+    const { e, input } = await attached();
+    caret(e, 1);
+    const before = e.snapshot();
+    fire(input, composition('compositionstart'));
+    update(input, 'Aにほん');
+    const during = e.snapshot();
+    expect(during.revision).toBe(before.revision);
+    expect(during.canUndo).toBe(before.canUndo);
+    expect(during.selection).toEqual(before.selection);
+    fire(input, composition('compositionend', 'にほん'));
+    expect(e.snapshot().canUndo).toBe(true);
+    e.destroy();
+  });
+
+  test('a cancelled composition leaves the slide as it was', async () => {
+    const { e, host, input } = await attached();
+    caret(e, 1);
+    fire(input, composition('compositionstart'));
+    update(input, 'Aにほん');
+    expect(painted(host)).toContain('AにほんB');
+    // Escape: the browser takes the composed text back out of the field.
+    update(input, 'A');
+    fire(input, composition('compositionend', ''));
+    expect(stored(e)).toBe('AB');
+    expect(painted(host)).toContain('AB');
+    expect(painted(host)).not.toContain('に');
+    expect(underline(host).length).toBe(0);
+    e.destroy();
+  });
+
+  test('a composition that a peer edit takes away leaves the slide', async () => {
+    const { e, host, input } = await attached();
+    caret(e, 1);
+    fire(input, composition('compositionstart'));
+    update(input, 'Aにほん');
+    // A peer replaces the text before the place: the composition is lost, its text refused.
+    const part = e.session!.info.slides[0]!.partName;
+    const t = find(root(e), 'a:t')!;
+    const ops = [{ op: 'setText' as const, part, node: t.id, text: 'ZZ' }];
+    expect(e.session!.store.transact(ops, { origin: 'remote' }).ok).toBe(true);
+    fire(input, composition('compositionend', 'にほん'));
+    expect(stored(e)).toBe('ZZ');
+    expect(painted(host)).not.toContain('に');
+    e.destroy();
+  });
+
+  test('a composition in a table cell shows in the cell', async () => {
+    const { e, host, input } = await attached();
+    const at = { paragraph: 0, offset: 1 };
+    e.setSelection({
+      kind: 'text',
+      nodeId: tableId(e),
+      cell: { row: 0, column: 0 },
+      anchor: at,
+      focus: at,
+    });
+    fire(input, composition('compositionstart'));
+    update(input, 'x中');
+    expect(painted(host)).toContain('x中y');
+    expect(underline(host).length).toBe(1);
+    expect(cellText(e)).toBe('xy');
+    fire(input, composition('compositionend', '中'));
+    expect(cellText(e)).toBe('x中y');
+    e.destroy();
+  });
+
+  test('a word composed again is underlined whole', async () => {
+    const { e, host, input } = await attached();
+    caret(e, 2);
+    input.setSelectionRange(0, 2);
+    fire(input, composition('compositionstart'));
+    update(input, 'AC');
+    const line = underline(host)[0]!;
+    // The underline starts at the word start, not at the one letter that changed.
+    const x1 = Number(line.getAttribute('x1'));
+    const x2 = Number(line.getAttribute('x2'));
+    update(input, 'AB');
+    expect(underline(host).length).toBe(1);
+    expect(Number(underline(host)[0]!.getAttribute('x1'))).toBe(x1);
+    expect(x2).toBeGreaterThan(x1);
+    fire(input, composition('compositionend', 'AC'));
+    expect(stored(e)).toBe('AC');
+    e.destroy();
+  });
+
+  test('a right-click during a composition puts the composed text in first', async () => {
+    const { e, input, host } = await attached();
+    caret(e, 2);
+    fire(input, composition('compositionstart'));
+    update(input, 'AB日本');
+    const stage = host.querySelector('.pptx-surface__stage')!;
+    fire(
+      stage,
+      new win.PointerEvent('pointerdown', { bubbles: true, button: 2 }) as unknown as Event
+    );
+    expect(stored(e)).toBe('AB日本');
+    e.destroy();
   });
 });

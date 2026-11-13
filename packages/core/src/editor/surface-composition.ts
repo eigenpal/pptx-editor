@@ -14,12 +14,21 @@ export interface CompositionLayerHost {
   readonly layout: () => SlideLayout | undefined;
   /** The slide with a composition's change in it (`compositionView`). */
   compositionView?(preview: CompositionPreview): CompositionView | undefined;
+  /** Changes when the same composition lays out differently: a format armed at the caret. */
+  compositionKey?(): unknown;
 }
 
 /** The composition that the slide shows, if any. */
 export class CompositionLayer {
   #preview: CompositionPreview | null = null;
-  #memo: { preview: CompositionPreview; layout: SlideLayout; view?: CompositionView } | null = null;
+  #memo: {
+    preview: CompositionPreview;
+    layout: SlideLayout;
+    key: unknown;
+    view?: CompositionView;
+  } | null = null;
+  /** Whether the slide last painted showed a composition. */
+  painted = false;
 
   constructor(private readonly host: CompositionLayerHost) {}
 
@@ -34,10 +43,11 @@ export class CompositionLayer {
     const preview = this.#preview;
     const layout = this.host.layout();
     if (!preview || !layout || !this.host.compositionView) return undefined;
+    const key = this.host.compositionKey?.();
     const memo = this.#memo;
-    if (memo?.preview === preview && memo.layout === layout) return memo.view;
+    if (memo?.preview === preview && memo.layout === layout && memo.key === key) return memo.view;
     const view = this.host.compositionView(preview);
-    this.#memo = { preview, layout, ...(view ? { view } : {}) };
+    this.#memo = { preview, layout, key, ...(view ? { view } : {}) };
     return view;
   }
 

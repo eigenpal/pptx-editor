@@ -421,7 +421,7 @@ export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel
 export function canvasMenuPoint(owner: Element, at: {
     readonly x: number;
     readonly y: number;
-} | null): {
+} | null, caret?: boolean): {
     x: number;
     y: number;
 };

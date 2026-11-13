@@ -57,8 +57,8 @@ export function useCanvasContextMenu(): {
   const open = (owner: HTMLElement, at: ContextMenuPoint | null): void => {
     if (entry === false || !editor || editor.snapshot().status !== 'ready') return;
     const kind = canvasMenuKind(editor.snapshot());
-    // From the keyboard: open at the selection, or at the middle of the canvas.
-    const point = canvasMenuPoint(owner, at);
+    // From the keyboard: open at the caret, the selection, or the middle of the canvas.
+    const point = canvasMenuPoint(owner, at, kind === 'text');
     setMenu({ at: point, kind, keyboard: at === null, owner });
   };
   const onContextMenu = (e: ReactMouseEvent<HTMLElement>): void => {

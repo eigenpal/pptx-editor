@@ -1,19 +1,18 @@
 // Right-click on the slide. The surface stops the browser's own menu and sets the selection
-// before its context menu opens: a shape that is not selected becomes the
-// selection; a shape in the selection keeps it, and so does the shape whose text is being
-// edited, where a right-click outside the text selection puts the caret at the click (after
-// DOCX Editor 627e74ab7); empty slide area clears the selection. A right-click on a table
-// cell places the caret in that cell (a cell range in the table stays, and so does a table
-// selected as an object), so the table menu acts on the cell under the pointer. The chrome then reads the selection and
-// draws its menu at the event's point, so no DOM type crosses the editor contract. A right-click
-// on the table's select handle selects the table as an object.
+// before its context menu opens: a shape that is not selected becomes the selection; a shape
+// in the selection keeps it, and so does the shape whose text is being edited, where a
+// right-click outside the text selection puts the caret at the click (after DOCX Editor
+// 627e74ab7); empty slide area clears the selection. A right-click on a table cell places the
+// caret in that cell (a cell range in the table stays, and so does a table selected as an
+// object), so the table menu acts on the cell under the pointer. The chrome then reads the
+// selection and draws its menu at the event's point, so no DOM type crosses the editor
+// contract. A right-click on the table's select handle selects the table as an object.
 
 import type { EditorSelection, TableCellAddress, TextPoint } from '../contracts/index.ts';
 import type { LayoutItem, SlideLayout } from '../layout/index.ts';
-import { itemById } from '../automation/commands/placement.ts';
-import { pointAt } from './surface-geometry.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
-import { parentGroupOf, selectionScope } from '../automation/commands/placement.ts';
+import { itemById, parentGroupOf, selectionScope } from '../automation/commands/placement.ts';
+import { pointAt } from './surface-geometry.ts';
 import type { SurfaceHost } from './surface.ts';
 
 type Point = { x: number; y: number };

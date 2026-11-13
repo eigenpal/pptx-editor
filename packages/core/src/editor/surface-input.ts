@@ -232,14 +232,14 @@ export function replacementTarget(
 }
 
 /**
- * The text a `deleteContentBackward` deletes in the input's context, when the event names
- * more than one character: the system selected it in the input, or its one target range lies
- * in the input's text, ends at the caret, and covers more than one grapheme. A keyboard that
- * deletes through the platform text service (on Android, `deleteSurroundingText`) names the
- * characters it means that way, and one event can name several presses or a word. Null for
- * any other event, which deletes as the key does: a range away from the caret cannot be
- * trusted, as the keyboard's copy of the text can drift. After DOCX Editor
- * `surface-ime-deletion.ts` at 59809e234, where the range counts only at a caret too.
+ * The text a `deleteContentBackward` deletes in the input's context, when the system selected
+ * it in the input for the deletion. A keyboard that deletes through the platform text service
+ * (on Android, `deleteSurroundingText`) makes the browser select the characters it names and
+ * then send the deletion, in one task; a text field reports no target range. One event can so
+ * name several presses or a word. One grapheme at the caret deletes as the key does, so the
+ * key's own rules apply (a list start, an AutoCorrect undo). Null for an unselected field.
+ * After DOCX Editor `surface-ime-deletion.ts` at 59809e234, where a selected range deletes as a
+ * selection too.
  */
 export function deletionTarget(
   e: InputEvent,
@@ -247,17 +247,10 @@ export function deletionTarget(
   context: TypingContext | null
 ): ReplacementTarget | null {
   if (e.inputType !== 'deleteContentBackward' || !context) return null;
-  const selected = inputTarget(input, context);
-  if (selected) return selected === UNUSABLE ? null : selected;
-  const ranges = typeof e.getTargetRanges === 'function' ? e.getTargetRanges() : [];
-  if (ranges.length !== 1) return null;
-  const range = ranges[0]!;
-  const node = range.startContainer;
-  const { value } = input;
-  if (node !== range.endContainer || node.nodeType !== 3 || node.textContent !== value) return null;
-  if (range.endOffset !== value.length) return null;
-  const target = contextTarget(context, value, range.startOffset, range.endOffset);
-  return target && segmentGraphemes(target.text).length > 1 ? target : null;
+  const target = inputTarget(input, context);
+  if (!target || target === UNUSABLE) return null;
+  const atCaret = target.after === 0 && segmentGraphemes(target.text).length <= 1;
+  return atCaret ? null : target;
 }
 
 /** Apply one `beforeinput` event. Exported for tests. */
@@ -306,9 +299,12 @@ export function compositionPreview(
     target: { text: '', after: 0, between: '', paragraph: key },
     text: '',
   };
-  // Where the change starts in the field: the IME caret counts from there.
+  // Where the change starts in the field: the IME caret and the composed region count from
+  // there. A word composed again is marked whole, also the letters that did not change.
   const lead = place.value.length - edit.target.after - edit.target.text.length;
-  return { kind: 'caret', edit, caret: selectionEnd - lead };
+  const end = value.length - (place.value.length - place.to);
+  const mark = [place.from - lead, Math.max(place.from, end) - lead] as const;
+  return { kind: 'caret', edit, caret: selectionEnd - lead, mark };
 }
 
 /** The class the input takes while an IME composes. */
@@ -350,8 +346,11 @@ export function bindSurfaceInput(
   input: HTMLTextAreaElement,
   root: HTMLElement,
   host: SurfaceInputHost,
-  /** Show a composition's text in the slide (null: none); whether the slide shows it. */
-  show?: (preview: CompositionPreview | null) => boolean
+  /**
+   * Show a composition's text in the slide (null: none); whether the slide shows it. With
+   * `paint` false, the next paint shows it: an end that writes paints once, with its text.
+   */
+  show?: (preview: CompositionPreview | null, paint: boolean) => boolean
 ): SurfaceInputBinding {
   /** The context the input holds (during a composition: the context when it started). */
   let context: TypingContext | null = null;
@@ -370,12 +369,13 @@ export function bindSurfaceInput(
    * Show the composed text: in the slide, where it goes (`show`), else in the input over the
    * caret. With no composition, neither.
    */
-  const fit = (): void => {
+  const fit = (paint = true): void => {
     const preview = compositionPreview(composition, input);
-    const slide = show?.(preview) === true && preview !== null;
+    const slide = show?.(preview, paint) === true && preview !== null;
+    // Read after `show`: the paint it runs can end the composition (`sync`).
     const state = composition;
     input.classList.toggle(COMPOSING_CLASS, state.phase !== 'idle');
-    input.classList.toggle(PREVIEWED_CLASS, slide);
+    input.classList.toggle(PREVIEWED_CLASS, slide && state.phase !== 'idle');
     if (state.phase !== 'idle' && !slide) overlay(state.place.value, state.width);
     else overlay(null, 0);
   };
@@ -454,8 +454,10 @@ export function bindSurfaceInput(
   /** End the composition `state`: its change goes in at its place. Then the input syncs. */
   const finish = (state: CompositionState, edit: ContextEdit | null, data: string): void => {
     composition = IDLE;
-    fit();
-    if (state.phase === 'idle') return sync();
+    // The edit below paints the slide with the text in it; `fit` at the end paints only when
+    // nothing did (a cancel, a refusal).
+    fit(false);
+    if (state.phase === 'idle') return (sync(), fit());
     const { place } = state;
     if (state.lost) {
       // A peer's edit before or over the place: the text goes in nowhere, and the user
@@ -472,6 +474,7 @@ export function bindSurfaceInput(
       else if (data) host.refuse('errors.compositionRangeChanged');
     }
     sync();
+    fit();
   };
   /**
    * Make the browser end the composition: the caret left its place with no edit (a click or

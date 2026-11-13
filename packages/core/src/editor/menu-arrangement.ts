@@ -52,15 +52,16 @@ export function placeInViewport(
 
 /**
  * Where a canvas context menu opens: the pointer, or for a keyboard open (`at` null) just below
- * the caret while text is edited (the focused input sits on it), else the middle of the
- * selection outline, else of the canvas. @internal
+ * the caret for the text menu (`caret`: the focused input sits on the caret), else the middle
+ * of the selection outline, else of the canvas. @internal
  */
 export function canvasMenuPoint(
   owner: Element,
-  at: { readonly x: number; readonly y: number } | null
+  at: { readonly x: number; readonly y: number } | null,
+  caret = false
 ): { x: number; y: number } {
   if (at) return { x: at.x, y: at.y };
-  const input = owner.ownerDocument.activeElement;
+  const input = caret ? owner.ownerDocument.activeElement : null;
   if (input?.classList.contains('pptx-surface__input') && owner.contains(input)) {
     const caret = input.getBoundingClientRect();
     return { x: Math.round(caret.left), y: Math.round(caret.bottom) };

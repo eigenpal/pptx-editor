@@ -227,9 +227,9 @@ export class SlideSurface {
       doc
     );
     this.#composition = new CompositionLayer(editor);
-    this.#inputBinding = bindSurfaceInput(this.#input, this.root, editor, (preview) => {
+    this.#inputBinding = bindSurfaceInput(this.#input, this.root, editor, (preview, paint) => {
       const shown = this.#composition.set(preview);
-      this.render();
+      if (paint && (preview || this.#composition.painted)) this.render();
       return shown;
     });
     this.root.tabIndex = 0;
@@ -330,6 +330,7 @@ export class SlideSurface {
     }
     // While an IME composes, the slide shows the composed text in place.
     const shown = this.#composition.view()?.layout ?? layout;
+    this.#composition.painted = shown !== layout;
     const painted = this.editor.paintLayout?.(shown) ?? shown;
     const paintKey = this.editor.paintKey?.();
     // Converted pictures, new faces, or a wider view: paint again, the old nodes standing in.
@@ -518,11 +519,11 @@ export class SlideSurface {
   }
 
   #onPointerDown = (e: PointerEvent): void => {
+    // The slide shows composed text the model does not hold yet: it goes in first, so the
+    // press, and the right-click menu after it, land on the text the user sees.
+    if (this.#composition.view()) this.#inputBinding.endComposition();
     // On a Mac, Ctrl+click is a right-click: the context menu handles it, not a press.
     if (e.button !== 0 || (e.ctrlKey && /Mac|iP(hone|ad)/.test(navigator.platform))) return;
-    // The slide shows composed text the model does not hold yet: it goes in first, so the
-    // press lands on the text the user sees.
-    if (this.#composition.view()) this.#inputBinding.endComposition();
     const layout = this.editor.layout();
     if (!layout) return;
     this.#pressed = true;

@@ -68,6 +68,8 @@ describe('canvas menu point', () => {
     // No text caret: the middle of the selection outline.
     expect(canvasMenuPoint(owner, null)).toEqual({ x: 200, y: 140 });
     input.focus();
-    expect(canvasMenuPoint(owner, null)).toEqual({ x: 240, y: 154 });
+    expect(canvasMenuPoint(owner, null, true)).toEqual({ x: 240, y: 154 });
+    // A menu for another selection keeps to the outline, wherever the input is.
+    expect(canvasMenuPoint(owner, null)).toEqual({ x: 200, y: 140 });
   });
 });

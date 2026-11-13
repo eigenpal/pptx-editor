@@ -106,6 +106,7 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
     }),
     ...(s.commentMarkers ? { commentMarkers: s.commentMarkers } : {}),
     // The text an IME composes, laid out in the slide before it commits.
+    compositionKey: () => s.arm.current()?.pkg,
     compositionView: (preview) =>
       compositionView({ ...s, layout: base.layout, armed: () => s.arm.current()?.pkg }, preview),
     paintLayout: (l) => s.prompts.paint(s.session(), l, s.selection(), s.viewing()) ?? l,

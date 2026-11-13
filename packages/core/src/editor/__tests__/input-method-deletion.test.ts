@@ -1,7 +1,8 @@
 // Deletions that a keyboard names as a range, not as a key: a keyboard that deletes through the
-// platform text service (Android `deleteSurroundingText`) sends one `deleteContentBackward`
-// for several characters or a word. The range deletes when it ends at the caret, checked
-// against the model; any other range deletes one character, as the key does.
+// platform text service (Android `deleteSurroundingText`) makes the browser select the
+// characters in the text field, then send one `deleteContentBackward`, in one task. A text
+// field reports no target range. The selection deletes, checked against the model; one
+// grapheme at the caret deletes as the key does.
 
 import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
@@ -54,24 +55,22 @@ const root = (e: PptxEditorInstance): Element =>
 const stored = (e: PptxEditorInstance): string => textOf(find(root(e), 'p:txBody'));
 
 /**
- * A cancelable `deleteContentBackward` whose target range covers `[start, end)` of the
- * input's text, as Chromium reports a range in a text field: in a text node that holds the
- * field's value.
+ * The browser selects `[start, end)` of the field for a keyboard's deletion and sends a
+ * cancelable `deleteContentBackward`, in one task. A browser sends `selectionchange` a task
+ * later; happy-dom sends it at once to a focused field, so the field is not focused here.
  */
 function deletion(input: HTMLTextAreaElement, start: number, end: number): Event {
-  const event = new win.InputEvent('beforeinput', {
+  input.blur();
+  input.setSelectionRange(start, end);
+  return new win.InputEvent('beforeinput', {
     inputType: 'deleteContentBackward',
     bubbles: true,
     cancelable: true,
-  }) as unknown as InputEvent;
-  const node = doc.createTextNode(input.value);
-  const range = { startContainer: node, endContainer: node, startOffset: start, endOffset: end };
-  Object.defineProperty(event, 'getTargetRanges', { value: () => [range] });
-  return event;
+  }) as unknown as Event;
 }
 
 describe('input method deletions', () => {
-  test('a range of a word at the caret deletes the word, as one undo step', async () => {
+  test('a word the keyboard selects at the caret deletes, as one undo step', async () => {
     const { e, input } = await attached();
     input.dispatchEvent(deletion(input, 6, 11));
     expect(stored(e)).toBe('Hello ');
@@ -90,7 +89,7 @@ describe('input method deletions', () => {
     e.destroy();
   });
 
-  test('a range of one character deletes as the key does', async () => {
+  test('one selected character at the caret deletes as the key does', async () => {
     const { e, input } = await attached();
     input.dispatchEvent(deletion(input, 10, 11));
     expect(stored(e)).toBe('Hello worl');
@@ -104,36 +103,37 @@ describe('input method deletions', () => {
     e.destroy();
   });
 
-  test('a range away from the caret deletes one character at the caret', async () => {
+  test('a word the keyboard selects away from the caret deletes, and the caret stays after', async () => {
     const { e, input } = await attached();
-    // The keyboard's copy of the text drifted: its range names the first word.
-    input.dispatchEvent(deletion(input, 0, 5));
-    expect(stored(e)).toBe('Hello worl');
+    input.dispatchEvent(deletion(input, 0, 6));
+    expect(stored(e)).toBe('world');
+    expect(e.snapshot().selection).toMatchObject({ focus: { offset: 5 } });
     e.destroy();
   });
 
-  test('a range over text the input does not hold deletes one character', async () => {
+  test('a selection over text the input does not hold deletes one character', async () => {
     const { e, input } = await attached();
-    const event = deletion(input, 6, 11);
     input.value = 'Hello there';
-    input.dispatchEvent(event);
+    input.dispatchEvent(deletion(input, 6, 11));
     expect(stored(e)).toBe('Hello worl');
     e.destroy();
   });
 
-  test('text the keyboard selects before it deletes is deleted', async () => {
+  test('a hardware Backspace deletes as the key, whatever a native key left selected', async () => {
     const { e, input } = await attached();
-    // The keyboard selects the word and deletes it in the same task. A browser sends
-    // `selectionchange` a task later; happy-dom sends it at once, to a focused field only.
-    input.blur();
+    input.focus();
     input.setSelectionRange(6, 11);
-    const event = new win.InputEvent('beforeinput', {
-      inputType: 'deleteContentBackward',
-      bubbles: true,
-      cancelable: true,
-    }) as unknown as Event;
-    input.dispatchEvent(event);
-    expect(stored(e)).toBe('Hello ');
+    input.dispatchEvent(
+      new win.KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }) as unknown as Event
+    );
+    input.dispatchEvent(
+      new win.InputEvent('beforeinput', {
+        inputType: 'deleteContentBackward',
+        bubbles: true,
+        cancelable: true,
+      }) as unknown as Event
+    );
+    expect(stored(e)).toBe('Hello worl');
     e.destroy();
   });
 });

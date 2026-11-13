@@ -2224,8 +2224,9 @@
   pointer-events: none;
   caret-color: transparent;
 }
-/* While an IME composes and the slide cannot show the composed text (a diagram node), the input
-   shows it at the caret, underlined, as the platform shows it in a text field. */
+/* While an IME composes and the slide cannot show the composed text in place (a diagram node,
+   a selection that is not text), the input shows it at the caret, underlined, as the platform
+   shows it in a text field. */
 .pptx-surface__input.pptx-surface__input--composing {
   min-width: 1px;
   opacity: 1;
