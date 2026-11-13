@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The SVG picture reader turns stored SVG picture parts into drawing records for the PDF export only. It reads parts and writes nothing. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/editor/__tests__/svg-picture-drawing.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/svg-picture.test.ts"
+  ]
+}

@@ -6452,6 +6452,69 @@ export function surfaceInputOf(editor: object): HTMLElement | null;
 // @internal
 export function surfaceRootOf(editor: object): HTMLElement | null;
 
+// @public
+export interface SvgPictureColor {
+    // (undocumented)
+    readonly a: number;
+    // (undocumented)
+    readonly b: number;
+    // (undocumented)
+    readonly g: number;
+    // (undocumented)
+    readonly r: number;
+}
+
+// @public
+export interface SvgPictureDrawing {
+    // (undocumented)
+    readonly items: readonly SvgPictureItem[];
+    readonly viewBox: readonly [number, number, number, number];
+}
+
+// @public
+export function svgPictureDrawing(bytes: Uint8Array): SvgPictureDrawing | undefined;
+
+// @public
+export interface SvgPictureGroup {
+    // (undocumented)
+    readonly clip?: {
+        readonly path: readonly PathCommand[];
+        readonly evenOdd: boolean;
+    };
+    // (undocumented)
+    readonly items: readonly SvgPictureItem[];
+    // (undocumented)
+    readonly kind: 'group';
+    // (undocumented)
+    readonly opacity: number;
+}
+
+// @public (undocumented)
+export type SvgPictureItem = SvgPictureShape | SvgPictureGroup;
+
+// @public
+export interface SvgPictureShape {
+    // (undocumented)
+    readonly fill?: {
+        readonly color: SvgPictureColor;
+        readonly evenOdd: boolean;
+    };
+    // (undocumented)
+    readonly kind: 'shape';
+    // (undocumented)
+    readonly matrix: Matrix;
+    // (undocumented)
+    readonly path: readonly PathCommand[];
+    // (undocumented)
+    readonly stroke?: {
+        readonly color: SvgPictureColor;
+        readonly width: number;
+        readonly cap: 'butt' | 'round' | 'square';
+        readonly join: 'miter' | 'round' | 'bevel';
+        readonly miterLimit: number;
+    };
+}
+
 // @internal
 export function swatchGridKeyDown(grid: HTMLElement | null, event: {
     readonly key: string;
