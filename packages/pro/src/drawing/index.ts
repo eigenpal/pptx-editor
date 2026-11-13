@@ -82,6 +82,7 @@ export {
   innerShadowShift,
   reflectionBlurSigma,
   reflectionFade,
+  softEdgeSpread,
   type ReflectionFade,
   type SpreadBlur,
 } from './effects-math.ts';

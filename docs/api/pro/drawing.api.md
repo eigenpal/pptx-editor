@@ -48,6 +48,9 @@ export interface ReflectionFade {
 export function reflectionFade(ref: NonNullable<ResolvedEffects['reflection']>, shape: Matrix, w: number, h: number): ReflectionFade;
 
 // @internal
+export function softEdgeSpread(rad: number): SpreadBlur;
+
+// @internal
 export interface SpreadBlur {
     readonly sigma: number;
     readonly spread: number;
