@@ -805,6 +805,7 @@ export interface ResolvedFace {
     readonly id: string;
     // (undocumented)
     readonly italic: boolean;
+    readonly mathTable?: true;
     // (undocumented)
     readonly metrics: FaceMetrics;
     readonly substituted: boolean;

@@ -208,6 +208,36 @@ describe('math layout', () => {
     expect(at('𝑥').x[1]! - at('𝑥').x[0]!).toBeCloseTo(0.5 * EM, 0);
   });
 
+  test('a face with no MATH table advances script glyphs at the size they draw', () => {
+    // The same measurer, but its faces have no MATH table (a serif fallback, for example).
+    const fixed = createFixedMeasurer();
+    let asked = false;
+    const plain = {
+      ...fixed,
+      resolve: (r: Parameters<typeof fixed.resolve>[0]) => {
+        const { mathTable: _, ...face } = fixed.resolve(r);
+        return face;
+      },
+      advances: (
+        face: Parameters<typeof fixed.advances>[0],
+        text: string,
+        options?: { readonly mathScript?: 1 | 2 }
+      ) => {
+        if (options?.mathScript) asked = true;
+        return fixed.advances(face, text);
+      },
+    };
+    const b = layoutMath(
+      readMathZone(zoneOf('x^(yz)'), () => props)!,
+      plain,
+      1
+    );
+    const y = b.glyphs.find((g) => g.text === '𝑦')!;
+    expect(y.sizePt).toBe(13);
+    expect(y.x[1]! - y.x[0]!).toBeCloseTo(0.5 * 13 * 12_700, 0);
+    expect(asked).toBe(false);
+  });
+
   test('a script ends with the space after a script, and prescripts start with it', () => {
     const sup = box('x^2');
     const two = sup.glyphs[1]!;

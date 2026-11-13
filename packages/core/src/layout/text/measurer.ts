@@ -54,6 +54,11 @@ export interface ResolvedFace {
   /** True when the requested family was not available and a substitute answered. */
   readonly substituted: boolean;
   readonly metrics: FaceMetrics;
+  /**
+   * The face has a `MATH` table (OpenType math): math layout takes its script-style forms
+   * (`TextMeasurer.advances`, `mathScript`). Absent for other faces.
+   */
+  readonly mathTable?: true;
 }
 
 /** One shaped glyph, in em units with y up. */
@@ -236,6 +241,8 @@ export function createFixedMeasurer(): TextMeasurer {
       synthItalic: false,
       substituted: false,
       metrics,
+      // The fixed measurer has no font data: a family named for math stands in for a math face.
+      ...(/math/i.test(r.family) ? { mathTable: true as const } : {}),
     }),
     advances: (_face, text) => {
       const out = new Float64Array(text.length);

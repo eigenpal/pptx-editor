@@ -207,8 +207,8 @@ const nextLevel = (level: 0 | 1 | 2): 0 | 1 | 2 => (level === 0 ? 1 : 2);
 /**
  * The size in points of `props` at a script level: 73 % and 60 % of the base size, rounded to
  * the nearest half point. The reference PDFs of `equations` and `equation-lines` draw scripts of
- * 18 pt text at 13 pt and scripts of scripts at 11 pt. Glyph advances use the unrounded size
- * (`advanceSizePt`).
+ * 18 pt text at 13 pt and scripts of scripts at 11 pt. In a face with a `MATH` table, glyph
+ * advances use the unrounded size (`advanceSizePt`).
  */
 function sizePt(props: RunProps, env: Env, level = env.level): number {
   const base = autofitSizePt(props.size / 100, env.fontScale);
@@ -217,13 +217,15 @@ function sizePt(props: RunProps, env: Env, level = env.level): number {
 }
 
 /**
- * The size that scales the glyph advances of a script level: the unrounded script size. On the
- * reference PDFs, script glyphs at 18 pt advance by their script-style advance at 13.14 pt (73 %),
- * within 0.03 pt, though they draw at 13 pt.
+ * The size that scales the advances of math text at a script level in a face with a `MATH`
+ * table: the unrounded script size. On the reference PDFs of `equations` and `equation-lines`
+ * (STIX Two Math), script glyphs of 18 pt text advance by their script-style advances at
+ * 13.14 pt (73 %), within 0.03 pt, and draw at 13 pt. Other faces advance at the size they draw.
  */
-function advanceSizePt(props: RunProps, env: Env, level = env.level): number {
+function advanceSizePt(props: RunProps, env: Env, face: ResolvedFace, size: number): number {
+  if (env.level === 0 || !face.mathTable) return size;
   const base = autofitSizePt(props.size / 100, env.fontScale);
-  return level === 0 ? base : Math.max(1, base * LEVEL_SCALE[level]);
+  return Math.max(1, base * LEVEL_SCALE[env.level]);
 }
 
 const emOf = (props: RunProps, env: Env, level = env.level): number =>
@@ -274,17 +276,17 @@ function textBox(
   size: number,
   props: RunProps,
   env: Env,
-  normal = false,
-  advanceSize = size
+  normal = false
 ): Box {
   const em = size * EMU_PER_PT;
-  // Math text in a script takes the script-style forms of a math face (MATH script, `ssty`):
-  // their advances place the glyphs. Paint draws the nominal forms at those places.
-  const mathScript = !normal && env.level > 0 && /math/i.test(face.family) ? env.level : 0;
+  // Math text in a script of a face with a `MATH` table takes the face's script-style forms
+  // (`ssty`): their advances, at the unrounded script size, place the glyphs. Paint draws the
+  // regular forms at those places.
+  const mathScript = !normal && env.level > 0 && face.mathTable ? env.level : 0;
   const adv = mathScript
     ? env.measurer.advances(face, text, { mathScript })
     : env.measurer.advances(face, text);
-  const advanceEm = advanceSize * EMU_PER_PT;
+  const advanceEm = (mathScript ? advanceSizePt(props, env, face, size) : size) * EMU_PER_PT;
   const x = [0];
   for (let i = 0; i < adv.length; i += 1) x.push(x[i]! + adv[i]! * advanceEm);
   let lo = 0;
@@ -344,7 +346,6 @@ function runItems(run: MathRun, env: Env): Item[] {
     });
     return run.text ? [{ box: textBox(run.text, face, size, props, env, true), cls: 'ord' }] : [];
   }
-  const advance = advanceSizePt(props, env);
   const style: MathStyle = run.sty ?? env.sty ?? 'i';
   const bold = style === 'b' || style === 'bi';
   const italic = style === 'i' || style === 'bi';
@@ -354,10 +355,7 @@ function runItems(run: MathRun, env: Env): Item[] {
   let pending: { text: string; face: ResolvedFace } | null = null;
   const flush = (): void => {
     if (!pending) return;
-    items.push({
-      box: textBox(pending.text, pending.face, size, props, env, false, advance),
-      cls: 'ord',
-    });
+    items.push({ box: textBox(pending.text, pending.face, size, props, env), cls: 'ord' });
     pending = null;
   };
   // Faces of the plain letters that stand for math alphanumerics, when no math font draws.
@@ -391,7 +389,7 @@ function runItems(run: MathRun, env: Env): Item[] {
       letter && upright.math ? String.fromCodePoint(mathAlphanumeric(cp, style)) : shown;
     if (cls !== 'ord') {
       flush();
-      items.push({ box: textBox(drawn, face, size, props, env, false, advance), cls });
+      items.push({ box: textBox(drawn, face, size, props, env), cls });
       continue;
     }
     if (pending && pending.face !== face) flush();
@@ -565,11 +563,10 @@ function radical(node: Extract<MathNode, { kind: 'rad' }>, env: Env): Box {
   // the place of the box).
   const box = Math.max(C.radBottom * em, content.desc + C.radGapBox * em);
   const bottom = -Math.max(C.radBottom * em, content.desc + C.radGapBelow * em);
-  // The sign widens as it grows, and the radicand starts under its top: on the reference PDFs,
-  // the radicand starts 0.639 em after the sign's left edge in `√(x+1)` and `∛8` (signs 0.98 em
-  // high) and 0.726 em after it in `√(a_n + 1)` (1.24 em high), and the sign's left edge is
-  // 0.019 em after its origin. A fit: the sign is the application's own outline, not a glyph of
-  // the font.
+  // The sign widens as it grows, and the radicand starts under its top. Fitted on the reference
+  // PDFs of `equations`: the radicand starts 0.639 em after the sign's left edge in `√(x+1)` and
+  // `∛8` (signs 0.98 em high) and 0.726 em after it in `√(a_n + 1)` (1.24 em high), and the
+  // sign's left edge is 0.019 em after its origin.
   const grow = Math.max(0, top - bottom - C.radMinHeight * em);
   const signW = C.radWidth * em + grow * C.radWidthGrow;
   const contentX = (C.radLeft + C.radContent) * em + grow * C.radContentGrow;
@@ -718,9 +715,8 @@ function accent(node: Extract<MathNode, { kind: 'acc' }>, env: Env): Box {
 }
 
 /**
- * A limit under or over its base. The reference PDF of `equations`, slide 4, puts `def` 0.72 em
- * over `x`, though the descender of `𝑓` then comes 0.08 em near the top of `x`: an upper limit
- * keeps a gap of 0.075 em (a fit), less than the font's `upperLimitGapMin` (0.135 em).
+ * A limit under or over its base. An upper limit keeps an ink gap of 0.075 em over its base,
+ * fitted on the reference PDF of `equations`, slide 4, which puts `def` 0.72 em over `x`.
  */
 function overUnder(base: Box, limit: Box, pos: 'low' | 'upp', em: number): Box {
   const out = emptyBox();
