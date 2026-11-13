@@ -137,6 +137,7 @@ export class PageOps {
   #names = 0;
   #forms = 0;
   #items = 0;
+  #pathUnit = 1;
   constructor(
     readonly page: PDFPage,
     readonly res: PaintResources,
@@ -200,6 +201,28 @@ export class PageOps {
    */
   get inForm(): boolean {
     return this.#forms > 0;
+  }
+
+  /** Slide EMU per unit of the paths that `tracePath` and `traceRect` write. */
+  get pathUnit(): number {
+    return this.#pathUnit;
+  }
+
+  /**
+   * Trace paths in points: concatenate a scale of `EMU_PER_PT`, then run `trace` with its path
+   * coordinates divided by `EMU_PER_PT`. The path stays where it is, and the current transform
+   * at its paint is about one point per unit. A tiling pattern fill inverts the current
+   * transform, and slide EMU (1/12,700 pt per unit) is too close to singular for that.
+   */
+  traceInPoints(trace: () => void): void {
+    this.push(concatTransformationMatrix(EMU_PER_PT, 0, 0, EMU_PER_PT, 0, 0));
+    const outer = this.#pathUnit;
+    this.#pathUnit = outer * EMU_PER_PT;
+    try {
+      trace();
+    } finally {
+      this.#pathUnit = outer;
+    }
   }
 
   /** The page's resource name for a face, added once per page. */
@@ -310,22 +333,24 @@ export function matrixScale(m: Matrix): number {
 }
 
 export function tracePath(commands: readonly PathCommand[], p: PageOps): void {
+  const u = p.pathUnit;
   let cx = 0;
   let cy = 0;
   for (const c of commands) {
-    if (c.op === 'M') p.push(moveTo(c.x, c.y));
-    else if (c.op === 'L') p.push(lineTo(c.x, c.y));
-    else if (c.op === 'C') p.push(appendBezierCurve(c.x1, c.y1, c.x2, c.y2, c.x, c.y));
+    if (c.op === 'M') p.push(moveTo(c.x / u, c.y / u));
+    else if (c.op === 'L') p.push(lineTo(c.x / u, c.y / u));
+    else if (c.op === 'C')
+      p.push(appendBezierCurve(c.x1 / u, c.y1 / u, c.x2 / u, c.y2 / u, c.x / u, c.y / u));
     else if (c.op === 'Q') {
       // A quadratic Bézier is the cubic with control points 2/3 of the way to its one control.
       p.push(
         appendBezierCurve(
-          cx + ((c.x1 - cx) * 2) / 3,
-          cy + ((c.y1 - cy) * 2) / 3,
-          c.x + ((c.x1 - c.x) * 2) / 3,
-          c.y + ((c.y1 - c.y) * 2) / 3,
-          c.x,
-          c.y
+          (cx + ((c.x1 - cx) * 2) / 3) / u,
+          (cy + ((c.y1 - cy) * 2) / 3) / u,
+          (c.x + ((c.x1 - c.x) * 2) / 3) / u,
+          (c.y + ((c.y1 - c.y) * 2) / 3) / u,
+          c.x / u,
+          c.y / u
         )
       );
     } else p.push(closePath());
@@ -338,7 +363,9 @@ export function tracePath(commands: readonly PathCommand[], p: PageOps): void {
 
 /** A `w` × `h` rectangle at `x`, `y`, as a path. */
 export function traceRect(x: number, y: number, w: number, h: number, p: PageOps): void {
-  p.push(moveTo(x, y), lineTo(x + w, y), lineTo(x + w, y + h), lineTo(x, y + h), closePath());
+  const u = p.pathUnit;
+  const [l, t, r, b] = [x / u, y / u, (x + w) / u, (y + h) / u];
+  p.push(moveTo(l, t), lineTo(r, t), lineTo(r, b), lineTo(l, b), closePath());
 }
 
 /** The local box grown by its own size on every side, for soft-mask bounds. */

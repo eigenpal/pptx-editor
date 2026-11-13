@@ -105,8 +105,10 @@ export async function paintFill(
   if (f.type === 'pattern') {
     // The preset path fill modes lighten and darken both colors, as in the SVG paint.
     const colors = { fg: adjustForPathMode(f.fg, mode), bg: adjustForPathMode(f.bg, mode) };
+    // The pattern maps to the content's space, whatever the current transform, so the path is
+    // traced in points for a normal transform at the fill.
     p.push(pushGraphicsState(), ...patternColor({ ...f, ...colors }, p));
-    trace();
+    p.traceInPoints(trace);
     p.push(fillEvenOdd(), popGraphicsState());
     return true;
   }
