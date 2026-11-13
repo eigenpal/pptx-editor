@@ -10,12 +10,21 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import type { ChartAxis, ChartModel, ChartPlot } from './chart-model.ts';
 import { formatChartNumber, isDateFormatCode } from './chart-number-format.ts';
 import { autoValueScale, logValueScale, scaleRatio, type ValueScale } from './chart-scale.ts';
-import { measureTextWidth, type ChartTextStyle } from './chart-text.ts';
+import { lineHeight, measureTextWidth, type ChartTextStyle } from './chart-text.ts';
 
 /** Room between the labels of a horizontal value axis, in sizes. */
 const HORIZONTAL_GAP = 1;
 /** Least distance between the ticks of an upright 3-D value axis, in sizes. */
 const VERTICAL_GAP_3D = 1.4;
+
+/**
+ * The least distance between the ticks of an upright 2-D value axis, radar axes included: one
+ * line of the tick label, so the labels of neighbouring ticks do not overlap. An automatic
+ * major unit takes the finest round step whose intervals keep this room.
+ */
+export function verticalTickRoom(style: ChartTextStyle): number {
+  return lineHeight(style);
+}
 
 export interface Box {
   l: number;
@@ -254,11 +263,13 @@ export function scaleValues(
   if (axis?.logBase && !percentFixed) {
     return logValueScale(dataMin, dataMax, axis.logBase, axis.min, axis.max);
   }
-  // A vertical axis keeps more than a label's height between ticks; a horizontal one keeps
-  // its widest label clear of the next by one size. A fixed percent range
-  // takes one tick more.
+  // A vertical axis keeps a label's line between ticks (3-D: a fixed share of the size); a
+  // horizontal one keeps its widest label clear of the next by one size. A fixed percent
+  // range takes one tick more.
   const minInterval = vertical
-    ? (threeD ? VERTICAL_GAP_3D : 1.6) * style.sizePt
+    ? threeD
+      ? VERTICAL_GAP_3D * style.sizePt
+      : verticalTickRoom(style)
     : labelWidth + HORIZONTAL_GAP * style.sizePt;
   const fitting = Math.floor(length / minInterval) + (percentFixed ? 1 : 0);
   return autoValueScale({

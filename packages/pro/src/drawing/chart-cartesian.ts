@@ -57,11 +57,13 @@ const LABEL_GAP = 0.64;
  */
 const LABEL_MARGIN_REACH = 4.5;
 /**
- * How far the top label of a vertical value axis may reach above the plot's room. A taller
- * label lowers the plot's top edge: at 11.97 pt by 1.3 pt, below the chart edge, the title, or
- * the legend alike, and at 10 pt not at all (the `charts` and `slide-structure` reference PDFs).
+ * How far the top label of a vertical value axis may reach above the plot's room: 6.5 pt and
+ * 0.05 sizes. A taller label lowers the plot's top edge: at 11.97 pt by 1.2 pt, at 14 pt by
+ * 2.5 pt, and at 20 pt by 6.3 pt, below the chart edge, the title, or the legend alike, and at
+ * 10 pt not at all (the `charts`, `chart-sizes`, and `slide-structure` reference PDFs).
  */
-const TOP_LABEL_REACH = 7;
+const TOP_LABEL_REACH = 6.5;
+const TOP_LABEL_REACH_SIZES = 0.05;
 const DEFAULT_AXIS_LINE: ChartStroke = {
   hex: '000000',
   alpha: 1,
@@ -332,7 +334,8 @@ export function paintCartesian(
     for (const view of views) {
       if (!view.labelled || !view.value || !vertical(view.side)) continue;
       const half = lineHeight(view.style) / 2 + LABEL_LIFT * view.style.sizePt;
-      overhang = Math.max(overhang, half - TOP_LABEL_REACH);
+      const reach = TOP_LABEL_REACH + TOP_LABEL_REACH_SIZES * view.style.sizePt;
+      overhang = Math.max(overhang, half - reach);
     }
     box.t += overhang;
     let rotation = 0;
