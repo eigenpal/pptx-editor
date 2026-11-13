@@ -52,7 +52,7 @@ const soft = (
   cx: number,
   cy: number,
   rad: number,
-  extra: { fill?: string; line?: string } = {}
+  extra: { fill?: string; line?: string; prst?: string } = {}
 ): Promise<PdfExportResult> =>
   exportPdf(
     buildPptx({
@@ -175,5 +175,55 @@ describe('soft edge paint', () => {
     // The fill color (#4472C4) is set nowhere, in the page or in a form.
     const text = await contentText(result.bytes);
     expect(text).not.toContain('0.4470588');
+  });
+});
+
+/** The end points of every stroked subpath of a mask, in slide EMU. */
+const strokedPoints = (mask: string): { x: number; y: number }[] => {
+  const out: { x: number; y: number }[] = [];
+  let pending: { x: number; y: number }[] = [];
+  for (const line of mask.split('\n')) {
+    const t = line.trim().split(' ');
+    const op = t[t.length - 1];
+    if (op === 'm' || op === 'l' || op === 'c')
+      pending.push({ x: Number(t[t.length - 3]), y: Number(t[t.length - 2]) });
+    else if (op === 'S') {
+      out.push(...pending);
+      pending = [];
+    } else if (op === 'f*' || op === 'f' || op === 'n') pending = [];
+  }
+  return out;
+};
+
+describe('soft edge of overlapping filled paths', () => {
+  test('a smiley face fades only its outer edge, with no rings around its eyes', async () => {
+    const result = await soft(2 * IN, 2 * IN, 5 * PT, { prst: 'smileyFace' });
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    const { spread, sigma } = softEdgeSpread(5 * PT);
+    const { reach } = softEdgeBands(-spread, sigma);
+    // The face and the eyes fill the mask one path at a time, so the eyes stay white.
+    expect(masks[0].match(/\nf\*\n/g)).toHaveLength(2);
+    // Only the face outline takes bands: the eyes lie inside the face.
+    expect(masks[0].match(/\nS\n/g)).toHaveLength(reach.length);
+    const cx = IN + IN;
+    const cy = IN + IN;
+    for (const pt of strokedPoints(masks[0]))
+      expect(Math.hypot(pt.x - cx, pt.y - cy)).toBeGreaterThan(0.9 * IN);
+  });
+
+  test('a can fades no seam where its top ellipse joins its body', async () => {
+    const result = await soft(2 * IN, 3 * IN, 5 * PT, { prst: 'can' });
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    const points = strokedPoints(masks[0]);
+    expect(points.length).toBeGreaterThan(0);
+    // The top ellipse spans 0.5 in from the top, the bottom arc 0.5 in from the bottom. Between
+    // them, the outer edge is the two sides; the lower half of the top ellipse is inside.
+    const tol = 0.02 * IN;
+    for (const pt of points) {
+      if (pt.y <= IN + 0.25 * IN + tol || pt.y >= IN + 2.75 * IN - tol) continue;
+      expect(Math.min(Math.abs(pt.x - IN), Math.abs(pt.x - 3 * IN))).toBeLessThan(tol);
+    }
   });
 });
