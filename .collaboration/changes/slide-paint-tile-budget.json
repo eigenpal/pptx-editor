@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The slide painter gives each paint of a slide the whole tile image budget and spends it in paint order on the background and every item on screen, so earlier paints and edits no longer switch tiled fills to the pattern. This changes painted output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/output/__tests__/slide-painter.test.ts",
+    "packages/core/src/output/__tests__/fill-fidelity.test.ts"
+  ]
+}

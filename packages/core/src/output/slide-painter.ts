@@ -13,7 +13,7 @@ import {
   type ViewRect,
 } from './paint.ts';
 import { groupPaintsEffects } from './paint-effects.ts';
-import type { PaintContext } from './paint-fill.ts';
+import { startTileBudget, type PaintContext } from './paint-fill.ts';
 import { Defs, svg, SVG_NS } from './svg.ts';
 
 /** Whether two views are the same rectangle (both absent counts). */
@@ -26,6 +26,8 @@ function sameView(a: ViewRect | undefined, b: ViewRect | undefined): boolean {
 interface PaintedItem {
   readonly node: SVGElement | null;
   readonly defs: SVGElement[];
+  /** The tile images it draws (`MAX_SLIDE_TILE_IMAGES`): a later paint that keeps it spends them. */
+  tiles: number;
   /** A group painted in part (`paint`'s budget): the index of its first child left out. */
   rest?: number;
 }
@@ -170,14 +172,24 @@ export class SlidePainter {
       ...(this.#opts.imageSize ? { imageSize: this.#opts.imageSize } : {}),
       sourcePart: layout.slide.backgroundPart,
     };
+    // Each paint has the whole tile budget, spent in paint order: the background, then each item
+    // on screen, kept or new. So the edits before a paint do not use up its budget, and the
+    // tiles on screen stay within one budget.
+    const tileBudget = startTileBudget(this.#defs);
+    /** Run `paint` and count the tile images it spent. */
+    const counted = <T>(paint: () => T): { value: T; defs: SVGElement[]; tiles: number } => {
+      const from = tileBudget.spent;
+      const fresh = this.#defs.capture(paint);
+      return { value: fresh.value, defs: [...fresh.defs], tiles: tileBudget.spent - from };
+    };
     // The background is one rectangle: it paints each time.
     const drop = dropPainted;
     if (this.#background) drop(this.#background);
     for (const painted of this.#twice.splice(0)) drop(painted);
-    const background = this.#defs.capture(() =>
+    const background = counted(() =>
       paintBackground(doc, layout.slide.background, width, height, ctx)
     );
-    this.#background = { node: background.value, defs: [...background.defs] };
+    this.#background = { node: background.value, defs: background.defs, tiles: background.tiles };
     root.insertBefore(background.value, content);
     const next = new Map<LayoutItem, PaintedItem>();
     const nodes: SVGElement[] = [];
@@ -188,22 +200,27 @@ export class SlidePainter {
       // The cascade bounds its weight (`MAX_GROUP_EFFECT_ELEMENTS`) and nesting, so it fits a frame.
       if (item.kind === 'group' && paintWeight(item) > room && !groupPaintsEffects(item)) {
         const g = groupNode(doc, item, opts);
-        const fresh = this.#defs.capture(() => paintChildren(doc, item, g, ctx, opts, 0, room));
+        const fresh = counted(() => paintChildren(doc, item, g, ctx, opts, 0, room));
         const { next: rest, spent } = fresh.value;
-        const painted: PaintedItem = { node: g, defs: [...fresh.defs] };
+        const painted: PaintedItem = { node: g, defs: fresh.defs, tiles: fresh.tiles };
         if (rest < item.children.length) painted.rest = rest;
         return [painted, spent + 1];
       }
-      const fresh = this.#defs.capture(() => paintItem(doc, item, ctx, opts, 1));
-      return [{ node: fresh.value, defs: [...fresh.defs] }, paintWeight(item)];
+      const fresh = counted(() => paintItem(doc, item, ctx, opts, 1));
+      return [{ node: fresh.value, defs: fresh.defs, tiles: fresh.tiles }, paintWeight(item)];
     };
-    /** Go on with a group painted in part, in `room`. Answers the weight painted. */
+    /**
+     * Go on with a group painted in part, in `room`, after its earlier children spend their
+     * tiles. Answers the weight painted.
+     */
     const paintMore = (item: LayoutItem, painted: PaintedItem, room: number): number => {
+      tileBudget.spend(painted.tiles);
       if (item.kind !== 'group' || painted.rest === undefined || !painted.node) return 0;
       const node = painted.node;
       const from = painted.rest;
-      const more = this.#defs.capture(() => paintChildren(doc, item, node, ctx, opts, from, room));
+      const more = counted(() => paintChildren(doc, item, node, ctx, opts, from, room));
       painted.defs.push(...more.defs);
+      painted.tiles += more.tiles;
       if (more.value.next < item.children.length) painted.rest = more.value.next;
       else delete painted.rest;
       return more.value.spent;
@@ -222,6 +239,7 @@ export class SlidePainter {
       if (kept) {
         // A group painted in part goes on with its children.
         if (kept.rest !== undefined && left > 0) left -= paintMore(item, kept, left);
+        else tileBudget.spend(kept.tiles);
         if (kept.rest !== undefined) this.#pending = true;
         next.set(item, kept);
         if (kept.node) nodes.push(kept.node);
@@ -235,6 +253,7 @@ export class SlidePainter {
         // An item of the layout stands in only for itself, when it waits to paint again.
         const own = stand?.[0] === item && stale;
         if (stand && !next.has(stand[0]) && (own || !current.has(stand[0]))) {
+          tileBudget.spend(stand[1].tiles);
           next.set(stand[0], stand[1]);
           if (stand[1].node) nodes.push(stand[1].node);
         }

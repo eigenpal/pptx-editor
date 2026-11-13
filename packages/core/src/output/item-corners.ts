@@ -54,18 +54,24 @@ export function boxCorners(item: BoxItem): { x: number; y: number }[] {
   ];
 }
 
+/**
+ * The slide-space corners of a shape's text frame, grown to text that overflows it. Empty for a
+ * picture or a shape with no characters.
+ */
+export function textCorners(item: BoxItem): { x: number; y: number }[] {
+  if (item.kind !== 'shape' || !item.text || !item.textMatrix || !hasCharacters(item.text))
+    return [];
+  const b = item.text.box;
+  const h = Math.max(b.height, item.text.contentHeight);
+  const frame: Matrix = [1, 0, 0, 1, b.x, b.y];
+  // Rotated text can extend either way: take the box as a square of its larger side.
+  const side = item.text.rotation % 180 !== 0 ? Math.max(b.width, h) : 0;
+  return cornersUnder(multiplyMatrix(item.textMatrix, frame), side || b.width, side || h);
+}
+
 /** Slide-space corners of a shape's box, its outline, and its text frame (text can overflow the box). */
 export function contentCorners(item: BoxItem): { x: number; y: number }[] {
-  const out = boxCorners(item);
-  if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
-    const b = item.text.box;
-    const h = Math.max(b.height, item.text.contentHeight);
-    const frame: Matrix = [1, 0, 0, 1, b.x, b.y];
-    // Rotated text can extend either way: take the box as a square of its larger side.
-    const side = item.text.rotation % 180 !== 0 ? Math.max(b.width, h) : 0;
-    out.push(...cornersUnder(multiplyMatrix(item.textMatrix, frame), side || b.width, side || h));
-  }
-  return out;
+  return [...boxCorners(item), ...textCorners(item)];
 }
 
 /**

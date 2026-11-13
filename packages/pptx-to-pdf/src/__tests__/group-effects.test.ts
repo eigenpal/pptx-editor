@@ -246,14 +246,60 @@ describe('group effects in the PDF export', () => {
     expect(textObjects(streams)).toBe(textObjects(await contentText(plain.bytes)));
     expect(textObjects(streams)).toBeGreaterThan(0);
   });
+
+  test('text that a later shape covers paints once, clipped to the outside of it', async () => {
+    const labelled = (id: number, x: number, fill: string, label: string) =>
+      shape({
+        id,
+        x,
+        y: 1.5 * IN,
+        cx: 2.5 * IN,
+        cy: IN,
+        fill,
+        text: `<a:p><a:r><a:rPr lang="en-US"/><a:t>${label}</a:t></a:r></a:p>`,
+      });
+    const deck = (over: string) =>
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: group(
+              {
+                id: 10,
+                x: 2 * IN,
+                y: 1.5 * IN,
+                cx: 4 * IN,
+                cy: IN,
+                effects: '<a:effectLst><a:softEdge rad="63500"/></a:effectLst>',
+              },
+              labelled(11, 2 * IN, solid('C00000'), 'Under') + labelled(12, 3.5 * IN, over, 'Over')
+            ),
+          },
+        ],
+      });
+    const count = (all: string[], op: string) =>
+      all
+        .join(' ')
+        .split(/\s+/)
+        .filter((t) => t === op).length;
+    // A filled shape 12 covers the text of shape 11; with no fill, it covers nothing.
+    const covered = await contentByKind((await exportPdf(deck(solid('0070C0')), BEST)).bytes);
+    const open = await contentByKind((await exportPdf(deck('<a:noFill/>'), BEST)).bytes);
+    // Each text paints once, over the faded bodies on the page.
+    expect(count(covered.page, 'BT')).toBe(2);
+    expect(count(covered.forms, 'BT')).toBe(0);
+    // The covered text takes one even-odd clip: around it, outside shape 12.
+    expect(count(covered.page, 'W*') - count(open.page, 'W*')).toBe(1);
+  });
 });
 
-/** The decoded content of the page and of every form, as text. */
-async function contentText(bytes: Uint8Array): Promise<string[]> {
+/** The decoded content of the page and of the forms, apart. */
+async function contentByKind(bytes: Uint8Array): Promise<{ page: string[]; forms: string[] }> {
   const doc = await PDFDocument.load(bytes);
   const { Contents } = doc.getPages()[0]!.node.normalizedEntries();
   const pageRefs = new Set((Contents?.asArray() ?? []).map((r) => r.toString()));
-  const out: string[] = [];
+  const page: string[] = [];
+  const forms: string[] = [];
   for (const [ref, obj] of doc.context.enumerateIndirectObjects()) {
     if (!(obj instanceof PDFRawStream)) continue;
     const form = obj.dict.get(PDFName.of('Subtype')) === PDFName.of('Form');
@@ -261,7 +307,13 @@ async function contentText(bytes: Uint8Array): Promise<string[]> {
     const raw = obj.dict.has(PDFName.of('Filter'))
       ? decodePDFRawStream(obj).decode()
       : obj.contents;
-    out.push(new TextDecoder('latin1').decode(raw));
+    (form ? forms : page).push(new TextDecoder('latin1').decode(raw));
   }
-  return out;
+  return { page, forms };
+}
+
+/** The decoded content of the page and of every form, as text. */
+async function contentText(bytes: Uint8Array): Promise<string[]> {
+  const { page, forms } = await contentByKind(bytes);
+  return [...page, ...forms];
 }

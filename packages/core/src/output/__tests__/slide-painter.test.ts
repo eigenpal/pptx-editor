@@ -5,8 +5,11 @@ import { afterAll, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor } from '../../editor/index.ts';
-import type { LayoutItem } from '../../layout/index.ts';
+import { resolveSlide } from '../../cascade/index.ts';
+import { createFixedMeasurer, layoutSlide, type LayoutItem } from '../../layout/index.ts';
+import { readPptx } from '../../store/index.ts';
 import { paintSlide, type PaintOptions } from '../paint.ts';
+import { MAX_SLIDE_TILE_IMAGES } from '../paint-fill.ts';
 import { SlidePainter } from '../slide-painter.ts';
 
 const win = new GlobalWindow();
@@ -228,4 +231,61 @@ test('a stand-in is the earlier node of the same part and layer, not of a shared
   painter.paint({ ...layout, items: items.map((i) => ({ ...i })) }, 0);
   expect(content()).toEqual(before);
   editor.destroy();
+});
+
+const IMAGE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+const TILE = (sx: number, sy: number) =>
+  `<a:blipFill><a:blip r:embed="rIdImg"/><a:tile sx="${sx}" sy="${sy}" algn="tl"/></a:blipFill>`;
+
+/** The layout of one slide with `shapes` and an optional `background`, with a tile image. */
+function tiledLayout(shapes: string, background?: string) {
+  const r = readPptx(
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          rels: [['rIdImg', IMAGE_REL, '../media/image1.png']],
+          ...(background ? { background } : {}),
+          shapes,
+        },
+      ],
+    })
+  );
+  if (!r.ok) throw new Error('open failed');
+  return layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+}
+
+const TILE_OPTS: PaintOptions = {
+  images: () => 'blob:test',
+  imageSize: () => ({ cx: 1_219_200, cy: 914_400 }),
+  idPrefix: 'x',
+};
+
+test('each paint of a slide has the whole tile budget: a tiled background stays tiles', () => {
+  const layout = tiledLayout(
+    '',
+    `<p:bg><p:bgPr>${TILE(100_000, 100_000)}<a:effectLst/></p:bgPr></p:bg>`
+  );
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  const tiles = () => svg.querySelectorAll('[data-kind="background"] image').length;
+  const svg = painter.paint(layout);
+  // 10 × 8 tiles of 1_219_200 × 914_400 cover the slide, on each paint.
+  expect(tiles()).toBe(80);
+  const paints = Math.ceil(MAX_SLIDE_TILE_IMAGES / 80) + 10;
+  for (let i = 0; i < paints; i += 1) painter.paint(layout);
+  expect(tiles()).toBe(80);
+  expect([...svg.querySelectorAll('pattern')].some((p) => p.id.includes('tile'))).toBe(false);
+});
+
+test('shapes painted over several frames share one tile budget, as a fresh paint', () => {
+  // Three boxes of 40 × 40 tiles: two fit the slide budget, the third draws the pattern.
+  const box = (id: number): string =>
+    shape({ id, x: id * 400_000, y: 0, cx: 9_525 * 40, cy: 9_525 * 40, fill: TILE(781, 1041) });
+  const layout = tiledLayout(box(2) + box(3) + box(4));
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  let svg = painter.paint(layout, 1);
+  while (painter.pending) svg = painter.paint(layout, 1);
+  for (let i = 0; i < 3; i += 1) painter.paint(layout);
+  expect(svg.querySelectorAll('image').length).toBe(2 * 1_600 + 1);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, TILE_OPTS)));
 });
