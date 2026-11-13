@@ -19,6 +19,8 @@ Each character uses the font of its slot in the run (ECMA-376 `a:rPr`):
 
 Quotes, dashes, the ellipsis, and arrows use `a:ea` when the run's `lang` or `altLang` is Chinese, Japanese, or Korean. A space uses `a:latin`, except a space between two complex-script characters, which uses `a:cs`.
 
+The toolbar font picker and the automation `setFont` operation write the family to `a:latin`, `a:ea`, and `a:cs`, so text in every script takes it. A theme font maps to the theme reference of each slot, such as `+mn-lt` to `+mn-ea` and `+mn-cs`. The **Latin text font** field of the Font dialog writes only `a:latin`.
+
 When the slot's font has no glyph for a character, such as `①` in Arial, the character uses another loaded face that has it. East Asian faces come first.
 
 When a run names no East Asian font and the theme's `a:ea` is empty, the theme's script font (`a:font script="Jpan"`, `Hans`, `Hant`, or `Hang`) for the run's language applies. `lang` comes first, then `altLang`.
@@ -47,8 +49,10 @@ A justified (`algn="just"`) or distributed (`algn="dist"`) line with East Asian 
 The canvas takes text from input methods (IME) for Chinese, Japanese, and Korean:
 
 - The candidate window opens at the caret.
-- The text being composed shows at the caret, underlined.
+- The text being composed shows in place, underlined, in the font, size, and color of the text at the caret. The text after it moves to make room. In a diagram, the text being composed shows over the caret.
 - The result goes in once, at composition end, as one undo step. It replaces the selected text.
+- The text being composed is not in the document until composition end. It makes no undo step and no collaboration change, and neither `editor.snapshot()` nor `editor.save()` includes it. A save during a composition, such as an autosave, does not end the composition.
+- A click, a tap, or a right-click during a composition ends it first, then acts on the text you see.
 - Keys during a composition, and the Enter that ends one, run no editor shortcut.
 
 If you add your own key handlers, ignore events with `isComposing` set or with key code 229.

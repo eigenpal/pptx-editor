@@ -319,6 +319,34 @@ describe('the table context menu', () => {
     expect(contextMenuSelection(range, 'f', undefined, at)).toBeNull();
   });
 
+  test('a right-click in edited text outside the selection puts the caret at the click', () => {
+    const text = (from: number, to: number, cell?: { row: number; column: number }) =>
+      ({
+        kind: 'text',
+        nodeId: 's',
+        ...(cell ? { cell } : {}),
+        anchor: caret(0, from),
+        focus: caret(0, to),
+      }) as Extract<EditorSelection, { kind: 'text' }>;
+    // Inside the selection, or on its edge: the selection stays, so the menu acts on it.
+    expect(contextMenuSelection(text(2, 6), 's', undefined, text(4, 4))).toBeNull();
+    expect(contextMenuSelection(text(6, 2), 's', undefined, text(6, 6))).toBeNull();
+    // Outside it, or away from a caret: the caret goes to the click.
+    expect(contextMenuSelection(text(2, 6), 's', undefined, text(9, 9))).toEqual(text(9, 9));
+    expect(contextMenuSelection(text(3, 3), 's', undefined, text(0, 0))).toEqual(text(0, 0));
+    // In a table cell, the same.
+    const cell = { row: 0, column: 1 };
+    expect(contextMenuSelection(text(2, 6, cell), 's', undefined, text(3, 3, cell))).toBeNull();
+    expect(contextMenuSelection(text(2, 6, cell), 's', undefined, text(8, 8, cell))).toEqual(
+      text(8, 8, cell)
+    );
+    // A shape that is not being edited becomes the selection, as before.
+    expect(contextMenuSelection({ kind: 'none' }, 's', undefined, text(1, 1))).toEqual({
+      kind: 'shapes',
+      nodeIds: ['s'],
+    });
+  });
+
   test('the Format panel calls a table a table, and a refusal in view mode is information', () => {
     const geometry = { kind: 'graphicFrame' as const, nodeId: 'f' };
     expect(elementKindLabelKey(geometry, null)).toBe('panel.format.elementKind.graphicFrame');

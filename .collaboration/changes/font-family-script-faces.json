@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The font picker and automation setFont write a:ea and a:cs run properties through the existing node operations. Shared operations, room metadata, and document storage remain unchanged.",
+  "tests": [
+    "packages/core/src/editor/__tests__/font-picker.test.ts",
+    "packages/pro/src/__tests__/collaboration-coverage.test.ts"
+  ]
+}

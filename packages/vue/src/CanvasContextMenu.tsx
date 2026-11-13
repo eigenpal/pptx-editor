@@ -61,10 +61,11 @@ export function useCanvasContextMenu(): UseCanvasContextMenuReturn {
   const open = (owner: HTMLElement, at: ContextMenuPoint | null): void => {
     const instance = editor.value;
     if (entry() === false || !instance || instance.snapshot().status !== 'ready') return;
+    const kind = canvasMenuKind(instance.snapshot());
     const state: CanvasMenuState = {
-      // From the keyboard: open at the selection, or at the middle of the canvas.
-      at: canvasMenuPoint(owner, at),
-      kind: canvasMenuKind(instance.snapshot()),
+      // From the keyboard: open at the caret, the selection, or the middle of the canvas.
+      at: canvasMenuPoint(owner, at, instance.snapshot().selection.kind === 'text'),
+      kind,
       keyboard: at === null,
       owner,
     };

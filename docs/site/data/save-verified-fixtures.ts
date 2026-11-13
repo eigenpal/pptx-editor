@@ -171,7 +171,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'text.complex-scripts': 'sha256:e402ea570ff05a3119aaa7c0fdea9c60f4ea3f0eea149ca037ea9f1cd02634f1',
   'text.find-replace': 'sha256:9667d4f2087fb86efe2571042ea7c7e1d371e91cb66189b57a0b44750c317c74',
   'text.font-family-size':
-    'sha256:4a5c2bc26a3b131d3f39dbb42b4f282c87ad97ebb1b97f7733c509d72ee49acf',
+    'sha256:6a8534838c1ae38d136c6d80539f8a0b5f73f8df876318d41e4b265205c6656a',
   'text.format-painter': 'sha256:bfc0643f53ce620501692fa93a67daeadae2e18bb2b623651f571329dc85eaf9',
   'text.hyperlinks': 'sha256:3a55fd374282395cdefeb2b5f3f0b58f41fcedf64fc53657d000b5112663702c',
   'text.input-method': 'sha256:e2dccdc16125bdba88d31c8633ed7bef4f81273109149e0efa8fd728ec01c359',

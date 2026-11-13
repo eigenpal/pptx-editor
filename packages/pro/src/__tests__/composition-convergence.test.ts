@@ -91,7 +91,7 @@ async function peers(text: string, cells?: string[]) {
   };
   /** A composition starts over the input selection, as a keyboard that composes a word again. */
   const start = () => fire('compositionstart');
-  return { a, b, input, start, compose, commit, composing, done };
+  return { a, b, host, input, start, compose, commit, composing, done };
 }
 
 const nodeId = (e: PptxEditorInstance, name: string) =>
@@ -164,6 +164,24 @@ describe('a composition while a peer edits', () => {
     commit('日本');
     expect(shapeText(a)).toEqual(['Hello日本 world!']);
     expect(a.snapshot().lastRejection).toBeNull();
+    done();
+  });
+
+  test('the slide shows the composed text with a peer edit; the peer gets it at the end', async () => {
+    const { a, b, host, input, compose, commit, done } = await peers(para(run('Hello world')));
+    caret(a, nodeId(a, 'T'), 0, 5);
+    compose('日本');
+    input.dispatchEvent(new win.Event('input', { bubbles: true }) as unknown as Event);
+    const painted = () =>
+      host.querySelector('.pptx-surface__slide')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(painted()).toContain('Hello日本 world');
+    // The composed text is in no replica yet.
+    expect(shapeText(b)).toEqual(['Hello world']);
+    caret(b, nodeId(b, 'T'), 0, 11);
+    expect(b.input('text', '!').ok).toBe(true);
+    expect(painted()).toContain('Hello日本 world!');
+    commit('日本');
+    expect(shapeText(b)).toEqual(['Hello日本 world!']);
     done();
   });
 

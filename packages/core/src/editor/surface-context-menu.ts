@@ -1,14 +1,18 @@
 // Right-click on the slide. The surface stops the browser's own menu and sets the selection
-// before its context menu opens: a shape that is not selected becomes the
-// selection; a shape in the selection keeps it, and so does the shape whose text is being
-// edited; empty slide area clears the selection. A right-click on a table cell places the caret
-// in that cell (a cell range in the table stays, and so does a table selected as an object), so
-// the table menu acts on the cell under the pointer. The chrome then reads the selection and
-// draws its menu at the event's point, so no DOM type crosses the editor contract. A right-click
-// on the table's select handle selects the table as an object.
+// before its context menu opens: a shape that is not selected becomes the selection; a shape
+// in the selection keeps it, and so does the shape whose text is being edited, where a
+// right-click outside the text selection puts the caret at the click (after DOCX Editor
+// 627e74ab7); empty slide area clears the selection. A right-click on a table cell places the
+// caret in that cell (a cell range in the table stays, and so does a table selected as an
+// object), so the table menu acts on the cell under the pointer. The chrome then reads the
+// selection and draws its menu at the event's point, so no DOM type crosses the editor
+// contract. A right-click on the table's select handle selects the table as an object.
 
-import type { EditorSelection } from '../contracts/index.ts';
-import { parentGroupOf, selectionScope } from '../automation/commands/placement.ts';
+import type { EditorSelection, TableCellAddress, TextPoint } from '../contracts/index.ts';
+import type { LayoutItem, SlideLayout } from '../layout/index.ts';
+import { comparePoints } from '../automation/commands/text-model.ts';
+import { itemById, parentGroupOf, selectionScope } from '../automation/commands/placement.ts';
+import { pointAt } from './surface-geometry.ts';
 import type { SurfaceHost } from './surface.ts';
 
 type Point = { x: number; y: number };
@@ -18,19 +22,35 @@ export function contextMenuSelection(
   selection: EditorSelection,
   id: string | undefined,
   group: string | undefined,
-  cell?: Extract<EditorSelection, { kind: 'text' }>
+  caret?: Extract<EditorSelection, { kind: 'text' }>
 ): EditorSelection | null {
   if (!id) return selection.kind === 'none' ? null : { kind: 'none' };
   // A table selected as an object stays selected: its menu is the object menu.
   if (selection.kind === 'shapes' && selection.nodeIds.includes(id)) return null;
-  if (cell && !(selection.kind === 'cells' && selection.nodeId === id)) {
+  // The text selection under the pointer stays; elsewhere in its text, the caret goes there.
+  const keeps = (sel: Extract<EditorSelection, { kind: 'text' }>, at: TextPoint): boolean => {
+    const [from, to] =
+      comparePoints(sel.anchor, sel.focus) <= 0 ? [sel.anchor, sel.focus] : [sel.focus, sel.anchor];
+    return comparePoints(from, at) <= 0 && comparePoints(at, to) <= 0;
+  };
+  if (caret?.cell && !(selection.kind === 'cells' && selection.nodeId === id)) {
     const same =
       selection.kind === 'text' &&
       selection.nodeId === id &&
-      selection.cell?.row === cell.cell?.row &&
-      selection.cell?.column === cell.cell?.column;
-    return same ? null : cell;
+      selection.cell?.row === caret.cell.row &&
+      selection.cell?.column === caret.cell.column;
+    return same && keeps(selection, caret.focus) ? null : caret;
   }
+  if (
+    caret &&
+    !caret.cell &&
+    selection.kind === 'text' &&
+    selection.nodeId === id &&
+    !selection.cell &&
+    selection.diagramNode === undefined &&
+    !keeps(selection, caret.focus)
+  )
+    return caret;
   // A caret or a cell range in the table under the pointer stays, as a text selection does.
   if ((selection.kind === 'text' || selection.kind === 'cells') && selection.nodeId === id)
     return null;
@@ -93,9 +113,28 @@ export function selectForContextMenu(
   const scope = selectionScope(layout.items, selection);
   const inScope = scope ? hit(p, scope) : undefined;
   const id = inScope ?? hit(p);
-  const cell = id ? cellAt?.(id, p) : undefined;
-  const next = contextMenuSelection(selection, id, inScope ? scope : undefined, cell);
+  const caret = id ? cellAt?.(id, p) : undefined;
+  const next = contextMenuSelection(selection, id, inScope ? scope : undefined, caret);
   if (next) editor.select(next);
+}
+
+/**
+ * A caret at slide point `p` in the table cell (`cellItemAt`) or the text of `id`, for a
+ * right-click; none in view mode.
+ */
+export function menuCaret(
+  editor: Pick<SurfaceHost, 'layout' | 'readOnly'>,
+  id: string,
+  p: Point,
+  cellItemAt: (layout: SlideLayout) => { item: LayoutItem; cell: TableCellAddress } | undefined
+): Extract<EditorSelection, { kind: 'text' }> | undefined {
+  const layout = editor.layout();
+  if (!layout || editor.readOnly()) return undefined;
+  const at = cellItemAt(layout);
+  const item = at?.item ?? itemById(layout, id);
+  const point = item ? pointAt(item, p.x, p.y) : undefined;
+  if (!point) return undefined;
+  return { kind: 'text', nodeId: id, ...(at && { cell: at.cell }), anchor: point, focus: point };
 }
 
 /**

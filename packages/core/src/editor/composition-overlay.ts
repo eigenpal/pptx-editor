@@ -1,6 +1,6 @@
-// The surface's input while an IME composes: it shows the text being composed at the caret
-// (the slide shows the text only once the composition ends). DOM only; the state of the
-// composition is in `composition.ts`.
+// The surface's input while an IME composes and the slide cannot show the composed text in
+// place (`composition-preview.ts`): it shows the text being composed at the caret. DOM only;
+// the state of the composition is in `composition.ts`.
 
 /** A strong right-to-left letter: Hebrew, Arabic, Syriac, Thaana, N'Ko, and their forms. */
 const RTL = /[֐-ࣿיִ-﷿ﹰ-ﻼ]/u;

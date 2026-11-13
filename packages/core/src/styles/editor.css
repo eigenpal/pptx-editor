@@ -2224,8 +2224,9 @@
   pointer-events: none;
   caret-color: transparent;
 }
-/* While an IME composes, the input shows the text being composed at the caret, underlined, as
-   the platform shows it in a text field. The slide shows the text once the composition ends. */
+/* While an IME composes and the slide cannot show the composed text in place (a diagram node,
+   a selection that is not text), the input shows it at the caret, underlined, as the platform
+   shows it in a text field. */
 .pptx-surface__input.pptx-surface__input--composing {
   min-width: 1px;
   opacity: 1;
@@ -2236,6 +2237,17 @@
   caret-color: var(--doc-caret);
   text-decoration: underline;
   box-shadow: 0 0 0 1px var(--doc-surface);
+}
+/* The slide shows the composed text in place, underlined (`composition-preview.ts`): the input
+   stays hidden on the caret, where the candidate window opens. */
+.pptx-surface__input.pptx-surface__input--composing.pptx-surface__input--previewed {
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+}
+.pptx-surface__composition {
+  stroke: var(--doc-caret);
 }
 /* The layer over the slide shows the pointer's cursor (surface.ts `#updateCursor`): resize on
    a table's grid lines, text over text, move on shapes. The slide under it never shows the

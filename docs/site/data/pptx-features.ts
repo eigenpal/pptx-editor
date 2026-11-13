@@ -196,7 +196,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Type and compose text at the caret, with selection and deletion by grapheme cluster. Composition commits as one undo step, but conflicting peer edits can cancel unfinished text. Validate your target input methods.',
+      'Type and compose text at the caret, with selection and deletion by grapheme cluster. Composed text shows in place before it commits as one undo step, but conflicting peer edits can cancel unfinished text. Validate your target input methods.',
   },
   {
     id: 'text.complex-scripts',
