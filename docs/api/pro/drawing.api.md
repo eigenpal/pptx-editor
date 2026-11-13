@@ -23,6 +23,9 @@ export function innerShadowShift(dist: number, dir: number): {
 // @public
 export function installDrawing(options?: ProLicenseOptions): void;
 
+// @internal
+export const MAX_MORPH_SPREAD = 1270000;
+
 // @public
 export interface ProLicenseOptions {
     readonly licenseKey?: string;

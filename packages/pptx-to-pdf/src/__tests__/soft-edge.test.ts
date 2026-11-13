@@ -48,7 +48,12 @@ async function contentText(bytes: Uint8Array): Promise<string> {
   return text;
 }
 
-const soft = (cx: number, cy: number, rad: number): Promise<PdfExportResult> =>
+const soft = (
+  cx: number,
+  cy: number,
+  rad: number,
+  extra: { fill?: string; line?: string } = {}
+): Promise<PdfExportResult> =>
   exportPdf(
     buildPptx({
       slides: [
@@ -61,6 +66,7 @@ const soft = (cx: number, cy: number, rad: number): Promise<PdfExportResult> =>
             cx,
             cy,
             fill: solid('4472C4'),
+            ...extra,
             effects: `<a:effectLst><a:softEdge rad="${rad}"/></a:effectLst>`,
           }),
         },
@@ -93,7 +99,59 @@ describe('soft edge bands', () => {
   });
 });
 
+/** The line widths and stroke grays of a mask, in order. */
+const strokesOf = (mask: string): { width: number; gray: number }[] => {
+  const out: { width: number; gray: number }[] = [];
+  let gray = 0;
+  let width = 0;
+  for (const m of mask.matchAll(/([\d.]+) (G|w)\n|\nS\n/g)) {
+    if (m[2] === 'G') gray = Number(m[1]);
+    else if (m[2] === 'w') width = Number(m[1]);
+    else out.push({ width, gray });
+  }
+  return out;
+};
+
+const LINE_12PT = `<a:ln w="${12 * PT}"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>`;
+
 describe('soft edge paint', () => {
+  test('a 12 pt outline fades from its outer edge, as the SVG filter reads the stroke', async () => {
+    const result = await soft(3 * IN, 2 * IN, 2.5 * PT, { line: LINE_12PT });
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    const { spread, sigma } = softEdgeSpread(2.5 * PT);
+    const { reach } = softEdgeBands(-spread, sigma);
+    const extent = reach[reach.length - 1];
+    // The whole fade lies on the outline: it is wider than the soft edge reaches.
+    expect(extent).toBeLessThan(6 * PT);
+    // The outline is clipped to the outside of the fill, then stroked from its full width in.
+    expect(masks[0]).toContain('W*\nn');
+    const strokes = strokesOf(masks[0]);
+    expect(strokes).toHaveLength(reach.length + 1);
+    expect(strokes[0].width).toBeCloseTo(12 * PT, 0);
+    expect(strokes[0].gray).toBeLessThan(0.05);
+    for (let k = 1; k < strokes.length; k += 1) {
+      expect(strokes[k].width).toBeLessThan(strokes[k - 1].width);
+      expect(strokes[k].gray).toBeGreaterThanOrEqual(strokes[k - 1].gray);
+    }
+    // Past the fade, the inner part of the outline and the fill stay opaque.
+    expect(strokes[strokes.length - 1]).toEqual({
+      width: expect.closeTo(12 * PT - 2 * extent, 0),
+      gray: 1,
+    });
+  });
+
+  test('an outline with no fill fades from both of its edges', async () => {
+    const result = await soft(3 * IN, 2 * IN, 2.5 * PT, {
+      fill: '<a:noFill/>',
+      line: LINE_12PT,
+    });
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    expect(masks[0]).not.toContain('W*\nn');
+    expect(strokesOf(masks[0])[0].width).toBeCloseTo(12 * PT, 0);
+  });
+
   test('a filled shape paints through a mask of its outline bands', async () => {
     const result = await soft(3 * IN, 2 * IN, 10 * PT);
     const masks = await softMasks(result.bytes);
@@ -107,7 +165,7 @@ describe('soft edge paint', () => {
     expect(widths[widths.length - 1]).toBeCloseTo(2 * reach[0], 0);
     expect(await contentText(result.bytes)).toContain('0.4470588');
     expect(result.diagnostics.find((d) => d.code === 'effect.soft-edge')?.message).toContain(
-      'distance to the outline'
+      'distance to the painted edge'
     );
   });
 
