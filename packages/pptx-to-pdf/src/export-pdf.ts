@@ -185,6 +185,7 @@ async function renderSession(
     images: new Map(),
     gradients: new Map(),
     patterns: new Map(),
+    imageSize: session.imageSize,
   };
   for (const [pageIndex, { index, layout }] of layouts.entries()) {
     step();

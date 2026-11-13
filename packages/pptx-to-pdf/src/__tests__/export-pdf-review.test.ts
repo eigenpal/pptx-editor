@@ -341,7 +341,7 @@ describe('pictures', () => {
     expect(widths[0]).toBeCloseTo(76_200, 0);
   });
 
-  test('a picture cropped to a shape is clipped to it; effects are reported', async () => {
+  test('a picture cropped to a shape is clipped to it; its effects are drawn', async () => {
     const deck = buildPptx({
       slides: [
         {
@@ -353,7 +353,7 @@ describe('pictures', () => {
       media: [{ name: 'img.png', bytes: tinyPng(), contentType: 'image/png' }],
     });
     const result = await exportPdf(deck, BEST);
-    expect(result.diagnostics.map((d) => d.code)).toContain('picture.color-effects');
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('picture.color-effects');
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     const { fnArray } = await (await pdf.getPage(1)).getOperatorList();
     // A nonzero clip to the ellipse comes before the image.

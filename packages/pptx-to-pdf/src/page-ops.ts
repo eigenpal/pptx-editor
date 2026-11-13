@@ -25,6 +25,7 @@ import {
 } from 'pdf-lib';
 import type { Rgba } from '@pptx-editor.dev/core/cascade';
 import type { Matrix, PathCommand, RegisteredFace } from '@pptx-editor.dev/core/layout';
+import type { ImageSizePort } from '@pptx-editor.dev/core/output';
 import type { PptxPackage } from '@pptx-editor.dev/core/store';
 import type { EmbeddedFace } from './fonts.ts';
 import type { Work } from './options.ts';
@@ -97,6 +98,10 @@ export interface PaintResources {
   readonly gradients: Map<string, StopFunctions>;
   /** Tiling patterns by preset, colors, and page height, written once per document. */
   readonly patterns: Map<string, PDFRef>;
+  /** Pictures with color effects by image and effects (`a:grayscl`, `a:duotone`, …); `null` when not drawn. */
+  recolored?: Map<string, PDFRef | null>;
+  /** The natural size of a picture in EMU, for tiles (`DocumentSession.imageSize`). */
+  readonly imageSize?: ImageSizePort;
 }
 
 /** Fill, clip, and path operators that `pdf-lib` has no helper for. */
