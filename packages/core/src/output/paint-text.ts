@@ -5,8 +5,10 @@
 
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
 import {
+  dashArray,
   isIdeographic,
   lineUnderlines,
+  strokeCap,
   strikeoutBars,
   type GlyphRun,
   type PathCommand,
@@ -73,22 +75,19 @@ function decorationRects(
   baselineEmu: number,
   text: TextPaint,
   underline: TextPaint,
-  underlineRings: readonly UnderlineRing[] | undefined
+  underlineRings: readonly UnderlineRing[] | undefined,
+  outline: Record<string, string | undefined> | undefined
 ): SVGElement[] {
   const out: SVGElement[] = [];
   // The underline's shapes come from its line (`lineUnderlines`). It takes its own fill
-  // (`a:uFill`) when the run has one, and its outline (`a:uLn`) strokes it in a solid color.
+  // (`a:uFill`) when the run has one, and its outline (`a:uLn`) strokes it.
   if (underlineRings?.length) {
-    const line = run.props.underlineLine;
-    const color = line?.fill.type === 'solid' ? line.fill.color : undefined;
     out.push(
       svg(doc, 'path', {
         d: ringPathData(underlineRings),
         fill: underline.paint,
         'fill-opacity': underline.opacity < 1 ? num(underline.opacity) : undefined,
-        stroke: color ? toCss(color) : undefined,
-        'stroke-width': color && line ? num(line.width / EMU_PER_PT) : undefined,
-        'stroke-linejoin': color && line ? line.join : undefined,
+        ...outline,
       })
     );
   }
@@ -119,6 +118,37 @@ function decorationRects(
       })
     );
   return out;
+}
+
+/**
+ * The stroke of a run's underline outline (`a:uLn`, or the text outline for `a:uLnTx`), in
+ * points: its fill, its width, dash, cap, and join, as a shape outline takes them
+ * (`layout/line-strokes.ts`). The reference PDF of `underline-styles` strokes the underline's
+ * outline with the line, dashes and caps included, and a gradient spans the run's underline.
+ */
+function underlineStroke(
+  run: GlyphRun,
+  rings: readonly UnderlineRing[],
+  ctx: PaintContext
+): Record<string, string | undefined> | undefined {
+  const line = run.props.underlineLine;
+  if (!line || !(line.width > 0)) return undefined;
+  const xs = rings.flatMap((r) => r.map((q) => q[0] / EMU_PER_PT));
+  const ys = rings.flatMap((r) => r.map((q) => q[1] / EMU_PER_PT));
+  const [x, y] = [Math.min(...xs), Math.min(...ys)];
+  const box = { x, y, w: Math.max(Math.max(...xs) - x, 1), h: Math.max(Math.max(...ys) - y, 1) };
+  const paint = textFill(line.fill, box, ctx);
+  if (paint.paint === 'none') return undefined;
+  const width = line.width / EMU_PER_PT;
+  return {
+    stroke: paint.paint,
+    'stroke-opacity': paint.opacity < 1 ? num(paint.opacity) : undefined,
+    'stroke-width': num(width),
+    'stroke-linecap': strokeCap(line),
+    'stroke-linejoin': line.join,
+    'stroke-miterlimit': line.join === 'miter' ? num(Math.max(1, line.miterLimit)) : undefined,
+    'stroke-dasharray': dashArray(line, width)?.map(num).join(' '),
+  };
 }
 
 /** The path data of closed rings in EMU, in points. */
@@ -591,7 +621,8 @@ export function paintText(
           ? textFill(run.props.underlineFill, bounds, ctx)
           : fill;
         const rings = unders.get(run);
-        for (const d of decorationRects(doc, run, line.baseline, fill, under, rings))
+        const outline = rings?.length ? underlineStroke(run, rings, ctx) : undefined;
+        for (const d of decorationRects(doc, run, line.baseline, fill, under, rings, outline))
           group.appendChild(d);
       }
     }

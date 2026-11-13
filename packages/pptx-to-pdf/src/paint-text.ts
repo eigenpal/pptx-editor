@@ -22,9 +22,7 @@ import {
   pushGraphicsState,
   setFillingRgbColor,
   setFontAndSize,
-  setLineJoin,
   setLineWidth,
-  LineJoinStyle,
   setStrokingRgbColor,
   stroke,
   setTextMatrix,
@@ -46,7 +44,7 @@ import {
   type WarpedRun,
 } from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
-import { flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
+import { flatColor, gradientBox, ownFill, strokeStyle, type FillScope } from './paint-fill.ts';
 import { drawPicture } from './paint-picture.ts';
 import { clip, clipNonZero, EMU_PER_PT, rgb, tracePath, type PageOps } from './page-ops.ts';
 
@@ -460,17 +458,21 @@ function drawDecorations(
   };
   if (underline?.length) {
     shapes(run.props.underlineFill ?? run.props.fill, underline);
+    // The outline strokes as a shape outline does: width, dash, cap, and join, and a gradient
+    // in its middle color with a diagnostic, as on every line of the export.
     const line = run.props.underlineLine;
-    if (line && line.fill.type === 'solid' && line.width > 0) {
+    if (line && line.width > 0) {
       p.push(pushGraphicsState());
-      p.alpha(1, line.fill.color.a);
-      p.push(setStrokingRgbColor(...rgb(line.fill.color)), setLineWidth(line.width));
-      p.push(setLineJoin(JOINS[line.join]));
-      for (const ring of underline) {
-        ring.forEach(([x, y], i) => p.push(i ? lineTo(x, y) : moveTo(x, y)));
-        p.push(closePath());
+      const color = strokeStyle(line, p, scope);
+      if (color) {
+        p.alpha(1, color.a);
+        for (const ring of underline) {
+          ring.forEach(([x, y], i) => p.push(i ? lineTo(x, y) : moveTo(x, y)));
+          p.push(closePath());
+        }
+        p.push(stroke());
       }
-      p.push(stroke(), popGraphicsState());
+      p.push(popGraphicsState());
     }
   }
   if (strike === 'noStrike') return;
@@ -494,12 +496,6 @@ function drawDecorations(
     })
   );
 }
-
-const JOINS = {
-  round: LineJoinStyle.Round,
-  bevel: LineJoinStyle.Bevel,
-  miter: LineJoinStyle.Miter,
-} as const;
 
 /**
  * The picture of a picture bullet, standing on the baseline, stretched over its box as the SVG

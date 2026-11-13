@@ -170,6 +170,24 @@ describe('underline outline (EG_TextUnderlineLine)', () => {
     expect(outlined.getAttribute('stroke')).toBeTruthy();
   });
 
+  test('the outline takes the dash, caps, and gradient fill of a:uLn', () => {
+    const red = '<a:solidFill><a:srgbClr val="C00000"/></a:solidFill>';
+    const [dashed] = underlines(`<a:uLn w="25400">${red}<a:prstDash val="dash"/></a:uLn>`);
+    // A 2 pt line: `dash` is 4 widths on and 3 off.
+    expect(dashed.getAttribute('stroke-dasharray')).toBe('8 6');
+    expect(dashed.getAttribute('stroke-linecap')).toBe('butt');
+    const [dots] = underlines(
+      `<a:uLn w="38100" cap="rnd">${red}<a:prstDash val="sysDot"/></a:uLn>`
+    );
+    expect(dots.getAttribute('stroke-linecap')).toBe('round');
+    expect(dots.getAttribute('stroke-dasharray')).toBeTruthy();
+    const [gradient] = underlines(
+      '<a:uLn w="25400"><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="C00000"/></a:gs>' +
+        '<a:gs pos="100000"><a:srgbClr val="0070C0"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></a:uLn>'
+    );
+    expect(gradient.getAttribute('stroke')).toMatch(/^url\(/);
+  });
+
   test('a:uLn without a fill, and a:uLnTx on text without an outline, draw no outline', () => {
     expect(underlines('<a:uLn w="76200"/>')[0].getAttribute('stroke')).toBeNull();
     expect(underlines('<a:uLnTx/>')[0].getAttribute('stroke')).toBeNull();

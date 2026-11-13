@@ -64,6 +64,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'path-start', title: 'Paths without a move', perSlide: false },
   { id: 'flipped-text', title: 'Text in flipped shapes', perSlide: true },
   { id: 'content-placeholders', title: 'Content placeholders', perSlide: true },
+  { id: 'underline-styles', title: 'Underline styles', perSlide: true },
   { id: 'missing-glyphs', title: 'Missing glyphs', perSlide: false },
   { id: 'script-fonts', title: 'East Asian, complex-script, and symbol fonts', perSlide: true },
   { id: 'rtl', title: 'Right-to-left text', perSlide: true },
@@ -88,6 +89,8 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
+/** Underline types whose bars the reference PDFs match at every measured size. */
+const EXACT_UNDERLINES = new Set(['none', 'sng', 'words', 'dbl', 'heavy']);
 const ROTATED_TEXT = new Set([
   'vert',
   'vert270',
@@ -227,6 +230,11 @@ class Collector {
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');
         if (props.baseline !== 0) this.add('script-size');
         if (props.hyperlink || props.hyperlinkAction) this.add('hyperlink-text');
+        if (
+          !EXACT_UNDERLINES.has(props.underline) ||
+          (props.underline !== 'none' && props.underlineLine)
+        )
+          this.add('underline-styles');
         const fill = props.fill.type === 'group' ? this.group : props.fill;
         if (fill?.type === 'linear' || fill?.type === 'path') this.add('gradient-text');
         this.fill(fill, false);
