@@ -3,7 +3,8 @@
 // hostile ones, gives undefined so that the export draws the raster alternative.
 
 import { describe, expect, test } from 'bun:test';
-import { MAX_DRAWING_COMMANDS, parseSvgPath } from '../svg-picture-geometry.ts';
+import { MAX_DRAWING_COMMANDS, MAX_STYLE_RULES, parseSvgPath } from '../svg-picture-geometry.ts';
+import { svgDrawable } from '../svg-picture.ts';
 import {
   svgPictureDrawing,
   type SvgPictureGroup,
@@ -161,6 +162,76 @@ describe('svgPictureDrawing', () => {
       expect([name, svgPictureDrawing(bytes)]).toEqual([name, undefined]);
   });
 
+  test('reads many style rules and many elements in time linear in each', () => {
+    // Under the rule limit, with nested use links that visit tens of thousands of empty groups.
+    const rules = Array.from({ length: MAX_STYLE_RULES - 2 }, (_, i) => `.c${i}{fill:red}`).join(
+      ''
+    );
+    let fan = '<g id="l0" class="c1"/>';
+    for (let k = 1; k <= 4; k += 1)
+      fan += `<g id="l${k}" class="c${k}">${`<use href="#l${k - 1}"/>`.repeat(12)}</g>`;
+    const bytes = svg(
+      `<style>${rules}.late{fill:#00f}</style><defs>${fan}</defs><g><use href="#l4"/></g>` +
+        '<rect class="c5 late" width="4" height="4"/>'
+    );
+    expect(svgDrawable(bytes)).toBe(true);
+    const start = performance.now();
+    const d = svgPictureDrawing(bytes)!;
+    expect(performance.now() - start).toBeLessThan(500);
+    // The later rule of the same specificity wins.
+    expect((d.items.at(-1) as SvgPictureShape).fill!.color).toEqual({ r: 0, g: 0, b: 255, a: 1 });
+  });
+
+  test('draws the PNG for a picture past the style rule limit, quickly', () => {
+    const rules = Array.from({ length: 9_000 }, (_, i) => `.c${i}{fill:red}`).join('');
+    let fan = '<g id="l0"/>';
+    for (let k = 1; k <= 4; k += 1)
+      fan += `<g id="l${k}">${`<use href="#l${k - 1}"/>`.repeat(14)}</g>`;
+    const bytes = svg(`<style>${rules}</style>${fan}`);
+    expect(svgDrawable(bytes)).toBe(true);
+    const start = performance.now();
+    expect(svgPictureDrawing(bytes)).toBeUndefined();
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  test('orders rules by specificity before document order, past 10,000 selectors', () => {
+    const many = Array.from({ length: 300 }, (_, i) => `.c${i}`).join(',');
+    const [s] = shapes(
+      svg(
+        `<style>#me{fill:lime} ${many}{fill:red} ${many}{fill:red} ${many}{fill:red}</style>` +
+          '<rect id="me" class="c299" width="4" height="4"/>'
+      )
+    );
+    expect(s!.fill!.color).toEqual({ r: 0, g: 255, b: 0, a: 1 });
+  });
+
+  test('ignores an invalid paint, as a browser does', () => {
+    const [inherited, attribute] = shapes(
+      svg(
+        '<style>.x{fill:bogus}</style><g fill="#00f"><rect fill="bogus" width="4" height="4"/></g>' +
+          '<rect class="x" fill="#0f0" width="4" height="4"/>'
+      )
+    );
+    expect(inherited!.fill!.color).toEqual({ r: 0, g: 0, b: 255, a: 1 });
+    expect(attribute!.fill!.color).toEqual({ r: 0, g: 255, b: 0, a: 1 });
+  });
+
+  test('refuses numbers that a PDF operator cannot take, and writes noise as zero', () => {
+    const refused = {
+      overflow: svg(
+        '<g transform="scale(1e200)"><rect transform="scale(1e200)" width="4" height="4"/></g>'
+      ),
+      hugeViewBox: svg('<rect width="4" height="4"/>', 'viewBox="0 0 1e308 1e308"'),
+      hugeStroke: svg('<rect width="4" height="4" stroke="red" stroke-width="1e308"/>'),
+      hugePath: svg('<path d="M0 0L1e300 0z"/>'),
+    };
+    for (const [name, bytes] of Object.entries(refused))
+      expect([name, svgPictureDrawing(bytes)]).toEqual([name, undefined]);
+    const [turned] = shapes(svg('<rect transform="rotate(90)" width="4" height="4"/>'));
+    expect(turned!.matrix[0]).toBe(0);
+    expect(turned!.matrix[3]).toBe(0);
+  });
+
   test('refuses hostile nesting, long paths, and use cycles quickly', () => {
     const deep = svg(`${'<g>'.repeat(400)}<rect width="4" height="4"/>${'</g>'.repeat(400)}`);
     const longPath = svg(`<path d="M0 0${' l1 1'.repeat(50_000)}"/>`);
@@ -197,6 +268,22 @@ describe('parseSvgPath', () => {
     // The half circle passes through its lowest point at 10, -10 (sweep 1 turns clockwise in y down).
     expect(curves[0]).toMatchObject({ x: expect.closeTo(10, 6), y: expect.closeTo(-10, 6) });
     expect(curves[1]).toMatchObject({ x: 20, y: 0 });
+  });
+
+  test('draws an arc of a huge or tiny radius as SVG does', () => {
+    // A radius too large for its square draws the straight chord.
+    expect(parseSvgPath('M0 0 A1e300 1e300 0 0 1 20 0')).toEqual([
+      { op: 'M', x: 0, y: 0 },
+      { op: 'L', x: 20, y: 0 },
+    ]);
+    // A radius too small scales up until the arc reaches its end: a half circle.
+    const scaled = parseSvgPath('M0 0 A1e-300 1e-300 0 0 1 20 0').filter((c) => c.op === 'C');
+    for (const c of scaled)
+      expect(Object.values(c).every((v) => typeof v === 'string' || Number.isFinite(v))).toBe(true);
+    expect(parseSvgPath('M0 0 A1 1 0 0 1 20 0').filter((c) => c.op === 'C')[0]).toMatchObject({
+      x: expect.closeTo(10, 6),
+      y: expect.closeTo(-10, 6),
+    });
   });
 
   test('keeps the path up to an error, as SVG renders it', () => {

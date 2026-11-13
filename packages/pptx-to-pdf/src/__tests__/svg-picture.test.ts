@@ -27,7 +27,12 @@ function png(): Uint8Array {
   return new Uint8Array(PNG.sync.write(image));
 }
 
-const deck = (svg: string, blipChildren = '', fill = '<a:stretch><a:fillRect/></a:stretch>') =>
+const deck = (
+  svg: string,
+  blipChildren = '',
+  fill = '<a:stretch><a:fillRect/></a:stretch>',
+  cx = IN
+) =>
   buildPptx({
     slides: [
       {
@@ -35,7 +40,7 @@ const deck = (svg: string, blipChildren = '', fill = '<a:stretch><a:fillRect/></
         shapes:
           `<p:pic><p:nvPicPr><p:cNvPr id="4" name="Picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>` +
           `<p:blipFill><a:blip r:embed="rIdImg">${blipChildren}${SVG_EXT}</a:blip>${fill}</p:blipFill>` +
-          `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm>` +
+          `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${IN}"/></a:xfrm>` +
           `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`,
         rels: [
           ['rIdImg', `${R}/image`, '../media/img.png'],
@@ -77,6 +82,21 @@ describe('SVG pictures in the PDF', () => {
     expect(text).toMatch(/\/ca 0\.5/);
   });
 
+  test('a picture with a width and height but no view box stretches over its frame', async () => {
+    // Browsers draw such a picture through the editor's <image preserveAspectRatio="none">
+    // stretched, as if its view box were 0 0 width height.
+    const svg = `<svg ${NS} width="50" height="50"><rect width="50" height="50" fill="red"/></svg>`;
+    const result = await exportPdf(deck(svg, '', undefined, 2 * IN), BEST);
+    expect(result.diagnostics.find((d) => d.code === 'picture.svg-fallback')).toBeUndefined();
+    const { fnArray, argsArray } = await operators(result.bytes);
+    const scales = fnArray.flatMap((op, i) => {
+      const m = argsArray[i] as number[];
+      return op === OPS.transform && m[1] === 0 && m[2] === 0 ? [m[0]! / m[3]!] : [];
+    });
+    // The view box maps 50 user units to the 2 in width and to the 1 in height.
+    expect(scales.some((r) => Math.abs(r - 2) < 1e-6)).toBe(true);
+  });
+
   const fallbacks: Record<string, [string, string?, string?]> = {
     'outside the subset (a gradient)': [
       `<svg ${NS} viewBox="0 0 4 4"><linearGradient id="g"/><rect width="4" height="4" fill="url(#g)"/></svg>`,
@@ -89,11 +109,25 @@ describe('SVG pictures in the PDF', () => {
       `<svg ${NS} viewBox="0 0 4 4">${'<g>'.repeat(400)}${'</g>'.repeat(400)}</svg>`,
     ],
     'with color effects': [ICON, '<a:grayscl/>'],
+    'whose view box scales past a PDF number': [
+      `<svg ${NS} viewBox="0 0 1e-8 1e-8"><rect width="1e-8" height="1e-8"/></svg>`,
+    ],
+    'with an overflowing transform': [
+      `<svg ${NS} viewBox="0 0 4 4"><g transform="scale(1e200)"><rect transform="scale(1e200)" width="4" height="4"/></g></svg>`,
+    ],
     tiled: [ICON, '', '<a:tile tx="0" ty="0" sx="100000" sy="100000" flip="none" algn="tl"/>'],
   };
   for (const [name, [svg, blip, fill]] of Object.entries(fallbacks))
     test(`an SVG picture ${name} draws its PNG fallback and says so`, async () => {
       const result = await exportPdf(deck(svg, blip, fill), BEST);
+      // Every number the page draws with is finite and within a plain PDF real.
+      const numbers: number[] = [];
+      const collect = (v: unknown): void => {
+        if (typeof v === 'number') numbers.push(v);
+        else if (v && typeof v === 'object') for (const x of Object.values(v)) collect(x);
+      };
+      collect((await operators(result.bytes)).argsArray);
+      expect(numbers.every((v) => Number.isFinite(v) && Math.abs(v) < 1e13)).toBe(true);
       const fallback = result.diagnostics.find((d) => d.code === 'picture.svg-fallback');
       expect(fallback?.severity).toBe('information');
       expect(new TextDecoder('latin1').decode(result.bytes)).toContain('/Subtype /Image');

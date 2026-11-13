@@ -14,8 +14,11 @@
 import { PRESET_COLORS, readXml, type PathCommand, type XmlNode } from '@eigenpal/ooxml-core';
 import type { Matrix } from '../layout/index.ts';
 import {
+  drawingNumber,
+  drawingPath,
   IDENTITY,
   MAX_DRAWING_COMMANDS,
+  MAX_STYLE_RULES,
   multiply,
   num,
   numberList,
@@ -160,9 +163,54 @@ interface Rule {
   readonly type: string | undefined;
   readonly classes: readonly string[];
   readonly id: string | undefined;
-  /** Ids, classes, types; then the rule's order. */
-  readonly rank: number;
+  /** Ids, classes, and types in the selector, for the cascade order. */
+  readonly specificity: readonly [number, number, number];
+  /** The rule's place in the document, and after `index` its place in the cascade order. */
+  order: number;
   readonly decls: readonly (readonly [string, string, boolean])[];
+}
+
+/**
+ * The rules of a picture, sorted once in cascade order and filed by one key of each selector:
+ * its id, else its first class, else its type, else none. An element looks only in the files
+ * of its own id, classes, and type, and in the file of rules without a key.
+ */
+interface RuleIndex {
+  readonly byId: Map<string, Rule[]>;
+  readonly byClass: Map<string, Rule[]>;
+  readonly byType: Map<string, Rule[]>;
+  readonly any: Rule[];
+}
+
+function indexRules(rules: Rule[]): RuleIndex {
+  const sorted = [...rules].sort(
+    (a, b) =>
+      a.specificity[0] - b.specificity[0] ||
+      a.specificity[1] - b.specificity[1] ||
+      a.specificity[2] - b.specificity[2] ||
+      a.order - b.order
+  );
+  const out: RuleIndex = { byId: new Map(), byClass: new Map(), byType: new Map(), any: [] };
+  const file = (map: Map<string, Rule[]>, key: string, rule: Rule) => {
+    const list = map.get(key);
+    if (list) list.push(rule);
+    else map.set(key, [rule]);
+  };
+  sorted.forEach((rule, at) => {
+    rule.order = at;
+    if (rule.id !== undefined) file(out.byId, rule.id, rule);
+    else if (rule.classes.length > 0) file(out.byClass, rule.classes[0]!, rule);
+    else if (rule.type !== undefined) file(out.byType, rule.type, rule);
+    else out.any.push(rule);
+  });
+  return out;
+}
+
+/** Whether a paint property's value is one a browser reads; an invalid one is dropped. */
+function validValue(name: string, value: string): boolean {
+  if (value === 'inherit') return true;
+  if (name === 'fill' || name === 'stroke') return parseColor(value) !== undefined;
+  return true;
 }
 
 function declarationList(css: string): [string, string, boolean][] {
@@ -197,8 +245,9 @@ function parseSheet(css: string, rules: Rule[]): void {
       if (ids.length > 1) throw new SvgUnsupported('selector');
       const classes = parts.filter((p) => p[0] === '.').map((p) => p.slice(1));
       const type = m[1] && m[1] !== '*' ? m[1] : undefined;
-      const specificity = ids.length * 1e6 + classes.length * 1e3 + (type ? 1 : 0);
-      rules.push({ type, classes, id: ids[0], rank: specificity * 1e4 + rules.length, decls });
+      if (rules.length >= MAX_STYLE_RULES) throw new SvgUnsupported('too many style rules');
+      const specificity = [ids.length, classes.length, type ? 1 : 0] as const;
+      rules.push({ type, classes, id: ids[0], specificity, order: rules.length, decls });
     }
     at = close + 1;
   }
@@ -206,27 +255,44 @@ function parseSheet(css: string, rules: Rule[]): void {
 
 type Style = Readonly<Record<string, string>>;
 
-/** The declared values of an element: presentation attributes, then sheet rules, then `style`. */
-function declared(el: Element, local: string, rules: readonly Rule[]): Map<string, string> {
+const declaredCache = new WeakMap<Element, Map<string, string>>();
+
+/**
+ * The declared values of an element: presentation attributes, then sheet rules, then `style`,
+ * without values a browser drops as invalid. Read once per element of one picture.
+ */
+function declared(el: Element, local: string, rules: RuleIndex): Map<string, string> {
+  const known = declaredCache.get(el);
+  if (known) return known;
   const out = new Map<string, string>();
+  const set = (name: string, value: string) => {
+    if (validValue(name, value)) out.set(name, value);
+  };
   for (const name in el.attributes)
-    if (PROPERTIES.has(name)) out.set(name, el.attributes[name]!.trim());
-  const classes = (el.attributes.class ?? '').trim().split(/\s+/);
+    if (PROPERTIES.has(name)) set(name, el.attributes[name]!.trim());
+  const classes = [...new Set((el.attributes.class ?? '').trim().split(/\s+/))].filter(Boolean);
   const id = el.attributes.id;
-  const matching = rules
+  const candidates = [
+    ...(id !== undefined ? (rules.byId.get(id) ?? []) : []),
+    ...classes.flatMap((c) => rules.byClass.get(c) ?? []),
+    ...(rules.byType.get(local) ?? []),
+    ...rules.any,
+  ];
+  const matching = candidates
     .filter(
       (r) =>
         (r.type === undefined || r.type === local) &&
         (r.id === undefined || r.id === id) &&
         r.classes.every((c) => classes.includes(c))
     )
-    .sort((a, b) => a.rank - b.rank);
+    .sort((a, b) => a.order - b.order);
   const inline = declarationList(el.attributes.style ?? '');
   for (const pass of [false, true]) {
     for (const r of matching)
-      for (const [name, value, important] of r.decls) if (important === pass) out.set(name, value);
-    for (const [name, value, important] of inline) if (important === pass) out.set(name, value);
+      for (const [name, value, important] of r.decls) if (important === pass) set(name, value);
+    for (const [name, value, important] of inline) if (important === pass) set(name, value);
   }
+  declaredCache.set(el, out);
   return out;
 }
 
@@ -319,7 +385,7 @@ function read(bytes: Uint8Array): SvgPictureDrawing | undefined {
 
   // Ids and style sheets, in document order.
   const ids = new Map<string, { el: Element; scope: Scope }>();
-  const rules: Rule[] = [];
+  const sheetRules: Rule[] = [];
   const index = (el: Element, scope: Scope): void => {
     const inner = scopeOf(el, scope);
     const local = svgLocal(el, inner);
@@ -327,13 +393,14 @@ function read(bytes: Uint8Array): SvgPictureDrawing | undefined {
     const id = el.attributes.id;
     if (id !== undefined && !ids.has(id)) ids.set(id, { el, scope: inner });
     if (local === 'style') {
-      for (const c of el.children) if (c.type === 'text') parseSheet(c.value, rules);
+      for (const c of el.children) if (c.type === 'text') parseSheet(c.value, sheetRules);
       return;
     }
     for (const c of el.children) if (c.type === 'element') index(c, inner);
   };
   const rootScope = scopeOf(root, new Map());
   index(root, new Map());
+  const rules = indexRules(sheetRules);
 
   const ra = root.attributes;
   const vbList = numberList(ra.viewBox);
@@ -346,6 +413,8 @@ function read(bytes: Uint8Array): SvgPictureDrawing | undefined {
         ? [0, 0, w, h]
         : undefined;
   if (!viewBox) return undefined;
+  const box = viewBox.map(drawingNumber) as [number, number, number, number];
+  if (!(box[2] > 0 && box[3] > 0)) return undefined;
 
   let commands = 0;
   let visited = 0;
@@ -564,7 +633,31 @@ function read(bytes: Uint8Array): SvgPictureDrawing | undefined {
   const rootOpacity = opacity(own.get('opacity'));
   const top: SvgPictureItem[] = [];
   emit(items, rootOpacity, own.get('clip-path'), IDENTITY, style, [], top, false);
-  return { viewBox, items: top };
+  return { viewBox: box, items: top.map(checked) };
+}
+
+/** An item with every number checked by `drawingNumber`, or a throw for one out of range. */
+function checked(item: SvgPictureItem): SvgPictureItem {
+  if (item.kind === 'group')
+    return {
+      ...item,
+      ...(item.clip ? { clip: { ...item.clip, path: drawingPath(item.clip.path) } } : {}),
+      items: item.items.map(checked),
+    };
+  return {
+    ...item,
+    matrix: item.matrix.map(drawingNumber) as unknown as Matrix,
+    path: drawingPath(item.path),
+    ...(item.stroke
+      ? {
+          stroke: {
+            ...item.stroke,
+            width: drawingNumber(item.stroke.width),
+            miterLimit: drawingNumber(item.stroke.miterLimit),
+          },
+        }
+      : {}),
+  };
 }
 
 function throwUnsupported(): never {
