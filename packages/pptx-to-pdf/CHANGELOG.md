@@ -1,5 +1,22 @@
 # @pptx-editor.dev/pptx-to-pdf
 
+## 0.5.0
+
+### Patch Changes
+
+- 14256cd: In exported PDFs, a group's shadow, glow, reflection, and soft edge draw once for the whole group, with sharp text over a soft edge. A group's blur applies to each shape. Diagnostics `effect.group-silhouette`, `effect.group-soft-edge`, `effect.group-soft-edge-effects`, `effect.group-body`, and `effect.group-text-order` report the approximations.
+- 14256cd: Draw fill overlays (`a:fillOverlay`) in exported PDFs with their blend mode.
+- 14256cd: Draw tiled picture fills and picture color effects (grayscale, duotone, brightness and contrast, and black and white) in PDF export, with the tile placement and colors of the editor.
+- 14256cd: The PDF export draws `path="shape"` gradients as bands of the outline, applies gradient stop alpha once to rectangle and shape path gradients, draws the bands of dashed compound lines, and fades soft edges. The export and the editor share these rules.
+- 14256cd: Draw simple SVG pictures in exported PDFs as vector paths instead of their PNG fallback.
+- 14256cd: Draw every underline style and the underline outline in exported PDFs, with the same shapes, dashes, and caps as the editor. A gradient underline outline draws in its middle color and reports a `line.gradient` approximation.
+- 14256cd: Draw picture borders with round dots, line caps, and joins, in the editor and in PDF export. Dashes with round or square caps on closed outlines start at the closing segment, so their pattern sits correctly. Picture brightness combined with contrast is more accurate.
+- 14256cd: End right-to-left lines on whole points, so they sit up to half a point more accurately. In PDF export, draw upright vertical characters upright, and write subscript and superscript runs as their own text items, so text extraction reads them apart.
+- 14256cd: Improve 3-D shapes: the scene's light shades the face and the extrusion sides for every camera, bevel presets follow measured profiles, and a turned extrusion casts its shadow and glow from its back. Turned faces in the editor no longer shift by a few pixels. PDF export draws blur as an edge fade with a halo.
+- 14256cd: Improve 3-D shapes: plastic and metal materials show stronger highlights, metal shines at its edges, lower bevels catch a soft highlight, and the top-left light and bevel profiles are more accurate. Bevels in exported PDFs no longer show seams. Skewed reflections keep their exact transform.
+- 14256cd: Fix tiled picture fills in printed slides: each tile prints as an image with no seams between mirrored tiles, and tiles fill the whole shape, up to 4,096 tile images per slide. A PNG or BMP resolution in pixels per meter that rounds to a whole DPI reads as that DPI.
+- Updated dependencies: @pptx-editor.dev/core@0.5.0, @pptx-editor.dev/pro@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

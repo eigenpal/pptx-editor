@@ -1,5 +1,31 @@
 # @pptx-editor.dev/core
 
+## 0.5.0
+
+### Minor Changes
+
+- ef380c0: Set the transparency of a shape's solid fill from the Format pane, with a slider and a percent field under Fill color. `ShapeFormatDetail.solid` reads the fill color and opacity, and the `{ kind: 'solid', opacity }` patch writes it. A new fill color now keeps the current transparency.
+- 14256cd: Draw group effects (`p:grpSpPr/a:effectLst`) on the whole group: one outer shadow, and with the Pro drawing renderers, glow, soft edge, reflection, and blur. Text under a group soft edge paints once, sharp, and a later opaque shape hides it. Inner shadows, effects nested in two effect groups, and effects of groups over 1,000 elements do not draw. `ResolvedGroup` has a new `effects` field.
+
+### Patch Changes
+
+- 14256cd: Improve the vertical placement of equations. Percent and exact line spacing apply to a line that holds an equation as they do to text. Fractions inside fractions, superscripts over tall bases, and radicals get more accurate shifts and room above them.
+- 14256cd: Improve the horizontal spacing of equations: scripts use the script-style advances of a math font, and radicals widen with their height. `TextMeasurer.advances` takes a new `mathScript` option, and `ResolvedFace` has a new `hasMathTable` flag for faces with a `MATH` table.
+- 526d3b2: Apply a picked font family to East Asian and complex script text too: the font picker and automation `setFont` write `a:ea` and `a:cs` with `a:latin`.
+- 526d3b2: Show text an input method composes in place on the slide, in the run's own font, with the text after it reflowed. Delete every character a mobile keyboard names in one deletion. A right-click outside the edited text selection moves the caret there, and Shift+F10 opens the menu below the caret.
+- 14256cd: Draw tiled picture fills and picture color effects (grayscale, duotone, brightness and contrast, and black and white) in PDF export, with the tile placement and colors of the editor.
+- 14256cd: Draw picture borders with round dots, line caps, and joins, in the editor and in PDF export. Dashes with round or square caps on closed outlines start at the closing segment, so their pattern sits correctly. Picture brightness combined with contrast is more accurate.
+- ef380c0: Show the rotation handle as a green circle, with a rotate arrow as its pointer and during a rotation drag.
+- 14256cd: End right-to-left lines on whole points, so they sit up to half a point more accurately. In PDF export, draw upright vertical characters upright, and write subscript and superscript runs as their own text items, so text extraction reads them apart.
+- d96753a: Restructure the incremental slide painter internally. Painted output and the public API do not change.
+- 14256cd: Read simple SVG pictures without a DOM, with bounds on their size and structure, so PDF export can draw them as vectors.
+- 14256cd: Improve 3-D shapes: the scene's light shades the face and the extrusion sides for every camera, bevel presets follow measured profiles, and a turned extrusion casts its shadow and glow from its back. Turned faces in the editor no longer shift by a few pixels. PDF export draws blur as an edge fade with a halo.
+- 14256cd: Improve 3-D shapes: plastic and metal materials show stronger highlights, metal shines at its edges, lower bevels catch a soft highlight, and the top-left light and bevel profiles are more accurate. Bevels in exported PDFs no longer show seams. Skewed reflections keep their exact transform.
+- 14256cd: Fix tiled picture fills in printed slides: each tile prints as an image with no seams between mirrored tiles, and tiles fill the whole shape, up to 4,096 tile images per slide. A PNG or BMP resolution in pixels per meter that rounds to a whole DPI reads as that DPI.
+- 14256cd: Draw every underline style, including dotted, dashed, and wavy underlines and their heavy and double forms. An underline outline (`a:uLn`, `a:uLnTx`) strokes the underline, and the new `RunProps.underlineLine` field holds it. Underlined runs on one line share one underline, and small caps in a superscript or subscript keep the script size.
+- 14256cd: Place each column of a multi-column text box a whole number of points right of the first column, as each baseline sits a whole number of points below its column top. Text in the second and later columns no longer sits up to 0.4 pt off its place.
+- Updated dependencies: @pptx-editor.dev/i18n@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

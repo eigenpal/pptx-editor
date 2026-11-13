@@ -1,5 +1,15 @@
 # @pptx-editor.dev/react
 
+## 0.5.0
+
+### Minor Changes
+
+- ef380c0: Set the transparency of a shape's solid fill from the Format pane, with a slider and a percent field under Fill color. `ShapeFormatDetail.solid` reads the fill color and opacity, and the `{ kind: 'solid', opacity }` patch writes it. A new fill color now keeps the current transparency.
+
+### Patch Changes
+
+- Updated dependencies: @pptx-editor.dev/core@0.5.0, @pptx-editor.dev/i18n@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
