@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The 3-D materials, light, and bevel profiles, the PDF outline of 3-D facets, and the transform precision of reflections affect painted output and PDF output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/pro/src/drawing/__tests__/three-d.test.ts",
+    "packages/pro/src/drawing/__tests__/effects-paint.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/three-d.test.ts"
+  ]
+}

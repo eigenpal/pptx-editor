@@ -27,9 +27,8 @@ import {
   type EffectFilterPaint,
   type EffectIds,
   type EffectNode,
-  type Matrix,
 } from '@pptx-editor.dev/core/layout';
-import { blurSigma } from '@pptx-editor.dev/core/output';
+import { blurSigma, matrixAttr } from '@pptx-editor.dev/core/output';
 import {
   boundsOf,
   glowSpread,
@@ -55,10 +54,6 @@ function node(
   children: readonly EffectNode[] = []
 ): EffectNode {
   return children.length > 0 ? { tag, attrs, children } : { tag, attrs };
-}
-
-function matrixAttr(m: Matrix): string {
-  return `matrix(${m.map(num).join(' ')})`;
 }
 
 /** The filter region attributes for bounds in user space. */

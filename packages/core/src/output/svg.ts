@@ -89,6 +89,7 @@ const coefficient = (v: number): string => {
 /**
  * Format a matrix for `transform`: the linear part to 1e-6, the offset to 0.01. A coefficient
  * rounded to 0.01 would move a point at 10^7 EMU by up to 50,000 EMU.
+ * @internal
  */
 export function matrixAttr(m: readonly number[]): string {
   return `matrix(${matrixParts(m).join(' ')})`;

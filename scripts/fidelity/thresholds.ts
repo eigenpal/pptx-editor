@@ -229,8 +229,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'picture-editing/1': ['pixels'],
     'picture-editing/2': ['pixels'],
     'pictures/1': ['pixels'],
-    'preserved-content/1': ['pixels'],
-    'three-d-effects/2': ['pixels'],
   },
 };
 
@@ -314,7 +312,5 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
     'equations/4': ['baseline'],
     'fill-fidelity/6': ['pixels'],
     'fills-lines/1': ['extra-text'],
-    'preserved-content/1': ['pixels'],
-    'three-d-effects/2': ['pixels'],
   },
 };

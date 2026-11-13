@@ -153,6 +153,9 @@ export function lumTransfer(bright: number, contrast: number): {
 };
 
 // @internal
+export function matrixAttr(m: readonly number[]): string;
+
+// @internal
 export const MAX_METAFILE_RASTER_EDGE = 4096;
 
 // @internal

@@ -72,6 +72,22 @@ describe('3-D shapes in the PDF', () => {
     for (const s of await streamsOf(result.bytes)) expect(s.text).not.toContain('NaN');
   });
 
+  test('opaque bevel strips have an outline of their own color, as in the SVG paint', async () => {
+    const result = await exportPdf(
+      deckOf({
+        cx: 2 * IN,
+        cy: IN,
+        effects: `${SCENE('')}<a:sp3d><a:bevelT w="76200" h="76200" prst="angle"/></a:sp3d>`,
+      }),
+      BEST
+    );
+    const text = (await streamsOf(result.bytes)).map((s) => s.text).join('\n');
+    // Each strip fills and strokes (`B`) with the same color, so neighbors leave no seam.
+    const strips = [...text.matchAll(/([\d.]+ [\d.]+ [\d.]+) rg\s+\1 RG\s+[\d.]+ w\s+1 j\s/g)];
+    expect(strips.length).toBeGreaterThanOrEqual(4);
+    expect(text).toMatch(/\bB\s/);
+  });
+
   test('the shadow of a turned face turns with it', async () => {
     const shadow =
       '<a:effectLst><a:outerShdw dist="0" dir="0" algn="ctr" rotWithShape="0">' +

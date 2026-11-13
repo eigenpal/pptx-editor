@@ -15,7 +15,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //
 // The light lies in the shape's own axes and is fitted to that fixture: the three-point rig from
 // the top on the warm matte material, over bevels, faces, and extrusion sides under many cameras.
-// The highlight depends on the view. Other rigs, directions, and materials are approximate.
+// The highlight depends on the view. A material changes only the highlights: matte, plastic, and
+// metal are measured. Other rigs, directions, and materials are approximate.
 
 import type { ResolvedThreeD } from '@pptx-editor.dev/core/cascade';
 
@@ -182,7 +183,10 @@ interface Rig {
  * under 18 cameras (slides 3 and 4), the extrusion sides (slides 3 and 4), and the turned faces
  * (`three-d-turned-effects`, slide 1), within 3.3 levels of 255 on average. The third, a rim
  * light from below and behind, is fitted to the outer strips of the bevels of slide 1, which
- * catch light at the bottom edge.
+ * catch light at the bottom edge. The fourth, from below, and the direction of the first are
+ * fitted to the circle and angle bevels of slides 1 and 2 and to the turned circle bevels
+ * (slide 4, and `preserved-content`): a lower bevel shows a soft highlight below the middle of
+ * the band.
  */
 const THREE_POINT: Rig = {
   ambient: 0.1253,
@@ -192,9 +196,10 @@ const THREE_POINT: Rig = {
     { dir: [-0.286, 0.571, -0.769], k: 0.929 },
   ],
   highlights: [
-    { dir: [-0.355, -0.749, 0.559], k: 0.484, power: 28.5 },
+    { dir: [-0.355, -0.719, 0.597], k: 0.484, power: 28.5 },
     { dir: [-0.457, 0.459, -0.762], k: 1.125, power: 82.4 },
     { dir: [0, 0.485, -0.875], k: 0.13, power: 24 },
+    { dir: [0.307, 0.851, 0.426], k: 0.169, power: 37.3 },
   ],
 };
 
@@ -225,12 +230,12 @@ const RIGS: Readonly<Record<string, Rig>> = {
 
 /**
  * How far the rig turns the light about the view axis, by `dir`, in degrees. The top-left
- * direction is fitted to the bevel of slide 2 of the fixture; the others follow the compass
- * and are approximate.
+ * direction is fitted to the four sides of its circle bevel on slide 2 of the fixture; the others
+ * follow the compass and are approximate.
  */
 const DIR_TURN: Readonly<Record<string, number>> = {
   t: 0,
-  tl: -55,
+  tl: -32,
   l: -90,
   bl: -135,
   b: 180,
@@ -239,11 +244,38 @@ const DIR_TURN: Readonly<Record<string, number>> = {
   tr: 45,
 };
 
-/** The highlight strength of each material: none for matte ones, more for metal. */
-function highlightOf(material: string): number {
-  if (/^(matte|powder|translucentPowder|dkEdge|softEdge|clear)$/.test(material)) return 0;
-  if (/^(metal|softmetal)$/.test(material)) return 2;
-  return 1;
+/**
+ * How a material (`ST_PresetMaterialType`, 20.1.10.47) takes the light: the diffuse light is the
+ * same for every material, and only the highlights change. `gloss` scales every highlight of the
+ * rig, `sharpness` scales their powers, and `rim` adds white where the surface turns away from
+ * the viewer, `rim * (1 - n·v) ^ rimPower`, as a metal reflects its surroundings at a grazing
+ * angle.
+ */
+interface Material {
+  readonly gloss: number;
+  readonly sharpness: number;
+  readonly rim: number;
+  readonly rimPower: number;
+}
+
+const DULL: Material = { gloss: 0, sharpness: 1, rim: 0, rimPower: 1 };
+/** `warmMatte`, the default material: the rigs are fitted to it. */
+const WARM_MATTE: Material = { gloss: 1, sharpness: 1, rim: 0, rimPower: 1 };
+/**
+ * `plastic` and `metal` are fitted to the reference PDFs: plastic to the turned extrusion and
+ * bevel of `preserved-content`, metal to the circle bevel of `three-d-effects` (slide 2), with
+ * the same lights as `warmMatte`. `softmetal` is not measured.
+ */
+const PLASTIC: Material = { gloss: 1.51, sharpness: 1, rim: 0, rimPower: 1 };
+const METAL: Material = { gloss: 4.97, sharpness: 1.54, rim: 1.26, rimPower: 4.5 };
+const SOFT_METAL: Material = { gloss: 2, sharpness: 1, rim: 0, rimPower: 1 };
+
+function materialOf(material: string): Material {
+  if (/^(matte|powder|translucentPowder|dkEdge|softEdge|clear)$/.test(material)) return DULL;
+  if (material === 'metal') return METAL;
+  if (material === 'plastic') return PLASTIC;
+  if (material === 'softmetal') return SOFT_METAL;
+  return WARM_MATTE;
 }
 
 /** A brightness factor and a white highlight, from 0 to 1, for one surface. */
@@ -299,19 +331,23 @@ export function lightingOf(t: ResolvedThreeD, view: Vec3 = [0, 0, 1]): Lighting 
   const turnBy = DIR_TURN[t.lightDir] ?? 0;
   const rig = RIGS[t.lightRig] ?? THREE_POINT;
   const lights = rig.lights.map((l) => ({ dir: spin(normalize(l.dir), turnBy), k: l.k }));
-  const gloss = highlightOf(t.material);
+  const m = materialOf(t.material);
   // The half vector of each highlight is fixed for one view.
   const halves = rig.highlights.map((h) => {
     const l = spin(normalize(h.dir), turnBy);
-    return { half: normalize([l[0] + view[0], l[1] + view[1], l[2] + view[2]]), lobe: h };
+    return {
+      half: normalize([l[0] + view[0], l[1] + view[1], l[2] + view[2]]),
+      k: m.gloss * h.k,
+      power: m.sharpness * h.power,
+    };
   });
+  const v = normalize(view);
   return {
     shade: (n) => ({
       level: lights.reduce((sum, l) => sum + l.k * Math.max(0, dot(n, l.dir)), rig.ambient),
-      white: halves.reduce(
-        (sum, { half, lobe }) => sum + gloss * lobe.k * Math.max(0, dot(n, half)) ** lobe.power,
-        0
-      ),
+      white:
+        halves.reduce((sum, h) => sum + h.k * Math.max(0, dot(n, h.half)) ** h.power, 0) +
+        (m.rim > 0 ? m.rim * (1 - Math.max(0, dot(n, v))) ** m.rimPower : 0),
     }),
   };
 }
