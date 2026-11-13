@@ -78,12 +78,13 @@ function opaque(fill: ResolvedFill): boolean {
 /**
  * The body of a shape that surely hides the text under it: the filled paths of its geometry, in
  * slide space, under an opaque fill. A picture, a table, a shape whose fill lets text show
- * through, and a shape whose soft edge or blur fades its body cover nothing: the text paints over
- * them unclipped.
+ * through, a shape whose soft edge or blur fades its body, and a 3-D shape, whose face can paint
+ * away from its flat outline, cover nothing: the text paints over them unclipped.
  */
 function bodyOf(item: BoxItem): Body | undefined {
   if (item.kind !== 'shape' || !opaque(item.element.fill)) return undefined;
-  if (item.element.effects?.softEdge || item.element.effects?.blur) return undefined;
+  const fx = item.element.effects;
+  if (fx?.softEdge || fx?.blur || fx?.threeD) return undefined;
   const filled = item.geometry.paths.filter((p) => p.fill !== 'none');
   if (filled.length === 0) return undefined;
   let outlines: PathCommand[][] | undefined;
@@ -101,7 +102,8 @@ const overlaps = (a: Bounds, b: Bounds): boolean =>
 
 /**
  * The clips of the text of `group`'s shapes that a later body in the group covers: an opaque
- * shape (`bodyOf`) that paints after the text and whose box meets its text frame. The text of a
+ * shape (`bodyOf`), in no nested group with a soft edge or a blur, that paints after the text
+ * and whose box meets its text frame. The text of a
  * 3-D shape paints in its face's turned space and takes no clip. A group with effects holds at
  * most `MAX_GROUP_EFFECT_ELEMENTS` items, so the check of each text against each later body stays
  * bounded, and `MAX_GROUP_TEXT_CLIP_COMMANDS` bounds the clips. @internal
@@ -109,20 +111,25 @@ const overlaps = (a: Bounds, b: Bounds): boolean =>
 export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): GroupTextCovers {
   // The bodies and texts in paint order: a shape's text paints over its own body.
   const order: { body?: Body; text?: { item: LayoutItem; bounds: Bounds } }[] = [];
-  const walk = (item: LayoutItem): void => {
+  // `faded`: a group between `group` and the item fades it with a soft edge or a blur, so its
+  // bodies cover nothing.
+  const walk = (item: LayoutItem, faded: boolean): void => {
     if (item.element.hidden) return;
     switch (item.kind) {
-      case 'group':
-        for (const child of item.children) walk(child);
+      case 'group': {
+        const fx = item.element.effects;
+        const fades = faded || !!fx?.softEdge || !!fx?.blur;
+        for (const child of item.children) walk(child, fades);
         return;
+      }
       case 'frame': {
         // A table's cells can be clear: it covers nothing.
-        if (item.poster) walk(item.poster);
-        for (const child of item.drawing ?? item.chart ?? []) walk(child);
+        if (item.poster) walk(item.poster, faded);
+        for (const child of item.drawing ?? item.chart ?? []) walk(child, faded);
         return;
       }
       default: {
-        const body = bodyOf(item);
+        const body = faded ? undefined : bodyOf(item);
         if (body) order.push({ body });
         const text = textCorners(item);
         if (text.length > 0 && !item.element.effects?.threeD)
@@ -130,7 +137,7 @@ export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): 
       }
     }
   };
-  for (const child of group.children) walk(child);
+  for (const child of group.children) walk(child, false);
   const clips = new Map<LayoutItem, PathCommand[][]>();
   let left = MAX_GROUP_TEXT_CLIP_COMMANDS;
   let complete = true;
