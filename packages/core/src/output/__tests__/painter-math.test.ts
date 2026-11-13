@@ -61,6 +61,26 @@ describe('blipColorSteps', () => {
     expect(applyBlipColorSteps(bi, [0.49, 0.49, 0.49])).toEqual([0, 0, 0]);
     expect(applyBlipColorSteps(bi, [0.51, 0.51, 0.51])).toEqual([1, 1, 1]);
   });
+
+  test('scales contrast between two halves of the brightness, as the reference PDF shows', () => {
+    // Channels of the `picture-adjustments` reference PDF (slide 5), 8-bit, within 1.
+    const cases: [number, number, number, number][] = [
+      // [brightness, contrast, channel in, reference channel out]
+      [0.2, 0, 0x40, 115],
+      [0, 0.4, 0x40, 22],
+      [0, 0.4, 0xc0, 235],
+      [-0.2, -0.4, 0x40, 49],
+      [-0.2, -0.4, 0xc0, 125],
+      [0.4, 0.4, 0x40, 158],
+      [0.4, 0.4, 0x60, 211],
+      [0.4, 0.4, 0x30, 131],
+    ];
+    for (const [bright, contrast, input, out] of cases) {
+      const steps = blipColorSteps([{ kind: 'lum', bright, contrast }]);
+      const [v] = applyBlipColorSteps(steps, [input / 255, input / 255, input / 255]);
+      expect(Math.abs(v * 255 - out)).toBeLessThanOrEqual(1);
+    }
+  });
 });
 
 describe('tileGeometry', () => {

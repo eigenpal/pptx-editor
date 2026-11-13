@@ -38,6 +38,7 @@ import {
   ARROW_MITER_LIMIT,
   dashArray,
   hasCharacters,
+  pictureBorder,
   planStroke,
   strokeCap,
   strokeWidth,
@@ -157,12 +158,11 @@ function drawStrokeExtras(plan: StrokePlan, color: Rgba, width: number, p: PageO
 type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
 
 /**
- * Clip to the outside of a picture's path and double the line width, so the stroke lies
- * outside the picture, as the
- * editor's paint does (`output/paint.ts`, `outsideOutline`).
+ * Clip to the outside of a picture's paths, so its border cannot paint over the picture, as the
+ * editor's paint masks it (`output/paint.ts`, `outsideOutline`).
  */
-function outsideOf(
-  commands: readonly PathCommand[],
+function clipOutside(
+  paths: readonly (readonly PathCommand[])[],
   width: number,
   cx: number,
   cy: number,
@@ -176,8 +176,51 @@ function outsideOf(
     lineTo(-pad, cy + pad),
     closePath()
   );
-  tracePath(commands, p);
-  p.push(clipEvenOdd(), endPath(), setLineWidth(2 * width));
+  for (const commands of paths) tracePath(commands, p);
+  p.push(clipEvenOdd(), endPath());
+}
+
+/**
+ * A picture's border, outside the picture, as the SVG paint draws it (`core/layout`,
+ * `pictureBorder`): the geometry grown by the line width with a shape's dashes and caps, or a
+ * stroke twice as wide whose inner half a clip hides.
+ */
+function drawPictureBorder(
+  item: Drawable,
+  line: ResolvedLine,
+  w: number,
+  h: number,
+  groupScale: number,
+  p: PageOps,
+  scope: FillScope
+): void {
+  const el = item.element;
+  const geometry = item.geometry.paths.map((path) => path.commands);
+  const rect = el.geometry.kind === 'preset' && el.geometry.preset === 'rect';
+  const border = pictureBorder(geometry, rect, line, w, h, groupScale);
+  const width = strokeWidth(line, groupScale);
+  p.push(pushGraphicsState());
+  const color = strokeStyle(line, p, scope, groupScale);
+  if (color) {
+    p.alpha(1, color.a);
+    if (border.kind === 'doubled') {
+      clipOutside(geometry, width, w, h, p);
+      p.push(setLineWidth(2 * width));
+      for (const commands of border.paths) {
+        tracePath(commands, p);
+        p.push(stroke());
+      }
+    } else {
+      if (border.clip) clipOutside(geometry, width, w, h, p);
+      const dashes = dashArray(line, width);
+      for (const plan of border.paths) {
+        if (dashes) p.push(setDashPattern(dashes, plan.dashPhase ?? 0));
+        tracePath(plan.commands, p);
+        p.push(stroke());
+      }
+    }
+  }
+  p.push(popGraphicsState());
 }
 
 /** The PDF blend mode of each `ST_BlendMode`, as the SVG paint's `mix-blend-mode`. */
@@ -292,21 +335,21 @@ async function drawGeometry(
         paintFill(el.fill, w, h, trace, p, scope, 'shapes', path.fill, banded);
       if (!(await withOverlay(item, w, h, trace, p, scope, own))) await own();
     }
-    // A picture's outline follows all of its geometry, as in the SVG paint.
-    if (!line || (!path.stroke && item.kind !== 'picture')) continue;
+    // A picture's border draws after the loop, outside the picture.
+    if (!line || item.kind === 'picture' || !path.stroke) continue;
     p.push(pushGraphicsState());
-    const picture = item.kind === 'picture';
     const width = strokeWidth(line, groupScale);
-    // An open path stops short under its line ends, and a dashed one can get square caps, as
-    // in the SVG paint (`core/layout`, `planStroke`).
-    const plan = picture ? undefined : planStroke(path.commands, line, groupScale);
-    const commands = plan ? plan.commands : path.commands;
-    const bands = picture ? null : compoundOf(line, width, commands);
-    const color = strokeStyle(line, p, scope, groupScale, picture, !!bands);
+    // An open path stops short under its line ends, a dashed one can get square caps, and a
+    // closed one can start its dashes at its closing segment, as in the SVG paint
+    // (`core/layout`, `planStroke`).
+    const plan = planStroke(path.commands, line, groupScale);
+    const commands = plan.commands;
+    const bands = compoundOf(line, width, commands);
+    const color = strokeStyle(line, p, scope, groupScale, !!bands);
     if (color) {
       p.alpha(1, color.a);
-      // A picture's border lies outside the picture.
-      if (picture) outsideOf(path.commands, width, w, h, p);
+      const dashes = plan.dashPhase ? dashArray(line, width) : undefined;
+      if (dashes) p.push(setDashPattern(dashes, plan.dashPhase!));
       if (bands?.kind === 'offset')
         drawBands(bands.bands, line.join === 'miter' ? line.miterLimit : 4, p);
       else if (bands) drawMaskedBands(bands, line, width, commands, w, h, p);
@@ -314,10 +357,11 @@ async function drawGeometry(
         tracePath(commands, p);
         p.push(stroke());
       }
-      if (plan) drawStrokeExtras(plan, color, width, p);
+      drawStrokeExtras(plan, color, width, p);
     }
     p.push(popGraphicsState());
   }
+  if (item.kind === 'picture' && line) drawPictureBorder(item, line, w, h, groupScale, p, scope);
 }
 
 /**

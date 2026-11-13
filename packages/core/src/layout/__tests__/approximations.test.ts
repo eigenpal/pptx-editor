@@ -262,12 +262,12 @@ describe('approximations a slide uses', () => {
     expect(approximationsOf(empty)).toEqual([]);
   });
 
-  test('every dashed picture border is flagged, round cap or not; a solid one is not', () => {
-    const picture = (ln: string): string =>
+  test('a dashed border off a rectangle picture is flagged; a rectangle or solid one is not', () => {
+    const picture = (ln: string, prst = 'ellipse'): string =>
       '<p:pic><p:nvPicPr><p:cNvPr id="2" name="P"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
       '<p:blipFill><a:blip/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
       `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm>` +
-      `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${ln}</p:spPr></p:pic>`;
+      `<a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom>${ln}</p:spPr></p:pic>`;
     const line = (dash: string, cap = ''): string =>
       `<a:ln w="38100"${cap}><a:solidFill><a:srgbClr val="000000"/></a:solidFill>` +
       `<a:prstDash val="${dash}"/></a:ln>`;
@@ -276,6 +276,10 @@ describe('approximations a slide uses', () => {
       'picture-border-dots'
     );
     expect(approximationsOf(picture(line('solid')))).not.toContain('picture-border-dots');
+    // A rectangle's border is measured (`picture-adjustments`), with dots and caps.
+    expect(approximationsOf(picture(line('sysDot', ' cap="rnd"'), 'rect'))).not.toContain(
+      'picture-border-dots'
+    );
   });
 
   test('pattern tiles of a turned or flipped shape are measured; a pattern line is not', () => {

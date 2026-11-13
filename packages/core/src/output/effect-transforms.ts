@@ -9,16 +9,20 @@ import { apply, invert, multiply, type Matrix } from '../layout/index.ts';
 const DEG = Math.PI / 180;
 
 /**
- * The linear transfer of a luminance effect (`a:lum`) on each sRGB channel in [0, 1]: brightness
- * shifts, contrast scales around mid-gray (ECMA-376 Part 1, 20.1.8.42). The SVG paint and the
- * Corrections gallery previews use this one copy. @internal
+ * The linear transfer of a luminance effect (`a:lum`) on each sRGB channel in [0, 1] (ECMA-376
+ * Part 1, 20.1.8.42). Contrast scales around mid-gray by 1 / (1 − contrast), or by 1 + contrast
+ * when it is negative. Half of the brightness applies before that scale and half after it, so
+ * brightness shifts by `bright` × (1 + scale) / 2. The specification gives no formula: the
+ * reference PDF of the `picture-adjustments` fixture shows this at brightness 20 % alone,
+ * contrast 40 % alone, −20 % with −40 %, and 40 % with 40 %. The SVG paint, the PDF export, and
+ * the Corrections gallery previews use this one copy. @internal
  */
 export function lumTransfer(
   bright: number,
   contrast: number
 ): { readonly slope: number; readonly intercept: number } {
   const slope = contrast >= 0 ? 1 / Math.max(0.0001, 1 - contrast) : 1 + contrast;
-  return { slope, intercept: bright + 0.5 - 0.5 * slope };
+  return { slope, intercept: 0.5 - 0.5 * slope + (bright * (1 + slope)) / 2 };
 }
 
 /**
@@ -67,7 +71,7 @@ export function blipColorSteps(effects: readonly BlipEffect[]): BlipColorStep[] 
         }
       );
     else if (e.kind === 'lum') {
-      // Brightness shifts, contrast scales around mid-gray (ECMA-376 §20.1.8.42).
+      // Contrast scales around mid-gray, between two halves of the brightness (`lumTransfer`).
       steps.push({ op: 'linear', ...lumTransfer(e.bright, e.contrast) });
     } else if (e.kind === 'biLevel')
       // Black below the threshold, white from it (ECMA-376 Part 1, 20.1.8.11).

@@ -327,18 +327,52 @@ describe('pictures', () => {
 
   test('a picture border is drawn outside the picture', async () => {
     const ln = '<a:ln w="38100"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:ln>';
+    const ops = async (bytes: Uint8Array) => {
+      const result = await exportPdf(bytes, BEST);
+      const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
+      return (await pdf.getPage(1)).getOperatorList();
+    };
+    // A rectangle: the outline of the rectangle grown by the line width, unclipped.
+    const rect = await ops(pictureDeck(tinyPng(), '', '', ln));
+    expect(rect.fnArray).not.toContain(OPS.eoClip);
+    const rectWidths = rect.fnArray.flatMap((op, i) =>
+      op === OPS.setLineWidth ? [rect.argsArray[i][0] as number] : []
+    );
+    expect(rectWidths).toEqual([38_100]);
+    // An ellipse: an even-odd clip to the outside of the frame, then a stroke twice as wide.
+    const ellipse = await ops(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: picture('', '', ln).replace('prst="rect"', 'prst="ellipse"'),
+            rels: [['rIdImg', `${R}/image`, '../media/img.png']],
+          },
+        ],
+        media: [{ name: 'img.png', bytes: tinyPng(), contentType: 'image/png' }],
+      })
+    );
+    const clip = ellipse.fnArray.indexOf(OPS.eoClip);
+    expect(clip).toBeGreaterThan(-1);
+    const widths = ellipse.fnArray.flatMap((op, i) =>
+      op === OPS.setLineWidth && i > clip ? [ellipse.argsArray[i][0] as number] : []
+    );
+    // 3 pt in EMU, doubled; the page matrix maps EMU to points.
+    expect(widths.at(-1)).toBeCloseTo(76_200, 0);
+  });
+
+  test('a round-dotted picture border has round caps and starts one width in', async () => {
+    const ln =
+      '<a:ln w="38100" cap="rnd"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill>' +
+      '<a:prstDash val="sysDot"/></a:ln>';
     const result = await exportPdf(pictureDeck(tinyPng(), '', '', ln), BEST);
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
-    // An even-odd clip to the outside of the frame, then a stroke twice the line width.
-    const clip = fnArray.indexOf(OPS.eoClip);
-    expect(clip).toBeGreaterThan(-1);
-    const widths = fnArray.flatMap((op, i) =>
-      op === OPS.setLineWidth && i > clip ? [argsArray[i][0] as number] : []
-    );
-    expect(widths.length).toBe(1);
-    // 3 pt in EMU, doubled; the page matrix maps EMU to points.
-    expect(widths[0]).toBeCloseTo(76_200, 0);
+    const caps = fnArray.flatMap((op, i) => (op === OPS.setLineCap ? [argsArray[i][0]] : []));
+    expect(caps).toContain(1);
+    const dash = argsArray[fnArray.lastIndexOf(OPS.setDash)] as [number[], number];
+    expect(dash[0][1]).toBeCloseTo(76_200, 0);
+    expect(dash[1]).toBeCloseTo(38_100, 0);
   });
 
   test('a picture cropped to a shape is clipped to it; its effects are drawn', async () => {

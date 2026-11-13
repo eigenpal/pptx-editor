@@ -34,13 +34,7 @@ import {
   type PDFRef,
 } from 'pdf-lib';
 import type { GradientStop, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
-import {
-  dashArray,
-  outsideDashArray,
-  strokeCap,
-  strokeWidth,
-  type GeometryPath,
-} from '@pptx-editor.dev/core/layout';
+import { dashArray, strokeCap, strokeWidth, type GeometryPath } from '@pptx-editor.dev/core/layout';
 import {
   adjustForPathMode,
   circleGradientGeometry,
@@ -627,9 +621,8 @@ export function lineCapStyle(cap: 'butt' | 'round' | 'square'): LineCapStyle {
 /**
  * Set the stroke for an outline, as the SVG `strokeAttrs`: a zero width is a hairline of one
  * pixel at 96 dpi, and `scale` undoes the enclosing group's scale. The width, the dash pattern,
- * and the caps come from the engine's shared rules (`core/layout`, `line-strokes.ts`). A
- * picture's border (`outside`) takes the dashes of a border outside the picture. `bands` is true
- * when the caller draws the bands of a compound line. Returns the stroke color, or null when the
+ * and the caps come from the engine's shared rules (`core/layout`, `line-strokes.ts`). `bands` is
+ * true when the caller draws the bands of a compound line. Returns the stroke color, or null when the
  * outline draws nothing.
  */
 export function strokeStyle(
@@ -637,7 +630,6 @@ export function strokeStyle(
   p: PageOps,
   scope: FillScope,
   scale = 1,
-  outside = false,
   bands = false
 ): Rgba | null {
   const color = flatColor(line.fill, scope, p, 'lines');
@@ -645,11 +637,11 @@ export function strokeStyle(
   if (line.compound !== 'sng' && !bands)
     p.diag.add('line.compound', 'approximation', 'Compound lines are drawn as one line.');
   const width = strokeWidth(line, scale);
-  const dashes = outside ? outsideDashArray(line, width) : dashArray(line, width);
+  const dashes = dashArray(line, width);
   p.push(
     setStrokingRgbColor(...rgb(color)),
     setLineWidth(width),
-    setLineCap(lineCapStyle(dashes && outside ? 'butt' : strokeCap(line))),
+    setLineCap(lineCapStyle(strokeCap(line))),
     setLineJoin(
       line.join === 'miter'
         ? LineJoinStyle.Miter

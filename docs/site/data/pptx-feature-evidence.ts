@@ -119,7 +119,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['pattern-bitmaps', 'fill-rotation', 'tiled-pictures'],
   },
   'fills-lines.lines': {
-    fixtures: ['lines-arrows', 'line-ends-dashes', 'fills-lines'],
+    fixtures: ['lines-arrows', 'line-ends-dashes', 'fills-lines', 'picture-adjustments'],
     approximations: ['inset-lines', 'dash-complexity', 'compound-lines'],
   },
   'fills-lines.theme-colors': {
@@ -152,12 +152,12 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['picture-shape-fill'],
   },
   'pictures.adjustments': {
-    fixtures: ['pictures', 'fill-fidelity', 'picture-editing'],
+    fixtures: ['pictures', 'fill-fidelity', 'picture-editing', 'picture-adjustments'],
     approximations: ['picture-luminance', 'picture-recolor'],
   },
   'pictures.crop': { fixtures: ['pictures', 'picture-editing'] },
   'pictures.styles-border': {
-    fixtures: ['picture-editing'],
+    fixtures: ['picture-editing', 'picture-adjustments'],
     approximations: ['blur', 'glow-soft-edge', 'picture-border-dots', 'inset-lines'],
   },
   'pictures.alt-text': { fixtures: ['picture-editing'] },

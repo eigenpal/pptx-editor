@@ -527,7 +527,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply correction, recolor, and transparency presets, or reset a picture. Saturation, color tone, and artistic effects are unavailable. Rendering is approximate, and some existing picture effects prevent corrections or reset.',
+      'Apply correction, recolor, and transparency presets, or reset a picture. Saturation, color tone, and artistic effects cannot be edited. Pictures with these effects display their stored image, which includes the effects. Rendering is approximate, and some existing picture effects prevent corrections or reset.',
   },
   {
     id: 'pictures.crop',
@@ -550,7 +550,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply five picture styles and set border color, weight, and dashes. Style and border fidelity remains approximate. Round border dots display as squares.',
+      'Apply five picture styles and set border color, weight, and dashes. Borders of rectangular pictures display with their dashes, caps, and joins. Style fidelity, and dashed borders on other picture shapes, remain approximate.',
   },
   {
     id: 'pictures.alt-text',

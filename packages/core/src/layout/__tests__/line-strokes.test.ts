@@ -1,5 +1,5 @@
 // The dash and line end rules that the SVG paint and the PDF export share. The expected values
-// are measured on the reference PDF of the `line-ends-dashes` fixture.
+// are measured on the reference PDFs of the `line-ends-dashes` and `picture-adjustments` fixtures.
 
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
@@ -11,7 +11,7 @@ import {
   layoutSlide,
   dashArray,
   lineEndReach,
-  outsideDashArray,
+  pictureBorder,
   planStroke,
   strokeCap,
   type PathCommand,
@@ -44,6 +44,15 @@ const STRAIGHT: PathCommand[] = [
   { op: 'L', x: 100 * PT, y: 0 },
 ];
 
+/** A closed 20 × 10 pt rectangle, clockwise from the top-left. */
+const SQUARE: PathCommand[] = [
+  { op: 'M', x: 0, y: 0 },
+  { op: 'L', x: 20 * PT, y: 0 },
+  { op: 'L', x: 20 * PT, y: 10 * PT },
+  { op: 'L', x: 0, y: 10 * PT },
+  { op: 'Z' },
+];
+
 /** The points of a drawn end's path, in points, rounded to 0.001 pt. */
 function points(commands: readonly PathCommand[]): [number, number][] {
   const r = (v: number): number => Math.round((v / PT) * 1000) / 1000 + 0;
@@ -74,10 +83,70 @@ describe('dashes', () => {
     expect(strokeCap(line({ cap: 'sq' }))).toBe('square');
   });
 
-  test("a picture border's dashes get butt caps and keep a centered line's visible length", () => {
-    expect(outsideDashArray(line({ dash: 'dash', cap: 'rnd' }), 2)).toEqual([8, 6]);
-    expect(outsideDashArray(line({ dash: 'dash' }), 2)).toEqual([8, 6]);
-    expect(outsideDashArray(line(), 2)).toBeUndefined();
+  test('a closed path with round or square caps starts its dashes at the closing segment', () => {
+    const rnd = line({ dash: 'lgDashDot', cap: 'rnd' });
+    const plan = planStroke(SQUARE, rnd);
+    // Bottom-left first, then the closing segment up to the top-left, then the path as it was.
+    expect(points(plan.commands)).toEqual([
+      [0, 10],
+      [0, 0],
+      [20, 0],
+      [20, 10],
+      [0, 10],
+    ]);
+    expect(plan.commands[plan.commands.length - 1]).toEqual({ op: 'Z' });
+    // Round dashes are [7, 4, 0, 4] widths: the pattern starts one width before its end.
+    expect(plan.dashPhase).toBeCloseTo(14 * PT, 1);
+    const sq = planStroke(SQUARE, line({ dash: 'lgDashDot', cap: 'sq' }));
+    expect(points(sq.commands)[0]).toEqual([0, 10]);
+    expect(sq.dashPhase).toBeUndefined();
+  });
+
+  test('a closed path with flat caps, a solid line, or a custom dash keeps its start', () => {
+    for (const l of [
+      line({ dash: 'lgDashDot' }),
+      line({ cap: 'rnd' }),
+      line({ dash: 'custom', dashes: [3, 1], cap: 'rnd' }),
+    ]) {
+      const plan = planStroke(SQUARE, l);
+      expect(plan.commands).toBe(SQUARE);
+      expect(plan.dashPhase).toBeUndefined();
+    }
+  });
+
+  test("a rectangle picture's border is the outline grown by the line width", () => {
+    const border = pictureBorder(
+      [SQUARE],
+      true,
+      line({ dash: 'sysDot', cap: 'rnd' }),
+      20 * PT,
+      10 * PT
+    );
+    expect(border.kind).toBe('grown');
+    if (border.kind !== 'grown') return;
+    expect(border.clip).toBe(false);
+    // Half a width out on each side, from the closing segment, as a shape's outline.
+    expect(points(border.paths[0]!.commands)).toEqual([
+      [-0.5, 10.5],
+      [-0.5, -0.5],
+      [20.5, -0.5],
+      [20.5, 10.5],
+      [-0.5, 10.5],
+    ]);
+    expect(border.paths[0]!.dashPhase).toBeCloseTo(PT, 1);
+    // A solid rectangle border is grown too: its joins are the joins of the grown outline.
+    expect(pictureBorder([SQUARE], true, line(), 20 * PT, 10 * PT).kind).toBe('grown');
+  });
+
+  test('a border off a rectangle is clipped outside; a solid one is a doubled stroke', () => {
+    const dashed = pictureBorder([SQUARE], false, line({ dash: 'dash' }), 20 * PT, 10 * PT);
+    expect(dashed.kind === 'grown' && dashed.clip).toBe(true);
+    expect(pictureBorder([SQUARE], false, line(), 20 * PT, 10 * PT)).toEqual({
+      kind: 'doubled',
+      paths: [SQUARE],
+    });
+    // An empty box cannot grow.
+    expect(pictureBorder([SQUARE], true, line({ dash: 'dash' }), 0, 10 * PT).kind).toBe('doubled');
   });
 
   test('a square-capped preset dash gets a cap at its start, and at its end inside a dash', () => {
