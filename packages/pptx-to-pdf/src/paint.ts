@@ -57,6 +57,7 @@ import {
 } from '@pptx-editor.dev/core/layout';
 import {
   compoundPlan,
+  groupTextCovers,
   MAX_OVERLAY_PATHS,
   threeDFaceItem,
   type CompoundBand,
@@ -530,6 +531,12 @@ type GroupBody = Pick<ResolvedEffects, 'blur'>;
  */
 type DrawPass = 'all' | 'body' | 'text';
 
+/**
+ * The clips of the text that later bodies cover under a group's soft edge, by shape
+ * (`groupTextCovers`): each is a slide-space path filled even-odd.
+ */
+type TextClips = ReadonlyMap<LayoutItem, readonly (readonly PathCommand[])[]>;
+
 /** The fill scope of a group's children. */
 function groupScope(group: Extract<LayoutItem, { kind: 'group' }>, scope: FillScope): FillScope {
   return {
@@ -622,7 +629,8 @@ async function drawItem(
   scope: FillScope,
   groupScale: number,
   body?: GroupBody,
-  pass: DrawPass = 'all'
+  pass: DrawPass = 'all',
+  clips?: TextClips
 ): Promise<void> {
   if (item.element.hidden) return;
   await p.step();
@@ -635,8 +643,12 @@ async function drawItem(
     const childBody: GroupBody | undefined = fx?.blur ? { blur: fx.blur } : body;
     const scale = matrixScale(item.matrix);
     const children = item.children;
-    const drawChildren = async (childPass: DrawPass): Promise<void> => {
-      for (const child of children) await drawItem(child, p, inner, scale, childBody, childPass);
+    const drawChildren = async (
+      childPass: DrawPass,
+      childClips: TextClips | undefined = clips
+    ): Promise<void> => {
+      for (const child of children)
+        await drawItem(child, p, inner, scale, childBody, childPass, childClips);
     };
     if (!fx || pass === 'text') return drawChildren(pass);
     // The group's reflection, shadows, and glow paint under its content, as in the SVG paint:
@@ -646,10 +658,23 @@ async function drawItem(
     // The soft edge fades the bodies of all children together; their text paints over them.
     const soft = !!fx.softEdge && fx.softEdge.radius > 0 && leaves.length > 0;
     const group = item;
+    // Text that a later body covers paints clipped to the outside of that body, as in the SVG
+    // paint. An enclosing soft edge's clips of a text hold this group's: its bodies are later too.
+    let textClips = clips;
+    if (soft) {
+      const covers = groupTextCovers(item);
+      textClips = new Map([...covers.clips, ...(clips ?? [])]);
+      if (!covers.complete)
+        p.diag.add(
+          'effect.group-text-order',
+          'approximation',
+          'Under the soft edge of a group, text that many later shapes cover paints over them.'
+        );
+    }
     const drawContent = async (): Promise<void> => {
       if (!soft) return drawChildren(pass);
-      await drawGroupSoftEdge(group, leaves, p, () => drawChildren('body'));
-      if (pass === 'all') await drawChildren('text');
+      await drawGroupSoftEdge(group, leaves, p, () => drawChildren('body', textClips));
+      if (pass === 'all') await drawChildren('text', textClips);
     };
     if (leaves.length > 0) await drawReflection(item, p, drawContent);
     await drawGroupShadowsAndGlow(item, leaves, p);
@@ -657,16 +682,17 @@ async function drawItem(
   }
   if (item.kind === 'frame') {
     // An OLE object shows its picture, as in the SVG paint.
-    if (item.poster) return drawItem(item.poster, p, local, groupScale, body, pass);
+    if (item.poster) return drawItem(item.poster, p, local, groupScale, body, pass, clips);
     // A diagram draws its saved drawing, as in the SVG paint.
     if (item.drawing) {
       for (const child of item.drawing)
-        await drawItem(child, p, scope, matrixScale(item.matrix), body, pass);
+        await drawItem(child, p, scope, matrixScale(item.matrix), body, pass, clips);
       return;
     }
     // A chart drawn by an installed renderer, as in the SVG paint.
     if (item.chart) {
-      for (const child of item.chart) await drawItem(child, p, local, groupScale, body, pass);
+      for (const child of item.chart)
+        await drawItem(child, p, local, groupScale, body, pass, clips);
       return;
     }
     // A table paints with its body: its text is part of its cells.
@@ -682,6 +708,7 @@ async function drawItem(
     p.push(popGraphicsState());
     return;
   }
+  const textClip = clips?.get(item) ?? [];
   item = withGroupBody(item, body);
   // A picture fill whose image is not drawn (a `p:pic`, or a shape's picture fill) casts no
   // shadow and has no inside to shade.
@@ -720,6 +747,11 @@ async function drawItem(
       hasCharacters(item.text)
     ) {
       p.push(pushGraphicsState());
+      // Clipped to the outside of the later bodies that cover it, in slide space.
+      for (const path of textClip) {
+        tracePath(path, p);
+        p.push(clipEvenOdd(), endPath());
+      }
       p.matrix(item.textMatrix);
       await drawText(item.text, p, local);
       p.push(popGraphicsState());

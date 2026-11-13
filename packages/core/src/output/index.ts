@@ -37,6 +37,7 @@ export {
   type BlipColorStep,
   type TileGeometry,
 } from './painter-math.ts';
+export { groupTextCovers, type GroupTextCovers } from './group-text-covers.ts';
 export { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 export {
   compoundBandLines,

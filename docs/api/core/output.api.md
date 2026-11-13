@@ -126,6 +126,17 @@ export interface FontFaceHandle {
 // @internal
 export function gradientPaintStops(stops: readonly GradientStop[]): GradientStop[];
 
+// @internal
+export interface GroupTextCovers {
+    readonly clips: ReadonlyMap<LayoutItem, readonly (readonly PathCommand[])[]>;
+    readonly complete: boolean;
+}
+
+// @internal
+export function groupTextCovers(group: Extract<LayoutItem, {
+    kind: 'group';
+}>): GroupTextCovers;
+
 // @public
 export type ImageSizePort = (sourcePart: string, rId: string) => {
     readonly cx: number;

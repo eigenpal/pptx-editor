@@ -21,10 +21,13 @@ import {
   type LayoutItem,
   type EffectNode,
   type Matrix,
+  type PathCommand,
   type ThreeDFacet,
 } from '../layout/index.ts';
 import { blurSigma, boundsOf, effectMatrix, grow, PX, type Bounds } from './effect-transforms.ts';
+import { groupTextCovers } from './group-text-covers.ts';
 import { groupContentCorners } from './item-corners.ts';
+import { commandData } from './path-data.ts';
 import type { PaintContext } from './paint-fill.ts';
 import { matrixAttr, num, svg, type Defs } from './svg.ts';
 import { finiteFacet } from './painter-math.ts';
@@ -213,7 +216,9 @@ export function paintGroupEffects(
   if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
   const blurFx = pro?.blur && effects.blur ? pro.blur(effects, bounds, ids) : null;
   if (blurFx) effectDefs(ctx.defs, blurFx.defs);
-  const content = svg(doc, 'g', {}, [bodyFx ? softEdged(doc, inner, bodyFx.filter, ctx) : inner]);
+  const content = svg(doc, 'g', {}, [
+    bodyFx ? softEdged(doc, group, inner, bodyFx.filter, ctx) : inner,
+  ]);
   const contentId = ctx.defs.id('content');
   content.setAttribute('id', contentId);
   const shown = blurFx ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content]) : content;
@@ -254,6 +259,41 @@ export function paintGroupEffects(
 /** The custom property that hides the text of shapes in the filtered copy (`softEdged`). */
 const COPY_TEXT = '--pptx-group-text';
 
+/** The shape of each painted text body, for the soft edge of a group that holds it. */
+const textOwners = new WeakMap<Element, LayoutItem>();
+
+/** Note that `item` painted the text body `node`. Returns `node`. @internal */
+export function ownText(item: LayoutItem, node: SVGElement): SVGElement {
+  textOwners.set(node, item);
+  return node;
+}
+
+/**
+ * Clip the text body `body` to each of `paths` (`groupTextCovers`), in the slide space of its
+ * parent: one group with a clip path for each, around the body in its place.
+ */
+function clipText(
+  body: Element,
+  paths: readonly (readonly PathCommand[])[],
+  ctx: PaintContext
+): void {
+  const { doc } = ctx.defs;
+  const parent = body.parentNode;
+  if (!parent) return;
+  const next = body.nextSibling;
+  let node = body as SVGElement;
+  for (const path of paths) {
+    const id = ctx.defs.id('cover');
+    ctx.defs.add(
+      svg(doc, 'clipPath', { id, clipPathUnits: 'userSpaceOnUse' }, [
+        svg(doc, 'path', { d: commandData(path), 'clip-rule': 'evenodd' }),
+      ])
+    );
+    node = svg(doc, 'g', { 'clip-path': `url(#${id})` }, [node]);
+  }
+  parent.insertBefore(node, next);
+}
+
 /**
  * The soft edge of a group (`filter`) over its painted children (`inner`), with the text of its
  * shapes painted once, unfaded, over the faded picture. The filter takes a `<use>` copy of the
@@ -261,19 +301,25 @@ const COPY_TEXT = '--pptx-group-text';
  * The children themselves keep their nodes and their text, with everything but that text hidden,
  * so the text stays in its shape's node and paints once at its own alpha. A table's text fades
  * with the picture, as the PDF export draws it. A soft-edged group inside the children hides its
- * own text in the copy in the same way.
+ * own text in the copy in the same way. Text that a later body in the group covers paints clipped
+ * to the outside of that body (`groupTextCovers`), so the body still shows over it.
  */
 function softEdged(
   doc: Document,
+  group: Extract<LayoutItem, { kind: 'group' }>,
   inner: SVGElement,
   filter: string,
   ctx: PaintContext
 ): SVGElement {
+  const { clips } = groupTextCovers(group);
   for (const body of inner.querySelectorAll('[data-pptx-text]')) {
     if (body.closest('[data-kind="table"]')) continue;
     const style = body.getAttribute('style') ?? '';
     if (!style.includes(COPY_TEXT))
       body.setAttribute('style', `${style};visibility:var(${COPY_TEXT},visible)`);
+    const owner = textOwners.get(body);
+    const paths = owner && clips.get(owner);
+    if (paths) clipText(body, paths, ctx);
   }
   const innerId = ctx.defs.id('soft');
   inner.setAttribute('id', innerId);

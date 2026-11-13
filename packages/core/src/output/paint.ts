@@ -17,7 +17,6 @@ import {
   pictureBorder,
   planStroke,
   type GeometryPath,
-  type PathCommand,
   type StrokePlan,
   type LayoutItem,
   type Matrix,
@@ -28,6 +27,7 @@ import {
   effectElement,
   facetElements,
   groupPaintsEffects,
+  ownText,
   paintGroupEffects,
   shadowCopy,
   type EffectSource,
@@ -56,6 +56,9 @@ import { paintTable } from './paint-table.ts';
 import { paintText, type Shows } from './paint-text.ts';
 import { ShapeBandBudget } from './paint-gradient.ts';
 import { Defs, matrixAttr, num, svg, SVG_NS } from './svg.ts';
+import { commandData, mapCommands, pathData } from './path-data.ts';
+
+export { pathData } from './path-data.ts';
 
 /** Paint options. */
 export interface PaintOptions {
@@ -136,29 +139,6 @@ function pictureAria(
   const alt = altText(el.partName, el.nodeId);
   const name = alt && !alt.decorative ? alt.description.trim() : '';
   return name ? { role: 'img', 'aria-label': name } : { 'aria-hidden': 'true' };
-}
-
-/** Path data for an evaluated path in local EMU. */
-export function pathData(path: GeometryPath): string {
-  let d = '';
-  for (const c of path.commands) {
-    switch (c.op) {
-      case 'M':
-      case 'L':
-        d += `${c.op}${num(c.x)} ${num(c.y)}`;
-        break;
-      case 'C':
-        d += `C${num(c.x1)} ${num(c.y1)} ${num(c.x2)} ${num(c.y2)} ${num(c.x)} ${num(c.y)}`;
-        break;
-      case 'Q':
-        d += `Q${num(c.x1)} ${num(c.y1)} ${num(c.x)} ${num(c.y)}`;
-        break;
-      case 'Z':
-        d += 'Z';
-        break;
-    }
-  }
-  return d;
 }
 
 /** The uniform scale a matrix applies (for line widths inside scaled groups). */
@@ -567,35 +547,6 @@ function paintGeometry(
   return out;
 }
 
-/** Path commands mapped through a matrix. */
-function mapCommands(commands: readonly PathCommand[], m: Matrix): PathCommand[] {
-  return commands.map((c): PathCommand => {
-    switch (c.op) {
-      case 'Z':
-        return c;
-      case 'M':
-      case 'L': {
-        const p = applyMatrix(m, c.x, c.y);
-        return { op: c.op, x: p.x, y: p.y };
-      }
-      case 'Q': {
-        const [p1, p] = [applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x, c.y)];
-        return { op: 'Q', x1: p1.x, y1: p1.y, x: p.x, y: p.y };
-      }
-      case 'C': {
-        const [p1, p2] = [applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x2, c.y2)];
-        const p = applyMatrix(m, c.x, c.y);
-        return { op: 'C', x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, x: p.x, y: p.y };
-      }
-    }
-  });
-}
-
-/** SVG path data for path commands. */
-function commandData(commands: readonly PathCommand[]): string {
-  return pathData({ commands, fill: 'none', stroke: true });
-}
-
 /**
  * The line ends and square dash caps of a stroke, in the stroke's paint: filled heads, open
  * arrows stroked as wide as the line, and solid caps with butt ends.
@@ -822,7 +773,8 @@ export function paintItem(
           effects?.outerShadow || effects?.reflection || effects?.glow || blurFx || threeD
             ? undefined
             : showsIn(opts.view, item.textMatrix);
-        parts.appendChild(paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix)));
+        const text = paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix));
+        parts.appendChild(ownText(item, text));
       }
       const shown = blurFx
         ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content])

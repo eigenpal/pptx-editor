@@ -5,10 +5,18 @@
 
 import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
-import { buildPptx, group, shape, solid } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  buildPptx,
+  group,
+  para,
+  run,
+  shape,
+  solid,
+} from '../../../../../scripts/fixtures/builder.ts';
 import { openPresentation } from '../../editor/document-session.ts';
 import { apply, type LayoutItem, type Matrix, type SlideLayout } from '../../layout/index.ts';
 import { effectMatrix } from '../effect-transforms.ts';
+import { groupTextCovers, MAX_GROUP_TEXT_CLIPS } from '../group-text-covers.ts';
 import { paintSlide, type PaintOptions } from '../paint.ts';
 import { SlidePainter } from '../slide-painter.ts';
 
@@ -225,5 +233,69 @@ describe('group effects', () => {
     );
     expect(paintSlide(doc, layout, OPTS).querySelector('[data-effect="shadow"]')).toBeNull();
     expect(layout.diagnostics).toContain('effect not rendered: group effects of a large group');
+  });
+});
+
+describe('text under a later body in a group', () => {
+  const labelled = (id: number, x: number, y: number, fill?: string) =>
+    shape({
+      id,
+      x,
+      y,
+      cx: 2 * IN,
+      cy: IN,
+      ...(fill ? { fill: solid(fill) } : {}),
+      text: para(run(`Shape ${id}`)),
+    });
+  const coversOf = async (children: string) =>
+    groupTextCovers(
+      groupOf(await layoutOf(group({ id: 10, x: IN, y: IN, cx: 5 * IN, cy: 3 * IN }, children)))
+    );
+  const covered = async (children: string): Promise<string[]> =>
+    [...(await coversOf(children)).clips.keys()].map((i) => i.element.drawingId!).sort();
+
+  test('a later filled shape over a text covers it; an earlier one does not', async () => {
+    // Shape 12 lies over the text of 11; the text of 12 lies over the body of 11, which is earlier.
+    expect(
+      await covered(labelled(11, IN, IN, 'C00000') + labelled(12, 2 * IN, IN, '0070C0'))
+    ).toEqual(['11']);
+  });
+
+  test('a later text box with no fill or outline covers nothing', async () => {
+    expect(await covered(labelled(11, IN, IN, 'C00000') + labelled(12, 2 * IN, IN))).toEqual([]);
+  });
+
+  test('shapes apart cover nothing, and a nested group adds its shapes in paint order', async () => {
+    expect(
+      await covered(labelled(11, IN, IN, 'C00000') + labelled(12, IN, 3 * IN, '0070C0'))
+    ).toEqual([]);
+    const nested = group(
+      { id: 20, x: 2 * IN, y: IN, cx: 2 * IN, cy: IN },
+      shape({ id: 21, x: 2 * IN, y: IN, cx: 2 * IN, cy: IN, fill: solid('00B050') })
+    );
+    expect(await covered(labelled(11, IN, IN, 'C00000') + nested)).toEqual(['11']);
+  });
+
+  test('each clip is a rectangle around the text and the outline of one later body', async () => {
+    const { clips, complete } = await coversOf(
+      labelled(11, IN, IN, 'C00000') + labelled(12, 2 * IN, IN, '0070C0')
+    );
+    expect(complete).toBe(true);
+    const [paths] = [...clips.values()];
+    expect(paths!.length).toBe(1);
+    // The rectangle (5 commands), then the rectangle of shape 12 in slide space.
+    const path = paths![0]!;
+    expect(path.slice(0, 5).map((c) => c.op)).toEqual(['M', 'L', 'L', 'L', 'Z']);
+    const xs = path.slice(5).flatMap((c) => ('x' in c ? [c.x] : []));
+    expect([Math.min(...xs), Math.max(...xs)]).toEqual([2 * IN, 4 * IN]);
+  });
+
+  test('past the clip budget, the text keeps no clip and the result is incomplete', async () => {
+    const many = Array.from({ length: MAX_GROUP_TEXT_CLIPS + 1 }, (_, i) =>
+      shape({ id: 100 + i, x: IN, y: IN, cx: IN, cy: IN, fill: solid('0070C0') })
+    ).join('');
+    const { clips, complete } = await coversOf(labelled(11, IN, IN, 'C00000') + many);
+    expect(clips.size).toBe(0);
+    expect(complete).toBe(false);
   });
 });

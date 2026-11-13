@@ -161,6 +161,35 @@ describe('group effects and the Pro drawing tier', () => {
     expect(copy.getAttribute('href')).toBe(`#${bodies[0]!.closest('[id]')!.getAttribute('id')}`);
   });
 
+  test('text that a later shape covers paints once, clipped to the outside of it', () => {
+    const labelled = (id: number, x: number, color: string) =>
+      shape({ id, x, y: IN, cx: 2 * IN, cy: IN, fill: solid(color), text: para(run(`T${id}`)) });
+    // Shape 21 and shape 22 sit apart in a nested soft-edged group; shape 30 covers shape 21.
+    const nested = group(
+      { id: 20, x: IN, y: IN, cx: 5 * IN, cy: IN, effects: SOFT },
+      labelled(21, IN, '4472C4') + labelled(22, 4 * IN, 'A5A5A5')
+    );
+    const { root } = paintFull(
+      group(
+        { id: 10, x: IN, y: IN, cx: 5 * IN, cy: IN, effects: SOFT },
+        nested + labelled(30, 2 * IN, 'ED7D31')
+      )
+    );
+    const bodies = [...root.querySelectorAll('[data-pptx-text]')];
+    expect(bodies.map((b) => b.textContent)).toEqual(['T21', 'T22', 'T30']);
+    const clip = (b: Element) => b.parentElement!.closest('[clip-path]');
+    // Only the covered text is clipped; each text still paints once, over the faded copy.
+    expect(bodies.map((b) => clip(b) !== null)).toEqual([true, false, false]);
+    const ref = /^url\(#(.+)\)$/.exec(clip(bodies[0]!)!.getAttribute('clip-path')!)![1]!;
+    const path = root.querySelector(`clipPath[id="${ref}"] > path`)!;
+    expect(path.getAttribute('clip-rule')).toBe('evenodd');
+    // A rectangle around the text, then the outline of shape 30 in slide space.
+    expect(path.getAttribute('d')).toContain(`M${2 * IN} ${IN}L${4 * IN} ${IN}`);
+    // The clip lies inside the shape's node, under no filter, in slide space.
+    expect(clip(bodies[0]!)!.closest('[data-kind="shape"]')).not.toBeNull();
+    expect(bodies[0]!.closest('[filter]')).toBeNull();
+  });
+
   test('a stack of 16 soft-edged groups paints in bounded time, each text once', () => {
     let shapes = '';
     for (let level = 15; level >= 0; level -= 1) {
