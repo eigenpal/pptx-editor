@@ -92,7 +92,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
-/** Underline types whose bars the reference PDFs match at every measured size. */
+/** Underline types whose bars agree with the reference PDFs at every measured size. */
 const EXACT_UNDERLINES = new Set(['none', 'sng', 'words', 'dbl', 'heavy']);
 const ROTATED_TEXT = new Set([
   'vert',

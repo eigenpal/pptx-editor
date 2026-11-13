@@ -1,4 +1,4 @@
-// SVG path data for evaluated geometry, and path commands mapped through a matrix: the slide
+// SVG `d` strings for evaluated geometry, and path commands mapped through a matrix: the slide
 // paint, the shape gallery, and the soft edge of a group (`group-text-covers.ts`) read them.
 
 import {
