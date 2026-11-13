@@ -1862,7 +1862,11 @@
 .pptx-surface__handle--w {
   cursor: ew-resize;
 }
+/* The rotation handle: a green circle, apart from the white box handles and the yellow adjust
+   handles. */
 .pptx-surface__handle--rot {
+  fill: #34c759;
+  stroke: #0b5d1e;
   cursor: var(--doc-cursor-rotate);
 }
 /* During a rotation drag the whole surface keeps the rotate pointer (surface.ts). */

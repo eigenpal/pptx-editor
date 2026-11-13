@@ -2,4 +2,4 @@
 '@pptx-editor.dev/core': patch
 ---
 
-Show a rotate arrow as the pointer on the rotation handle and during a rotation drag.
+Show the rotation handle as a green circle, with a rotate arrow as its pointer and during a rotation drag.

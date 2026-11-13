@@ -1,0 +1,8 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The rotation handle's pointer and color are editor styles only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": ["scripts/collaboration/test.mjs"]
+}
