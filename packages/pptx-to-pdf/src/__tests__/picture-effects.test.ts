@@ -15,7 +15,7 @@ import type { BlipEffect } from '@pptx-editor.dev/core/cascade';
 import { applyBlipColorSteps, blipColorSteps } from '@pptx-editor.dev/core/output';
 import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
-import { colorStepsCode, MAX_COLOR_STEPS } from '../paint-fill.ts';
+import { colorStepsCode, MAX_COLOR_STEPS } from '../paint-picture.ts';
 
 const IN = 914_400;
 const BEST = { fidelityPolicy: 'best-effort' } as const;

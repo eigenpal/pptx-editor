@@ -108,7 +108,7 @@ describe('openDocumentForExport and exportPdfFrom', () => {
   });
 
   test('a failed or cancelled export leaves the session usable', async () => {
-    const session = await open('fills-lines');
+    const session = await open('effects');
     try {
       await expect(exportPdfFrom(session)).rejects.toBeInstanceOf(PdfFidelityError);
       const controller = new AbortController();

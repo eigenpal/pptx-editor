@@ -5,8 +5,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Fills as PDF paint, from the same resolved fills the editor's SVG paint reads
 // (`packages/core/src/output/paint-fill.ts`): solid colors, linear and path gradients as PDF
-// shadings, and pictures cropped by `srcRect` and placed by `fillRect`. A fill other than a
-// solid color clips to its path and paints the shape's local box, as an SVG paint server does.
+// shadings (a `path="shape"` gradient as the SVG paint's outline bands), and pictures cropped by
+// `srcRect` and placed by `fillRect`. A fill other than a solid color clips to its path and
+// paints the shape's local box, as an SVG paint server does.
 
 import {
   closePath,
@@ -16,6 +17,7 @@ import {
   moveTo,
   popGraphicsState,
   pushGraphicsState,
+  setFillingGrayscaleColor,
   setFillingRgbColor,
   setDashPattern,
   setLineCap,
@@ -29,10 +31,6 @@ import {
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
-  PDFBool,
-  type PDFDocument,
-  type PDFImage,
-  PDFRawStream,
   type PDFRef,
 } from 'pdf-lib';
 import type { GradientStop, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
@@ -45,21 +43,16 @@ import {
 } from '@pptx-editor.dev/core/layout';
 import {
   adjustForPathMode,
-  blipColorSteps,
   circleGradientGeometry,
   gradientPaintStops,
   linearGradientEnds,
-  LUMA_WEIGHTS,
-  metafilePng,
+  rectGradientGeometry,
+  shapeGradientBands,
   patternBitmap,
   PATTERN_PIXEL,
-  tileGeometry,
-  type BlipColorStep,
-  type TileGeometry,
 } from '@pptx-editor.dev/core/output';
-import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import {
-  clip,
+  around,
   clipEvenOdd,
   EMU_PER_PT,
   endPath,
@@ -70,14 +63,7 @@ import {
   type PageOps,
   type StopFunctions,
 } from './page-ops.ts';
-import { fontEmbeddingDecision } from './pdf-font-embedding.ts';
-
-/**
- * The largest picture this writer decodes. `pdf-lib` decodes every PNG pixel, so a small file
- * that declares a huge size could exhaust memory; the header is read first and checked here.
- */
-export const MAX_IMAGE_PIXELS = 25_000_000;
-const MAX_IMAGE_SIDE = 20_000;
+import { drawPicture } from './paint-picture.ts';
 
 /** Where a fill's pictures resolve, and the enclosing group's fill for `a:grpFill`. */
 export interface FillScope {
@@ -87,7 +73,6 @@ export interface FillScope {
   readonly groupSourcePart?: string;
 }
 
-type PictureFill = Extract<ResolvedFill, { type: 'picture' }>;
 type PathGradient = Extract<ResolvedFill, { type: 'path' }>;
 
 /** A fill with `a:grpFill` replaced by the enclosing group's fill, as the SVG paint does. */
@@ -105,7 +90,9 @@ export function ownFill(
 /**
  * Fill the path that `trace` draws, over a `w` × `h` local box. A solid color fills the path;
  * any other fill clips to it (even-odd, as the SVG `fill-rule`) and paints the box. `mode` is
- * the preset path fill mode (`a:path/@fill`). Returns false when the fill paints nothing.
+ * the preset path fill mode (`a:path/@fill`). With `banded`, a `path="shape"` gradient draws as
+ * bands of the path that `trace` draws (`shapeBandBudget` decides, as in the SVG paint); without
+ * it, as a rectangle gradient. Returns false when the fill paints nothing.
  */
 export async function paintFill(
   fill: ResolvedFill,
@@ -115,7 +102,8 @@ export async function paintFill(
   p: PageOps,
   scope: FillScope,
   what: string,
-  mode: GeometryPath['fill'] = 'norm'
+  mode: GeometryPath['fill'] = 'norm',
+  banded = false
 ): Promise<boolean> {
   const own = ownFill(fill, scope);
   const f = own.fill;
@@ -139,7 +127,7 @@ export async function paintFill(
     trace();
     p.push(clipEvenOdd(), endPath());
     if (f.type === 'picture') await drawPicture(own.sourcePart, f, w, h, p);
-    else gradientBox(f, w, h, p, mode);
+    else gradientBox(f, w, h, p, mode, banded ? trace : undefined);
   }
   p.push(popGraphicsState());
   return true;
@@ -246,18 +234,26 @@ function patternRef(
   return ref;
 }
 
-/** Paint a gradient over a `w` × `h` box at the origin, inside the current clip. */
+/**
+ * Paint a gradient over a `w` × `h` box at the origin, inside the current clip. `outline` traces
+ * the filled path, for the bands of a `path="shape"` gradient; without it, that gradient paints
+ * as a rectangle gradient, as the SVG paint does without a fill path.
+ */
 export function gradientBox(
   f: Extract<ResolvedFill, { type: 'linear' | 'path' }>,
   w: number,
   h: number,
   p: PageOps,
-  mode: GeometryPath['fill'] = 'norm'
+  mode: GeometryPath['fill'] = 'norm',
+  outline?: () => void
 ): void {
+  const adjusted = f.stops.map((s) => ({ ...s, color: adjustForPathMode(s.color, mode) }));
+  if (f.type === 'path' && f.path === 'shape' && outline) {
+    shapeGradient(f, adjusted, w, h, p, outline);
+    return;
+  }
   // The SVG paint's stop colors, so a two-stop gradient bends.
-  const stops = gradientPaintStops(
-    f.stops.map((s) => ({ ...s, color: adjustForPathMode(s.color, mode) }))
-  );
+  const stops = gradientPaintStops(adjusted);
   if (f.type === 'linear') linearGradient(f.angle, f.scaled, stops, w, h, p);
   else if (f.path === 'circle') radialGradient(f, stops, w, h, p);
   else rectGradient(f, stops, w, h, p);
@@ -397,6 +393,26 @@ function stopFunctions(stops: readonly GradientStop[], p: PageOps): StopFunction
   return fns;
 }
 
+/** The fill operator of a type 2 (axial) or 3 (radial) shading with `coords` in local space. */
+function shadingOp(
+  type: 2 | 3,
+  coords: number[],
+  space: 'DeviceRGB' | 'DeviceGray',
+  fn: PDFRef,
+  p: PageOps
+): PDFOperator {
+  const ctx = p.res.doc.context;
+  const dict = ctx.obj({
+    ShadingType: type,
+    ColorSpace: space,
+    Coords: coords,
+    Function: fn,
+    Extend: [true, true],
+  });
+  p.res.work.reserveContent(dict.sizeInBytes());
+  return shadingFill(p.name('Shading', ctx.register(dict)));
+}
+
 /**
  * Paint a shading over the current clip: type 2 (axial) or 3 (radial) with `coords` in local
  * space. Stops with different alphas paint through a luminosity soft mask of the same shading.
@@ -409,37 +425,60 @@ function shade(
   bbox: [number, number, number, number],
   p: PageOps
 ): void {
-  const ctx = p.res.doc.context;
-  const shading = (space: 'DeviceRGB' | 'DeviceGray', fn: PDFRef): PDFName => {
-    const dict = ctx.obj({
-      ShadingType: type,
-      ColorSpace: space,
-      Coords: coords,
-      Function: fn,
-      Extend: [true, true],
-    });
-    p.res.work.reserveContent(dict.sizeInBytes());
-    return p.name('Shading', ctx.register(dict));
-  };
-  if (fns.alpha) {
-    const form = p.form([shadingFill(shading('DeviceGray', fns.alpha))], bbox, {
-      S: 'Transparency',
-      CS: 'DeviceGray',
-    });
-    p.state(`smask:${form.toString()}`, () =>
-      ctx.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: form } })
-    );
-  } else p.alpha(fns.flatAlpha, 1);
-  p.push(shadingFill(shading('DeviceRGB', fns.color)));
+  withStopAlpha(
+    fns.alpha ? null : fns.flatAlpha,
+    bbox,
+    p,
+    (gray) =>
+      p.push(
+        gray
+          ? shadingOp(type, coords, 'DeviceGray', fns.alpha!, p)
+          : shadingOp(type, coords, 'DeviceRGB', fns.color, p)
+      ),
+    false
+  );
 }
 
-/** The local box grown by its own size on every side, for soft-mask bounds. */
-const around = (w: number, h: number): [number, number, number, number] => [
-  -Math.abs(w),
-  -Math.abs(h),
-  2 * Math.abs(w),
-  2 * Math.abs(h),
-];
+/**
+ * Paint `draw` with the stop alpha of a gradient, as the SVG paint's luminance masks: one
+ * `flatAlpha` for every stop, or, when it is null, a luminosity soft mask that `draw(true)` paints
+ * in gray (the stop alpha as luminance). `draw(false)` paints the colors opaque. The alpha of a
+ * graphics state applies to each paint operator, so a construction of overlapping parts
+ * (`grouped`) paints into a transparency group first, and the alpha applies once, to the group.
+ * `bbox` bounds the mask and the group in local space.
+ */
+function withStopAlpha(
+  flatAlpha: number | null,
+  bbox: [number, number, number, number],
+  p: PageOps,
+  draw: (gray: boolean) => void,
+  grouped = true
+): void {
+  if (flatAlpha === null) {
+    const ops = p.captureNow(() => draw(true));
+    const form = p.form(ops, bbox, { S: 'Transparency', CS: 'DeviceGray' });
+    p.state(`smask:${form.toString()}`, () =>
+      p.res.doc.context.obj({
+        Type: 'ExtGState',
+        SMask: { Type: 'Mask', S: 'Luminosity', G: form },
+      })
+    );
+  } else p.alpha(flatAlpha, 1);
+  if (!grouped || flatAlpha === 1) {
+    draw(false);
+    return;
+  }
+  const group = p.form(
+    p.captureNow(() => draw(false)),
+    bbox,
+    { S: 'Transparency' }
+  );
+  p.push(drawObject(p.name('XObject', group)));
+}
+
+/** Set the fill color of a construction part: the color, or its alpha as gray for a mask. */
+const partColor = (c: Rgba, gray: boolean): PDFOperator =>
+  gray ? setFillingGrayscaleColor(Math.max(0, Math.min(1, c.a))) : setFillingRgbColor(...rgb(c));
 
 /** `a:lin`: the SVG paint's gradient line (`linearGradientEnds`, ECMA-376 §20.1.8.41). */
 function linearGradient(
@@ -472,9 +511,10 @@ function radialGradient(
 }
 
 /**
- * `a:path path="rect"` (and `shape`, which the SVG paint draws the same way): concentric
- * rectangles from `fillToRect` (the first stop) to the box edge (the last stop), as four
- * trapezoids with linear gradients over a base of the last color.
+ * `a:path path="rect"`, and `shape` without bands: the SVG paint's construction
+ * (`rectGradientGeometry`), concentric rectangles from `fillToRect` (the first stop) to the edge
+ * of the tile rectangle (the last stop), as four trapezoids with linear gradients over a base of
+ * the last color. Stop alpha masks the whole construction.
  */
 function rectGradient(
   fill: PathGradient,
@@ -485,375 +525,94 @@ function rectGradient(
 ): void {
   const fns = stopFunctions(stops, p);
   if (!fns) return;
-  const f = fill.fillToRect;
-  const l = Math.min(f.l * w, w);
-  const t = Math.min(f.t * h, h);
-  const r = Math.max(l, w - f.r * w);
-  const b = Math.max(t, h - f.b * h);
-  const solid = (c: Rgba, x: number, y: number, rw: number, rh: number): void => {
-    // The SVG paint draws the base and the center opaque.
-    p.push(setFillingRgbColor(...rgb(c)));
-    traceRect(x, y, rw, rh, p);
-    p.push(fillEvenOdd());
-  };
-  solid(stops[stops.length - 1].color, 0, 0, w, h);
-  const trapezoid = (pts: [number, number][], coords: number[]): void => {
-    p.push(pushGraphicsState(), moveTo(pts[0][0], pts[0][1]));
-    for (const [x, y] of pts.slice(1)) p.push(lineTo(x, y));
-    p.push(closePath(), clipEvenOdd(), endPath());
-    shade(2, coords, fns, around(w, h), p);
-    p.push(popGraphicsState());
-  };
-  const [tl, tr, br, bl]: [number, number][] = [
-    [0, 0],
-    [w, 0],
-    [w, h],
-    [0, h],
-  ];
-  trapezoid([tl, tr, [r, t], [l, t]], [0, t, 0, 0]);
-  trapezoid([[l, b], [r, b], br, bl], [0, b, 0, h]);
-  trapezoid([tl, [l, t], [l, b], bl], [l, 0, 0, 0]);
-  trapezoid([[r, t], tr, br, [r, b]], [r, 0, w, 0]);
-  if (r > l && b > t) solid(stops[0].color, l, t, r - l, b - t);
-}
-
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const isPng = (b: Uint8Array): boolean => PNG_SIGNATURE.every((v, i) => b[i] === v);
-const isJpeg = (b: Uint8Array): boolean => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-
-/** Embed a picture part once per document: the format from its signature, its size checked first. */
-async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
-  const cached = p.res.images.get(target);
-  if (cached !== undefined) return cached;
-  let image: PDFImage | null = null;
-  let bytes = binaryPartOf(p.res.pkg, target);
-  // An EMF or WMF picture draws as its PNG, converted as in the editor.
-  const metafile = bytes !== undefined && metafileFormat(bytes) !== undefined;
-  if (bytes && metafile) {
-    // Metafile text draws only with fonts that their embedding permission lets the PDF carry.
-    const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()]
-      .filter((f) => {
-        const face = {
-          identity: f.id,
-          bytes: f.bytes,
-          faceIndex: 0,
-          request: { family: f.family },
-        };
-        return fontEmbeddingDecision(face).kind !== 'refuse';
-      })
-      .map((f) => f.bytes));
-    let png = await metafilePng(bytes, fonts, p.res.work.signal);
-    // When the export's signal or deadline stopped the conversion, the export fails.
-    p.res.work.check();
-    // A picture that the converter's own time limit stopped tries once more (a busy machine),
-    // then reports `picture.metafile`.
-    if (png === undefined) png = await metafilePng(bytes, fonts, p.res.work.signal);
-    p.res.work.check();
-    bytes = png ?? undefined;
-  }
-  const png = bytes ? isPng(bytes) : false;
-  if (!bytes && metafile)
-    p.diag.add('picture.metafile', 'unsupported', 'An EMF or WMF picture does not convert.');
-  else if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
-  else if (!png && !isJpeg(bytes))
-    p.diag.add('picture.format', 'unsupported', 'A picture is not PNG, JPEG, EMF, or WMF.');
-  else {
-    const size = imageSize(bytes);
-    if (!size || size.width <= 0 || size.height <= 0)
-      p.diag.add('picture.unreadable', 'unsupported', 'A picture header cannot be read.');
-    else if (
-      size.width > MAX_IMAGE_SIDE ||
-      size.height > MAX_IMAGE_SIDE ||
-      size.width * size.height > MAX_IMAGE_PIXELS
-    )
-      p.diag.add(
-        'picture.too-large',
-        'unsupported',
-        `A ${size.width} × ${size.height} picture exceeds the ${MAX_IMAGE_PIXELS} pixel limit.`
+  const { l, t, r, b, x0, y0, x1, y1 } = rectGradientGeometry(fill, w, h);
+  withStopAlpha(fns.alpha ? null : fns.flatAlpha, around(w, h), p, (gray) => {
+    const solid = (c: Rgba, x: number, y: number, rw: number, rh: number): void => {
+      p.push(partColor(c, gray));
+      traceRect(x, y, rw, rh, p);
+      p.push(fillEvenOdd());
+    };
+    // The base hides antialiasing seams between the trapezoids.
+    solid(stops[stops.length - 1].color, 0, 0, w, h);
+    const trapezoid = (pts: [number, number][], coords: number[]): void => {
+      p.push(pushGraphicsState(), moveTo(pts[0][0], pts[0][1]));
+      for (const [x, y] of pts.slice(1)) p.push(lineTo(x, y));
+      p.push(closePath(), clipEvenOdd(), endPath());
+      p.push(
+        gray
+          ? shadingOp(2, coords, 'DeviceGray', fns.alpha!, p)
+          : shadingOp(2, coords, 'DeviceRGB', fns.color, p)
       );
-    else {
-      // The picture's file bytes become PDF content once per document. pdf-lib keeps a PNG
-      // decoded until the save, and only the pixel limit above bounds each one. DOCX Editor
-      // passes a PNG through without decoding it.
-      p.res.work.reserveContent(bytes.length);
-      try {
-        image = png ? await p.res.doc.embedPng(bytes) : await p.res.doc.embedJpg(bytes);
-        await smoothImage(image, p);
-      } catch {
-        // An image that fails to embed is neither drawn nor saved: the save embeds every image
-        // again, and the failed one would fail the whole export.
-        if (image) forgetImage(p.res.doc, image);
-        image = null;
-        p.diag.add('picture.unreadable', 'unsupported', 'A picture cannot be decoded.');
-      }
-    }
-  }
-  p.res.images.set(target, image);
-  return image;
-}
-
-/**
- * Remove an image from the list that `PDFDocument.save` embeds. `pdf-lib` keeps the list private
- * (`images`) and keeps a failed embed's rejected task, so the save would throw the same error.
- */
-function forgetImage(doc: PDFDocument, image: PDFImage): void {
-  const list = (doc as unknown as { images?: unknown }).images;
-  if (!Array.isArray(list)) return;
-  const at = list.indexOf(image);
-  if (at >= 0) list.splice(at, 1);
-}
-
-/**
- * Mark an embedded picture for smooth sampling (`/Interpolate`, ISO 32000-1, 8.9.5.3), as the
- * editor's paint samples it. Without the flag, a PDF viewer can draw an enlarged picture with
- * hard pixel edges. The picture is embedded now, so its image dictionary exists.
- */
-async function smoothImage(image: PDFImage, p: PageOps): Promise<void> {
-  await image.embed();
-  const ctx = p.res.doc.context;
-  const dict = ctx.lookup(image.ref);
-  if (!(dict instanceof PDFRawStream)) return;
-  dict.dict.set(PDFName.of('Interpolate'), PDFBool.True);
-  // A PNG with alpha keeps it in a soft mask image: smooth its edges too.
-  const mask = ctx.lookup(dict.dict.get(PDFName.of('SMask')));
-  if (mask instanceof PDFRawStream) mask.dict.set(PDFName.of('Interpolate'), PDFBool.True);
-}
-
-/** A rectangle path. */
-function rectOps(x: number, y: number, w: number, h: number): PDFOperator[] {
-  return [moveTo(x, y), lineTo(x + w, y), lineTo(x + w, y + h), lineTo(x, y + h), closePath()];
-}
-
-/**
- * At most this many color steps are drawn. Each step is about 150 bytes of function code that a
- * viewer runs for every pixel, and a file decides how many effects a picture has. A picture with
- * each effect once takes 7 steps.
- */
-export const MAX_COLOR_STEPS = 64;
-
-/** A number for a PostScript calculator function: plain decimal notation, bounded. */
-function psNumber(v: number): string {
-  const x = Number.isFinite(v) ? Math.max(-1e6, Math.min(1e6, v)) : 0;
-  const s = x.toFixed(6).replace(/\.?0+$/, '');
-  return s === '-0' || s === '' ? '0' : s;
-}
-
-/**
- * The PostScript calculator code (ISO 32000-1, 7.10.5) of color steps, from `inputs` (1 or 3)
- * components in [0, 1] to red, green, and blue: each step as the SVG filter primitive computes
- * it, clamped to [0, 1].
- */
-export function colorStepsCode(steps: readonly BlipColorStep[], inputs: 1 | 3): string {
-  const clamp = 'dup 0 lt { pop 0 } if dup 1 gt { pop 1 } if';
-  const code: string[] = inputs === 1 ? ['dup dup'] : [];
-  const [wr, wg, wb] = LUMA_WEIGHTS.map(psNumber);
-  for (const s of steps) {
-    if (s.op === 'gray') {
-      // r g b → r·wr + g·wg + b·wb, three times.
-      code.push(`${wb} mul exch ${wg} mul add exch ${wr} mul add ${clamp} dup dup`);
-      continue;
-    }
-    // Blue, then green, then red: each channel on the top, mapped, and rolled under the others.
-    for (const i of [2, 1, 0]) {
-      const slope = s.op === 'table' ? s.to[i]! - s.from[i]! : s.slope;
-      const intercept = s.op === 'table' ? s.from[i]! : s.intercept;
-      code.push(`${psNumber(slope)} mul ${psNumber(intercept)} add ${clamp} 3 1 roll`);
-    }
-  }
-  return `{ ${code.join(' ')} }`;
-}
-
-/**
- * The image with color steps applied: a copy of its image dictionary and its encoded data, in a
- * `DeviceN` color space whose tint transform is the steps' PostScript function. A viewer maps each
- * decoded pixel through the function, so the export never decodes a picture for its effects, and
- * a JPEG stays a JPEG. The alpha (`SMask`) is the original's. Written once per image and steps.
- * An image in a color space other than RGB and gray (a CMYK JPEG) is drawn without the effects.
- */
-function recolored(image: PDFImage, allSteps: readonly BlipColorStep[], p: PageOps): PDFRef {
-  if (allSteps.length === 0) return image.ref;
-  if (allSteps.length > MAX_COLOR_STEPS)
-    p.diag.add(
-      'picture.color-effects',
-      'approximation',
-      `Pictures with more than ${MAX_COLOR_STEPS} color effect steps are drawn with the first ${MAX_COLOR_STEPS}.`
+      p.push(popGraphicsState());
+    };
+    trapezoid(
+      [
+        [x0, y0],
+        [x1, y0],
+        [r, t],
+        [l, t],
+      ],
+      [0, t, 0, y0]
     );
-  const steps = allSteps.slice(0, MAX_COLOR_STEPS);
-  const key = `${image.ref.toString()}|${JSON.stringify(steps)}`;
-  const cache = (p.res.recolored ??= new Map());
-  const known = cache.get(key);
-  const ctx = p.res.doc.context;
-  const source = ctx.lookup(image.ref);
-  const space = source instanceof PDFRawStream ? source.dict.get(PDFName.of('ColorSpace')) : null;
-  const inputs = space === PDFName.of('DeviceRGB') ? 3 : space === PDFName.of('DeviceGray') ? 1 : 0;
-  if (known === null || !(source instanceof PDFRawStream) || inputs === 0) {
-    // Reported on each slide that draws the picture.
-    p.diag.add(
-      'picture.color-effects',
-      'approximation',
-      'Picture color effects on a CMYK picture are not drawn.'
+    trapezoid(
+      [
+        [l, b],
+        [r, b],
+        [x1, y1],
+        [x0, y1],
+      ],
+      [0, b, 0, y1]
     );
-    cache.set(key, null);
-    return image.ref;
-  }
-  if (known) return known;
-  const code = colorStepsCode(steps, inputs);
-  const fn = ctx.register(
-    ctx.stream(code, {
-      FunctionType: 4,
-      Domain: Array.from({ length: inputs }, () => [0, 1]).flat(),
-      Range: [0, 1, 0, 1, 0, 1],
-    })
-  );
-  const names = inputs === 3 ? ['PptxRed', 'PptxGreen', 'PptxBlue'] : ['PptxGray'];
-  const dict = source.dict.clone(ctx);
-  dict.set(
-    PDFName.of('ColorSpace'),
-    ctx.obj(['DeviceN', names.map((n) => PDFName.of(n)), 'DeviceRGB', fn])
-  );
-  // The encoded picture is written a second time.
-  p.res.work.reserveContent(source.contents.length + code.length + dict.sizeInBytes());
-  const ref = ctx.register(PDFRawStream.of(dict, source.contents));
-  cache.set(key, ref);
-  return ref;
-}
-
-/**
- * The tiling pattern of a tiled picture (ISO 32000-1, 8.7.3.3): one cell of 1 tile, or 2 or 4
- * tiles mirrored by `flip`, as the SVG paint's pattern (`core/output`, `tilePaint`). The pattern
- * space is the box's, with the grid's origin at `g.x`, `g.y`. Written once per picture and
- * geometry.
- */
-function tilePattern(image: PDFRef, g: TileGeometry, p: PageOps): PDFRef {
-  const { width: tw, height: th, flipX: fx, flipY: fy } = g;
-  const cw = fx ? 2 * tw : tw;
-  const ch = fy ? 2 * th : th;
-  const key = `tile|${image.toString()}|${[g.x, g.y, tw, th, fx, fy].join(',')}`;
-  let ref = p.res.patterns.get(key);
-  if (ref) return ref;
-  const ctx = p.res.doc.context;
-  // The image space is the unit square with y up; a tile is tw × th with y down.
-  const placements: number[][] = [[tw, 0, 0, -th, 0, th]];
-  if (fx) placements.push([-tw, 0, 0, -th, 2 * tw, th]);
-  if (fy) placements.push([tw, 0, 0, th, 0, th]);
-  if (fx && fy) placements.push([-tw, 0, 0, th, 2 * tw, th]);
-  const ops: PDFOperator[] = [];
-  for (const m of placements)
-    ops.push(
-      pushGraphicsState(),
-      concatTransformationMatrix(m[0]!, m[1]!, m[2]!, m[3]!, m[4]!, m[5]!),
-      drawObject('Im'),
-      popGraphicsState()
+    trapezoid(
+      [
+        [x0, y0],
+        [l, t],
+        [l, b],
+        [x0, y1],
+      ],
+      [l, 0, x0, 0]
     );
-  const dict = ctx.obj({
-    Type: 'Pattern',
-    PatternType: 1,
-    PaintType: 1,
-    TilingType: 1,
-    BBox: [0, 0, cw, ch],
-    XStep: cw,
-    YStep: ch,
-    Matrix: [1, 0, 0, 1, g.x, g.y],
-    Resources: ctx.obj({ XObject: ctx.obj({ Im: image }) }),
+    trapezoid(
+      [
+        [r, t],
+        [x1, y0],
+        [x1, y1],
+        [r, b],
+      ],
+      [r, 0, x1, 0]
+    );
+    if (r > l && b > t) solid(stops[0].color, l, t, r - l, b - t);
   });
-  let bytes = dict.sizeInBytes();
-  for (const op of ops) bytes += op.sizeInBytes() + 1;
-  p.res.work.count(ops.length);
-  p.res.work.reserveContent(bytes);
-  ref = ctx.register(PDFContentStream.of(dict, ops, false));
-  p.res.patterns.set(key, ref);
-  return ref;
-}
-
-/** Whether a picture fill has an image this writer draws (the image is embedded once). */
-export async function canDrawPicture(
-  sourcePart: string,
-  fill: PictureFill,
-  p: PageOps
-): Promise<boolean> {
-  const target = relTarget(p.res.pkg, sourcePart, fill.rId);
-  return target ? (await imageFor(target, p)) !== null : false;
 }
 
 /**
- * Draw a picture fill over a `w` × `h` box, as the SVG `pictureImage`: `fillRect` places the
- * picture in the box, and `srcRect` crops it, so the picture's visible part fills that place.
- * The caller clips to the shape.
+ * `a:path path="shape"`: the SVG paint's bands (`shapeGradientBands`), copies of the outline that
+ * `outline` traces, scaled about the focus center from 1 down, each filled in one color, outside
+ * in. `stops` are the fill's stops after the path fill mode. Stop alpha masks all the bands.
  */
-export async function drawPicture(
-  sourcePart: string,
-  fill: PictureFill,
+function shapeGradient(
+  fill: PathGradient,
+  stops: readonly GradientStop[],
   w: number,
   h: number,
-  p: PageOps
-): Promise<void> {
-  const target = relTarget(p.res.pkg, sourcePart, fill.rId);
-  if (!target) {
-    p.diag.add('picture.missing', 'unsupported', 'A picture part is missing or external.');
-    return;
-  }
-  // The fallback is the deck's own raster picture of the SVG, so it is reported, not refused.
-  if (fill.svgRId)
-    p.diag.add(
-      'picture.svg-fallback',
-      'information',
-      'SVG pictures are drawn from their PNG fallback.'
-    );
-  // The SVG paint draws no other effect either, so the export reports them as the editor shows.
-  const unsupported = fill.effects.find((e) => e.kind === 'unsupported');
-  if (unsupported)
-    p.diag.add(
-      'picture.color-effects',
-      'approximation',
-      `The picture color effect ${clip(unsupported.name)} is not drawn.`
-    );
-  const image = await imageFor(target, p);
-  if (!image) return;
-  const ref = recolored(image, blipColorSteps(fill.effects), p);
-  const alpha = fill.effects.reduce((a, e) => (e.kind === 'alphaModFix' ? a * e.amount : a), 1);
-  if (fill.mode === 'tile' && fill.tile) {
-    // The tiles sit on the box, so a pattern in the space of a form drawn at the box's matrix.
-    const g = tileGeometry(fill.tile, p.res.imageSize?.(sourcePart, fill.rId), w, h);
-    const pattern = p.name('Pattern', tilePattern(ref, g, p));
-    const bbox = around(w, h);
-    const form = p.form(
-      [
-        PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
-        PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [pattern]),
-        ...rectOps(bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]),
-        fillEvenOdd(),
-      ],
-      bbox
-    );
-    p.push(pushGraphicsState());
-    p.alpha(alpha, 1);
-    p.push(drawObject(p.name('XObject', form)), popGraphicsState());
-    return;
-  }
-  const fr = fill.fillRect;
-  const bx = fr.l * w;
-  const by = fr.t * h;
-  const bw = w * (1 - fr.l - fr.r);
-  const bh = h * (1 - fr.t - fr.b);
-  // A crop that leaves nothing visible on an axis (two concurrent crops merged edge by edge)
-  // draws uncropped on that axis, as the SVG paint and the crop commands read it.
-  const raw = fill.srcRect;
-  const okW = 1 - raw.l - raw.r >= 0.001;
-  const okH = 1 - raw.t - raw.b >= 0.001;
-  const sr = {
-    l: okW ? raw.l : 0,
-    r: okW ? raw.r : 0,
-    t: okH ? raw.t : 0,
-    b: okH ? raw.b : 0,
-  };
-  const iw = bw / (1 - sr.l - sr.r);
-  const ih = bh / (1 - sr.t - sr.b);
-  const name = p.name('XObject', ref);
-  p.push(pushGraphicsState());
-  p.alpha(alpha, 1);
-  // The image space is the unit square with y up; the picture is iw × ih EMU with y down.
-  p.push(concatTransformationMatrix(iw, 0, 0, -ih, bx - sr.l * iw, by - sr.t * ih + ih));
-  p.push(drawObject(name), popGraphicsState());
+  p: PageOps,
+  outline: () => void
+): void {
+  if (stops.length === 0) return;
+  const { cx, cy, bands } = shapeGradientBands(fill, stops, w, h);
+  const alphas = stops.map((s) => s.color.a);
+  const flat = alphas.every((a) => a === alphas[0]);
+  withStopAlpha(flat ? alphas[0]! : null, around(w, h), p, (gray) => {
+    for (const { scale: k, color } of bands) {
+      p.push(
+        pushGraphicsState(),
+        concatTransformationMatrix(k, 0, 0, k, cx - k * cx, cy - k * cy),
+        partColor(color, gray)
+      );
+      outline();
+      p.push(fillEvenOdd(), popGraphicsState());
+    }
+  });
 }
 
 /** The PDF line cap of an SVG `stroke-linecap` value. */

@@ -25,7 +25,7 @@ import {
 } from 'pdf-lib';
 import type { Rgba } from '@pptx-editor.dev/core/cascade';
 import type { Matrix, PathCommand, RegisteredFace } from '@pptx-editor.dev/core/layout';
-import type { ImageSizePort } from '@pptx-editor.dev/core/output';
+import { shapeBandBudget, type ImageSizePort } from '@pptx-editor.dev/core/output';
 import type { PptxPackage } from '@pptx-editor.dev/core/store';
 import type { EmbeddedFace } from './fonts.ts';
 import type { Work } from './options.ts';
@@ -129,6 +129,10 @@ export class PageOps {
   readonly #fontKeys = new Map<string, PDFName>();
   /** This page's names of the document's tiling patterns (`PaintResources.patterns`). */
   readonly patterns = new Map<string, PDFName>();
+  /** This page's work for `path="shape"` gradient bands, with the SVG paint's limits. */
+  readonly shapeBands = shapeBandBudget();
+  /** Whether each shape draws its shape gradient as bands, decided once: a reflection draws it again. */
+  readonly bandedShapes = new WeakMap<object, boolean>();
   #resourcesRef: PDFRef | undefined;
   #names = 0;
   #forms = 0;
@@ -169,6 +173,20 @@ export class PageOps {
     this.#forms += 1;
     try {
       await draw();
+      return this.#ops;
+    } finally {
+      this.#forms -= 1;
+      this.#ops = outer;
+    }
+  }
+
+  /** `capture` for a `draw` that does not wait. */
+  captureNow(draw: () => void): PDFOperator[] {
+    const outer = this.#ops;
+    this.#ops = [];
+    this.#forms += 1;
+    try {
+      draw();
       return this.#ops;
     } finally {
       this.#forms -= 1;
@@ -233,7 +251,7 @@ export class PageOps {
   form(
     ops: PDFOperator[],
     bbox: number[],
-    group?: { readonly S: 'Transparency'; readonly CS?: 'DeviceGray' }
+    group?: { readonly S: 'Transparency'; readonly CS?: 'DeviceGray'; readonly I?: boolean }
   ): PDFRef {
     const ctx = this.res.doc.context;
     let bytes = 0;
@@ -322,3 +340,11 @@ export function tracePath(commands: readonly PathCommand[], p: PageOps): void {
 export function traceRect(x: number, y: number, w: number, h: number, p: PageOps): void {
   p.push(moveTo(x, y), lineTo(x + w, y), lineTo(x + w, y + h), lineTo(x, y + h), closePath());
 }
+
+/** The local box grown by its own size on every side, for soft-mask bounds. */
+export const around = (w: number, h: number): [number, number, number, number] => [
+  -Math.abs(w),
+  -Math.abs(h),
+  2 * Math.abs(w),
+  2 * Math.abs(h),
+];

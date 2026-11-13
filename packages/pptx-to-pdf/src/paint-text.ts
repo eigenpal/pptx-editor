@@ -42,7 +42,8 @@ import {
   type WarpedRun,
 } from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
-import { drawPicture, flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
+import { flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
+import { drawPicture } from './paint-picture.ts';
 import { clip, clipNonZero, EMU_PER_PT, rgb, tracePath, type PageOps } from './page-ops.ts';
 
 /** The embedded face for a layout face id, or null with a diagnostic. */

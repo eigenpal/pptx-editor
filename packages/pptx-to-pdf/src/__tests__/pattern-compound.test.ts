@@ -39,6 +39,22 @@ async function patterns(bytes: Uint8Array): Promise<{ matrix: number[]; content:
   return out;
 }
 
+/** The decoded content of every luminosity soft mask group (a form with a DeviceGray group). */
+async function softMasks(bytes: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(bytes);
+  const out: string[] = [];
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    const group = obj.dict.lookupMaybe(PDFName.of('Group'), PDFDict);
+    if (group?.get(PDFName.of('CS')) !== PDFName.of('DeviceGray')) continue;
+    const raw = obj.dict.has(PDFName.of('Filter'))
+      ? decodePDFRawStream(obj).decode()
+      : obj.contents;
+    out.push(new TextDecoder('latin1').decode(raw));
+  }
+  return out;
+}
+
 /** The number of stroke operators on page 1, through pdf.js. */
 async function strokes(result: PdfExportResult): Promise<number> {
   const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
@@ -188,9 +204,49 @@ describe('compound lines', () => {
     expect(await strokes(await of(line('tri')))).toBe(3);
   });
 
-  test('a dashed compound line draws as one line, with a diagnostic', async () => {
+  test('a dashed asymmetric compound line on an open path draws each band, dashed', async () => {
     const result = await of(line('thickThin', '<a:prstDash val="dash"/>'));
-    expect(codes(result)).toContain('line.compound');
-    expect(await strokes(result)).toBe(1);
+    expect(codes(result)).not.toContain('line.compound');
+    expect(await strokes(result)).toBe(2);
+  });
+
+  test('a dashed compound line on a closed path draws masked bands', async () => {
+    const result = await exportPdf(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: IN,
+              y: IN,
+              cx: 2 * IN,
+              cy: IN,
+              prst: 'roundRect',
+              line: line('tri', '<a:prstDash val="dash"/>'),
+            }),
+          },
+        ],
+      }),
+      BEST
+    );
+    expect(codes(result)).not.toContain('line.compound');
+    // `tri` on a closed path: the outer band, and the middle and inner bands inside the path.
+    // Each paints the line's own stroke through a luminosity mask of its band strokes.
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(2);
+    for (const mask of masks) {
+      // The mask strokes carry the line's dashes, from the closing segment of the path.
+      expect(mask).toMatch(/\[[\d. ]+\] 0 d/);
+      expect(mask).toContain('1 G');
+    }
+    // The outer band loses the inside of the path.
+    expect(masks.filter((m) => /\nf\n/.test(m))).toHaveLength(1);
+  });
+
+  test('a dashed symmetric compound line on an open path draws masked bands', async () => {
+    const result = await of(line('dbl', '<a:prstDash val="dash"/>'));
+    expect(codes(result)).not.toContain('line.compound');
+    expect(await softMasks(result.bytes)).toHaveLength(1);
   });
 });

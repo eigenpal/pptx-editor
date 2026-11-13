@@ -74,6 +74,8 @@ export const SOFT_EDGE_INSET_PER_RADIUS = 0.84;
 /**
  * A soft edge of radius `rad`: the outline shrinks by 0.84 `rad` and blurs with a radius of
  * `rad`, so the alpha rises from 0 on the outline to 1 at about 1.84 `rad` inside it.
+ *
+ * @internal
  */
 export function softEdgeSpread(rad: number): SpreadBlur {
   const r = Math.max(0, rad);

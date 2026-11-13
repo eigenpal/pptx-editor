@@ -3,6 +3,7 @@
 
 export {
   paintSlide,
+  MAX_OVERLAY_PATHS,
   paintWeight,
   pathData,
   type AltTextPort,
@@ -26,6 +27,9 @@ export {
   linearGradientEnds,
   LUMA_WEIGHTS,
   lumTransfer,
+  rectGradientGeometry,
+  shapeBandBudget,
+  shapeGradientBands,
   threeDColor,
   tileGeometry,
   type BlipColorStep,
@@ -34,6 +38,9 @@ export {
 export { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 export {
   compoundBandLines,
+  compoundPlan,
+  type Band as CompoundBand,
+  type CompoundPlan,
   type CompoundBandLine,
   type Point as CompoundPoint,
   type Polyline as CompoundPolyline,
