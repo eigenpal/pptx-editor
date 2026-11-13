@@ -777,8 +777,9 @@ export async function drawSoftEdge(
  * the painted edge of `shape` (the fill and the outline) shrunk by `inset` and blurred by
  * `sigma`. The mask holds the alpha by the distance to the painted edge, in bands: inside the
  * filled paths, strokes of the outer edge of their union (`outerEdges`) from the widest band in;
- * on the outline, outside the filled paths, strokes of the outline from the full width in. At a corner a band rounds where the blur
- * takes the product of the two edges. `corners` bound the shape in slide space.
+ * on the outline, outside the filled paths, strokes of the outline from the full width in. At a
+ * corner a band rounds where the blur takes the product of the two edges. `corners` bound the
+ * shape in slide space.
  */
 async function drawEdgeFade(
   shape: SoftEdgeSilhouette,

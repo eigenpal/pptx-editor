@@ -774,6 +774,7 @@ export function paintItem(
             ? undefined
             : showsIn(opts.view, item.textMatrix);
         const text = paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix));
+        // `ownText` links the body to its shape, for the clips of a soft-edged group (`softEdged`).
         parts.appendChild(ownText(item, text));
       }
       const shown = blurFx

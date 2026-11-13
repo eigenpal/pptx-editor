@@ -259,7 +259,11 @@ export function paintGroupEffects(
 /** The custom property that hides the text of shapes in the filtered copy (`softEdged`). */
 const COPY_TEXT = '--pptx-group-text';
 
-/** The shape of each painted text body, for the soft edge of a group that holds it. */
+/**
+ * The shape of each painted text body, for the soft edge of a group that holds it. `paintItem`
+ * notes each body with `ownText`, and `softEdged` reads it to clip the text that a later body
+ * covers (`groupTextCovers`).
+ */
 const textOwners = new WeakMap<Element, LayoutItem>();
 
 /** Note that `item` painted the text body `node`. Returns `node`. @internal */

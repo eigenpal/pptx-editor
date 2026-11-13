@@ -16,7 +16,7 @@ import {
 import { openPresentation } from '../../editor/document-session.ts';
 import { apply, type LayoutItem, type Matrix, type SlideLayout } from '../../layout/index.ts';
 import { effectMatrix } from '../effect-transforms.ts';
-import { groupTextCovers, MAX_GROUP_TEXT_CLIPS } from '../group-text-covers.ts';
+import { groupTextCovers, MAX_GROUP_TEXT_CLIP_COMMANDS } from '../group-text-covers.ts';
 import { paintSlide, type PaintOptions } from '../paint.ts';
 import { SlidePainter } from '../slide-painter.ts';
 
@@ -290,12 +290,49 @@ describe('text under a later body in a group', () => {
     expect([Math.min(...xs), Math.max(...xs)]).toEqual([2 * IN, 4 * IN]);
   });
 
-  test('past the clip budget, the text keeps no clip and the result is incomplete', async () => {
-    const many = Array.from({ length: MAX_GROUP_TEXT_CLIPS + 1 }, (_, i) =>
-      shape({ id: 100 + i, x: IN, y: IN, cx: IN, cy: IN, fill: solid('0070C0') })
+  test('the clips of a group stay within one budget of path commands', async () => {
+    // 250 texts under one custom shape of 20,000 points: a copy of its outline for each text
+    // would write 5,000,000 commands.
+    const points = Array.from({ length: 20_000 }, (_, i) => {
+      const t = (i / 20_000) * 2 * Math.PI;
+      return `<a:lnTo><a:pt x="${Math.round(50_000 + 50_000 * Math.cos(t))}" y="${Math.round(50_000 + 50_000 * Math.sin(t))}"/></a:lnTo>`;
+    }).join('');
+    const custom =
+      '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/>' +
+      `<a:pathLst><a:path w="100000" h="100000"><a:moveTo><a:pt x="100000" y="50000"/></a:moveTo>${points}<a:close/></a:path></a:pathLst></a:custGeom>`;
+    const cover = shape({
+      id: 999,
+      x: IN,
+      y: IN,
+      cx: 4 * IN,
+      cy: 3 * IN,
+      fill: solid('0070C0'),
+    }).replace(/<a:prstGeom[\s\S]*?<\/a:prstGeom>/, custom);
+    const texts = Array.from({ length: 250 }, (_, i) =>
+      shape({ id: 100 + i, x: IN, y: IN, cx: IN, cy: IN, text: para(run(`T${i}`)) })
     ).join('');
-    const { clips, complete } = await coversOf(labelled(11, IN, IN, 'C00000') + many);
-    expect(clips.size).toBe(0);
+    const { clips, complete } = await coversOf(texts + cover);
+    const commands = [...clips.values()].flat().reduce((n, path) => n + path.length, 0);
+    expect(commands).toBeLessThanOrEqual(MAX_GROUP_TEXT_CLIP_COMMANDS);
+    expect(clips.size).toBeGreaterThan(0);
     expect(complete).toBe(false);
+  });
+
+  test('only a body that surely hides the text covers it', async () => {
+    const over = (fill: string) =>
+      shape({ id: 12, x: 2 * IN, y: IN, cx: 2 * IN, cy: IN, fill, text: para(run('Over')) });
+    const under = labelled(11, IN, IN, 'C00000');
+    const alpha = (a: number) =>
+      `<a:solidFill><a:srgbClr val="0070C0"><a:alpha val="${a}"/></a:srgbClr></a:solidFill>`;
+    const gradient = (a: number) =>
+      '<a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>' +
+      `<a:gs pos="100000"><a:srgbClr val="0000FF"><a:alpha val="${a}"/></a:srgbClr></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill>`;
+    // Clear or partly clear fills show the text through them.
+    expect(await covered(under + over(alpha(0)))).toEqual([]);
+    expect(await covered(under + over(alpha(50_000)))).toEqual([]);
+    expect(await covered(under + over(gradient(0)))).toEqual([]);
+    // Opaque fills hide it.
+    expect(await covered(under + over(alpha(100_000)))).toEqual(['11']);
+    expect(await covered(under + over(gradient(100_000)))).toEqual(['11']);
   });
 });
