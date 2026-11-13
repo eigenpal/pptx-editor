@@ -1867,12 +1867,16 @@ export interface ShapeFormatDetail {
     readonly reflection: ReflectionDetail | null;
     // (undocumented)
     readonly shadow: ShadowDetail | null;
+    readonly solid: SolidFillDetail | null;
     // (undocumented)
     readonly target: ShapeFormatTarget;
 }
 
 // @public
 export type ShapeFormatPatch = {
+    readonly kind: 'solid';
+    readonly opacity: number;
+} | {
     readonly kind: 'gradient';
     readonly angle?: number;
     readonly rotWithShape?: boolean;
@@ -2041,6 +2045,13 @@ export interface SlideTransitionState {
     readonly advanceOnClick: boolean;
     readonly durationMs: number;
     readonly kind: TransitionKind | 'none' | 'other';
+}
+
+// @public
+export interface SolidFillDetail {
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly opacity: number;
 }
 
 // @public

@@ -2,7 +2,13 @@ import { colorPickOf } from './color-fields.ts';
 import { renderedColorOf } from './chrome-forms.ts';
 import type { GradientDetail, ThemeSwatch } from '../contracts/index.ts';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import type { ShapeFormatDetail, ShapeFormatPatch, ColorChoice } from '../contracts/index.ts';
+import type {
+  ShapeFormatDetail,
+  ShapeFormatPatch,
+  ShapeFormatTarget,
+  ColorChoice,
+} from '../contracts/index.ts';
+import type { PptxEditorInstance } from './pptx-editor-types.ts';
 
 /** One numeric property of an existing fill or effect. @internal */
 export interface FormatNumberProperty {
@@ -114,6 +120,36 @@ export function formatNumberProperties(
   }
   return fields;
 }
+/** The fill Transparency field and the shape whose fill it edits. @internal */
+export interface FormatFillTransparency extends FormatNumberProperty {
+  readonly target: ShapeFormatTarget;
+}
+/**
+ * The Transparency of the solid fill of one selected shape, in percent from 0 to 100, or null
+ * when the selection is not one shape with a solid fill. Its patch keeps the fill color. @internal
+ */
+export function formatFillTransparency(
+  editor: Pick<PptxEditorInstance, 'snapshot' | 'shapeFormat'> | null
+): FormatFillTransparency | null {
+  if (!editor) return null;
+  const snapshot = editor.snapshot();
+  if (snapshot.geometry?.kind !== 'shape') return null;
+  if (snapshot.selection.kind === 'shapes' && snapshot.selection.nodeIds.length !== 1) return null;
+  const read = editor.shapeFormat();
+  const solid = read.ok ? read.format.solid : null;
+  if (!read.ok || !solid) return null;
+  return {
+    id: 'fill.transparency',
+    labelKey: 'inspector.transparency',
+    value: Math.round((1 - solid.opacity) * 100),
+    unit: '%',
+    min: 0,
+    max: 100,
+    target: read.format.target,
+    patch: (percent) => ({ kind: 'solid', opacity: Math.round((100 - percent) * 1000) / 100_000 }),
+  };
+}
+
 /** Colors for stops and shadows. @internal */
 export function formatColorProperties(
   detail: ShapeFormatDetail,

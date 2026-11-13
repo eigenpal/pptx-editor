@@ -127,6 +127,8 @@ export function setShadowDistance(editor: PptxEditorInstance, points: number) {
 
 Check the command result before reporting success. A replaced document or removed target can invalidate the captured target. Lengths use points, angles use degrees, and opacity uses fractions from zero to one. Omitted properties stay unchanged, including source XML that the inspector does not expose. Existing preset commands remain available for intentional style replacement.
 
+`read.format.solid` holds the color and opacity of a solid fill, own or inherited, and is `null` for any other fill. Patch it with `{ kind: 'solid', opacity }` to change the fill transparency. The patch keeps the color and its other transforms. An inherited fill is copied to the shape first.
+
 If the read includes `effectsReason`, its effect details are unavailable. A supported gradient remains readable and editable independently. Effect patches refuse unsupported effect graphs without changing their content.
 
 For batched browser or server editing, use [shape formatting automation](/docs/editor-api/slides-and-shapes#edit-gradient-and-effect-properties).

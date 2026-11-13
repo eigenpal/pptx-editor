@@ -137,6 +137,13 @@ export function readShapeFormatProperties(
         })),
     };
   }
+  const solid =
+    source && fill?.local === 'solidFill' && colorOf(fill)
+      ? {
+          ...(colorChoice(fill) === undefined ? {} : { color: colorChoice(fill)! }),
+          opacity: opacity(fill),
+        }
+      : null;
   let fx: FormatNode[];
   let effectsReason: string | undefined;
   try {
@@ -152,6 +159,7 @@ export function readShapeFormatProperties(
   const s = shadows.length === 1 && shadows[0]!.local !== 'prstShdw' ? shadows[0] : undefined;
   const r = fx.find((e) => e.ns === NS.a && e.local === 'reflection');
   return {
+    solid,
     gradient,
     ...(effectsReason ? { effectsReason } : {}),
     shadow: s
@@ -282,7 +290,20 @@ function patchColor(
   }
 }
 
-/** Patch an existing gradient, shadow, or reflection through store operations. @internal */
+/** Copy an inherited fill into the shape's own properties, after its geometry. */
+function ownFill(batch: OpBatch, part: string, el: Element, spec: NodeSpec): Element {
+  const props = child(el, 'p:spPr')!;
+  let index = 0;
+  props.children.forEach((c, i) => {
+    if (c.type === 'element' && ['xfrm', 'prstGeom', 'custGeom'].includes(c.local)) index = i + 1;
+  });
+  return batch.element(
+    part,
+    batch.insert({ op: 'insertNode', part, parent: props.id, index, spec })
+  );
+}
+
+/** Patch an existing solid fill, gradient, shadow, or reflection through store operations. @internal */
 export function patchShapeFormatProperties(
   batch: OpBatch,
   part: string,
@@ -290,8 +311,23 @@ export function patchShapeFormatProperties(
   patch: ShapeFormatPatch
 ): void {
   const el = shape(batch, part, id);
-  if (!patch || !['gradient', 'shadow', 'reflection'].includes(patch.kind))
+  if (!patch || !['solid', 'gradient', 'shadow', 'reflection'].includes(patch.kind))
     throw new CommandRefusal('errors.unsupported', 'format patch');
+  if (patch.kind === 'solid') {
+    if (patch.opacity === undefined) throw new CommandRefusal('disabled.noEffectChange');
+    checked(patch.opacity, 1);
+    const source = fillSource(batch, part, el);
+    if (!source || source.raw.local !== 'solidFill' || !colorOf(source.spec))
+      throw new CommandRefusal('errors.unsupported', 'solid fill');
+    patchColor(
+      batch,
+      part,
+      source.own ? source.raw : ownFill(batch, part, el, source.spec),
+      undefined,
+      patch.opacity
+    );
+    return;
+  }
   const hasChange =
     patch.kind === 'gradient'
       ? patch.angle !== undefined ||
@@ -347,16 +383,7 @@ export function patchShapeFormatProperties(
       throw new CommandRefusal('errors.unsupported', 'gradient stop');
     let fill = source.raw;
     if (!source.own) {
-      const props = child(el, 'p:spPr')!;
-      let index = 0;
-      props.children.forEach((c, i) => {
-        if (c.type === 'element' && ['xfrm', 'prstGeom', 'custGeom'].includes(c.local))
-          index = i + 1;
-      });
-      fill = batch.element(
-        part,
-        batch.insert({ op: 'insertNode', part, parent: props.id, index, spec: source.spec })
-      );
+      fill = ownFill(batch, part, el, source.spec);
       const copiedStops = elements(child(fill, 'a:gsLst')).filter(
         (c) => c.ns === NS.a && c.local === 'gs'
       );

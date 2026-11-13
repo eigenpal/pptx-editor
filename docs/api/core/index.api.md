@@ -3321,6 +3321,15 @@ export interface FormatColorProperty {
 export function formatControlMixed(editor: PptxEditorInstance | null, slot: ChromeSlotId): boolean;
 
 // @internal
+export interface FormatFillTransparency extends FormatNumberProperty {
+    // (undocumented)
+    readonly target: ShapeFormatTarget;
+}
+
+// @internal
+export function formatFillTransparency(editor: Pick<PptxEditorInstance, 'snapshot' | 'shapeFormat'> | null): FormatFillTransparency | null;
+
+// @internal
 export function formatLineSlotValue(editor: Editor | null, slot: ChromeSlotId): string | undefined;
 
 // @public
@@ -5850,12 +5859,16 @@ export interface ShapeFormatDetail {
     readonly reflection: ReflectionDetail | null;
     // (undocumented)
     readonly shadow: ShadowDetail | null;
+    readonly solid: SolidFillDetail | null;
     // (undocumented)
     readonly target: ShapeFormatTarget;
 }
 
 // @public
 export type ShapeFormatPatch = {
+    readonly kind: 'solid';
+    readonly opacity: number;
+} | {
     readonly kind: 'gradient';
     readonly angle?: number;
     readonly rotWithShape?: boolean;
@@ -6328,6 +6341,13 @@ export function slotOptionState(editor: Editor | null, slot: ChromeSlotId, value
     readonly enabled: boolean;
     readonly reason: string | null;
 };
+
+// @public
+export interface SolidFillDetail {
+    readonly color?: ColorChoice;
+    // (undocumented)
+    readonly opacity: number;
+}
 
 // @internal
 export function sorterKeyDown(e: PaneKeyEvent, ctx: SlideListKeyContext & {

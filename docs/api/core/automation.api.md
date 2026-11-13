@@ -1370,6 +1370,9 @@ export type ServerAutomationRejection = PackageRejection | {
 
 // @public
 export type ShapeFormatPatch = {
+    readonly kind: 'solid';
+    readonly opacity: number;
+} | {
     readonly kind: 'gradient';
     readonly angle?: number;
     readonly rotWithShape?: boolean;

@@ -24,6 +24,13 @@ export interface GradientDetail {
   readonly stops: readonly GradientStopDetail[];
 }
 
+/** A solid fill. Opacity is a fraction from 0 to 1; transparency is one minus opacity. @public */
+export interface SolidFillDetail {
+  /** Absent when the source color cannot be represented by a color choice. */
+  readonly color?: ColorChoice;
+  readonly opacity: number;
+}
+
 /** A shadow. Lengths are points, angles are degrees, and opacity is a fraction. @public */
 export interface ShadowDetail {
   readonly kind: 'inner' | 'outer';
@@ -49,6 +56,8 @@ export interface ReflectionDetail {
 /** Detailed formatting that partial writes can edit. @public */
 export interface ShapeFormatDetail {
   readonly target: ShapeFormatTarget;
+  /** The solid fill, own or inherited; null for any other fill. */
+  readonly solid: SolidFillDetail | null;
   readonly gradient: GradientDetail | null;
   readonly shadow: ShadowDetail | null;
   readonly reflection: ReflectionDetail | null;
@@ -63,6 +72,11 @@ export type ShapeFormatRead =
 
 /** Change only specified properties. Other source XML remains unchanged. @public */
 export type ShapeFormatPatch =
+  | {
+      readonly kind: 'solid';
+      /** The fill opacity. The color and its other transforms stay as they are. */
+      readonly opacity: number;
+    }
   | {
       readonly kind: 'gradient';
       readonly angle?: number;

@@ -422,7 +422,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply solid colors or gradients. Edit gradient stops, opacity, and direction without replacing unrelated properties. Gradient colors, focus, tiling, and rotation can differ from the reference. Rectangle and shape gradients can show seams or bands.',
+      'Apply solid colors or gradients. Set the transparency of a solid fill, which a new fill color keeps. Edit gradient stops, opacity, and direction without replacing unrelated properties. Gradient colors, focus, tiling, and rotation can differ from the reference. Rectangle and shape gradients can show seams or bands.',
   },
   {
     id: 'fills-lines.pattern-picture',

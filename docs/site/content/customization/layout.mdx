@@ -387,7 +387,7 @@ Omit `sections` to use the default order. An explicit list hides omitted section
 
 The default order puts the selection's main task first. Lines show their width, dash, and endpoints together. Pictures start with picture controls. Primary sections open by default. Existing effects also open unless you previously collapsed their section. Section expansion stays with the editor instance, separately for each selection category. It does not change the presentation or synchronize with collaborators.
 
-Gradient controls show a preview and editable properties for the selected stop. Numeric fields show units. Enter or blur commits a valid value, and Escape restores the document value. Invalid drafts remain visible with an explanation. Selection changes discard drafts for the previous target.
+Gradient controls show a preview and editable properties for the selected stop. When one shape with a solid fill is selected, **Transparency** appears under **Fill color**. It has a slider and a percent field. The slider writes once when you release it, so one drag is one undo step. A new fill color keeps the transparency. Numeric fields show units. Enter or blur commits a valid value, and Escape restores the document value. Invalid drafts remain visible with an explanation. Selection changes discard drafts for the previous target.
 
 In React, `sectionContent` replaces individual sections; `null` hides a section. In Vue, the corresponding named slot replaces the section, such as `#fill` or `#effects`. Children in React and the default slot in Vue append your content after the sections. Use the root's locale to change built-in labels.
 

@@ -1840,6 +1840,7 @@
     "blur": "ぼかし",
     "distance": "距離",
     "opacity": "不透明度",
+    "transparency": "透明度",
     "startOpacity": "開始の不透明度",
     "endOpacity": "終了の不透明度",
     "startPosition": "開始位置",

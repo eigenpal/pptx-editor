@@ -1,0 +1,12 @@
+{
+  "impact": "compatible",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The solid fill patch and the fill color command that keeps the fill alpha use existing attribute and tree operations. They do not change shared schemas, repair rules, or canonical interpretation.",
+  "tests": [
+    "packages/core/src/editor/__tests__/fill-transparency.test.ts",
+    "packages/pro/src/__tests__/collaboration-coverage.test.ts",
+    "packages/pro/src/__tests__/yjs-format-detail.test.ts"
+  ]
+}
