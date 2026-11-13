@@ -23,6 +23,7 @@ import {
   fontSubstitutes,
   type FaceMetrics,
   type FontRequest,
+  type MathScriptLevel,
   type ResolvedFace,
   type TextMeasurer,
   type ShapedGlyph,
@@ -154,7 +155,7 @@ interface LoadedFace {
    */
   readonly kerns: boolean;
   /** The face has a `MATH` table, so it has math constants and script-style forms. */
-  readonly mathTable: boolean;
+  readonly hasMathTable: boolean;
   /**
    * The face's Unicode cmap subtable (`unicodeCmapSubtable`), or null for a face without one,
    * such as a symbol face. Coverage then comes from HarfBuzz alone.
@@ -260,7 +261,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         upem,
         kerns:
           entry.origin === HOST_SUBSTITUTE_ORIGIN || sfntTable(entry.bytes, 'kern') !== undefined,
-        mathTable: sfntTable(entry.bytes, 'MATH') !== undefined,
+        hasMathTable: sfntTable(entry.bytes, 'MATH') !== undefined,
         cmap: unicodeCmapSubtable(entry.bytes, 0),
         metrics: {
           ascent: (line ? line[0] : Math.abs(ext.ascender)) / upem,
@@ -328,7 +329,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
           substituted,
           // A missing face keeps its own line metrics when the table knows them.
           metrics: substituted ? withFaceLineMetrics(r.family, chosen.metrics) : chosen.metrics,
-          ...(chosen.mathTable ? { mathTable: true as const } : {}),
+          ...(chosen.hasMathTable ? { hasMathTable: true as const } : {}),
         }
       : {
           id: r.family,
@@ -403,11 +404,11 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
   const advances = (
     face: ResolvedFace,
     text: string,
-    options?: { readonly kerning?: boolean; readonly mathScript?: 1 | 2 }
+    options?: { readonly kerning?: boolean; readonly mathScript?: MathScriptLevel }
   ): Float64Array => {
     const lf = loaded.get(face.id);
     const kerning = options?.kerning === true && (lf?.kerns === true || face.substituted);
-    const ssty = lf?.mathTable ? options?.mathScript : undefined;
+    const ssty = lf?.hasMathTable ? options?.mathScript : undefined;
     const key = `${face.id}${kerning ? 'k' : ''}${ssty ? `s${ssty}` : ''}\u0000${text}`;
     const hit = cache.get(key);
     if (hit) return hit;

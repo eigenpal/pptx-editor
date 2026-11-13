@@ -223,7 +223,7 @@ function sizePt(props: RunProps, env: Env, level = env.level): number {
  * 13.14 pt (73 %), within 0.03 pt, and draw at 13 pt. Other faces advance at the size they draw.
  */
 function advanceSizePt(props: RunProps, env: Env, face: ResolvedFace, size: number): number {
-  if (env.level === 0 || !face.mathTable) return size;
+  if (env.level === 0 || !face.hasMathTable) return size;
   const base = autofitSizePt(props.size / 100, env.fontScale);
   return Math.max(1, base * LEVEL_SCALE[env.level]);
 }
@@ -282,7 +282,7 @@ function textBox(
   // Math text in a script of a face with a `MATH` table takes the face's script-style forms
   // (`ssty`): their advances, at the unrounded script size, place the glyphs. Paint draws the
   // regular forms at those places.
-  const mathScript = !normal && env.level > 0 && face.mathTable ? env.level : 0;
+  const mathScript = !normal && env.level > 0 && face.hasMathTable ? env.level : 0;
   const adv = mathScript
     ? env.measurer.advances(face, text, { mathScript })
     : env.measurer.advances(face, text);

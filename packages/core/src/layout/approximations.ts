@@ -5,6 +5,7 @@
 // for every slide. Entries that layout cannot see in a laid-out slide (`perSlide: false`) are
 // listed once, in the report header.
 
+import { drawsGroupEffects } from '../cascade/index.ts';
 import type {
   RelRect,
   ResolvedEffects,
@@ -256,11 +257,7 @@ class Collector {
         // A group's effects paint over its content as one picture; a fill overlay does not draw.
         const fx = item.element.effects;
         this.effects(fx, false);
-        if (
-          fx &&
-          (fx.outerShadow || fx.glow || fx.softEdge || fx.reflection || fx.innerShadow || fx.blur)
-        )
-          this.add('group-effects');
+        if (drawsGroupEffects(fx)) this.add('group-effects');
         if (item.element.fill.type !== 'group') this.group = item.element.fill;
         for (const c of item.children) this.item(c);
         this.group = outer;

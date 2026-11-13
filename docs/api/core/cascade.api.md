@@ -145,6 +145,9 @@ export function defaultTableStyleId(pkg: PptxPackage): string;
 // @public
 export type DiagramFallback = 'no-drawing' | 'unsupported' | 'limit';
 
+// @internal
+export function drawsGroupEffects(fx: ResolvedEffects | undefined): boolean;
+
 // @public
 export type EffectAlign = 'tl' | 't' | 'tr' | 'l' | 'ctr' | 'r' | 'bl' | 'b' | 'br';
 

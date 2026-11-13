@@ -39,6 +39,7 @@ export { inheritedPlaceholders, layoutPlaceholderOf } from './placeholders.ts';
 import { resolveChartPart } from './chart-part.ts';
 import { colorChild, resolveColor, type ColorContext } from './color.ts';
 import {
+  drawsGroupEffects,
   effectContainer,
   fillElementOf,
   resolveEffects,
@@ -52,7 +53,7 @@ import {
 import { entryParts } from './picture-bullet.ts';
 import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
-import { threeDOf } from './three-d.ts';
+import { resolveThreeD, threeDOf } from './three-d.ts';
 import { readTextWarp } from './text-warp.ts';
 import {
   diagramParts,
@@ -593,14 +594,6 @@ function diagramGroup(
   };
 }
 
-/** Whether a group's effects copy or filter its content: what `MAX_GROUP_EFFECT_DEPTH` counts. */
-function drawsGroupEffects(fx: ResolvedEffects | undefined): boolean {
-  return !!(
-    fx &&
-    (fx.outerShadow || fx.secondShadow || fx.glow || fx.reflection || fx.softEdge || fx.blur)
-  );
-}
-
 /** The scope of a group's children: one more enclosing group that draws effects, if it does. */
 function effectScope(fx: ResolvedEffects | undefined, scope: SlideScope): SlideScope {
   const depth = scope.effectDepth ?? 0;
@@ -654,7 +647,7 @@ function boundGroupEffects(
  * The effects of a group (`p:grpSpPr` or `dsp:grpSpPr`, ECMA-376 Part 1, 19.3.1.22): an effect
  * list applies to the group's content as one picture. A group has no style, so it has no theme
  * effect. A group's inner shadow draws nothing, so it is left out; it stays in the file. A
- * group's 3-D scene (`a:scene3d`) is reported unsupported.
+ * group's turned 3-D scene (`a:scene3d`) is reported unsupported.
  */
 function groupEffects(
   grpSpPr: Element | undefined,
@@ -666,7 +659,10 @@ function groupEffects(
     const { innerShadow: _drawsNothing, ...rest } = resolved;
     listed = rest;
   }
-  if (!child(grpSpPr, 'a:scene3d')) return listed ? { effects: listed } : {};
+  // A front camera with no turn draws the group flat: nothing is left out.
+  if (!resolveThreeD(child(grpSpPr, 'a:scene3d'), undefined, ctx)) {
+    return listed ? { effects: listed } : {};
+  }
   return { effects: { ...listed, unsupported: [...(listed?.unsupported ?? []), 'scene3d'] } };
 }
 

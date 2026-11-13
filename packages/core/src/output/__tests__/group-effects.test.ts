@@ -97,6 +97,15 @@ describe('group effects', () => {
     expect(fx?.outerShadow?.dist).toBe(DIST);
   });
 
+  test('only a turned 3-D scene of a group is reported unsupported', async () => {
+    const scene = (camera: string) =>
+      `<a:scene3d><a:camera prst="${camera}"/>` + '<a:lightRig rig="threePt" dir="t"/></a:scene3d>';
+    const flat = groupOf(await layoutOf(groupDeck(shadow() + scene('orthographicFront'))));
+    expect(flat.element.effects?.unsupported).not.toContain('scene3d');
+    const turned = groupOf(await layoutOf(groupDeck(shadow() + scene('isometricTopUp'))));
+    expect(turned.element.effects?.unsupported).toContain('scene3d');
+  });
+
   test('one shadow copies all children together; the children cast none', async () => {
     const layout = await layoutOf(groupDeck(shadow(), { rot: 1_800_000, flipH: true }));
     const svg = paintSlide(doc, layout, OPTS);

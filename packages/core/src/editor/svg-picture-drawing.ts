@@ -31,7 +31,7 @@ import {
 } from './svg-picture-geometry.ts';
 import { svgDrawable, MAX_SVG_BYTES } from './svg-picture.ts';
 
-/** A solid paint: red, green, and blue in 0–255, and its opacity in 0–1. */
+/** A solid paint: red, green, and blue in 0–255, and its opacity in 0–1. @internal */
 export interface SvgPictureColor {
   readonly r: number;
   readonly g: number;
@@ -39,7 +39,10 @@ export interface SvgPictureColor {
   readonly a: number;
 }
 
-/** One shape of an SVG picture: its path in its own user space and the matrix to the view box. */
+/**
+ * One shape of an SVG picture: its path in its own user space and the matrix to the view box.
+ * @internal
+ */
 export interface SvgPictureShape {
   readonly kind: 'shape';
   readonly matrix: Matrix;
@@ -54,7 +57,10 @@ export interface SvgPictureShape {
   };
 }
 
-/** Items drawn together: with an opacity, as one layer, and inside a clip path in view box space. */
+/**
+ * Items drawn together: with an opacity, as one layer, and inside a clip path in view box space.
+ * @internal
+ */
 export interface SvgPictureGroup {
   readonly kind: 'group';
   readonly opacity: number;
@@ -62,9 +68,10 @@ export interface SvgPictureGroup {
   readonly items: readonly SvgPictureItem[];
 }
 
+/** A shape or a group of an SVG picture. @internal */
 export type SvgPictureItem = SvgPictureShape | SvgPictureGroup;
 
-/** An SVG picture as drawing records in the space of its view box. */
+/** An SVG picture as drawing records in the space of its view box. @internal */
 export interface SvgPictureDrawing {
   /** The view box: `x`, `y`, width, and height. The picture stretches it over its frame. */
   readonly viewBox: readonly [number, number, number, number];
@@ -334,7 +341,8 @@ const opacity = (v: string | undefined): number => {
  * The drawing of an SVG picture part, or `undefined` when the editor draws its raster
  * alternative (`svgDrawable`) or the picture uses an icon feature this reader does not draw:
  * a nested `<svg>`, a clip path in `objectBoundingBox` units, a clip path of more than one
- * shape, or a clip path that is itself clipped.
+ * shape, or a clip path that is itself clipped. `pptx-to-pdf` draws it.
+ * @internal
  */
 export function svgPictureDrawing(bytes: Uint8Array): SvgPictureDrawing | undefined {
   if (bytes.length === 0 || bytes.length > MAX_SVG_BYTES || !svgDrawable(bytes)) return undefined;

@@ -6452,7 +6452,7 @@ export function surfaceInputOf(editor: object): HTMLElement | null;
 // @internal
 export function surfaceRootOf(editor: object): HTMLElement | null;
 
-// @public
+// @internal
 export interface SvgPictureColor {
     // (undocumented)
     readonly a: number;
@@ -6464,17 +6464,17 @@ export interface SvgPictureColor {
     readonly r: number;
 }
 
-// @public
+// @internal
 export interface SvgPictureDrawing {
     // (undocumented)
     readonly items: readonly SvgPictureItem[];
     readonly viewBox: readonly [number, number, number, number];
 }
 
-// @public
+// @internal
 export function svgPictureDrawing(bytes: Uint8Array): SvgPictureDrawing | undefined;
 
-// @public
+// @internal
 export interface SvgPictureGroup {
     // (undocumented)
     readonly clip?: {
@@ -6489,10 +6489,10 @@ export interface SvgPictureGroup {
     readonly opacity: number;
 }
 
-// @public (undocumented)
+// @internal
 export type SvgPictureItem = SvgPictureShape | SvgPictureGroup;
 
-// @public
+// @internal
 export interface SvgPictureShape {
     // (undocumented)
     readonly fill?: {

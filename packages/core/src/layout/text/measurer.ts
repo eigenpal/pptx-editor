@@ -58,8 +58,11 @@ export interface ResolvedFace {
    * The face has a `MATH` table (OpenType math): math layout takes its script-style forms
    * (`TextMeasurer.advances`, `mathScript`). Absent for other faces.
    */
-  readonly mathTable?: true;
+  readonly hasMathTable?: true;
 }
+
+/** The script level of math text: 1 for scripts, 2 for scripts of scripts. */
+export type MathScriptLevel = 1 | 2;
 
 /** One shaped glyph, in em units with y up. */
 export interface ShapedGlyph {
@@ -92,7 +95,7 @@ export interface TextMeasurer {
        * The script level of math text (1 or 2): the face's script-style forms (the `ssty`
        * feature of the math script) give the advances. A face without them keeps its forms.
        */
-      readonly mathScript?: 1 | 2;
+      readonly mathScript?: MathScriptLevel;
     }
   ): Float64Array;
   /**
@@ -241,8 +244,6 @@ export function createFixedMeasurer(): TextMeasurer {
       synthItalic: false,
       substituted: false,
       metrics,
-      // The fixed measurer has no font data: a family named for math stands in for a math face.
-      ...(/math/i.test(r.family) ? { mathTable: true as const } : {}),
     }),
     advances: (_face, text) => {
       const out = new Float64Array(text.length);

@@ -68,10 +68,10 @@ describe('the HarfBuzz measurer (P7, P8)', () => {
     // The plain advance stays cached apart from the script forms.
     expect(m.advances(face, '𝑛')[0]).toBeCloseTo(0.565, 3);
     // The MATH table of the face's data marks it, whatever its name.
-    expect(face.mathTable).toBe(true);
+    expect(face.hasMathTable).toBe(true);
     // A face with no script-style forms keeps its advances.
     const sans = measurer.resolve({ family: 'Liberation Sans', bold: false, italic: false });
-    expect(sans.mathTable).toBeUndefined();
+    expect(sans.hasMathTable).toBeUndefined();
     expect(Array.from(measurer.advances(sans, 'n+1', { mathScript: 1 }))).toEqual(
       Array.from(measurer.advances(sans, 'n+1'))
     );

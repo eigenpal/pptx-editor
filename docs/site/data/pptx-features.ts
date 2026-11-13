@@ -468,7 +468,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply or clear shadow presets on supported shapes and pictures. Edit existing shadow color, opacity, blur, distance, and direction. Groups, tables, charts, and theme effect graphs reject these edits. A group shadow draws as the silhouette of the whole group. Perspective shadows are unavailable, and blur is measured only for small radii.',
+      'Apply, clear, or edit shadows on shapes and pictures; groups, tables, charts, and theme effects reject these edits. A group shadow draws as the silhouette of the whole group. Perspective shadows are unavailable, and blur is measured only for small radii.',
   },
   {
     id: 'effects.glow-reflection',
@@ -528,7 +528,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply correction, recolor, and transparency presets, or reset a picture. Saturation, color tone, and artistic effects cannot be edited. Pictures with these effects display their stored image, which includes the effects. Rendering is approximate, and some existing picture effects prevent corrections or reset.',
+      'Apply correction, recolor, and transparency presets, or reset a picture; some existing effects prevent this. Saturation, color tone, and artistic effects cannot be edited and display as the stored image. Rendering is approximate.',
   },
   {
     id: 'pictures.crop',

@@ -40,15 +40,6 @@ function plainStyle(style: string): { readonly plain: string; readonly heavy: bo
   return { plain: style, heavy: false };
 }
 
-/**
- * Whether `style` is an underline type that `underlineRings` draws (every type but `none`).
- * @internal
- */
-export function isDrawnUnderline(style: string): boolean {
-  const { plain } = plainStyle(style);
-  return ['sng', 'words', 'dbl', 'wavy', 'wavyDbl'].includes(plain) || plain in DASHES;
-}
-
 function rect(x0: number, x1: number, y0: number, y1: number): UnderlineRing {
   return [
     [x0, y0],

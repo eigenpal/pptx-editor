@@ -183,6 +183,10 @@ describe('math layout', () => {
     const fixed = createFixedMeasurer();
     const styled = {
       ...fixed,
+      resolve: (r: Parameters<typeof fixed.resolve>[0]) => ({
+        ...fixed.resolve(r),
+        hasMathTable: true as const,
+      }),
       advances: (
         face: Parameters<typeof fixed.advances>[0],
         text: string,
@@ -209,15 +213,11 @@ describe('math layout', () => {
   });
 
   test('a face with no MATH table advances script glyphs at the size they draw', () => {
-    // The same measurer, but its faces have no MATH table (a serif fallback, for example).
+    // The fixed measurer's faces have no MATH table (a serif fallback, for example).
     const fixed = createFixedMeasurer();
     let asked = false;
     const plain = {
       ...fixed,
-      resolve: (r: Parameters<typeof fixed.resolve>[0]) => {
-        const { mathTable: _, ...face } = fixed.resolve(r);
-        return face;
-      },
       advances: (
         face: Parameters<typeof fixed.advances>[0],
         text: string,

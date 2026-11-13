@@ -1,12 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { RunProps } from '../../../cascade/index.ts';
 import type { GlyphRun } from '../text-layout.ts';
-import {
-  isDrawnUnderline,
-  lineUnderlines,
-  underlineRings,
-  type UnderlineRing,
-} from '../underline-marks.ts';
+import { lineUnderlines, underlineRings, type UnderlineRing } from '../underline-marks.ts';
 
 const PT = 12_700;
 const round = (v: number): number => Math.round(v * 1000) / 1000;
@@ -65,11 +60,8 @@ describe('underlineRings', () => {
       'wavyHeavy',
       'wavyDbl',
     ]) {
-      // prettier-ignore
-      expect(isDrawnUnderline(style)).toBe(true);
       expect(rings(style).length).toBeGreaterThan(0);
     }
-    expect(isDrawnUnderline('none')).toBe(false);
   });
 
   test('single and words are one bar of one thickness, under the spaces too', () => {

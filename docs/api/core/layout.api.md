@@ -488,9 +488,6 @@ export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): v
 export function invert(m: Matrix): Matrix;
 
 // @internal
-export function isDrawnUnderline(style: string): boolean;
-
-// @internal
 export function isExactScheme(scheme: string, upTo?: number): boolean;
 
 // @public
@@ -653,6 +650,9 @@ export function lineUnderlines(runs: readonly GlyphRun[], baseline: number): Map
 export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & FontResolverMark;
 
 // @public
+export type MathScriptLevel = 1 | 2;
+
+// @public
 export type Matrix = readonly [number, number, number, number, number, number];
 
 // @public
@@ -802,10 +802,10 @@ export interface ResolvedFace {
     // (undocumented)
     readonly bold: boolean;
     readonly family: string;
+    readonly hasMathTable?: true;
     readonly id: string;
     // (undocumented)
     readonly italic: boolean;
-    readonly mathTable?: true;
     // (undocumented)
     readonly metrics: FaceMetrics;
     readonly substituted: boolean;
@@ -947,7 +947,7 @@ export interface TextLayout {
 export interface TextMeasurer {
     advances(face: ResolvedFace, text: string, options?: {
         readonly kerning?: boolean;
-        readonly mathScript?: 1 | 2;
+        readonly mathScript?: MathScriptLevel;
     }): Float64Array;
     fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
     glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
