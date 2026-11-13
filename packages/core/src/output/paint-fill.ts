@@ -608,10 +608,8 @@ function tileImages(
   const { defs } = ctx;
   const doc = defs.doc;
   const g = tileGeometry(fill.tile!, ctx.imageSize?.(ctx.sourcePart, fill.rId), w, h);
-  const budget = paintBudgets(defs).tiles;
-  const tiles = tilePlacements(g, area, budget.ask());
+  const tiles = paintBudgets(defs).tiles.take((left) => tilePlacements(g, area, left));
   if (!tiles) return undefined;
-  budget.spend(tiles.length);
   const images = tiles.map((t) =>
     tileImage(doc, url, g.width, g.height, t.x, t.y, t.mirrorX, t.mirrorY)
   );
