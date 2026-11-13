@@ -20,29 +20,37 @@ import {
   popGraphicsState,
   pushGraphicsState,
   setDashPattern,
+  setFillingGrayscaleColor,
   setFillingRgbColor,
   setLineCap,
   setLineJoin,
   setLineWidth,
+  setStrokingGrayscaleColor,
   stroke,
   LineJoinStyle,
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
 } from 'pdf-lib';
-import type { ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
+import type { ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
 import {
   ARROW_MITER_LIMIT,
   dashArray,
   hasCharacters,
   planStroke,
+  strokeCap,
   strokeWidth,
   type LayoutItem,
   type PathCommand,
   type SlideLayout,
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
-import { compoundBandLines, type CompoundBandLine } from '@pptx-editor.dev/core/output';
+import {
+  compoundPlan,
+  type CompoundBand,
+  type CompoundBandLine,
+  type CompoundPlan,
+} from '@pptx-editor.dev/core/output';
 import {
   drawGlow,
   drawShadows,
@@ -209,6 +217,7 @@ async function drawGeometry(
       'approximation',
       'The border of a picture cropped to a shape with several paths is drawn path by path.'
     );
+  const banded = item.kind === 'shape' && bandsShapeGradient(item, ownFill(el.fill, scope).fill, p);
   // Path by path, fill then outline, in the SVG paint's order.
   for (const path of paths) {
     if (boxOnly && path.fill !== 'none' && pastBox(path.commands, w, h))
@@ -226,7 +235,8 @@ async function drawGeometry(
         p,
         scope,
         'shapes',
-        path.fill
+        path.fill,
+        banded
       );
     // A picture's outline follows all of its geometry, as in the SVG paint.
     if (!line || (!path.stroke && item.kind !== 'picture')) continue;
@@ -237,13 +247,15 @@ async function drawGeometry(
     // in the SVG paint (`core/layout`, `planStroke`).
     const plan = picture ? undefined : planStroke(path.commands, line, groupScale);
     const commands = plan ? plan.commands : path.commands;
-    const bands = picture ? null : solidBands(line, width, commands);
+    const bands = picture ? null : compoundOf(line, width, commands);
     const color = strokeStyle(line, p, scope, groupScale, picture, !!bands);
     if (color) {
       p.alpha(1, color.a);
       // A picture's border lies outside the picture.
       if (picture) outsideOf(path.commands, width, w, h, p);
-      if (bands) drawBands(bands, line.join === 'miter' ? line.miterLimit : 4, p);
+      if (bands?.kind === 'offset')
+        drawBands(bands.bands, line.join === 'miter' ? line.miterLimit : 4, p);
+      else if (bands) drawMaskedBands(bands, line, width, commands, w, h, p);
       else {
         tracePath(commands, p);
         p.push(stroke());
@@ -255,18 +267,117 @@ async function drawGeometry(
 }
 
 /**
- * The bands of a solid compound line, as the SVG paint draws them (`core/output`,
- * `compoundBandLines`), or null for a single line. A dashed compound line draws as one line: the
- * SVG paint cuts its bands with a mask.
+ * Whether a shape draws its `path="shape"` gradient as bands of its paths, as the SVG paint
+ * decides (`shapeBandBudget`): only shapes with such a fill spend the page's band work, once each.
  */
-function solidBands(
+function bandsShapeGradient(item: Drawable, fill: ResolvedFill, p: PageOps): boolean {
+  if (fill.type !== 'path' || fill.path !== 'shape') return false;
+  let banded = p.bandedShapes.get(item);
+  if (banded === undefined) {
+    const paths = item.geometry.paths;
+    const commands = paths.reduce((n, path) => n + path.commands.length, 0);
+    banded = p.shapeBands.allow(paths.length, commands);
+    p.bandedShapes.set(item, banded);
+  }
+  return banded;
+}
+
+/**
+ * How a compound line draws, as in the SVG paint (`core/output`, `compoundPlan`): offset bands,
+ * or bands cut from the line's own stroke by a mask. Null for a single line.
+ */
+function compoundOf(
   line: ResolvedLine,
   width: number,
   commands: readonly PathCommand[]
-): CompoundBandLine[] | null {
-  if (line.compound === 'sng' || dashArray(line, width)) return null;
+): CompoundPlan | null {
+  if (line.compound === 'sng') return null;
   const join = line.join === 'miter' ? 'miter' : line.join === 'bevel' ? 'bevel' : 'round';
-  return compoundBandLines(commands, line.compound, width, join, Math.max(1, line.miterLimit));
+  const closed = commands[commands.length - 1]?.op === 'Z';
+  const dashed = !!dashArray(line, width);
+  return compoundPlan(line.compound, width, closed, dashed, join, miterLimitOf(line), commands);
+}
+
+/** The miter limit of a line as the SVG paint writes it: 4 when the join is not a miter. */
+const miterLimitOf = (line: ResolvedLine): number =>
+  line.join === 'miter' ? Math.max(1, line.miterLimit) : 4;
+
+/**
+ * Draw the masked bands of a compound line, as the SVG paint's `compoundStroke`: the line's own
+ * stroke (color, width, caps, joins, and dashes already set) under a luminosity soft mask of a
+ * white stroke `2b` wide and a black stroke `2a` wide for each band. On a closed path, the outer
+ * bands lose the inside of the path, and the inner bands keep only the inside.
+ */
+function drawMaskedBands(
+  plan: Extract<CompoundPlan, { kind: 'masked' }>,
+  line: ResolvedLine,
+  width: number,
+  given: readonly PathCommand[],
+  w: number,
+  h: number,
+  p: PageOps
+): void {
+  const commands = plan.commands ?? given;
+  const grow = width + Math.max(w, h);
+  const bbox = [-grow, -grow, w + 2 * grow, h + 2 * grow];
+  const dashes = dashArray(line, width);
+  const join =
+    line.join === 'miter'
+      ? LineJoinStyle.Miter
+      : line.join === 'bevel'
+        ? LineJoinStyle.Bevel
+        : LineJoinStyle.Round;
+  /** Paint the line through a mask of `bands`; `cutInside` removes the inside of the path. */
+  const painted = (bands: readonly CompoundBand[], cutInside: boolean): void => {
+    const ops = p.captureNow(() => {
+      // A soft mask starts from the default graphics state: set the line's own stroke.
+      p.push(
+        setLineCap(lineCapStyle(strokeCap(line))),
+        setLineJoin(join),
+        PDFOperator.of(PDFOperatorNames.SetLineMiterLimit, [PDFNumber.of(miterLimitOf(line))])
+      );
+      if (dashes) p.push(setDashPattern(dashes, 0));
+      // Widest first, so each black stroke cuts only its own band.
+      for (const band of [...bands].sort((x, y) => y.b - x.b)) {
+        p.push(setStrokingGrayscaleColor(1), setLineWidth(2 * band.b));
+        tracePath(commands, p);
+        p.push(stroke());
+        if (band.a > 0) {
+          p.push(setStrokingGrayscaleColor(0), setLineWidth(2 * band.a));
+          tracePath(commands, p);
+          p.push(stroke());
+        }
+      }
+      if (cutInside) {
+        p.push(setFillingGrayscaleColor(0));
+        tracePath(commands, p);
+        p.push(fill());
+      }
+    });
+    const form = p.form(ops, bbox, { S: 'Transparency', CS: 'DeviceGray' });
+    p.push(pushGraphicsState());
+    p.state(`smask:${form.toString()}`, () =>
+      p.res.doc.context.obj({
+        Type: 'ExtGState',
+        SMask: { Type: 'Mask', S: 'Luminosity', G: form },
+      })
+    );
+    tracePath(commands, p);
+    p.push(stroke(), popGraphicsState());
+  };
+  if (!plan.closed) {
+    painted(plan.outer, false);
+    return;
+  }
+  if (plan.outer.length) painted(plan.outer, true);
+  if (plan.inner.length) {
+    // The inside of the path, nonzero, as the SVG paint's mask of the filled path.
+    p.push(pushGraphicsState());
+    tracePath(commands, p);
+    p.push(clipNonZero(), endPath());
+    painted(plan.inner, false);
+    p.push(popGraphicsState());
+  }
 }
 
 /** Stroke the bands of a compound line in the current stroke color, caps, and dashes. */

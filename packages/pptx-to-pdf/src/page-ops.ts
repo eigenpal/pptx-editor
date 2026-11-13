@@ -25,6 +25,7 @@ import {
 } from 'pdf-lib';
 import type { Rgba } from '@pptx-editor.dev/core/cascade';
 import type { Matrix, PathCommand, RegisteredFace } from '@pptx-editor.dev/core/layout';
+import { shapeBandBudget } from '@pptx-editor.dev/core/output';
 import type { PptxPackage } from '@pptx-editor.dev/core/store';
 import type { EmbeddedFace } from './fonts.ts';
 import type { Work } from './options.ts';
@@ -124,6 +125,10 @@ export class PageOps {
   readonly #fontKeys = new Map<string, PDFName>();
   /** This page's names of the document's tiling patterns (`PaintResources.patterns`). */
   readonly patterns = new Map<string, PDFName>();
+  /** This page's work for `path="shape"` gradient bands, with the SVG paint's limits. */
+  readonly shapeBands = shapeBandBudget();
+  /** Whether each shape draws its shape gradient as bands, decided once: a reflection draws it again. */
+  readonly bandedShapes = new WeakMap<object, boolean>();
   #resourcesRef: PDFRef | undefined;
   #names = 0;
   #forms = 0;
@@ -164,6 +169,20 @@ export class PageOps {
     this.#forms += 1;
     try {
       await draw();
+      return this.#ops;
+    } finally {
+      this.#forms -= 1;
+      this.#ops = outer;
+    }
+  }
+
+  /** `capture` for a `draw` that does not wait. */
+  captureNow(draw: () => void): PDFOperator[] {
+    const outer = this.#ops;
+    this.#ops = [];
+    this.#forms += 1;
+    try {
+      draw();
       return this.#ops;
     } finally {
       this.#forms -= 1;

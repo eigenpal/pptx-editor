@@ -50,7 +50,7 @@ import {
 import { compoundStroke } from './compound-lines.ts';
 import { paintTable } from './paint-table.ts';
 import { paintText, type Shows } from './paint-text.ts';
-import { MAX_SHAPE_BANDS } from './paint-gradient.ts';
+import { ShapeBandBudget } from './paint-gradient.ts';
 import { Defs, matrixAttr, num, svg, SVG_NS } from './svg.ts';
 
 /** Paint options. */
@@ -162,21 +162,8 @@ function matrixScale(m: Matrix): number {
   return Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
 }
 
-/**
- * The most paths of one shape that draw a `path="shape"` gradient (fill or overlay) as outline
- * bands; a shape with more paths uses the rectangle construction, so a file cannot multiply the
- * bands.
- */
-const MAX_BANDED_PATHS = 16;
-/** The most path commands of one shape that draw outline bands: bands repeat every command. */
-const MAX_BANDED_COMMANDS = 2000;
-/**
- * The band work (path commands × `MAX_SHAPE_BANDS`) one slide may spend. Later shapes use the
- * rectangle construction, so many shapes cannot multiply the bands either.
- */
-const MAX_SLIDE_BAND_WORK = 512_000;
-/** The band work left on each slide, by its `Defs`. */
-const bandWork = new WeakMap<Defs, { left: number }>();
+/** The shape gradient band work left on each slide, by its `Defs`. */
+const bandWork = new WeakMap<Defs, ShapeBandBudget>();
 /**
  * The most paths of one shape that draw a fill overlay. Each overlay is an isolated group (an
  * offscreen layer); a shape with more paths draws no overlay, and the report says so.
@@ -214,11 +201,8 @@ function shapePaints(
   const bands = (): boolean => {
     if (banded === undefined) {
       let budget = bandWork.get(ctx.defs);
-      if (!budget) bandWork.set(ctx.defs, (budget = { left: MAX_SLIDE_BAND_WORK }));
-      const cost = commands * MAX_SHAPE_BANDS;
-      banded =
-        paths.length <= MAX_BANDED_PATHS && commands <= MAX_BANDED_COMMANDS && cost <= budget.left;
-      if (banded) budget.left -= cost;
+      if (!budget) bandWork.set(ctx.defs, (budget = new ShapeBandBudget()));
+      banded = budget.allow(paths.length, commands);
     }
     return banded;
   };

@@ -5,8 +5,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Fills as PDF paint, from the same resolved fills the editor's SVG paint reads
 // (`packages/core/src/output/paint-fill.ts`): solid colors, linear and path gradients as PDF
-// shadings, and pictures cropped by `srcRect` and placed by `fillRect`. A fill other than a
-// solid color clips to its path and paints the shape's local box, as an SVG paint server does.
+// shadings (a `path="shape"` gradient as the SVG paint's outline bands), and pictures cropped by
+// `srcRect` and placed by `fillRect`. A fill other than a solid color clips to its path and
+// paints the shape's local box, as an SVG paint server does.
 
 import {
   closePath,
@@ -16,6 +17,7 @@ import {
   moveTo,
   popGraphicsState,
   pushGraphicsState,
+  setFillingGrayscaleColor,
   setFillingRgbColor,
   setDashPattern,
   setLineCap,
@@ -49,6 +51,8 @@ import {
   gradientPaintStops,
   linearGradientEnds,
   metafilePng,
+  rectGradientGeometry,
+  shapeGradientBands,
   patternBitmap,
   PATTERN_PIXEL,
 } from '@pptx-editor.dev/core/output';
@@ -99,7 +103,9 @@ export function ownFill(
 /**
  * Fill the path that `trace` draws, over a `w` × `h` local box. A solid color fills the path;
  * any other fill clips to it (even-odd, as the SVG `fill-rule`) and paints the box. `mode` is
- * the preset path fill mode (`a:path/@fill`). Returns false when the fill paints nothing.
+ * the preset path fill mode (`a:path/@fill`). With `banded`, a `path="shape"` gradient draws as
+ * bands of the path that `trace` draws (`shapeBandBudget` decides, as in the SVG paint); without
+ * it, as a rectangle gradient. Returns false when the fill paints nothing.
  */
 export async function paintFill(
   fill: ResolvedFill,
@@ -109,7 +115,8 @@ export async function paintFill(
   p: PageOps,
   scope: FillScope,
   what: string,
-  mode: GeometryPath['fill'] = 'norm'
+  mode: GeometryPath['fill'] = 'norm',
+  banded = false
 ): Promise<boolean> {
   const own = ownFill(fill, scope);
   const f = own.fill;
@@ -133,7 +140,7 @@ export async function paintFill(
     trace();
     p.push(clipEvenOdd(), endPath());
     if (f.type === 'picture') await drawPicture(own.sourcePart, f, w, h, p);
-    else gradientBox(f, w, h, p, mode);
+    else gradientBox(f, w, h, p, mode, banded ? trace : undefined);
   }
   p.push(popGraphicsState());
   return true;
@@ -240,18 +247,26 @@ function patternRef(
   return ref;
 }
 
-/** Paint a gradient over a `w` × `h` box at the origin, inside the current clip. */
+/**
+ * Paint a gradient over a `w` × `h` box at the origin, inside the current clip. `outline` traces
+ * the filled path, for the bands of a `path="shape"` gradient; without it, that gradient paints
+ * as a rectangle gradient, as the SVG paint does without a fill path.
+ */
 export function gradientBox(
   f: Extract<ResolvedFill, { type: 'linear' | 'path' }>,
   w: number,
   h: number,
   p: PageOps,
-  mode: GeometryPath['fill'] = 'norm'
+  mode: GeometryPath['fill'] = 'norm',
+  outline?: () => void
 ): void {
+  const adjusted = f.stops.map((s) => ({ ...s, color: adjustForPathMode(s.color, mode) }));
+  if (f.type === 'path' && f.path === 'shape' && outline) {
+    shapeGradient(f, adjusted, w, h, p, outline);
+    return;
+  }
   // The SVG paint's stop colors, so a two-stop gradient bends.
-  const stops = gradientPaintStops(
-    f.stops.map((s) => ({ ...s, color: adjustForPathMode(s.color, mode) }))
-  );
+  const stops = gradientPaintStops(adjusted);
   if (f.type === 'linear') linearGradient(f.angle, f.scaled, stops, w, h, p);
   else if (f.path === 'circle') radialGradient(f, stops, w, h, p);
   else rectGradient(f, stops, w, h, p);
@@ -391,6 +406,26 @@ function stopFunctions(stops: readonly GradientStop[], p: PageOps): StopFunction
   return fns;
 }
 
+/** The fill operator of a type 2 (axial) or 3 (radial) shading with `coords` in local space. */
+function shadingOp(
+  type: 2 | 3,
+  coords: number[],
+  space: 'DeviceRGB' | 'DeviceGray',
+  fn: PDFRef,
+  p: PageOps
+): PDFOperator {
+  const ctx = p.res.doc.context;
+  const dict = ctx.obj({
+    ShadingType: type,
+    ColorSpace: space,
+    Coords: coords,
+    Function: fn,
+    Extend: [true, true],
+  });
+  p.res.work.reserveContent(dict.sizeInBytes());
+  return shadingFill(p.name('Shading', ctx.register(dict)));
+}
+
 /**
  * Paint a shading over the current clip: type 2 (axial) or 3 (radial) with `coords` in local
  * space. Stops with different alphas paint through a luminosity soft mask of the same shading.
@@ -403,29 +438,60 @@ function shade(
   bbox: [number, number, number, number],
   p: PageOps
 ): void {
-  const ctx = p.res.doc.context;
-  const shading = (space: 'DeviceRGB' | 'DeviceGray', fn: PDFRef): PDFName => {
-    const dict = ctx.obj({
-      ShadingType: type,
-      ColorSpace: space,
-      Coords: coords,
-      Function: fn,
-      Extend: [true, true],
-    });
-    p.res.work.reserveContent(dict.sizeInBytes());
-    return p.name('Shading', ctx.register(dict));
-  };
-  if (fns.alpha) {
-    const form = p.form([shadingFill(shading('DeviceGray', fns.alpha))], bbox, {
-      S: 'Transparency',
-      CS: 'DeviceGray',
-    });
-    p.state(`smask:${form.toString()}`, () =>
-      ctx.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: form } })
-    );
-  } else p.alpha(fns.flatAlpha, 1);
-  p.push(shadingFill(shading('DeviceRGB', fns.color)));
+  withStopAlpha(
+    fns.alpha ? null : fns.flatAlpha,
+    bbox,
+    p,
+    (gray) =>
+      p.push(
+        gray
+          ? shadingOp(type, coords, 'DeviceGray', fns.alpha!, p)
+          : shadingOp(type, coords, 'DeviceRGB', fns.color, p)
+      ),
+    false
+  );
 }
+
+/**
+ * Paint `draw` with the stop alpha of a gradient, as the SVG paint's luminance masks: one
+ * `flatAlpha` for every stop, or, when it is null, a luminosity soft mask that `draw(true)` paints
+ * in gray (the stop alpha as luminance). `draw(false)` paints the colors opaque. The alpha of a
+ * graphics state applies to each paint operator, so a construction of overlapping parts
+ * (`grouped`) paints into a transparency group first, and the alpha applies once, to the group.
+ * `bbox` bounds the mask and the group in local space.
+ */
+function withStopAlpha(
+  flatAlpha: number | null,
+  bbox: [number, number, number, number],
+  p: PageOps,
+  draw: (gray: boolean) => void,
+  grouped = true
+): void {
+  if (flatAlpha === null) {
+    const ops = p.captureNow(() => draw(true));
+    const form = p.form(ops, bbox, { S: 'Transparency', CS: 'DeviceGray' });
+    p.state(`smask:${form.toString()}`, () =>
+      p.res.doc.context.obj({
+        Type: 'ExtGState',
+        SMask: { Type: 'Mask', S: 'Luminosity', G: form },
+      })
+    );
+  } else p.alpha(flatAlpha, 1);
+  if (!grouped || flatAlpha === 1) {
+    draw(false);
+    return;
+  }
+  const group = p.form(
+    p.captureNow(() => draw(false)),
+    bbox,
+    { S: 'Transparency' }
+  );
+  p.push(drawObject(p.name('XObject', group)));
+}
+
+/** Set the fill color of a construction part: the color, or its alpha as gray for a mask. */
+const partColor = (c: Rgba, gray: boolean): PDFOperator =>
+  gray ? setFillingGrayscaleColor(Math.max(0, Math.min(1, c.a))) : setFillingRgbColor(...rgb(c));
 
 /** The local box grown by its own size on every side, for soft-mask bounds. */
 const around = (w: number, h: number): [number, number, number, number] => [
@@ -466,9 +532,10 @@ function radialGradient(
 }
 
 /**
- * `a:path path="rect"` (and `shape`, which the SVG paint draws the same way): concentric
- * rectangles from `fillToRect` (the first stop) to the box edge (the last stop), as four
- * trapezoids with linear gradients over a base of the last color.
+ * `a:path path="rect"`, and `shape` without bands: the SVG paint's construction
+ * (`rectGradientGeometry`), concentric rectangles from `fillToRect` (the first stop) to the edge
+ * of the tile rectangle (the last stop), as four trapezoids with linear gradients over a base of
+ * the last color. Stop alpha masks the whole construction.
  */
 function rectGradient(
   fill: PathGradient,
@@ -479,36 +546,94 @@ function rectGradient(
 ): void {
   const fns = stopFunctions(stops, p);
   if (!fns) return;
-  const f = fill.fillToRect;
-  const l = Math.min(f.l * w, w);
-  const t = Math.min(f.t * h, h);
-  const r = Math.max(l, w - f.r * w);
-  const b = Math.max(t, h - f.b * h);
-  const solid = (c: Rgba, x: number, y: number, rw: number, rh: number): void => {
-    // The SVG paint draws the base and the center opaque.
-    p.push(setFillingRgbColor(...rgb(c)));
-    traceRect(x, y, rw, rh, p);
-    p.push(fillEvenOdd());
-  };
-  solid(stops[stops.length - 1].color, 0, 0, w, h);
-  const trapezoid = (pts: [number, number][], coords: number[]): void => {
-    p.push(pushGraphicsState(), moveTo(pts[0][0], pts[0][1]));
-    for (const [x, y] of pts.slice(1)) p.push(lineTo(x, y));
-    p.push(closePath(), clipEvenOdd(), endPath());
-    shade(2, coords, fns, around(w, h), p);
-    p.push(popGraphicsState());
-  };
-  const [tl, tr, br, bl]: [number, number][] = [
-    [0, 0],
-    [w, 0],
-    [w, h],
-    [0, h],
-  ];
-  trapezoid([tl, tr, [r, t], [l, t]], [0, t, 0, 0]);
-  trapezoid([[l, b], [r, b], br, bl], [0, b, 0, h]);
-  trapezoid([tl, [l, t], [l, b], bl], [l, 0, 0, 0]);
-  trapezoid([[r, t], tr, br, [r, b]], [r, 0, w, 0]);
-  if (r > l && b > t) solid(stops[0].color, l, t, r - l, b - t);
+  const { l, t, r, b, x0, y0, x1, y1 } = rectGradientGeometry(fill, w, h);
+  withStopAlpha(fns.alpha ? null : fns.flatAlpha, around(w, h), p, (gray) => {
+    const solid = (c: Rgba, x: number, y: number, rw: number, rh: number): void => {
+      p.push(partColor(c, gray));
+      traceRect(x, y, rw, rh, p);
+      p.push(fillEvenOdd());
+    };
+    // The base hides antialiasing seams between the trapezoids.
+    solid(stops[stops.length - 1].color, 0, 0, w, h);
+    const trapezoid = (pts: [number, number][], coords: number[]): void => {
+      p.push(pushGraphicsState(), moveTo(pts[0][0], pts[0][1]));
+      for (const [x, y] of pts.slice(1)) p.push(lineTo(x, y));
+      p.push(closePath(), clipEvenOdd(), endPath());
+      p.push(
+        gray
+          ? shadingOp(2, coords, 'DeviceGray', fns.alpha!, p)
+          : shadingOp(2, coords, 'DeviceRGB', fns.color, p)
+      );
+      p.push(popGraphicsState());
+    };
+    trapezoid(
+      [
+        [x0, y0],
+        [x1, y0],
+        [r, t],
+        [l, t],
+      ],
+      [0, t, 0, y0]
+    );
+    trapezoid(
+      [
+        [l, b],
+        [r, b],
+        [x1, y1],
+        [x0, y1],
+      ],
+      [0, b, 0, y1]
+    );
+    trapezoid(
+      [
+        [x0, y0],
+        [l, t],
+        [l, b],
+        [x0, y1],
+      ],
+      [l, 0, x0, 0]
+    );
+    trapezoid(
+      [
+        [r, t],
+        [x1, y0],
+        [x1, y1],
+        [r, b],
+      ],
+      [r, 0, x1, 0]
+    );
+    if (r > l && b > t) solid(stops[0].color, l, t, r - l, b - t);
+  });
+}
+
+/**
+ * `a:path path="shape"`: the SVG paint's bands (`shapeGradientBands`), copies of the outline that
+ * `outline` traces, scaled about the focus center from 1 down, each filled in one color, outside
+ * in. `stops` are the fill's stops after the path fill mode. Stop alpha masks all the bands.
+ */
+function shapeGradient(
+  fill: PathGradient,
+  stops: readonly GradientStop[],
+  w: number,
+  h: number,
+  p: PageOps,
+  outline: () => void
+): void {
+  if (stops.length === 0) return;
+  const { cx, cy, bands } = shapeGradientBands(fill, stops, w, h);
+  const alphas = stops.map((s) => s.color.a);
+  const flat = alphas.every((a) => a === alphas[0]);
+  withStopAlpha(flat ? alphas[0]! : null, around(w, h), p, (gray) => {
+    for (const { scale: k, color } of bands) {
+      p.push(
+        pushGraphicsState(),
+        concatTransformationMatrix(k, 0, 0, k, cx - k * cx, cy - k * cy),
+        partColor(color, gray)
+      );
+      outline();
+      p.push(fillEvenOdd(), popGraphicsState());
+    }
+  });
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

@@ -28,6 +28,14 @@ export function circleGradientGeometry(fill: Extract<ResolvedFill, {
 };
 
 // @internal
+export interface CompoundBand {
+    // (undocumented)
+    readonly a: number;
+    // (undocumented)
+    readonly b: number;
+}
+
+// @internal
 export interface CompoundBandLine {
     // (undocumented)
     readonly lines: readonly CompoundPolyline[];
@@ -37,6 +45,21 @@ export interface CompoundBandLine {
 
 // @internal
 export function compoundBandLines(commands: readonly PathCommand[], cmpd: string, width: number, join: string, miterLimit: number): CompoundBandLine[] | null;
+
+// @internal
+export type CompoundPlan = {
+    readonly kind: 'offset';
+    readonly bands: readonly CompoundBandLine[];
+} | {
+    readonly kind: 'masked';
+    readonly closed: boolean;
+    readonly commands?: readonly PathCommand[];
+    readonly outer: readonly CompoundBand[];
+    readonly inner: readonly CompoundBand[];
+};
+
+// @internal
+export function compoundPlan(cmpd: string, width: number, closed: boolean, dashed: boolean, join: string, miterLimit: number, commands?: readonly PathCommand[]): CompoundPlan | null;
 
 // @internal
 export type CompoundPoint = {
@@ -143,6 +166,20 @@ export const PATTERN_PIXEL = 12700;
 // @internal
 export function patternBitmap(preset: string): number[][] | undefined;
 
+// @internal
+export function rectGradientGeometry(fill: Extract<ResolvedFill, {
+    type: 'path';
+}>, w: number, h: number): {
+    l: number;
+    t: number;
+    r: number;
+    b: number;
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+};
+
 // @public
 export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[], options?: RegisterFontFacesOptions): FontFaceHandle;
 
@@ -154,6 +191,23 @@ export interface RegisterFontFacesOptions {
 
 // @internal
 export function serializeSvgElement(root: Element): string;
+
+// @internal
+export function shapeBandBudget(): {
+    allow(paths: number, commands: number): boolean;
+};
+
+// @internal
+export function shapeGradientBands(fill: Extract<ResolvedFill, {
+    type: 'path';
+}>, stops: readonly GradientStop[], w: number, h: number): {
+    cx: number;
+    cy: number;
+    bands: {
+        scale: number;
+        color: Rgba;
+    }[];
+};
 
 // @internal
 export class SlidePainter {

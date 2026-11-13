@@ -23,11 +23,17 @@ export {
   gradientPaintStops,
   linearGradientEnds,
   lumTransfer,
+  rectGradientGeometry,
+  shapeBandBudget,
+  shapeGradientBands,
   threeDColor,
 } from './painter-math.ts';
 export { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 export {
   compoundBandLines,
+  compoundPlan,
+  type Band as CompoundBand,
+  type CompoundPlan,
   type CompoundBandLine,
   type Point as CompoundPoint,
   type Polyline as CompoundPolyline,
