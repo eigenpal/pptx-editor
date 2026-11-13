@@ -612,6 +612,25 @@ describe('automation host: text', () => {
       expect(attr(child(rPr, face), 'typeface')).toBe('Noto Sans TC');
   });
 
+  test('a font name maps a theme font to each face, and refuses other references', () => {
+    const host = open();
+    const box = firstShape(host);
+    for (const name of ['+mj-ea', '+foo', '   '])
+      expect(exec(host, [{ op: 'setFont', shape: box, font: { name } }]).ok).toBe(false);
+    ok(host, [{ op: 'setFont', shape: box, font: { name: '+mj-lt' } }]);
+    const saved = host.save();
+    if (!saved.ok) throw new Error(saved.error.code);
+    const pkg = readPptx(saved.bytes);
+    if (!pkg.ok) throw new Error('unreadable');
+    const slide = xmlPartOf(pkg.pkg, '/ppt/slides/slide1.xml')!.root;
+    const rPr = child(find(slide, 'a:r')!, 'a:rPr');
+    expect(['a:latin', 'a:ea', 'a:cs'].map((f) => attr(child(rPr, f), 'typeface'))).toEqual([
+      '+mj-lt',
+      '+mj-ea',
+      '+mj-cs',
+    ]);
+  });
+
   test('reads and writes alignment, bullets, and the list level', () => {
     const host = open();
     const box = firstShape(host);

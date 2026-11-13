@@ -279,6 +279,21 @@ describe('script faces', () => {
     const again = await reopen(editor.save()!);
     expect(facesOf(again)).toEqual({ latin: '+mn-lt', ea: '+mn-ea', cs: '+mn-cs' });
   });
+
+  test('a second pick keeps one face of each slot, in schema order', async () => {
+    const editor = await reopen(cjkDeck());
+    selectAll(editor);
+    expect(editor.exec({ type: 'setFontFamily', family: 'Lato' }).ok).toBe(true);
+    selectAll(editor);
+    expect(editor.exec({ type: 'setFontFamily', family: 'Noto Sans TC' }).ok).toBe(true);
+    const root = xmlPartOf(
+      editor.session!.store.package,
+      editor.session!.info.slides[0].partName
+    )!.root;
+    const rPr = child(find(root, 'a:r')!, 'a:rPr')!;
+    expect(elements(rPr).map((c) => c.local)).toEqual(['latin', 'ea', 'cs']);
+    expect(facesOf(editor).ea).toBe('Noto Sans TC');
+  });
 });
 
 describe('fontPickerRow', () => {
