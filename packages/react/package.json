@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/react",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "React adapter for PPTX Editor: a provider, hooks, and chrome compounds over the @pptx-editor.dev/core editor contract.",
   "type": "module",
   "sideEffects": [
@@ -28,10 +28,10 @@
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/react"
   },
   "dependencies": {
-    "@pptx-editor.dev/i18n": "^0.4.0"
+    "@pptx-editor.dev/i18n": "^0.5.0"
   },
   "peerDependencies": {
-    "@pptx-editor.dev/core": "~0.4.0",
+    "@pptx-editor.dev/core": "~0.5.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
   },

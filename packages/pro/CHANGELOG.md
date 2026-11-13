@@ -1,5 +1,14 @@
 # @pptx-editor.dev/pro
 
+## 0.5.0
+
+### Patch Changes
+
+- 14256cd: Fix chart value axes and best-fit pie labels. An automatic major unit now keeps one label line between ticks, so a small chart with large text shows every step. The top value label lowers the plot less at large text sizes. A best-fit pie label sits at equal distance from both edges of its slice, with its farthest corner 4 pt inside the circle.
+- 14256cd: Improve 3-D shapes: the scene's light shades the face and the extrusion sides for every camera, bevel presets follow measured profiles, and a turned extrusion casts its shadow and glow from its back. Turned faces in the editor no longer shift by a few pixels. PDF export draws blur as an edge fade with a halo.
+- 14256cd: Improve 3-D shapes: plastic and metal materials show stronger highlights, metal shines at its edges, lower bevels catch a soft highlight, and the top-left light and bevel profiles are more accurate. Bevels in exported PDFs no longer show seams. Skewed reflections keep their exact transform.
+- Updated dependencies: @pptx-editor.dev/core@0.5.0, @pptx-editor.dev/react@0.5.0, @pptx-editor.dev/vue@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

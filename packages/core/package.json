@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/core",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Framework-agnostic core for PPTX Editor: PresentationML parse and serialize, the canonical document tree, the property cascade, layout, paint, and the Editor contract the adapters render.",
   "type": "module",
   "sideEffects": [
@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@docx-editor.dev/fonts": "^2.34.0",
-    "@pptx-editor.dev/i18n": "^0.4.0",
+    "@pptx-editor.dev/i18n": "^0.5.0",
     "bidi-js": "1.1.0",
     "emf-converter": "4.28.0",
     "fast-xml-parser": "^5.10.1",
