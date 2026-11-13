@@ -22,7 +22,7 @@ import {
 import { ALIGN_POINTS, blipColorSteps } from './effect-transforms.ts';
 import { circleGradient, linearGradient, rectGradient, shapeGradient } from './paint-gradient.ts';
 import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
-import { Defs, num, svg } from './svg.ts';
+import { Defs, matrixParts, num, svg } from './svg.ts';
 
 /** Resolves a picture fill's relationship id to a displayable URL (never a remote fetch). */
 export type ImageUrlPort = (sourcePart: string, rId: string) => string | undefined;
@@ -341,7 +341,7 @@ function slideSpace(m: Matrix): string | undefined {
 
 /** A matrix as `matrixAttr` writes it. */
 function roundedMatrix(m: Matrix): Matrix {
-  return m.map((v) => Number(num(v))) as unknown as Matrix;
+  return matrixParts(m).map(Number) as unknown as Matrix;
 }
 
 /** The inverse of `r` as a `transform` value, or undefined when `r` cannot be inverted. */

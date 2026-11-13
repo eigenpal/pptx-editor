@@ -162,28 +162,53 @@ interface Light {
   readonly k: number;
 }
 
+/** A highlight: the direction toward its light, its strength, and its power. */
+interface Lobe extends Light {
+  readonly power: number;
+}
+
 /**
- * The three-point rig from the top, fitted to the fixture: an ambient term, a key light from
- * above, a fill light from below, and a highlight at the half vector `H`.
+ * The three-point rig from the top, in the shape's own axes: a camera turn moves the view, not
+ * the light. An ambient term, three lights (from above, from below, and from behind), and two
+ * highlights at the half vector of the light and the view (Blinn). Fitted together to the
+ * fixture: the angle bevels (slides 1 and 2), the faces under 18 cameras (slides 3 and 4), the
+ * extrusion sides (slides 3 and 4), and the turned faces (`three-d-turned-effects`, slide 1),
+ * within 3.3 levels of 255 on average.
  */
-const AMBIENT = 0.044;
-const KEY: Light = { dir: [-0.017, -0.707, 0.707], k: 1.07 };
-const FILL: Light = { dir: [-0.227, 0.924, 0.307], k: 0.774 };
-const HIGHLIGHT = { dir: [-0.189, -0.405, 0.894] as Vec3, k: 0.452, power: 32.7 };
+const AMBIENT = 0.1253;
+const LIGHTS: readonly Light[] = [
+  { dir: [-0.194, -0.722, 0.664], k: 0.857 },
+  { dir: [-0.027, 0.669, 0.743], k: 0.486 },
+  { dir: [-0.286, 0.571, -0.769], k: 0.929 },
+];
+const HIGHLIGHTS: readonly Lobe[] = [
+  { dir: [-0.355, -0.749, 0.559], k: 0.484, power: 28.5 },
+  { dir: [-0.457, 0.459, -0.762], k: 1.125, power: 82.4 },
+];
 
 /**
  * How far the rig turns the light about the view axis, by `dir`, in degrees. The top-left
- * direction is measured (a quarter turn); the others follow the compass and are approximate.
+ * direction is measured (the bevel of slide 2 lit from the left); the others follow the compass
+ * and are approximate.
  */
 const DIR_TURN: Readonly<Record<string, number>> = {
   t: 0,
-  tl: -90,
+  tl: -75,
   l: -90,
   bl: -135,
   b: 180,
   br: 135,
   r: 90,
   tr: 45,
+};
+
+/**
+ * The strength of a rig against the three-point rig, measured on the faces of slide 2 of the
+ * fixture. The rigs that the fixture does not show keep the strength of the three-point rig.
+ */
+const RIG_STRENGTH: Readonly<Record<string, number>> = {
+  balanced: 0.93,
+  harsh: 0.77,
 };
 
 /** The highlight strength of each material: none for matte ones, more for metal. */
@@ -193,10 +218,29 @@ function highlightOf(material: string): number {
   return 1;
 }
 
+/** A brightness factor and a white highlight, from 0 to 1, for one surface. */
+export interface Shade {
+  readonly level: number;
+  readonly white: number;
+}
+
 /** The light of a scene: the brightness and the white highlight for a surface normal. */
 export interface Lighting {
-  /** Brightness factor for a normal, 1 on the face of a flat-lit shape. */
-  readonly shade: (n: Vec3) => { readonly level: number; readonly white: number };
+  /** The shade of a normal in the shape's axes. A flat material or rig gives level 1. */
+  readonly shade: (n: Vec3) => Shade;
+}
+
+/**
+ * The direction toward the viewer in the shape's axes (x right, y down, z out of the face). A
+ * turn gives the camera axis turned back; an oblique view looks along its depth direction.
+ */
+export function viewDirection(view: CameraView): Vec3 {
+  if (view.kind === 'turn') {
+    const R = view.rotation;
+    return normalize([-R[2][0], -R[2][1], R[2][2]]);
+  }
+  if (view.kind === 'oblique') return normalize([view.dx, view.dy, 1]);
+  return [0, 0, 1];
 }
 
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -213,10 +257,11 @@ export function normalize(v: Vec3): Vec3 {
 }
 
 /**
- * The light of a scene. Brightness is relative to the face of the shape: a normal toward the
- * viewer gives level 1 and no white. A flat material or rig gives no shading.
+ * The light of a scene seen from `view` (`viewDirection`). The shade is absolute: the face of a
+ * shape (normal `[0, 0, 1]`) is brighter than its fill, as in the fixture. A flat material or
+ * rig gives no shading.
  */
-export function lightingOf(t: ResolvedThreeD): Lighting {
+export function lightingOf(t: ResolvedThreeD, view: Vec3 = [0, 0, 1]): Lighting {
   if (
     t.material === 'flat' ||
     t.material === 'legacyWireframe' ||
@@ -224,19 +269,22 @@ export function lightingOf(t: ResolvedThreeD): Lighting {
   )
     return { shade: () => ({ level: 1, white: 0 }) };
   const turnBy = DIR_TURN[t.lightDir] ?? 0;
-  const key = spin(KEY.dir, turnBy);
-  const fill = spin(FILL.dir, turnBy);
-  const high = spin(HIGHLIGHT.dir, turnBy);
-  const gloss = highlightOf(t.material) * HIGHLIGHT.k;
-  const raw = (n: Vec3) => ({
-    level: AMBIENT + KEY.k * Math.max(0, dot(n, key)) + FILL.k * Math.max(0, dot(n, fill)),
-    white: gloss * Math.max(0, dot(n, high)) ** HIGHLIGHT.power,
+  const strength = RIG_STRENGTH[t.lightRig] ?? 1;
+  const lights = LIGHTS.map((l) => ({ dir: spin(normalize(l.dir), turnBy), k: strength * l.k }));
+  const ambient = strength * AMBIENT;
+  const gloss = strength * highlightOf(t.material);
+  // The half vector of each highlight is fixed for one view.
+  const halves = HIGHLIGHTS.map((h) => {
+    const l = spin(normalize(h.dir), turnBy);
+    return { half: normalize([l[0] + view[0], l[1] + view[1], l[2] + view[2]]), lobe: h };
   });
-  const face = raw([0, 0, 1]);
   return {
-    shade: (n) => {
-      const s = raw(n);
-      return { level: s.level / face.level, white: Math.max(0, s.white - face.white) };
-    },
+    shade: (n) => ({
+      level: lights.reduce((sum, l) => sum + l.k * Math.max(0, dot(n, l.dir)), ambient),
+      white: halves.reduce(
+        (sum, { half, lobe }) => sum + gloss * lobe.k * Math.max(0, dot(n, half)) ** lobe.power,
+        0
+      ),
+    }),
   };
 }

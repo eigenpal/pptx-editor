@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The 3-D light, bevel profiles, face color, back offset of turned extrusions, and transform precision affect painted output and PDF output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/pro/src/drawing/__tests__/three-d.test.ts",
+    "packages/core/src/output/__tests__/painter-math.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/three-d.test.ts"
+  ]
+}

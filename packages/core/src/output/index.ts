@@ -32,6 +32,7 @@ export {
   shapeBandBudget,
   shapeGradientBands,
   threeDColor,
+  threeDFaceItem,
   tileGeometry,
   type BlipColorStep,
   type TileGeometry,

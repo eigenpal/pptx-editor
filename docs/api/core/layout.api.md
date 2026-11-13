@@ -962,7 +962,12 @@ export interface ThreeDInput {
 
 // @internal
 export interface ThreeDPaint {
+    readonly backOffset?: {
+        readonly x: number;
+        readonly y: number;
+    };
     readonly behind: readonly ThreeDFacet[];
+    readonly faceColor?: Rgba;
     readonly front: Matrix;
     readonly over: readonly ThreeDFacet[];
     readonly showsFace: boolean;

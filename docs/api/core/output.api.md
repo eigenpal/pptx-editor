@@ -265,6 +265,13 @@ export const SVG_NS = "http://www.w3.org/2000/svg";
 export function threeDColor(fill: ResolvedFill): Rgba;
 
 // @internal
+export function threeDFaceItem<T extends Extract<LayoutItem, {
+    kind: 'shape';
+} | {
+    kind: 'picture';
+}>>(item: T, paint: ThreeDPaint | null): T;
+
+// @internal
 export interface TileGeometry {
     readonly flipX: boolean;
     readonly flipY: boolean;

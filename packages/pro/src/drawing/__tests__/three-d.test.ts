@@ -68,19 +68,22 @@ const input = (fx: ResolvedEffects) => ({
 });
 
 describe('3-D polygons', () => {
-  test('a circle bevel is eight strips on each edge, lit from the top', () => {
+  test('a circle bevel is twelve strips on each edge, lit from the top', () => {
     const paint = threeDPaint(
       input(effects({ bevelTop: { w: 76_200, h: 76_200, preset: 'circle' } }))
     )!;
     const strips = polygons(paint.over);
-    expect(strips).toHaveLength(4 * 8);
+    expect(strips).toHaveLength(4 * 12);
     expect(paint.behind).toHaveLength(0);
     expect(paint.front).toEqual([1, 0, 0, 1, 0, 0]);
     expect(paint.showsFace).toBe(true);
     // The outermost strip of each edge: top, right, bottom, left.
     const [top, right, bottom, left] = [0, 1, 2, 3].map((i) => strips[i]!.color.g);
     expect(right).toBeLessThan(left!);
-    expect(bottom).toBeLessThan(top!);
+    // The outer bottom strip catches light from below, as in the reference; the fifth strips
+    // show the light from the top.
+    expect(bottom).toBeGreaterThan(top!);
+    expect(strips[4 * 4 + 2]!.color.g).toBeLessThan(strips[4 * 4]!.color.g);
     // The outer right strip is close to the measured 0x17.
     expect(Math.abs(right! - 0x17)).toBeLessThan(12);
   });
@@ -156,12 +159,12 @@ describe('3-D paint', () => {
     expect(paint().querySelectorAll('path').length).toBe(1);
     installDrawing();
     const svg = paint();
-    // The geometry, 32 bevel strips, four sides, and the front cap, as subpaths: polygons of
+    // The geometry, 48 bevel strips, four sides, and the front cap, as subpaths: polygons of
     // one color share a path.
     const subpaths = [...svg.querySelectorAll('path')].map(
       (p) => (p.getAttribute('d') ?? '').split('M').length - 1
     );
-    expect(subpaths.reduce((a, b) => a + b, 0)).toBe(1 + 32 + 5);
+    expect(subpaths.reduce((a, b) => a + b, 0)).toBe(1 + 48 + 5);
     expect(svg.querySelector('g[data-kind="shape"] g g[transform]')).not.toBeNull();
   });
 });
@@ -326,10 +329,10 @@ describe('degenerate 3-D shapes', () => {
     })!;
     const facets = paint.over.length + paint.under.length + paint.behind.length;
     const all = polygons(paint.over).length + polygons(paint.under).length;
-    // The 3-D work follows every fourth point: 1,000 points, 8 strips and a contour side each.
-    expect(all).toBe(1000 * 8 + 1000);
-    // Neighboring polygons of one color share a path: 40,001 paths before, about 3,700 now.
-    expect(facets).toBeLessThan(4000);
+    // The 3-D work follows every fourth point: 1,000 points, 12 strips and a contour side each.
+    expect(all).toBe(1000 * 12 + 1000);
+    // Neighboring polygons of one color share a path: about 5,200 paths for 13,000 polygons.
+    expect(facets).toBeLessThan(6000);
   });
 });
 

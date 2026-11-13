@@ -31,7 +31,7 @@ import {
   shadowCopy,
   type EffectSource,
 } from './paint-effects.ts';
-import { threeDColor } from './painter-math.ts';
+import { threeDColor, threeDFaceItem } from './painter-math.ts';
 import { boundsOf, PX } from './effect-transforms.ts';
 import { boxCorners, contentCorners } from './item-corners.ts';
 import {
@@ -727,7 +727,9 @@ export function paintItem(
       // A turned camera turns the face and its text about the shape's center, and the regions
       // of the effects that copy the face turn with it.
       const front = threeD?.front.some((v, i) => v !== IDENTITY[i]) ? threeD.front : undefined;
-      for (const node of paintGeometry(doc, item, local, parentScale, front))
+      // A solid face takes the scene's light (ECMA-376 Part 1, 20.1.5).
+      const faceItem = threeDFaceItem(item, threeD);
+      for (const node of paintGeometry(doc, faceItem, local, parentScale, front))
         body.appendChild(node);
       // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.1).
       if (threeD) for (const node of facetElements(doc, threeD.over, SEAM)) body.appendChild(node);
@@ -774,6 +776,10 @@ export function paintItem(
         return outer;
       }
       const corners = cornersOf();
+      // A turned extrusion casts its shadows and its glow from its back.
+      const back = threeD?.backOffset;
+      const castFrom = (m: Matrix): Matrix =>
+        back ? [m[0], m[1], m[2], m[3], m[4] + back.x, m[5] + back.y] : m;
       // Shadow, reflection, and glow use the content, text included (design D1 of `effects-fidelity`).
       const contentId = ctx.defs.id('content');
       content.setAttribute('id', contentId);
@@ -785,7 +791,9 @@ export function paintItem(
         width: el.xfrm.cx,
         height: el.xfrm.cy,
         corners,
-        ...(front && faceId ? { face: { id: faceId, corners: contentCorners(item), front } } : {}),
+        ...(front && faceId
+          ? { face: { id: faceId, corners: contentCorners(item), front: castFrom(front) } }
+          : {}),
       };
       const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
       if (reflection) {
@@ -799,8 +807,11 @@ export function paintItem(
       if (shadow) outer.appendChild(shadow);
       // The glow is a copy that paints the glow alone, under the extrusion and the content. The
       // content itself paints with no filter, so its text stays text in a printed PDF.
-      const glow =
-        pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids, true) : null;
+      // The glow of a turned extrusion lies around the face and its back.
+      const glowCorners = back
+        ? [...corners, ...corners.map((q) => ({ x: q.x + back.x, y: q.y + back.y }))]
+        : corners;
+      const glow = pro && effects.glow ? pro.glow(effects, boundsOf(glowCorners), ids, true) : null;
       if (glow) {
         effectDefs(ctx.defs, glow.defs);
         let glowSource = contentId;
@@ -810,7 +821,10 @@ export function paintItem(
         }
         outer.appendChild(
           svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
-            svg(doc, 'use', { href: `#${glowSource}` }),
+            svg(doc, 'use', {
+              href: `#${glowSource}`,
+              transform: back ? matrixAttr([1, 0, 0, 1, back.x, back.y]) : undefined,
+            }),
           ])
         );
       }

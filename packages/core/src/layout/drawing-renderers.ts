@@ -123,6 +123,16 @@ export interface ThreeDPaint {
    * the effects of the face do not paint, and only the extrusion shows.
    */
   readonly showsFace: boolean;
+  /**
+   * The face's own color under the scene's light, for a solid fill: the paint fills the face in
+   * this color in place of the fill's color.
+   */
+  readonly faceColor?: Rgba;
+  /**
+   * The slide-space offset of the back of a turned extrusion from the face. The outer shadows
+   * and the glow are cast from the back: the paint moves their copies of the turned face by it.
+   */
+  readonly backOffset?: { readonly x: number; readonly y: number };
   /** Extrusion sides, in slide space, painted under everything else of the element. */
   readonly behind: readonly ThreeDFacet[];
   /** The contour, in the local box, painted under the geometry. */
