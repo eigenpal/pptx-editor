@@ -170,6 +170,34 @@ describe('group effects in the PDF export', () => {
     expect(text).toMatch(/\/ShadingType 2\s*\/ColorSpace \/DeviceGray/);
   });
 
+  test("a group soft edge reports that its shapes' own shadows show only over them", async () => {
+    const own =
+      '<a:effectLst><a:outerShdw blurRad="0" dist="152400" dir="0"><a:srgbClr val="000000"/>' +
+      '</a:outerShdw></a:effectLst>';
+    const deck = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: group(
+            {
+              id: 10,
+              x: IN,
+              y: IN,
+              cx: 2 * IN,
+              cy: IN,
+              effects: '<a:effectLst><a:softEdge rad="63500"/></a:effectLst>',
+            },
+            shape({ id: 11, x: IN, y: IN, cx: IN, cy: IN, fill: solid('C00000'), effects: own })
+          ),
+        },
+      ],
+    });
+    expect(codes(await exportPdf(deck, BEST))).toContain('effect.group-soft-edge-effects');
+    expect(codes(await exportPdf(deckOf('<a:softEdge rad="63500"/>'), BEST))).not.toContain(
+      'effect.group-soft-edge-effects'
+    );
+  });
+
   test('a group soft edge masks all bodies together and paints each text once', async () => {
     const labelled = (effects: string) =>
       buildPptx({

@@ -105,6 +105,8 @@ interface SlideScope {
   readonly presentationPart: string;
   readonly masterPart?: string;
   readonly layoutPart?: string;
+  /** How many enclosing groups draw effects of their own (`boundGroupEffects`). */
+  readonly effectDepth?: number;
 }
 
 /**
@@ -117,6 +119,17 @@ const resolvedParagraphs = new WeakMap<
 >();
 
 const MAX_GROUP_DEPTH = 32;
+/**
+ * Groups whose effects draw, one inside another: each copies the content that holds the copies
+ * of the groups inside it, so the painted copies grow with the power of this depth. Effects of
+ * groups nested deeper do not draw.
+ */
+const MAX_GROUP_EFFECT_DEPTH = 2;
+/**
+ * A group with effects paints whole, in one frame: the effects of a group of more elements than
+ * this do not draw, so it paints within the editor's paint budget.
+ */
+const MAX_GROUP_EFFECT_ELEMENTS = 1_000;
 
 /** The namespace of a shape's own children: `p:` on a slide, `dsp:` in a diagram drawing. */
 function ownNs(el: Element | undefined): string {
@@ -524,7 +537,8 @@ function resolveDiagramElement(
       scope.diagramShapes.count += 1;
       if (depth >= MAX_DIAGRAM_GROUP_DEPTH) return overLimit(budget);
       if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
-      const kids = resolveDiagramTree(el, layer, drawingPart, scope, depth + 1, budget);
+      const inner = effectScope(groupEffects(child(el, 'dsp:grpSpPr'), scope.ctx).effects, scope);
+      const kids = resolveDiagramTree(el, layer, drawingPart, inner, depth + 1, budget);
       if (!kids) return UNSUPPORTED;
       return diagramGroup(el, kids, layer, drawingPart, scope);
     }
@@ -575,8 +589,65 @@ function diagramGroup(
     childExtent: { cx: intAttr(chExt, 'cx') ?? xfrm.cx, cy: intAttr(chExt, 'cy') ?? xfrm.cy },
     children,
     fill: resolveFillElement(fillElementOf(grpSpPr), scope.ctx) ?? { type: 'none' },
-    ...groupEffects(grpSpPr, scope.ctx),
+    ...boundGroupEffects(groupEffects(grpSpPr, scope.ctx).effects, scope, children),
   };
+}
+
+/** Whether a group's effects copy or filter its content: what `MAX_GROUP_EFFECT_DEPTH` counts. */
+function drawsGroupEffects(fx: ResolvedEffects | undefined): boolean {
+  return !!(
+    fx &&
+    (fx.outerShadow || fx.secondShadow || fx.glow || fx.reflection || fx.softEdge || fx.blur)
+  );
+}
+
+/** The scope of a group's children: one more enclosing group that draws effects, if it does. */
+function effectScope(fx: ResolvedEffects | undefined, scope: SlideScope): SlideScope {
+  const depth = scope.effectDepth ?? 0;
+  if (!drawsGroupEffects(fx) || depth >= MAX_GROUP_EFFECT_DEPTH) return scope;
+  return { ...scope, effectDepth: depth + 1 };
+}
+
+/** Resolved elements and table cells in `list` and below (each group counts its whole content). */
+const elementCounts = new WeakMap<readonly ResolvedElement[], number>();
+
+function elementCount(list: readonly ResolvedElement[]): number {
+  const known = elementCounts.get(list);
+  if (known !== undefined) return known;
+  let n = 0;
+  for (const el of list) {
+    n += 1;
+    if (el.kind === 'group') n += elementCount(el.children);
+    else if (el.kind === 'graphicFrame') {
+      // A table weighs its cells, as the paint budget counts them (`paintWeight`).
+      n += el.table?.cells.length ?? 0;
+      if (el.drawing) n += elementCount(el.drawing);
+    }
+  }
+  elementCounts.set(list, n);
+  return n;
+}
+
+/**
+ * A group's effects within the paint bounds: past `MAX_GROUP_EFFECT_DEPTH` enclosing groups that
+ * draw effects, or over `MAX_GROUP_EFFECT_ELEMENTS` elements, they do not draw and are reported
+ * unsupported. They stay in the file.
+ */
+function boundGroupEffects(
+  fx: ResolvedEffects | undefined,
+  scope: SlideScope,
+  children: readonly ResolvedElement[]
+): { effects?: ResolvedEffects } {
+  if (!fx) return {};
+  if (!drawsGroupEffects(fx)) return { effects: fx };
+  const reason =
+    (scope.effectDepth ?? 0) >= MAX_GROUP_EFFECT_DEPTH
+      ? 'nested group effects'
+      : elementCount(children) > MAX_GROUP_EFFECT_ELEMENTS
+        ? 'group effects of a large group'
+        : undefined;
+  if (!reason) return { effects: fx };
+  return { effects: { unsupported: [...fx.unsupported, reason] } };
 }
 
 /**
@@ -649,12 +720,13 @@ function resolveDiagram(
   // `nodes`: the node whose text each drawing shape shows, by the shape's `modelId`.
   const nodes = textNodesOf(parts.dataModel);
   const budget: DiagramBudget = { shapes: 0, overLimit: false, nodes };
-  const shapes = resolveDiagramTree(tree, layer, parts.drawingPart, scope, 0, budget);
+  const rootProps = child(tree, 'dsp:grpSpPr');
+  const placed = !!child(rootProps, 'a:xfrm');
+  const inner = placed ? effectScope(groupEffects(rootProps, scope.ctx).effects, scope) : scope;
+  const shapes = resolveDiagramTree(tree, layer, parts.drawingPart, inner, 0, budget);
   if (!shapes) return { drawingFallback: budget.overLimit ? 'limit' : 'unsupported' };
   if (shapes.length === 0) return { drawingFallback: 'no-drawing' };
-  const root = child(child(tree, 'dsp:grpSpPr'), 'a:xfrm')
-    ? [diagramGroup(tree, shapes, layer, parts.drawingPart, scope)]
-    : shapes;
+  const root = placed ? [diagramGroup(tree, shapes, layer, parts.drawingPart, scope)] : shapes;
   const background = diagramBackground(frame, parts.dataModel, xfrm, layer, parts.dataPart, scope);
   return { drawing: background ? [background, ...root] : root };
 }
@@ -680,9 +752,11 @@ function resolveElement(
       const xfrm = readXfrm(x) ?? ZERO_XFRM;
       const chOff = child(x, 'a:chOff');
       const chExt = child(x, 'a:chExt');
+      const own = groupEffects(grpSpPr, scope.ctx);
+      const inner = effectScope(own.effects, scope);
       const kids: ResolvedElement[] = [];
       for (const c of contentElements(el, xmlPartOf(scope.pkg, partName)?.root)) {
-        const r = resolveElement(c, layer, partName, scope, depth + 1);
+        const r = resolveElement(c, layer, partName, inner, depth + 1);
         if (r) kids.push(r);
       }
       const cNvPr = nonVisualProps(el);
@@ -698,7 +772,7 @@ function resolveElement(
         childExtent: { cx: intAttr(chExt, 'cx') ?? xfrm.cx, cy: intAttr(chExt, 'cy') ?? xfrm.cy },
         children: kids,
         fill: resolveFillElement(fillElementOf(grpSpPr), scope.ctx) ?? { type: 'none' },
-        ...groupEffects(grpSpPr, scope.ctx),
+        ...boundGroupEffects(own.effects, scope, kids),
       };
     }
     case 'graphicFrame': {

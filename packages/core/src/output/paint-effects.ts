@@ -186,7 +186,7 @@ export function groupPaintsEffects(group: Extract<LayoutItem, { kind: 'group' }>
   if (fx.outerShadow || fx.secondShadow) return true;
   const pro = drawingRenderers().effects;
   if (!pro) return false;
-  return !!(fx.glow || fx.reflection || fx.softEdge || fx.innerShadow || (pro.blur && fx.blur));
+  return !!(fx.glow || fx.reflection || fx.softEdge || (pro.blur && fx.blur));
 }
 
 /**
@@ -208,14 +208,12 @@ export function paintGroupEffects(
   const ids = ctx.defs;
   const corners = groupContentCorners(group);
   const bounds = boundsOf(corners);
-  const bodyFx =
-    pro && (effects.softEdge || effects.innerShadow) ? pro.body(effects, bounds, ids) : null;
+  // A group's inner shadow is not resolved (`ResolvedGroup.effects`): the body is its soft edge.
+  const bodyFx = pro && effects.softEdge ? pro.body(effects, bounds, ids) : null;
   if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
   const blurFx = pro?.blur && effects.blur ? pro.blur(effects, bounds, ids) : null;
   if (blurFx) effectDefs(ctx.defs, blurFx.defs);
-  const content = svg(doc, 'g', {}, [
-    bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [inner]) : inner,
-  ]);
+  const content = svg(doc, 'g', {}, [bodyFx ? softEdged(doc, inner, bodyFx.filter, ctx) : inner]);
   const contentId = ctx.defs.id('content');
   content.setAttribute('id', contentId);
   const shown = blurFx ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content]) : content;
@@ -251,31 +249,38 @@ export function paintGroupEffects(
     );
   }
   outer.appendChild(shown);
-  // The soft edge fades the group's picture, text included; the text then paints again over it,
-  // sharp. A printed PDF keeps the filtered picture as an image, so its text stays text.
-  if (bodyFx) {
-    const text = textOverlay(doc, inner);
-    if (text) outer.appendChild(text);
-  }
 }
 
+/** The custom property that hides the text of shapes in the filtered copy (`softEdged`). */
+const COPY_TEXT = '--pptx-group-text';
+
 /**
- * Copies of the text bodies (`data-pptx-text`) that `root` paints, each placed by the transforms
- * of its parents up to `root`, or null when `root` paints no text. The copies hold no ids.
+ * The soft edge of a group (`filter`) over its painted children (`inner`), with the text of its
+ * shapes painted once, unfaded, over the faded picture. The filter takes a `<use>` copy of the
+ * children; in the copy, the text of shapes is hidden (`COPY_TEXT`, inherited from the copy).
+ * The children themselves keep their nodes and their text, with everything but that text hidden,
+ * so the text stays in its shape's node and paints once at its own alpha. A table's text fades
+ * with the picture, as the PDF export draws it. A soft-edged group inside the children hides its
+ * own text in the copy in the same way.
  */
-function textOverlay(doc: Document, root: Element): SVGElement | null {
-  const bodies = [...root.querySelectorAll('[data-pptx-text]')];
-  if (bodies.length === 0) return null;
-  const layer = svg(doc, 'g', { 'data-effect': 'text' });
-  for (const body of bodies) {
-    let node = body.cloneNode(true) as Element;
-    node.removeAttribute('id');
-    for (const withId of node.querySelectorAll('[id]')) withId.removeAttribute('id');
-    for (let up = body.parentElement; up && up !== root; up = up.parentElement) {
-      const transform = up.getAttribute('transform');
-      if (transform) node = svg(doc, 'g', { transform }, [node as SVGElement]);
-    }
-    layer.appendChild(node);
+function softEdged(
+  doc: Document,
+  inner: SVGElement,
+  filter: string,
+  ctx: PaintContext
+): SVGElement {
+  for (const body of inner.querySelectorAll('[data-pptx-text]')) {
+    if (body.closest('[data-kind="table"]')) continue;
+    const style = body.getAttribute('style') ?? '';
+    if (!style.includes(COPY_TEXT))
+      body.setAttribute('style', `${style};visibility:var(${COPY_TEXT},visible)`);
   }
-  return layer;
+  const innerId = ctx.defs.id('soft');
+  inner.setAttribute('id', innerId);
+  return svg(doc, 'g', {}, [
+    svg(doc, 'g', { filter: `url(#${filter})` }, [
+      svg(doc, 'use', { href: `#${innerId}`, style: `${COPY_TEXT}:hidden` }),
+    ]),
+    svg(doc, 'g', { visibility: 'hidden' }, [inner]),
+  ]);
 }
