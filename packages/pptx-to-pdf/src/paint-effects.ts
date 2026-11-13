@@ -671,18 +671,31 @@ export async function drawReflection(
 const MAX_SOFT_EDGE_BANDS = 48;
 /** The narrowest band of a soft edge, half a point: a narrower one is under one output pixel. */
 const MIN_SOFT_EDGE_BAND = 6_350;
+/** The most path commands that the bands of one edge fade trace, over all of its bands. */
+const MAX_BAND_WORK = 200_000;
+/** The fewest bands that still draw a fade: with fewer, an edge fade draws a hard edge. */
+const MIN_FADE_BANDS = 4;
 
 /**
  * The alpha of a soft edge as bands of the distance inside the outline (`softEdgeSpread`): the
  * outline shrunk by `inset`, blurred with Gaussian σ `sigma`. Band `k` reaches `reach[k]` inside
  * the outline and takes `alpha[k]`, the profile at its middle; beyond the last band the alpha is 1.
+ * At most `maxBands` bands.
  */
-export function softEdgeBands(inset: number, sigma: number): { reach: number[]; alpha: number[] } {
+export function softEdgeBands(
+  inset: number,
+  sigma: number,
+  maxBands = MAX_SOFT_EDGE_BANDS
+): { reach: number[]; alpha: number[] } {
   const extent = inset + 3 * sigma;
   if (!(extent > 0)) return { reach: [], alpha: [] };
   const count = Math.max(
     1,
-    Math.min(MAX_SOFT_EDGE_BANDS, Math.ceil(extent / Math.max(sigma / 6, MIN_SOFT_EDGE_BAND)))
+    Math.min(
+      maxBands,
+      MAX_SOFT_EDGE_BANDS,
+      Math.ceil(extent / Math.max(sigma / 6, MIN_SOFT_EDGE_BAND))
+    )
   );
   const profile = (d: number): number =>
     sigma < MIN_SIGMA ? (d >= inset ? 1 : 0) : phi((d - inset) / sigma);
@@ -769,7 +782,7 @@ export async function drawSoftEdge(
   const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
   if (Math.abs(spread) > narrow / 2) return;
   const inset = Math.min(Math.abs(spread), MAX_MORPH_SPREAD);
-  await drawEdgeFade(shape, p, inset, sigma, corners, drawBody);
+  await drawEdgeFade(shape, p, inset, sigma, corners, drawBody, 'effect.soft-edge-complex');
 }
 
 /**
@@ -779,7 +792,7 @@ export async function drawSoftEdge(
  * filled paths, strokes of the outer edge of their union (`outerEdges`) from the widest band in;
  * on the outline, outside the filled paths, strokes of the outline from the full width in. At a
  * corner a band rounds where the blur takes the product of the two edges. `corners` bound the
- * shape in slide space.
+ * shape in slide space. `code` reports a fade drawn with fewer bands or as a hard edge.
  */
 async function drawEdgeFade(
   shape: SoftEdgeSilhouette,
@@ -787,10 +800,11 @@ async function drawEdgeFade(
   inset: number,
   sigma: number,
   corners: readonly { x: number; y: number }[],
-  drawBody: () => Promise<void>
+  drawBody: () => Promise<void>,
+  code: string
 ): Promise<void> {
   const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });
-  drawThroughMask(p, body, await edgeFadeOps(shape, p, inset, sigma, corners));
+  drawThroughMask(p, body, await edgeFadeOps(shape, p, inset, sigma, corners, code));
 }
 
 /** Draw the transparency group `body` under a luminosity soft mask of the gray `maskOps`. */
@@ -803,19 +817,24 @@ export function drawThroughMask(p: PageOps, body: PDFRef, maskOps: PDFOperator[]
   p.push(drawObject(p.name('XObject', body)), popGraphicsState());
 }
 
-/** The gray operators of the edge fade of `shape` (`drawEdgeFade`), white where it is opaque. */
+/**
+ * The gray operators of the edge fade of `shape` (`drawEdgeFade`), white where it is opaque.
+ * The bands trace at most `MAX_BAND_WORK` path commands: a shape with more edge commands gets
+ * fewer bands. With fewer than `MIN_FADE_BANDS` bands, or when the outer edge of the filled paths
+ * is past the search (`outerEdges`), the mask is a hard edge: the filled paths and the outline,
+ * white. `code` reports both cases.
+ */
 export async function edgeFadeOps(
   shape: SoftEdgeSilhouette,
   p: PageOps,
   inset: number,
   sigma: number,
-  corners: readonly { x: number; y: number }[]
+  corners: readonly { x: number; y: number }[],
+  code: string
 ): Promise<PDFOperator[]> {
   const xs = corners.map((c) => c.x);
   const ys = corners.map((c) => c.y);
   const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  const { reach, alpha } = softEdgeBands(inset, sigma);
-  const extent = reach[reach.length - 1] ?? 0;
   const trace = (paths: readonly PathCommand[][]): void => {
     for (const path of paths) tracePath(path, p);
   };
@@ -823,6 +842,30 @@ export async function edgeFadeOps(
   // The bands fade only the outer edge of the union of the filled paths: an edge inside another
   // filled path stays white (`outerEdges`).
   const edges = outerEdges(shape.filled);
+  const commands = (paths: readonly PathCommand[][]): number =>
+    paths.reduce((n, path) => n + path.length, 0);
+  const work = commands(edges ?? shape.filled) + (W > 0 ? commands(shape.outlines) : 0);
+  const full = softEdgeBands(inset, sigma);
+  const maxBands = Math.floor(MAX_BAND_WORK / Math.max(1, work));
+  const hard = !edges || (full.reach.length > maxBands && maxBands < MIN_FADE_BANDS);
+  if (hard)
+    p.diag.add(
+      code,
+      'approximation',
+      'An edge fade of a shape with too many paths or points is drawn as a hard edge.'
+    );
+  else if (full.reach.length > maxBands)
+    p.diag.add(
+      code,
+      'approximation',
+      'An edge fade of a shape with many points is drawn with fewer bands.'
+    );
+  const { reach, alpha } = hard
+    ? { reach: [], alpha: [] }
+    : full.reach.length > maxBands
+      ? softEdgeBands(inset, sigma, maxBands)
+      : full;
+  const extent = reach[reach.length - 1] ?? 0;
   const ops = await p.capture(async () => {
     p.push(setLineJoin(LineJoinStyle.Round), setLineCap(LineCapStyle.Round));
     // Each filled path fills white on its own, so where paths overlap the mask stays white.
@@ -831,6 +874,15 @@ export async function edgeFadeOps(
       tracePath(path, p);
       p.push(fillEvenOdd());
     }
+    if (hard) {
+      if (shape.outlines.length && W > 0) {
+        p.push(setStrokingGrayscaleColor(1), setLineWidth(W));
+        trace([...shape.outlines]);
+        p.push(stroke());
+      }
+      return;
+    }
+    const outer = edges ?? [];
     // Inside a filled path: its own edge lies `off` inside the painted edge. Widest band first,
     // over the paths with and without an outline over their edge, so a point keeps the gray of
     // the narrowest band that reaches it.
@@ -838,7 +890,7 @@ export async function edgeFadeOps(
       for (const rim of [false, true]) {
         const off = rim ? W / 2 : 0;
         if (reach[k] <= off) continue;
-        const paths = edges.filter((path, i) => shape.rimmed[i] === rim && path.length > 0);
+        const paths = outer.filter((path, i) => shape.rimmed[i] === rim && path.length > 0);
         if (paths.length === 0) continue;
         p.push(setStrokingGrayscaleColor(alpha[k]), setLineWidth(2 * (reach[k] - off)));
         trace(paths);
@@ -938,5 +990,5 @@ export async function drawBlur(
       await drawLayers(cls.parts, color, blurLayers(color.a, sigma, cls.bandWidth, 0), p);
     p.push(popGraphicsState());
   }
-  await drawEdgeFade(shape, p, 0, sigma, corners, drawBody);
+  await drawEdgeFade(shape, p, 0, sigma, corners, drawBody, 'effect.blur-complex');
 }

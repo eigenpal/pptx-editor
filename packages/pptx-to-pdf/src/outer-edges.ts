@@ -22,11 +22,11 @@ const SIDE_OFFSET = 4 * FLATTEN_TOLERANCE;
 const PIECE_LENGTH = 12_700;
 /** The most edge pieces tested for one shape. */
 const MAX_PIECES = 20_000;
-/** The most flattened segments for one shape. Past it, every path keeps its own commands. */
+/** The most flattened segments for one shape. Past it, the search gives up. */
 const MAX_SEGMENTS = 8_000;
 /**
- * The most filled paths whose union is searched. Past it, every path keeps its own commands, so
- * the pair test of the bounds and the side tests stay bounded.
+ * The most filled paths whose union is searched. Past it, the search gives up, so the pair test
+ * of the bounds and the side tests stay bounded.
  */
 const MAX_PATHS = 256;
 
@@ -134,14 +134,16 @@ function segmentsOf(rings: readonly Pt[][]): Segment[][] {
 /**
  * The commands to stroke for the outer edge of the union of `filled`, one entry per filled path:
  * its own commands when its bounds meet no other path, else open polylines of the pieces of its
- * edge that lie on the outer edge (empty when none does).
+ * edge that lie on the outer edge (empty when none does). Undefined when the shape has more paths
+ * or segments than the search takes: its own edges could lie inside the union.
  */
-export function outerEdges(filled: readonly PathCommand[][]): PathCommand[][] {
-  if (filled.length < 2 || filled.length > MAX_PATHS) return filled.map((path) => [...path]);
+export function outerEdges(filled: readonly PathCommand[][]): PathCommand[][] | undefined {
+  if (filled.length < 2) return filled.map((path) => [...path]);
+  if (filled.length > MAX_PATHS) return undefined;
   // Each drawing command flattens into at least one segment: past the cap, skip the flattening.
   let commands = 0;
   for (const path of filled) for (const c of path) if (c.op !== 'M' && c.op !== 'Z') commands += 1;
-  if (commands > MAX_SEGMENTS) return filled.map((path) => [...path]);
+  if (commands > MAX_SEGMENTS) return undefined;
   const rings = filled.map(flatten);
   const boxes = rings.map(boundsOf);
   const pad = 2 * SIDE_OFFSET;
@@ -151,7 +153,7 @@ export function outerEdges(filled: readonly PathCommand[][]): PathCommand[][] {
   if (!overlapping.some(Boolean)) return filled.map((path) => [...path]);
   const segments = rings.map(segmentsOf);
   const count = segments.reduce((n, path) => n + path.reduce((m, ring) => m + ring.length, 0), 0);
-  if (count > MAX_SEGMENTS) return filled.map((path) => [...path]);
+  if (count > MAX_SEGMENTS) return undefined;
   let perimeter = 0;
   segments.forEach((path, i) => {
     if (!overlapping[i]) return;

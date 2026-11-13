@@ -166,7 +166,7 @@ export async function drawGroupSoftEdge(
     const ys = corners.map((c) => c.y);
     const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
     if (Math.abs(spread) > narrow / 2) continue;
-    const ops = await edgeFadeOps(shape, p, inset, sigma, corners);
+    const ops = await edgeFadeOps(shape, p, inset, sigma, corners, 'effect.soft-edge-complex');
     fades.push(p.form(ops, formBox(p), { S: 'Transparency', CS: 'DeviceGray', I: true }));
   }
   const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });

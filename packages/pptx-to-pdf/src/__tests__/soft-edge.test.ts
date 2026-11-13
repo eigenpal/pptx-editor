@@ -227,3 +227,100 @@ describe('soft edge of overlapping filled paths', () => {
     }
   });
 });
+
+/** A soft-edged shape of custom geometry: `paths` are `a:path` elements, in a 4 in square. */
+const softCustom = (paths: string, rad: number): Promise<PdfExportResult> =>
+  exportPdf(
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes:
+            '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Freeform"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
+            `<p:spPr><a:xfrm><a:off x="${IN}" y="${IN}"/><a:ext cx="${4 * IN}" cy="${4 * IN}"/></a:xfrm>` +
+            '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/>' +
+            `<a:pathLst>${paths}</a:pathLst></a:custGeom>` +
+            '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>' +
+            `<a:effectLst><a:softEdge rad="${rad}"/></a:effectLst></p:spPr></p:sp>`,
+        },
+      ],
+    }),
+    BEST
+  );
+
+const pt = (x: number, y: number): string => `<a:pt x="${x}" y="${y}"/>`;
+/** A closed `a:path` through `points`, in a 100,000 unit square. */
+const polygon = (points: [number, number][]): string =>
+  '<a:path w="100000" h="100000">' +
+  `<a:moveTo>${pt(...points[0])}</a:moveTo>` +
+  points
+    .slice(1)
+    .map((q) => `<a:lnTo>${pt(...q)}</a:lnTo>`)
+    .join('') +
+  '<a:close/></a:path>';
+
+describe('soft edge of a complex shape', () => {
+  test('30,000 small paths export with a hard edge, in bounded time and size', async () => {
+    const paths: string[] = [];
+    for (let i = 0; i < 30_000; i += 1) {
+      const x = (i % 200) * 500;
+      const y = Math.floor(i / 200) * 600;
+      paths.push(
+        polygon([
+          [x, y],
+          [x + 300, y],
+          [x + 300, y + 300],
+          [x, y + 300],
+        ])
+      );
+    }
+    const start = performance.now();
+    const result = await softCustom(paths.join(''), 63_500);
+    expect(performance.now() - start).toBeLessThan(15_000);
+    expect(result.bytes.length).toBeLessThan(8 * 1024 * 1024);
+    expect(result.diagnostics.map((d) => d.code)).toContain('effect.soft-edge-complex');
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    expect(masks[0].match(/\nS\n/g)).toBeNull();
+  }, 30_000);
+
+  test('300 concentric squares keep a solid body: no bands inside the union', async () => {
+    const paths: string[] = [];
+    for (let i = 0; i < 300; i += 1) {
+      const a = i * 150;
+      const b = 100_000 - a;
+      paths.push(
+        polygon([
+          [a, a],
+          [b, a],
+          [b, b],
+          [a, b],
+        ])
+      );
+    }
+    const result = await softCustom(paths.join(''), 5 * PT);
+    expect(result.diagnostics.map((d) => d.code)).toContain('effect.soft-edge-complex');
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    // Every square fills white; no band strokes an edge inside the outer square.
+    expect(masks[0].match(/\nf\*\n/g)).toHaveLength(300);
+    expect(masks[0].match(/\nS\n/g)).toBeNull();
+  });
+
+  test('a path of 45,000 points fades with fewer bands, and the PDF stays small', async () => {
+    const n = 45_000;
+    const points = Array.from({ length: n }, (_, i): [number, number] => {
+      const t = (2 * Math.PI * i) / n;
+      return [Math.round(50_000 + 45_000 * Math.cos(t)), Math.round(50_000 + 45_000 * Math.sin(t))];
+    });
+    const result = await softCustom(polygon(points), 20 * PT);
+    expect(result.bytes.length).toBeLessThan(4 * 1024 * 1024);
+    const diag = result.diagnostics.find((d) => d.code === 'effect.soft-edge-complex');
+    expect(diag?.message).toContain('fewer bands');
+    const masks = await softMasks(result.bytes);
+    expect(masks).toHaveLength(1);
+    const strokes = masks[0].match(/\nS\n/g) ?? [];
+    expect(strokes.length).toBeGreaterThanOrEqual(4);
+    expect(strokes.length).toBeLessThan(10);
+  }, 30_000);
+});
