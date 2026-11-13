@@ -1,8 +1,8 @@
 // The budgets of one slide paint: the tile images of tiled pictures (`TileBudget`) and the band
-// work of shape gradients (`ShapeBandBudget`). Each bounds what one paint of a slide writes. The
-// slide's `Defs` holds the budgets of its paint in progress (`paintBudgets`). A painter that keeps
-// its `Defs` across paints (`SlidePainter`) starts new budgets for each paint, so the paints and
-// edits before it do not use them up.
+// work of shape gradients (`ShapeBandBudget`). Each bounds what one paint of a slide writes. This
+// module keeps the budgets of the paint in progress for each `Defs` (`paintBudgets`). A painter that
+// keeps its `Defs` across paints (`SlidePainter`) starts new budgets for each paint
+// (`startPaintBudgets`), so the paints and edits before it do not use them up.
 
 import { MAX_SHAPE_BANDS } from './paint-gradient.ts';
 import type { Defs } from './svg.ts';
@@ -120,18 +120,30 @@ export class PaintBudgets {
 }
 
 /**
- * The budgets of the paint in progress with `defs` (`Defs.budgets`). A fresh `paintSlide` makes
- * new `Defs`, so its first tiled picture or shape gradient starts whole budgets.
+ * The budgets of the slide paint in progress, by the `Defs` of that paint. This module alone reads
+ * and writes it, so `Defs` stays a plain SVG helper. A `WeakMap` lets the budgets go with their
+ * `Defs`.
+ */
+const work = new WeakMap<Defs, PaintBudgets>();
+
+/**
+ * The budgets of the slide paint in progress with `defs`. The fills that spend a budget find it
+ * here. A fresh `paintSlide` makes new `Defs`, so its first tiled picture or shape gradient makes
+ * whole budgets.
  */
 export function paintBudgets(defs: Defs): PaintBudgets {
-  return (defs.budgets ??= new PaintBudgets());
+  let budgets = work.get(defs);
+  if (!budgets) work.set(defs, (budgets = new PaintBudgets()));
+  return budgets;
 }
 
 /**
- * Start a new slide paint with `defs`, with whole budgets. A painter that keeps its `Defs` across
- * paints (`SlidePainter`) calls this when each paint starts, so each paint of a slide spends the
- * same budgets and draws the same tiles and bands.
+ * Replace the budgets of `defs` with whole ones, and answer them. A painter that keeps its `Defs`
+ * across paints (`SlidePainter`, through `PaintMeter`) calls this when each paint starts, so each
+ * paint of a slide spends the same budgets and draws the same tiles and bands.
  */
 export function startPaintBudgets(defs: Defs): PaintBudgets {
-  return (defs.budgets = new PaintBudgets());
+  const budgets = new PaintBudgets();
+  work.set(defs, budgets);
+  return budgets;
 }

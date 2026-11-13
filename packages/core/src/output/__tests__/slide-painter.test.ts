@@ -452,11 +452,17 @@ const bandedStar = (id: number, x: number) =>
   shape({ id, x, y: 0, cx: IN, cy: IN, prst: 'star5', fill: SHAPE_GRADIENT });
 
 /** Paint `layout` a frame at a time until nothing is pending, and expect a fresh paint. */
-function settles(painter: SlidePainter, layout: SlideLayout, budget: number, max: number) {
+function settles(
+  painter: SlidePainter,
+  layout: SlideLayout,
+  budget: number,
+  max: number,
+  opts: PaintOptions = TILE_OPTS
+) {
   let svg = painter.paint(layout, budget);
   for (let n = 1; painter.pending && n < max; n += 1) svg = painter.paint(layout, budget);
   expect(painter.pending).toBe(false);
-  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, layout, TILE_OPTS)));
+  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, layout, opts)));
   return svg;
 }
 
@@ -540,47 +546,76 @@ function seeded(seed: number): () => number {
 }
 
 test('edits painted over frames of any budget settle to a fresh paint, and stay', () => {
-  const pool = tiledLayout(
-    tiledBox(2, 0) +
-      tiledBox(3, IN) +
-      tiledBox(4, 2 * IN) +
-      customBanded(20, 1_500) +
-      customBanded(21, 1_500) +
-      bandedStar(23, 4 * IN) +
-      heavyGroup(100, 0, 60, tiledBox(99, 0)) +
-      heavyGroup(300, 2 * IN, 60, bandedStar(299, 0)) +
-      heavyGroup(600, 3 * IN, 2_100, tiledBox(599, 3 * IN))
-  ).items;
+  // Two layouts of the same shapes: an item of `moved` replaces the item with its key in `pool`.
+  const shapes = (dx: number) =>
+    tiledBox(2, dx) +
+    tiledBox(3, IN + dx) +
+    tiledBox(4, 2 * IN + dx) +
+    customBanded(20, 1_500) +
+    customBanded(21, 1_500) +
+    bandedStar(23, 4 * IN + dx) +
+    shape({ id: 30, x: dx, y: 3 * IN, cx: IN, cy: IN, text: para(run('Text')) }) +
+    group(
+      { id: 40, x: dx, y: IN, cx: IN, cy: IN },
+      tiledBox(41, dx) + shape({ id: 42, x: dx, y: 0, cx: IN, cy: IN, text: para(run('In')) })
+    ) +
+    heavyGroup(100, dx, 60, tiledBox(99, dx)) +
+    heavyGroup(300, 2 * IN + dx, 60, bandedStar(299, dx)) +
+    heavyGroup(600, 3 * IN + dx, 2_100, tiledBox(599, 3 * IN + dx));
+  const pool = tiledLayout(shapes(0)).items;
+  const moved = tiledLayout(shapes(12_700)).items;
   const base = tiledLayout('');
   const budgets = [1, 3, 2_000, Infinity];
+  const views = [undefined, { x: 0, y: 0, width: 4 * IN, height: 4 * IN }];
   for (let trial = 0; trial < 6; trial += 1) {
     const random = seeded(trial * 7_919 + 1);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
     const painter = new SlidePainter(doc, TILE_OPTS);
+    let view: (typeof views)[number] = undefined;
+    let key = 0;
     let items = pool.filter(() => random() < 0.4);
     painter.paint({ ...base, items }, pick(budgets));
-    for (let step = 0; step < 6; step += 1) {
+    for (let step = 0; step < 8; step += 1) {
       const op = random();
       const out = pool.filter((i) => !items.includes(i));
-      if (op < 0.4 && out.length > 0) {
+      if (op < 0.25 && out.length > 0) {
         const at = Math.floor(random() * (items.length + 1));
         items = [...items.slice(0, at), pick(out), ...items.slice(at)];
-      } else if (op < 0.7 && items.length > 0) {
+      } else if (op < 0.4 && items.length > 0) {
         const at = Math.floor(random() * items.length);
         items = items.filter((_, i) => i !== at);
-      } else items = [...items].sort(() => random() - 0.5);
+      } else if (op < 0.55 && items.length > 0) {
+        // Replace an item with the item at the same place (`itemKey`) in the other layout.
+        const at = Math.floor(random() * items.length);
+        const it = items[at]!;
+        const swap = pool.includes(it) ? moved[pool.indexOf(it)]! : pool[moved.indexOf(it)]!;
+        items = items.map((x, i) => (i === at ? swap : x));
+      } else if (op < 0.65 && items.length > 0) {
+        // The same item twice in one layout.
+        const at = Math.floor(random() * (items.length + 1));
+        items = [...items.slice(0, at), pick(items), ...items.slice(at)];
+      } else if (op < 0.75) painter.invalidate((key += 1));
+      else if (op < 0.85) painter.view((view = pick(views)));
+      else items = [...items].sort(() => random() - 0.5);
       const count = 1 + Math.floor(random() * 2);
       for (let k = 0; k < count; k += 1) painter.paint({ ...base, items }, pick(budgets));
     }
-    const layout = { ...base, items };
+    const opts = view ? { ...TILE_OPTS, view } : TILE_OPTS;
     const budget = pick(budgets);
-    const weight = items.reduce((n, i) => n + paintWeight(i), 0);
-    // Each item paints at most twice: once for the edits, once more for the budgets it read.
-    const max = 2 * Math.ceil(weight / budget) + 2 * items.length + 4;
-    const svg = settles(painter, layout, budget, max);
+    const max = (layout: SlideLayout) => {
+      const weight = layout.items.reduce((n, i) => n + paintWeight(i), 0);
+      // Each item paints at most twice: once for the edits, once more for the budgets it read.
+      return 2 * Math.ceil(weight / budget) + 2 * layout.items.length + 4;
+    };
+    // A layout with repeats settles too, though each paint paints the repeats again.
+    const layout = { ...base, items };
+    settles(painter, layout, budget, max(layout), opts);
+    // Without repeats, it settles and later paints of any budget keep every node.
+    const once = { ...base, items: [...new Set(items)] };
+    const svg = settles(painter, once, budget, max(once), opts);
     const before = [...svg.querySelectorAll('[data-kind="content"] > *')];
     for (const b of budgets) {
-      painter.paint(layout, b);
+      painter.paint(once, b);
       expect(painter.pending).toBe(false);
       expect([...svg.querySelectorAll('[data-kind="content"] > *')]).toEqual(before);
     }

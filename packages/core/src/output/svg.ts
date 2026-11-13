@@ -1,8 +1,6 @@
 // SVG construction helpers. Every attribute value goes through `setAttribute` and every text
 // through `textContent`: no markup is ever parsed from a string (AGENTS.md "Security").
 
-import type { PaintBudgets } from './paint-budgets.ts';
-
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** Attribute values: numbers are rounded to keep the DOM compact and deterministic. */
@@ -40,11 +38,6 @@ export class Defs {
   readonly element: SVGElement;
   #next = 0;
   #captured: SVGElement[] | null = null;
-  /**
-   * The budgets of the slide paint in progress with these definitions. Read and start them with
-   * `paintBudgets` and `startPaintBudgets`.
-   */
-  budgets: PaintBudgets | undefined = undefined;
   constructor(
     readonly doc: Document,
     readonly prefix: string

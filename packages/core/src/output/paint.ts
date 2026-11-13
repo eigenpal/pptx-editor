@@ -878,6 +878,14 @@ export function groupNode(
   });
 }
 
+/** What one `paintChildren` call painted of a group's children. */
+export interface ChildPaint {
+  /** The index of the first child left out: the group's `children.length` when none is. */
+  readonly next: number;
+  /** The weight (`paintWeight`) that it painted. */
+  readonly spent: number;
+}
+
 /**
  * Paint the children of `group` into its node `g`, from child `from` on, while their weight
  * (`paintWeight`) fits in `budget`; at least one child. Answers the index of the first child
@@ -891,7 +899,7 @@ export function paintChildren(
   opts: PaintOptions,
   from: number,
   budget: number
-): { readonly next: number; readonly spent: number } {
+): ChildPaint {
   const el = group.element;
   const scale = matrixScale(group.matrix);
   // A group with `a:grpFill` passes its own group's fill on (ECMA-376 Part 1, 20.1.8.35).
