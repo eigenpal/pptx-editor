@@ -41,6 +41,8 @@ import {
   pictureUrl,
   slideSpaceFill,
   strokeAttrs,
+  pathBounds,
+  tileArea,
   tiledPictureContent,
   type ImageSizePort,
   type FillContext,
@@ -259,26 +261,7 @@ function geometryMask(
   w: number,
   h: number
 ): string {
-  let x0 = 0;
-  let y0 = 0;
-  let x1 = w;
-  let y1 = h;
-  for (const p of paths)
-    for (const c of p.commands) {
-      if (c.op === 'Z') continue;
-      const pts =
-        c.op === 'C'
-          ? [c.x1, c.y1, c.x2, c.y2, c.x, c.y]
-          : c.op === 'Q'
-            ? [c.x1, c.y1, c.x, c.y]
-            : [c.x, c.y];
-      for (let i = 0; i < pts.length; i += 2) {
-        x0 = Math.min(x0, pts[i]);
-        x1 = Math.max(x1, pts[i]);
-        y0 = Math.min(y0, pts[i + 1]);
-        y1 = Math.max(y1, pts[i + 1]);
-      }
-    }
+  const { x0, y0, x1, y1 } = pathBounds(paths, w, h);
   const id = defs.id('clip');
   defs.add(
     svg(
@@ -502,7 +485,9 @@ function paintGeometry(
     const extras = plan ? strokeExtras(doc, plan, stroke) : [];
     // A tiled picture draws as images inside the path (`tiledPictureContent`); the stroke follows.
     const content =
-      path.fill === 'none' || lostPicture ? undefined : tiledPictureContent(el.fill, w, h, ctx);
+      path.fill === 'none' || lostPicture
+        ? undefined
+        : tiledPictureContent(el.fill, w, h, ctx, tileArea(path, w, h));
     if (content) {
       const kept = keepInside(doc, ctx, item, path, d, content);
       const over = overlayPath(doc, d, effects, paintFor);

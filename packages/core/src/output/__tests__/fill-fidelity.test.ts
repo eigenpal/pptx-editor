@@ -15,7 +15,7 @@ import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { MAX_OVERLAY_PATHS as REPORTED_OVERLAY_PATHS } from '../../layout/approximations.ts';
 import { paintSlide } from '../index.ts';
 import { MAX_OVERLAY_PATHS } from '../paint.ts';
-import { MAX_TILE_IMAGES, tilePlacements } from '../paint-fill.ts';
+import { MAX_SLIDE_TILE_IMAGES, tilePlacements } from '../paint-fill.ts';
 import {
   colorAt,
   linearEnds,
@@ -792,11 +792,37 @@ describe('paint', () => {
     expect(image.closest('g[mask]')).not.toBeNull();
   });
 
-  test('a box of too many tiles fills with the pattern', () => {
-    // Tiles of 9_525 EMU: 2_048 tiles at most, so this box draws the pattern.
-    const root = paint(tiled(9_525 * 50, 9_525 * 50, 'sx="781" sy="1041" algn="tl"'), IMG_REL);
-    expect(root.querySelectorAll('image').length).toBe(1);
-    expect([...root.querySelectorAll('pattern')].some((p) => p.id.includes('tile'))).toBe(true);
+  test('tiles past the slide budget fill with the pattern, across shapes', () => {
+    // Tiles of 9_525 EMU, 40 × 40 in each box: two boxes fit in the slide budget, the third
+    // does not and draws the pattern, which holds one image.
+    const box = (id: number): string =>
+      shape({
+        id,
+        x: id * 400_000,
+        y: 0,
+        cx: 9_525 * 40,
+        cy: 9_525 * 40,
+        fill: '<a:blipFill><a:blip r:embed="rIdImg"/><a:tile sx="781" sy="1041" algn="tl"/></a:blipFill>',
+      });
+    expect(2 * 1_600).toBeLessThanOrEqual(MAX_SLIDE_TILE_IMAGES);
+    expect(3 * 1_600).toBeGreaterThan(MAX_SLIDE_TILE_IMAGES);
+    const root = paint(box(2) + box(3) + box(4), IMG_REL);
+    expect(root.querySelectorAll('image').length).toBe(2 * 1_600 + 1);
+    expect([...root.querySelectorAll('pattern')].filter((p) => p.id.includes('tile')).length).toBe(
+      1
+    );
+  });
+
+  test('tiles fill a path outside the box, as the PDF pattern does', () => {
+    // The pointer of a callout reaches below its box (to 1.125 × its height): the tiles cover it.
+    const h = 1_371_600;
+    const root = paint(
+      tiled(2_438_400, h, 'sx="50000" sy="50000" algn="tl"', 'wedgeRectCallout'),
+      IMG_REL
+    );
+    const ys = [...root.querySelectorAll('image')].map((i) => Number(i.getAttribute('y')));
+    expect(Math.max(...ys)).toBe(h);
+    expect(root.querySelector('image')!.closest('g[mask]')).not.toBeNull();
   });
 
   test('a tiled background draws its tiles in the slide viewport', () => {
@@ -826,9 +852,9 @@ describe('paint', () => {
     expect(bg.querySelectorAll('image').length).toBe(80);
   });
 
-  test('tile placements cover the box once and stop at the image budget', () => {
+  test('tile placements cover the area once and stop at the image budget', () => {
     const g = { x: -100, y: 0, width: 400, height: 300, flipX: true, flipY: false };
-    const tiles = tilePlacements(g, 1000, 300)!;
+    const tiles = tilePlacements(g, { x0: 0, y0: 0, x1: 1000, y1: 300 }, 100)!;
     // Cells of 800 from -100: tiles at -100, 300, 700 meet the box; 1100 does not.
     expect(tiles.map((t) => [t.x + (t.mirrorX ? g.width : 0), t.mirrorX])).toEqual([
       [-100, false],
@@ -836,8 +862,13 @@ describe('paint', () => {
       [700, false],
     ]);
     const tiny = { ...g, x: 0, width: 1, height: 1, flipX: false };
-    expect(tilePlacements(tiny, MAX_TILE_IMAGES, 1)!.length).toBe(MAX_TILE_IMAGES);
-    expect(tilePlacements(tiny, MAX_TILE_IMAGES + 1, 1)).toBeUndefined();
+    const row = (x1: number) => ({ x0: 0, y0: 0, x1, y1: 1 });
+    expect(tilePlacements(tiny, row(50), 50)!.length).toBe(50);
+    expect(tilePlacements(tiny, row(51), 50)).toBeUndefined();
+    // An area left of the box: tiles at negative places.
+    expect(tilePlacements(tiny, { x0: -3, y0: 0, x1: 0, y1: 1 }, 50)!.map((t) => t.x)).toEqual([
+      -3, -2, -1,
+    ]);
   });
 
   const picture = (crop: string): string =>

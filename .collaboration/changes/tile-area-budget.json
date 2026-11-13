@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Tiled picture images now cover the filled path's bounds and stay within one budget for each slide, the PDF export writes its tile pattern at the exact cell size, and a resolution stated in pixels per metre reads as whole DPI only within the rounding of a whole DPI. These change painted output, PDF output, and the natural size of a picture that a command reads only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/output/__tests__/fill-fidelity.test.ts",
+    "packages/core/src/store/__tests__/image-size.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/picture-effects.test.ts"
+  ]
+}

@@ -137,7 +137,7 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Path fill modes.** The darken and lighten path fill modes use fixed factors to shift colors toward black or white. ECMA-376 does not specify these factors.
 - **Fill rotation.** Gradient and picture fills always turn with a rotated shape. `rotWithShape="0"` is ignored.
 - **Gradient text.** A gradient on text spans the bounds of the whole text body.
-- **Tiled pictures.** The tile size comes from the image's pixels and resolution, at 72 DPI when the image states none. A resolution stated in pixels per metre reads as whole DPI.
+- **Tiled pictures.** The tile size comes from the image's pixels and resolution, at 72 DPI when the image states none. A resolution stated in pixels per metre reads as whole DPI when it is within the rounding of a whole DPI. A slide draws at most 4,096 tile images; further tiles draw as a pattern.
 - **Picture shape fill.** A picture's own fill, behind the transparent areas of the image, is not drawn.
 - **Picture brightness and contrast.** `a:lum` adds brightness to each component, then scales around mid-gray by contrast. The specification gives no formula, so washed-out pictures can draw lighter than expected.
 - **Picture recolor.** Grayscale, duotone, and black and white take the luminance with Rec. 709 weights. The specification gives no weights.
