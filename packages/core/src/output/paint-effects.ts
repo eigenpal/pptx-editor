@@ -251,4 +251,31 @@ export function paintGroupEffects(
     );
   }
   outer.appendChild(shown);
+  // The soft edge fades the group's picture, text included; the text then paints again over it,
+  // sharp. A printed PDF keeps the filtered picture as an image, so its text stays text.
+  if (bodyFx) {
+    const text = textOverlay(doc, inner);
+    if (text) outer.appendChild(text);
+  }
+}
+
+/**
+ * Copies of the text bodies (`data-pptx-text`) that `root` paints, each placed by the transforms
+ * of its parents up to `root`, or null when `root` paints no text. The copies hold no ids.
+ */
+function textOverlay(doc: Document, root: Element): SVGElement | null {
+  const bodies = [...root.querySelectorAll('[data-pptx-text]')];
+  if (bodies.length === 0) return null;
+  const layer = svg(doc, 'g', { 'data-effect': 'text' });
+  for (const body of bodies) {
+    let node = body.cloneNode(true) as Element;
+    node.removeAttribute('id');
+    for (const withId of node.querySelectorAll('[id]')) withId.removeAttribute('id');
+    for (let up = body.parentElement; up && up !== root; up = up.parentElement) {
+      const transform = up.getAttribute('transform');
+      if (transform) node = svg(doc, 'g', { transform }, [node as SVGElement]);
+    }
+    layer.appendChild(node);
+  }
+  return layer;
 }

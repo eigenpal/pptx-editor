@@ -64,16 +64,19 @@ import {
 } from '@pptx-editor.dev/core/output';
 import {
   drawGlow,
-  drawGroupShadowsAndGlow,
   drawShadows,
   drawInnerShadow,
   drawReflection,
   drawBlur,
   drawSoftEdge,
   effectDiagnostics,
+} from './paint-effects.ts';
+import {
+  drawGroupShadowsAndGlow,
+  drawGroupSoftEdge,
   groupEffectDiagnostics,
   type GroupLeaf,
-} from './paint-effects.ts';
+} from './paint-group-effects.ts';
 import { canDrawPicture, drawPicture } from './paint-picture.ts';
 import { lineCapStyle, ownFill, paintFill, strokeStyle, type FillScope } from './paint-fill.ts';
 import { drawTable } from './paint-table.ts';
@@ -474,8 +477,14 @@ function frameMessage(
   return 'A diagram is not drawn: it has no saved drawing.';
 }
 
-/** The effects of enclosing groups that the writer applies to each shape in them. */
-type GroupBody = Pick<ResolvedEffects, 'softEdge' | 'innerShadow' | 'blur'>;
+/** The effect of enclosing groups that the writer applies to each shape in them. */
+type GroupBody = Pick<ResolvedEffects, 'blur'>;
+
+/**
+ * What one drawing of an item paints: everything, the bodies without the text, or the text
+ * alone. A group's soft edge fades its bodies, and their text paints over them.
+ */
+type DrawPass = 'all' | 'body' | 'text';
 
 /** The fill scope of a group's children. */
 function groupScope(group: Extract<LayoutItem, { kind: 'group' }>, scope: FillScope): FillScope {
@@ -512,18 +521,23 @@ async function groupLeaves(
   item: LayoutItem,
   scope: FillScope,
   p: PageOps,
+  groupScale: number,
   out: GroupLeaf[] = []
 ): Promise<GroupLeaf[]> {
   if (item.element.hidden) return out;
   const local: FillScope = { ...scope, sourcePart: item.element.partName };
   switch (item.kind) {
-    case 'group':
-      for (const child of item.children) await groupLeaves(child, groupScope(item, scope), p, out);
+    case 'group': {
+      const scale = matrixScale(item.matrix);
+      for (const child of item.children)
+        await groupLeaves(child, groupScope(item, scope), p, scale, out);
       return out;
+    }
     case 'frame':
-      if (item.poster) return groupLeaves(item.poster, local, p, out);
-      for (const child of item.drawing ?? []) await groupLeaves(child, scope, p, out);
-      for (const child of item.chart ?? []) await groupLeaves(child, local, p, out);
+      if (item.poster) return groupLeaves(item.poster, local, p, groupScale, out);
+      for (const child of item.drawing ?? [])
+        await groupLeaves(child, scope, p, matrixScale(item.matrix), out);
+      for (const child of item.chart ?? []) await groupLeaves(child, local, p, groupScale, out);
       if (item.table) {
         const w = Math.max(item.element.xfrm.cx, item.table.width);
         const h = Math.max(item.element.xfrm.cy, item.table.height);
@@ -533,38 +547,28 @@ async function groupLeaves(
           element: { ...item.element, kind: 'picture', fill: { type: 'none' } },
           geometry: { paths: [boxPath(w, h)] },
         } as unknown as GroupLeaf['item'];
-        out.push({ item: box, scope: local });
+        out.push({ item: box, scope: local, groupScale });
       }
       return out;
     default: {
       const own = ownFill(item.element.fill, local);
       if (own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p)))
-        out.push({ item, scope: local });
+        out.push({ item, scope: local, groupScale });
       return out;
     }
   }
 }
 
 /**
- * A shape or picture with the soft edge, inner shadow, and blur of its enclosing groups, where it
- * has none of its own (`GroupBody`).
+ * A shape or picture with the blur of its enclosing groups, where it has none of its own
+ * (`GroupBody`).
  */
 function withGroupBody<T extends Extract<LayoutItem, { kind: 'shape' | 'picture' }>>(
   item: T,
   body: GroupBody | undefined
 ): T {
-  if (!body || !(body.softEdge || body.innerShadow || body.blur)) return item;
-  const own = item.element.effects;
-  const softEdge = own?.softEdge ?? body.softEdge;
-  const innerShadow = own?.innerShadow ?? body.innerShadow;
-  const blur = own?.blur ?? body.blur;
-  const effects: ResolvedEffects = {
-    unsupported: [],
-    ...own,
-    ...(softEdge ? { softEdge } : {}),
-    ...(innerShadow ? { innerShadow } : {}),
-    ...(blur ? { blur } : {}),
-  };
+  if (!body?.blur || item.element.effects?.blur) return item;
+  const effects: ResolvedEffects = { unsupported: [], ...item.element.effects, blur: body.blur };
   return { ...item, element: { ...item.element, effects } };
 }
 
@@ -573,7 +577,8 @@ async function drawItem(
   p: PageOps,
   scope: FillScope,
   groupScale: number,
-  body?: GroupBody
+  body?: GroupBody,
+  pass: DrawPass = 'all'
 ): Promise<void> {
   if (item.element.hidden) return;
   await p.step();
@@ -581,44 +586,47 @@ async function drawItem(
   if (item.kind === 'group') {
     const inner = groupScope(item, scope);
     const fx = item.element.effects;
-    // The writer has no filter over a group's content: the soft edge, inner shadow, and blur of
-    // a group apply to each shape in it (`effect.group-body`).
-    const childBody: GroupBody | undefined =
-      fx && (fx.softEdge || fx.innerShadow || fx.blur)
-        ? {
-            softEdge: fx.softEdge ?? body?.softEdge,
-            innerShadow: fx.innerShadow ?? body?.innerShadow,
-            blur: fx.blur ?? body?.blur,
-          }
-        : body;
+    // The writer has no filter over a group's content: the blur of a group applies to each
+    // shape in it (`effect.group-body`).
+    const childBody: GroupBody | undefined = fx?.blur ? { blur: fx.blur } : body;
     const scale = matrixScale(item.matrix);
     const children = item.children;
-    const drawChildren = async (): Promise<void> => {
-      for (const child of children) await drawItem(child, p, inner, scale, childBody);
+    const drawChildren = async (childPass: DrawPass): Promise<void> => {
+      for (const child of children) await drawItem(child, p, inner, scale, childBody, childPass);
     };
-    if (!fx) return drawChildren();
+    if (!fx || pass === 'text') return drawChildren(pass);
     // The group's reflection, shadows, and glow paint under its content, as in the SVG paint:
     // one copy of all children together, placed by the group's box.
-    const leaves = await groupLeaves(item, scope, p);
+    const leaves = await groupLeaves(item, scope, p, groupScale);
     groupEffectDiagnostics(item, leaves, p);
-    if (leaves.length > 0) await drawReflection(item, p, drawChildren);
+    // The soft edge fades the bodies of all children together; their text paints over them.
+    const soft = !!fx.softEdge && fx.softEdge.radius > 0 && leaves.length > 0;
+    const group = item;
+    const drawContent = async (): Promise<void> => {
+      if (!soft) return drawChildren(pass);
+      await drawGroupSoftEdge(group, leaves, p, () => drawChildren('body'));
+      if (pass === 'all') await drawChildren('text');
+    };
+    if (leaves.length > 0) await drawReflection(item, p, drawContent);
     await drawGroupShadowsAndGlow(item, leaves, p);
-    return drawChildren();
+    return drawContent();
   }
   if (item.kind === 'frame') {
     // An OLE object shows its picture, as in the SVG paint.
-    if (item.poster) return drawItem(item.poster, p, local, groupScale, body);
+    if (item.poster) return drawItem(item.poster, p, local, groupScale, body, pass);
     // A diagram draws its saved drawing, as in the SVG paint.
     if (item.drawing) {
       for (const child of item.drawing)
-        await drawItem(child, p, scope, matrixScale(item.matrix), body);
+        await drawItem(child, p, scope, matrixScale(item.matrix), body, pass);
       return;
     }
     // A chart drawn by an installed renderer, as in the SVG paint.
     if (item.chart) {
-      for (const child of item.chart) await drawItem(child, p, local, groupScale, body);
+      for (const child of item.chart) await drawItem(child, p, local, groupScale, body, pass);
       return;
     }
+    // A table paints with its body: its text is part of its cells.
+    if (pass === 'text') return;
     if (!item.table) {
       const kind = item.element.frameKind;
       p.diag.add(`frame.${kind}`, 'unsupported', frameMessage(kind, item.element.drawingFallback));
@@ -635,11 +643,12 @@ async function drawItem(
   // shadow and has no inside to shade.
   const own = ownFill(item.element.fill, local);
   const shown = own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p));
-  if (shown) effectDiagnostics(item, p, local);
+  if (shown && pass !== 'text') effectDiagnostics(item, p, local);
   // Bevels, contour, extrusion, and the camera's turn of the face, as the SVG paint draws them.
   const threeD = threeDOf(item);
   const turned = turnsFace(threeD);
-  const drawContent = async (): Promise<void> => {
+  const drawContent = async (contentPass: DrawPass): Promise<void> => {
+    if (threeD && !threeD.showsFace) return;
     if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
     // The soft edge fades the body (the geometry, its bevel, and the inner shadow), not the text,
     // as in the SVG paint. The blur fades the body after the soft edge.
@@ -654,10 +663,18 @@ async function drawItem(
         // Over the geometry and under the text, in slide space.
         if (shown) await drawInnerShadow(item, p, local);
       });
-    if (shown) await drawBlur(item, p, local, groupScale, drawBody);
-    else await drawBody();
+    if (contentPass !== 'text') {
+      if (shown) await drawBlur(item, p, local, groupScale, drawBody);
+      else await drawBody();
+    }
     // An empty body's caret line draws nothing: no operators for it.
-    if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
+    if (
+      contentPass !== 'body' &&
+      item.kind === 'shape' &&
+      item.text &&
+      item.textMatrix &&
+      hasCharacters(item.text)
+    ) {
       p.push(pushGraphicsState());
       p.matrix(item.textMatrix);
       await drawText(item.text, p, local);
@@ -665,6 +682,7 @@ async function drawItem(
     }
     if (turned) p.push(popGraphicsState());
   };
+  if (pass === 'text') return drawContent('text');
   // A face turned edge-on paints only its extrusion: it has no area to paint or to copy.
   if (threeD && !threeD.showsFace) {
     fillFacets(threeD.behind, p);
@@ -678,11 +696,11 @@ async function drawItem(
   const cast: Matrix = back
     ? [face[0], face[1], face[2], face[3], face[4] + back.x, face[5] + back.y]
     : face;
-  if (shown) await drawReflection(item, p, drawContent);
+  if (shown) await drawReflection(item, p, () => drawContent('all'));
   if (shown) await drawShadows(item, p, local, cast);
   if (shown) await drawGlow(item, p, local, cast);
   if (threeD) fillFacets(threeD.behind, p);
-  await drawContent();
+  await drawContent(pass);
 }
 
 /** Map layout's fidelity notes to PDF diagnostics, with fixed codes. */
