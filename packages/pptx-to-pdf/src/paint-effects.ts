@@ -40,6 +40,7 @@ import {
   setStrokingRgbColor,
   stroke,
   type PDFName,
+  type PDFRef,
 } from 'pdf-lib';
 import type { ResolvedEffects, ResolvedFill, Rgba, Xfrm } from '@pptx-editor.dev/core/cascade';
 import {
@@ -87,7 +88,7 @@ import {
   type PageOps,
 } from './page-ops.ts';
 
-type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
+export type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
 
 /** A shape, picture, or group whose effects place copies of its content by its box. */
 type EffectHost = {
@@ -96,13 +97,13 @@ type EffectHost = {
 };
 
 /** A blur below half a point is drawn as a hard edge: it is under one output pixel. */
-const MIN_SIGMA = 6_350;
+export const MIN_SIGMA = 6_350;
 
 /** A typical stem of a glyph, as a fraction of the font size: the width of a text silhouette. */
 const STEM_PER_EM = 0.1;
 
 /** Whether the Pro drawing renderers are installed, so glow, inner shadow, and reflection paint. */
-function proEffects(): boolean {
+export function proEffects(): boolean {
   return drawingRenderers().effects !== undefined;
 }
 
@@ -275,7 +276,7 @@ function pathUnder(commands: readonly PathCommand[], m: Matrix): PathCommand[] {
 }
 
 /** The bounds of every form here: the slide and its surroundings, in slide EMU. */
-function formBox(p: PageOps): number[] {
+export function formBox(p: PageOps): number[] {
   const { width, height } = p.page.getSize();
   const [w, h] = [width * EMU_PER_PT, height * EMU_PER_PT];
   return [-w, -h, 2 * w, 2 * h];
@@ -295,14 +296,14 @@ async function form(p: PageOps, draw: () => void): Promise<PDFName> {
  * `flat` (when present) only filled, for a layer that does not grow. `width(grow)` is the line
  * width that grows the part by `grow` slide EMU.
  */
-interface Part {
+export interface Part {
   readonly grown: PDFName;
   readonly flat?: PDFName;
   readonly width: (grow: number) => number;
 }
 
 /** A class of silhouette parts with one blur profile: wide areas, or bands of one width. */
-interface PartClass {
+export interface PartClass {
   readonly parts: readonly Part[];
   /** Infinity for areas; the band width in slide EMU for outlines and text. */
   readonly bandWidth: number;
@@ -314,7 +315,7 @@ interface PartClass {
  * a band of the line width; the text is a third, a band of a glyph stem, when the shape has no
  * fill to cover it.
  */
-async function silhouette(
+export async function silhouette(
   item: Drawable,
   m: Matrix,
   p: PageOps,
@@ -474,7 +475,7 @@ async function drawLayers(
  * maps the `w`x`h` box of the shape or group to the slide; `classesUnder` gives the silhouette
  * under an effect transform.
  */
-async function castShadows(
+export async function castShadows(
   effects: ResolvedEffects,
   matrix: Matrix,
   w: number,
@@ -498,7 +499,7 @@ async function castShadows(
 }
 
 /** Cast a glow around the silhouette `classes`, as the SVG glow (`glowSpread`). */
-async function castGlow(
+export async function castGlow(
   glow: ResolvedEffects['glow'],
   classes: () => Promise<PartClass[]>,
   p: PageOps
@@ -544,87 +545,6 @@ export async function drawGlow(
   face: Matrix
 ): Promise<void> {
   await castGlow(item.element.effects?.glow, () => silhouette(item, face, p, scope), p);
-}
-
-/** A shape or picture that a group paints, with the fill scope it paints in. */
-export interface GroupLeaf {
-  readonly item: Drawable;
-  readonly scope: FillScope;
-}
-
-/**
- * The silhouette of a group's content under `m`: the silhouettes of its shapes and pictures
- * together. Parts of one blur profile join one class, so a layer paints them as one
- * transparency group, and children that overlap cast one shadow, not two.
- */
-async function groupSilhouette(
-  leaves: readonly GroupLeaf[],
-  m: Matrix,
-  p: PageOps
-): Promise<PartClass[]> {
-  const byWidth = new Map<number, Part[]>();
-  for (const leaf of leaves)
-    for (const cls of await silhouette(leaf.item, m, p, leaf.scope)) {
-      const parts = byWidth.get(cls.bandWidth);
-      if (parts) parts.push(...cls.parts);
-      else byWidth.set(cls.bandWidth, [...cls.parts]);
-    }
-  return [...byWidth].map(([bandWidth, parts]) => ({ parts, bandWidth }));
-}
-
-/**
- * The outer shadows and the glow of a group (`p:grpSpPr/a:effectLst`), painted before its
- * content, as in the SVG paint: one shadow of all `leaves` together, placed by the group's box.
- */
-export async function drawGroupShadowsAndGlow(
-  group: Extract<LayoutItem, { kind: 'group' }>,
-  leaves: readonly GroupLeaf[],
-  p: PageOps
-): Promise<void> {
-  const effects = group.element.effects;
-  if (!effects || leaves.length === 0) return;
-  const { cx: w, cy: h } = group.element.xfrm;
-  const identity: Matrix = [1, 0, 0, 1, 0, 0];
-  const under = (m: Matrix): Promise<PartClass[]> => groupSilhouette(leaves, m, p);
-  await castShadows(effects, group.matrix, w, h, identity, under, p);
-  await castGlow(effects.glow, () => under(identity), p);
-}
-
-/** Report how the writer draws a group's effects, when they draw something. */
-export function groupEffectDiagnostics(
-  group: Extract<LayoutItem, { kind: 'group' }>,
-  leaves: readonly GroupLeaf[],
-  p: PageOps
-): void {
-  const fx = group.element.effects;
-  if (!fx || leaves.length === 0) return;
-  const pro = proEffects();
-  const shadow = fx.outerShadow ?? fx.secondShadow;
-  const shadowDrawn = shadow !== undefined && shadow.color.a > 0;
-  const glowDrawn = pro && fx.glow !== undefined && fx.glow.radius > 0 && fx.glow.color.a > 0;
-  if (shadowDrawn && blurSigma(shadow.blur) >= MIN_SIGMA)
-    p.diag.add('effect.shadow-blur', 'approximation', 'Shadow blur is drawn as layered rings.');
-  if (glowDrawn) p.diag.add('effect.glow', 'approximation', 'Glow is drawn as layered rings.');
-  if (shadowDrawn || glowDrawn)
-    p.diag.add(
-      'effect.group-silhouette',
-      'approximation',
-      'Group shadows and glow use an opaque silhouette of the shapes in the group: a table casts its box, and the effects of the shapes cast nothing.'
-    );
-  const ref = fx.reflection;
-  if (
-    pro &&
-    ref &&
-    (ref.startAlpha > 0 || ref.endAlpha > 0) &&
-    reflectionBlurSigma(ref.blur) >= MIN_SIGMA
-  )
-    p.diag.add('effect.reflection-blur', 'approximation', 'Reflections are drawn without blur.');
-  if (pro && (fx.softEdge || fx.innerShadow || fx.blur))
-    p.diag.add(
-      'effect.group-body',
-      'approximation',
-      'The soft edge, inner shadow, and blur of a group apply to each shape in the group.'
-    );
 }
 
 /**
@@ -776,14 +696,14 @@ export function softEdgeBands(inset: number, sigma: number): { reach: number[]; 
  * twice its width, clipped outside). `rimmed` are the filled paths whose outline lies over their
  * edge, so their own edge is `width / 2` inside the painted edge.
  */
-interface SoftEdgeSilhouette {
+export interface SoftEdgeSilhouette {
   readonly filled: readonly PathCommand[][];
   readonly rimmed: readonly boolean[];
   readonly outlines: readonly PathCommand[][];
   readonly width: number;
 }
 
-function softEdgeSilhouette(
+export function softEdgeSilhouette(
   item: Drawable,
   scope: FillScope,
   groupScale: number
@@ -867,10 +787,31 @@ async function drawEdgeFade(
   corners: readonly { x: number; y: number }[],
   drawBody: () => Promise<void>
 ): Promise<void> {
+  const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });
+  drawThroughMask(p, body, await edgeFadeOps(shape, p, inset, sigma, corners));
+}
+
+/** Draw the transparency group `body` under a luminosity soft mask of the gray `maskOps`. */
+export function drawThroughMask(p: PageOps, body: PDFRef, maskOps: PDFOperator[]): void {
+  const mask = p.form(maskOps, formBox(p), { S: 'Transparency', CS: 'DeviceGray' });
+  p.push(pushGraphicsState());
+  p.state(`smask:${mask.toString()}`, () =>
+    p.res.doc.context.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: mask } })
+  );
+  p.push(drawObject(p.name('XObject', body)), popGraphicsState());
+}
+
+/** The gray operators of the edge fade of `shape` (`drawEdgeFade`), white where it is opaque. */
+export async function edgeFadeOps(
+  shape: SoftEdgeSilhouette,
+  p: PageOps,
+  inset: number,
+  sigma: number,
+  corners: readonly { x: number; y: number }[]
+): Promise<PDFOperator[]> {
   const xs = corners.map((c) => c.x);
   const ys = corners.map((c) => c.y);
   const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });
   const { reach, alpha } = softEdgeBands(inset, sigma);
   const extent = reach[reach.length - 1] ?? 0;
   const trace = (paths: readonly PathCommand[][]): void => {
@@ -930,12 +871,7 @@ async function drawEdgeFade(
       p.push(popGraphicsState());
     }
   });
-  const mask = p.form(ops, formBox(p), { S: 'Transparency', CS: 'DeviceGray' });
-  p.push(pushGraphicsState());
-  p.state(`smask:${mask.toString()}`, () =>
-    p.res.doc.context.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: mask } })
-  );
-  p.push(drawObject(p.name('XObject', body)), popGraphicsState());
+  return ops;
 }
 
 /** The color of a painted edge: the representative color of a fill (`threeDColor`). */

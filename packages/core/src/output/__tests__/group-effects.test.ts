@@ -85,6 +85,18 @@ describe('group effects', () => {
     expect(layout.diagnostics).toContain('approximation: group-effects');
   });
 
+  test("a group's inner shadow resolves to nothing; its other effects stay", async () => {
+    const inner =
+      '<a:effectLst><a:innerShdw blurRad="63500" dist="50800" dir="5400000">' +
+      '<a:srgbClr val="000000"/></a:innerShdw></a:effectLst>';
+    const alone = groupOf(await layoutOf(groupDeck(inner))).element.effects;
+    expect(alone?.innerShadow).toBeUndefined();
+    const both = inner.replace('</a:effectLst>', shadow().slice('<a:effectLst>'.length));
+    const fx = groupOf(await layoutOf(groupDeck(both))).element.effects;
+    expect(fx?.innerShadow).toBeUndefined();
+    expect(fx?.outerShadow?.dist).toBe(DIST);
+  });
+
   test('one shadow copies all children together; the children cast none', async () => {
     const layout = await layoutOf(groupDeck(shadow(), { rot: 1_800_000, flipH: true }));
     const svg = paintSlide(doc, layout, OPTS);

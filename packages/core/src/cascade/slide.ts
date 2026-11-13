@@ -582,13 +582,19 @@ function diagramGroup(
 /**
  * The effects of a group (`p:grpSpPr` or `dsp:grpSpPr`, ECMA-376 Part 1, 19.3.1.22): an effect
  * list applies to the group's content as one picture. A group has no style, so it has no theme
- * effect. A group's 3-D scene (`a:scene3d`) is reported unsupported.
+ * effect. A group's inner shadow draws nothing, so it is left out; it stays in the file. A
+ * group's 3-D scene (`a:scene3d`) is reported unsupported.
  */
 function groupEffects(
   grpSpPr: Element | undefined,
   ctx: ColorContext
 ): { effects?: ResolvedEffects } {
-  const listed = resolveEffects(effectContainer(grpSpPr), ctx);
+  const resolved = resolveEffects(effectContainer(grpSpPr), ctx);
+  let listed = resolved;
+  if (resolved?.innerShadow) {
+    const { innerShadow: _drawsNothing, ...rest } = resolved;
+    listed = rest;
+  }
   if (!child(grpSpPr, 'a:scene3d')) return listed ? { effects: listed } : {};
   return { effects: { ...listed, unsupported: [...(listed?.unsupported ?? []), 'scene3d'] } };
 }

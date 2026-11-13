@@ -25,6 +25,7 @@ import { pictureAdjustmentsDeck } from './picture-adjustments.ts';
 import { textWarpFixtures } from './text-warp.ts';
 import { equationFixtures } from './equations.ts';
 import { THREE_D_EFFECT_STYLES, threeDFixtures } from './three-d.ts';
+import { groupEffectsFixtures } from './group-effects.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -107,6 +108,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
   ...textWarpFixtures,
   ...equationFixtures,
   ...threeDFixtures,
+  ...groupEffectsFixtures,
   ...textScriptFixtures,
   ...followUpFixtures,
   ...lineEndsDashesFixtures,

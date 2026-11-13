@@ -282,7 +282,8 @@ export interface ResolvedGroup extends ResolvedBase {
   readonly fill: ResolvedFill;
   /**
    * The group's effects (`p:grpSpPr/a:effectLst`). They apply to the group's content as one
-   * picture: an outer shadow is the silhouette of all children together.
+   * picture: an outer shadow is the silhouette of all children together. It holds no inner
+   * shadow: a group's inner shadow draws nothing.
    */
   readonly effects?: ResolvedEffects;
 }

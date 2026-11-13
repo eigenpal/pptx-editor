@@ -152,7 +152,7 @@ describe('group effects in the PDF export', () => {
     expect(codes(result).filter((c) => c.startsWith('effect.'))).toEqual([]);
   });
 
-  test('glow, reflection, and the body effects of a group draw and are reported', async () => {
+  test('glow, reflection, and the soft edge of a group draw and are reported', async () => {
     const effects =
       '<a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow>' +
       '<a:innerShdw blurRad="63500" dist="50800" dir="5400000"><a:srgbClr val="000000"/></a:innerShdw>' +
@@ -161,11 +161,79 @@ describe('group effects in the PDF export', () => {
     const result = await exportPdf(deckOf(effects), BEST);
     const found = codes(result);
     expect(found).toContain('effect.glow');
-    expect(found).toContain('effect.group-body');
-    // The soft edge applies to each shape: each reports it as its own.
-    expect(found).toContain('effect.soft-edge');
+    expect(found).toContain('effect.group-soft-edge');
+    // The soft edge applies to the group, not to each shape; a group's inner shadow draws nothing.
+    expect(found).not.toContain('effect.soft-edge');
+    expect(found).not.toContain('effect.inner-shadow');
     // The reflection fades through a gray soft mask.
     const text = new TextDecoder('latin1').decode(result.bytes);
     expect(text).toMatch(/\/ShadingType 2\s*\/ColorSpace \/DeviceGray/);
   });
+
+  test('a group soft edge masks all bodies together and paints each text once', async () => {
+    const labelled = (effects: string) =>
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: group(
+              { id: 10, x: 2 * IN, y: 1.5 * IN, cx: 4 * IN, cy: 2 * IN, effects },
+              shape({
+                id: 11,
+                x: 2 * IN,
+                y: 1.5 * IN,
+                cx: 2.5 * IN,
+                cy: IN,
+                fill: solid('C00000'),
+                text: '<a:p><a:r><a:rPr lang="en-US"/><a:t>Front</a:t></a:r></a:p>',
+              }) +
+                shape({
+                  id: 12,
+                  x: 3.5 * IN,
+                  y: 2.5 * IN,
+                  cx: 2.5 * IN,
+                  cy: IN,
+                  prst: 'ellipse',
+                  fill: solid('0070C0'),
+                  text: '<a:p><a:r><a:rPr lang="en-US"/><a:t>Back</a:t></a:r></a:p>',
+                })
+            ),
+          },
+        ],
+      });
+    const soft = await exportPdf(
+      labelled('<a:effectLst><a:softEdge rad="63500"/></a:effectLst>'),
+      BEST
+    );
+    const plain = await exportPdf(labelled(''), BEST);
+    const streams = await contentText(soft.bytes);
+    // One fade per shape, lightest wins: the mask draws them with the Lighten blend mode.
+    expect(new TextDecoder('latin1').decode(soft.bytes)).toMatch(/\/BM \/Lighten/);
+    // The text paints over the faded bodies, once.
+    const textObjects = (all: string[]) =>
+      all
+        .join(' ')
+        .split(/\s+/)
+        .filter((t) => t === 'BT').length;
+    expect(textObjects(streams)).toBe(textObjects(await contentText(plain.bytes)));
+    expect(textObjects(streams)).toBeGreaterThan(0);
+  });
 });
+
+/** The decoded content of the page and of every form, as text. */
+async function contentText(bytes: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(bytes);
+  const { Contents } = doc.getPages()[0]!.node.normalizedEntries();
+  const pageRefs = new Set((Contents?.asArray() ?? []).map((r) => r.toString()));
+  const out: string[] = [];
+  for (const [ref, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    const form = obj.dict.get(PDFName.of('Subtype')) === PDFName.of('Form');
+    if (!form && !pageRefs.has(ref.toString())) continue;
+    const raw = obj.dict.has(PDFName.of('Filter'))
+      ? decodePDFRawStream(obj).decode()
+      : obj.contents;
+    out.push(new TextDecoder('latin1').decode(raw));
+  }
+  return out;
+}

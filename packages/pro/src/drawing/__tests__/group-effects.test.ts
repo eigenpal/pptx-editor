@@ -4,12 +4,19 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The effects of a group (`p:grpSpPr/a:effectLst`) with and without the Pro drawing renderers:
-// glow, inner shadow, reflection, soft edge, and blur paint over the group's content as one
-// picture only after `installDrawing`; the outer shadow paints in both.
+// glow, reflection, soft edge, and blur paint over the group's content as one picture only after
+// `installDrawing`; the outer shadow paints in both. A group's inner shadow draws nothing.
 
 import { afterAll, describe, expect, spyOn, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
-import { buildPptx, group, shape, solid } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  buildPptx,
+  group,
+  para,
+  run,
+  shape,
+  solid,
+} from '../../../../../scripts/fixtures/builder.ts';
 import { readPptx } from '@pptx-editor.dev/core/store';
 import { resolveSlide } from '@pptx-editor.dev/core/cascade';
 import { createFixedMeasurer, layoutSlide } from '@pptx-editor.dev/core/layout';
@@ -83,7 +90,7 @@ describe('group effects and the Pro drawing tier', () => {
     });
   });
 
-  test('with the module, every effect paints over the group content as one picture', () => {
+  test('with the module, every effect but the inner shadow paints over the group as one picture', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => {});
     installDrawing();
     warn.mockRestore();
@@ -92,17 +99,62 @@ describe('group effects and the Pro drawing tier', () => {
       shadow: 2,
       reflection: 2,
       glow: 2,
-      innerShadow: true,
+      innerShadow: false,
       softEdge: true,
       shapes: 2,
     });
     // The children carry no effects of their own: the group's filters wrap them both.
     expect(root.querySelectorAll('[data-kind="shape"] [data-effect]').length).toBe(0);
-    // The blur filters the content, and the body filter (inner shadow and soft edge) inside it
-    // holds both shapes.
+    // The blur filters the content, and the body filter (the soft edge) inside it holds both
+    // shapes.
     const shown = root.querySelector('[data-kind="group"]')!.lastElementChild!;
     expect(shown.getAttribute('filter')).toMatch(/^url\(#/);
     const body = shown.querySelector('[id] > [filter]')!;
     expect(body.querySelectorAll('[data-kind="shape"]').length).toBe(2);
+  });
+
+  test('the text of a soft-edged group paints again over the filtered picture', () => {
+    const labelled = group(
+      {
+        id: 20,
+        x: IN,
+        y: IN,
+        cx: 3 * IN,
+        cy: IN,
+        effects: '<a:effectLst><a:softEdge rad="63500"/></a:effectLst>',
+      },
+      shape({
+        id: 21,
+        x: IN,
+        y: IN,
+        cx: 1.5 * IN,
+        cy: IN,
+        fill: solid('4472C4'),
+        text: para(run('One')),
+      }) +
+        shape({
+          id: 22,
+          x: 2.5 * IN,
+          y: IN,
+          cx: 1.5 * IN,
+          cy: IN,
+          fill: solid('ED7D31'),
+          text: para(run('Two')),
+        })
+    );
+    const root = paint(labelled);
+    const node = root.querySelector('[data-kind="group"]')!;
+    const overlay = node.querySelector(':scope > [data-effect="text"]')!;
+    // The copies lie over the filtered picture, outside any filter, and hold no ids.
+    expect(node.lastElementChild).toBe(overlay);
+    const copies = [...overlay.querySelectorAll('[data-pptx-text]')];
+    expect(copies.map((c) => c.textContent)).toEqual(['One', 'Two']);
+    expect(overlay.querySelectorAll('[id]').length).toBe(0);
+    expect(overlay.closest('[filter]')).toBeNull();
+    // Each copy keeps the placement of its original.
+    const originals = [...node.querySelectorAll('[filter] [data-pptx-text]')];
+    expect(copies.map((c) => c.getAttribute('transform'))).toEqual(
+      originals.map((o) => o.getAttribute('transform'))
+    );
   });
 });
