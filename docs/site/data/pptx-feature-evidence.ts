@@ -93,7 +93,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['custom-geometry', 'follow-ups'],
     approximations: ['path-start'],
   },
-  'shapes.groups': { fixtures: ['groups-transforms'], approximations: ['group-effects'] },
+  'shapes.groups': {
+    fixtures: ['groups-transforms', 'group-effects'],
+    approximations: ['group-effects'],
+  },
   'shapes.connectors': { fixtures: ['lines-arrows', 'line-ends-dashes'] },
   'shapes.arrange': { fixtures: ['arrange-flip-hidden'] },
   'shapes.flip-rotate': {
@@ -128,7 +131,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   },
   // --- Effects -----------------------------------------------------------
   'effects.outer-shadow': {
-    fixtures: ['effects', 'shape-effects-presets'],
+    fixtures: ['effects', 'shape-effects-presets', 'group-effects'],
     approximations: ['blur', 'shadow-skew', 'group-effects'],
   },
   // Painted by the drawing module of @pptx-editor.dev/pro: the harness installs it

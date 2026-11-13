@@ -208,6 +208,15 @@
         540
       ]
     },
+    "group-effects": {
+      "deck": "6d7443bbdd595b258f6572e9238aadf358ca4e17090e73f04c1e1ffe53b309b2",
+      "pdf": "530354d4536c2d868d19f7346b092f050643ff69b01d2a261044828dc4771d0e",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "groups-transforms": {
       "deck": "45e0611f06e78553a1fdc0901af3339a1e62d95d9a83e73a955f29c6c6e7bf2b",
       "pdf": "9832ee9762045b248bef7809417900a468774c4ecb2c8a3e67ddd3d8f3914838",

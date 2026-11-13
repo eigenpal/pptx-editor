@@ -13,7 +13,8 @@
  * `chart-data`, 2 copies, no prompt; `three-d-effects`, 2 copies, no prompt;
  * `diagram-editing`, 2 copies, no prompt; `equations`, 2 copies, no prompt; and
  * `three-d-turned-effects`, 2 copies and a copy with bevels set and removed on theme-styled
- * shapes, no prompt. On 8 November 2026: `equation-lines`, 2 copies, no prompt.
+ * shapes, no prompt. On 8 November 2026: `equation-lines`, 2 copies, no prompt. On 13 November
+ * 2026: `group-effects`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -39,6 +40,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'follow-ups',
   'font-effects',
   'gradients',
+  'group-effects',
   'groups-transforms',
   'header-footer',
   'hyperlinks',
