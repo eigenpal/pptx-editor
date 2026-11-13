@@ -502,26 +502,51 @@ function tilePaint(
 }
 
 /**
- * The most tile images that the paint draws on one slide (`TileBudget`). A slide with more tiles
+ * The most tile images that one paint of a slide draws (`TileBudget`). A slide with more tiles
  * fills the rest with the pattern of `tilePaint`, so a file cannot make the paint write millions
  * of elements, with many shapes or many filled paths.
  */
 export const MAX_SLIDE_TILE_IMAGES = 4096;
 
-/** The tile images left on one slide. */
-class TileBudget {
-  #left = MAX_SLIDE_TILE_IMAGES;
-  /** The images still allowed. */
+/** The tile images left in one paint of a slide. */
+export class TileBudget {
+  #spent = 0;
+  /** The images still allowed, never below zero. */
   get left(): number {
-    return this.#left;
+    return Math.max(0, MAX_SLIDE_TILE_IMAGES - this.#spent);
+  }
+  /** The images spent so far, past the budget too. */
+  get spent(): number {
+    return this.#spent;
   }
   spend(n: number): void {
-    this.#left -= n;
+    this.#spent += n;
   }
 }
 
-/** The tile image budget of each slide, by its `Defs`. */
+/** The tile image budget of the slide paint in progress, by the painter's `Defs`. */
 const tileWork = new WeakMap<Defs, TileBudget>();
+
+/**
+ * The tile budget of the paint in progress with `defs`: a fresh `paintSlide` makes new `Defs`,
+ * so its first tiled fill makes the budget.
+ */
+export function tileBudget(defs: Defs): TileBudget {
+  let budget = tileWork.get(defs);
+  if (!budget) tileWork.set(defs, (budget = new TileBudget()));
+  return budget;
+}
+
+/**
+ * Start a new slide paint with `defs`, with the whole tile budget. A painter that keeps its
+ * `Defs` across paints (`SlidePainter`) calls this when each paint starts, so each paint of a
+ * slide spends the same budget and draws the same tiles.
+ */
+export function startTileBudget(defs: Defs): TileBudget {
+  const budget = new TileBudget();
+  tileWork.set(defs, budget);
+  return budget;
+}
 
 /** A rectangle in a fill box's space, by its edges. */
 export interface TileArea {
@@ -629,8 +654,7 @@ function tileImages(
   const { defs } = ctx;
   const doc = defs.doc;
   const g = tileGeometry(fill.tile!, ctx.imageSize?.(ctx.sourcePart, fill.rId), w, h);
-  let budget = tileWork.get(defs);
-  if (!budget) tileWork.set(defs, (budget = new TileBudget()));
+  const budget = tileBudget(defs);
   const tiles = tilePlacements(g, area, budget.left);
   if (!tiles) return undefined;
   budget.spend(tiles.length);
