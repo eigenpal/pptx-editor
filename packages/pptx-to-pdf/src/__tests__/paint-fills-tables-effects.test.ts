@@ -472,8 +472,9 @@ describe('effects', () => {
 describe('diagnostic codes', () => {
   test('each approximation has its code on the fixtures that use it', async () => {
     const of = async (name: string) => codes(await exportPdf(deck(name), BEST));
-    expect(await of('fills-lines')).toContain('picture.tile');
-    expect(await of('pictures')).toContain('picture.color-effects');
+    // Tiled pictures and picture color effects are drawn.
+    expect(await of('fills-lines')).not.toContain('picture.tile');
+    expect(await of('pictures')).not.toContain('picture.color-effects');
     const effects = await of('effects');
     for (const code of [
       'effect.shadow-blur',

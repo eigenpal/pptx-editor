@@ -79,8 +79,10 @@ function region(b: EffectBounds): Record<string, string> {
  * inches stops the page for seconds. Glows of up to 200 pt and soft edges of up to 100 pt draw
  * as stored. A larger glow draws as a 200 pt glow, and a larger soft edge shrinks the outline
  * by 100 pt and keeps its blur.
+ *
+ * @internal
  */
-const MAX_MORPH_SPREAD = 1_270_000;
+export const MAX_MORPH_SPREAD = 1_270_000;
 
 /** `SourceAlpha` as an opaque gray image: each color channel holds the alpha. */
 const ALPHA_TO_GRAY = '0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1';

@@ -199,17 +199,16 @@ Edits recalculate the slide layout and apply text autofit rules. The following o
 - **Shadow and glow blur.** Drawn as layers of growing outlines, not as a Gaussian blur.
 - **Opaque silhouettes.** Fill transparency does not lighten a shadow, and a picture's shadow takes the shape of its frame.
 - **Inner shadows.** The outer half of an outline is not shaded, and an unfilled shape gets no inner shadow.
-- **Soft edges.** Drawn hard.
+- **Soft edges.** The fade follows the distance to the painted edge of the fill and outline, so corners are rounder than a blur.
 - **Blur.** `a:blur` is not drawn.
 - **Reflection blur.** A reflection is drawn with its fade, without its blur.
 - **Gradient lines.** Drawn in one color.
 - **Gradient stops.** At most 64 stops are drawn.
 - **Fills outside the box.** A rectangle path gradient or a picture fill paints the shape's box only.
-- **Tiled pictures.** Drawn stretched over the box.
-- **Picture color effects.** Grayscale, duotone, brightness and contrast, and black and white are not applied.
-- **Compound lines.** Dashed compound lines and compound table borders render as single lines. Compound bands requiring more than 16,384 points also render as single lines.
+- **Picture color effects on CMYK pictures.** Grayscale, duotone, brightness and contrast, and black and white are not applied to CMYK JPEG pictures.
+- **Compound lines.** Compound table borders render as single lines. Dashed compound lines, and lines whose bands need more than 16,384 points, cut their bands from the line with a mask.
 - **SVG pictures.** The PNG fallback of the picture is drawn.
-- **Text.** Synthetic bold and italic do not render, upright vertical characters rotate, and missing glyphs disappear. Underline styles other than single and double render as single lines.
+- **Text.** Synthetic bold and italic do not render, and missing glyphs disappear. Underline styles other than single and double render as single lines.
 - **Not drawn.** Text patterns, line patterns, picture-filled text, and text outlines do not render. Unsupported picture formats and frames without usable drawings, pictures, or grids do not render. Unsupported charts show placeholders; see [Charts](/docs/guides/charts).
 
 ## See also

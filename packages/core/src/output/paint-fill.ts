@@ -19,7 +19,7 @@ import {
   strokeWidth,
   type Matrix,
 } from '../layout/index.ts';
-import { ALIGN_POINTS, lumTransfer } from './effect-transforms.ts';
+import { ALIGN_POINTS, blipColorSteps } from './effect-transforms.ts';
 import { circleGradient, linearGradient, rectGradient, shapeGradient } from './paint-gradient.ts';
 import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 import { Defs, num, svg } from './svg.ts';
@@ -161,34 +161,22 @@ export function pictureImage(
 /** Grayscale, duotone, luminance, and bi-level blip effects as one SVG filter. */
 function blipFilter(doc: Document, defs: Defs, effects: readonly BlipEffect[]): string | undefined {
   const primitives: SVGElement[] = [];
-  for (const e of effects) {
-    if (e.kind === 'grayscale')
+  // The PDF export draws the same steps (`blipColorSteps`).
+  for (const step of blipColorSteps(effects)) {
+    if (step.op === 'gray')
       primitives.push(svg(doc, 'feColorMatrix', { type: 'saturate', values: '0' }));
-    else if (e.kind === 'duotone') {
-      primitives.push(svg(doc, 'feColorMatrix', { type: 'saturate', values: '0' }));
-      const ch = (a: number, b: number): string => `${num(a / 255)} ${num(b / 255)}`;
+    else if (step.op === 'table') {
+      const ch = (i: number): string => `${num(step.from[i]!)} ${num(step.to[i]!)}`;
       primitives.push(
         svg(doc, 'feComponentTransfer', {}, [
-          svg(doc, 'feFuncR', { type: 'table', tableValues: ch(e.dark.r, e.light.r) }),
-          svg(doc, 'feFuncG', { type: 'table', tableValues: ch(e.dark.g, e.light.g) }),
-          svg(doc, 'feFuncB', { type: 'table', tableValues: ch(e.dark.b, e.light.b) }),
+          svg(doc, 'feFuncR', { type: 'table', tableValues: ch(0) }),
+          svg(doc, 'feFuncG', { type: 'table', tableValues: ch(1) }),
+          svg(doc, 'feFuncB', { type: 'table', tableValues: ch(2) }),
         ])
       );
-    } else if (e.kind === 'lum') {
-      // Brightness shifts, contrast scales around mid-gray (ECMA-376 §20.1.8.42).
-      const { slope, intercept } = lumTransfer(e.bright, e.contrast);
+    } else {
       const fn = (tag: string): SVGElement =>
-        svg(doc, tag, { type: 'linear', slope: num(slope), intercept: num(intercept) });
-      primitives.push(
-        svg(doc, 'feComponentTransfer', {}, [fn('feFuncR'), fn('feFuncG'), fn('feFuncB')])
-      );
-    } else if (e.kind === 'biLevel') {
-      primitives.push(svg(doc, 'feColorMatrix', { type: 'saturate', values: '0' }));
-      // Black below the threshold, white from it (ECMA-376 Part 1, 20.1.8.11): a ramp so steep
-      // that one 8-bit step is the whole range.
-      const slope = 10_000;
-      const fn = (tag: string): SVGElement =>
-        svg(doc, tag, { type: 'linear', slope, intercept: num(1 - slope * e.threshold) });
+        svg(doc, tag, { type: 'linear', slope: num(step.slope), intercept: num(step.intercept) });
       primitives.push(
         svg(doc, 'feComponentTransfer', {}, [fn('feFuncR'), fn('feFuncG'), fn('feFuncB')])
       );
@@ -393,10 +381,57 @@ const MIN_TILE = 9525;
  */
 const MAX_TILE = 51_206_400;
 
+/** Where the tiles of a tiled picture lie in a fill box (`tileGeometry`). @internal */
+export interface TileGeometry {
+  /** The left edge of the tile grid in the box: the first tile's left edge. */
+  readonly x: number;
+  /** The top edge of the tile grid in the box: the first tile's top edge. */
+  readonly y: number;
+  /** The width of one tile, at least `MIN_TILE` and at most `MAX_TILE`. */
+  readonly width: number;
+  /** The height of one tile, at least `MIN_TILE` and at most `MAX_TILE`. */
+  readonly height: number;
+  /** Whether every second tile is mirrored left to right (`flip` x or xy). */
+  readonly flipX: boolean;
+  /** Whether every second tile is mirrored top to bottom (`flip` y or xy). */
+  readonly flipY: boolean;
+}
+
 /**
- * A tiled picture (`CT_TileInfoProperties`; design D4 of `fill-and-line-fidelity`): tiles at the
- * image's natural size × `sx`/`sy`, placed at the `algn` point plus `tx`/`ty`, mirrored by `flip`,
- * recolored by the blip effects. Without a size port, a tile is the box.
+ * The tiles of a tiled picture (`CT_TileInfoProperties`; design D4 of `fill-and-line-fidelity`)
+ * in a `w`×`h` box: tiles at the image's `natural` size × `sx`/`sy`, placed at the `algn` point
+ * plus `tx`/`ty`, mirrored by `flip`. Without a natural size, a tile is the box. The SVG paint and
+ * the PDF export place tiles with this one copy. @internal
+ */
+export function tileGeometry(
+  tile: NonNullable<Extract<ResolvedFill, { type: 'picture' }>['tile']>,
+  natural: { readonly cx: number; readonly cy: number } | undefined,
+  w: number,
+  h: number
+): TileGeometry {
+  const size = natural ?? { cx: w, cy: h };
+  const sw = Math.max(Math.abs(size.cx * tile.sx) || w, MIN_TILE);
+  const sh = Math.max(Math.abs(size.cy * tile.sy) || h, MIN_TILE);
+  // One factor for both sides, so a capped tile keeps its aspect ratio.
+  const fit = Math.min(1, MAX_TILE / sw, MAX_TILE / sh);
+  const tw = Math.max(sw * fit, MIN_TILE);
+  const th = Math.max(sh * fit, MIN_TILE);
+  // `algn` comes from the file: an own-key check, so `toString` cannot reach the prototype.
+  const align = Object.hasOwn(ALIGN_POINTS, tile.algn) ? (tile.algn as EffectAlign) : 'tl';
+  const [ax, ay] = ALIGN_POINTS[align];
+  return {
+    x: ax * w - ax * tw + tile.tx,
+    y: ay * h - ay * th + tile.ty,
+    width: tw,
+    height: th,
+    flipX: tile.flip === 'x' || tile.flip === 'xy',
+    flipY: tile.flip === 'y' || tile.flip === 'xy',
+  };
+}
+
+/**
+ * A tiled picture (`tileGeometry`), recolored by the blip effects. Without a size port, a tile
+ * is the box.
  */
 function tilePaint(
   fill: Extract<ResolvedFill, { type: 'picture' }>,
@@ -407,19 +442,8 @@ function tilePaint(
 ): Paint {
   const { defs } = ctx;
   const doc = defs.doc;
-  const tile = fill.tile!;
-  const natural = ctx.imageSize?.(ctx.sourcePart, fill.rId) ?? { cx: w, cy: h };
-  const sw = Math.max(Math.abs(natural.cx * tile.sx) || w, MIN_TILE);
-  const sh = Math.max(Math.abs(natural.cy * tile.sy) || h, MIN_TILE);
-  // One factor for both sides, so a capped tile keeps its aspect ratio.
-  const fit = Math.min(1, MAX_TILE / sw, MAX_TILE / sh);
-  const tw = Math.max(sw * fit, MIN_TILE);
-  const th = Math.max(sh * fit, MIN_TILE);
-  // `algn` comes from the file: an own-key check, so `toString` cannot reach the prototype.
-  const align = Object.hasOwn(ALIGN_POINTS, tile.algn) ? (tile.algn as EffectAlign) : 'tl';
-  const [ax, ay] = ALIGN_POINTS[align];
-  const fx = tile.flip === 'x' || tile.flip === 'xy';
-  const fy = tile.flip === 'y' || tile.flip === 'xy';
+  const g = tileGeometry(fill.tile!, ctx.imageSize?.(ctx.sourcePart, fill.rId), w, h);
+  const { width: tw, height: th, flipX: fx, flipY: fy } = g;
   const image = (mx: boolean, my: boolean): SVGElement =>
     svg(doc, 'image', {
       href: url,
@@ -446,8 +470,8 @@ function tilePaint(
     {
       id,
       patternUnits: 'userSpaceOnUse',
-      x: num(ax * w - ax * tw + tile.tx),
-      y: num(ay * h - ay * th + tile.ty),
+      x: num(g.x),
+      y: num(g.y),
       width: num(fx ? 2 * tw : tw),
       height: num(fy ? 2 * th : th),
     },
