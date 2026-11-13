@@ -372,14 +372,15 @@ test('a banded shape added in front leaves the kept shapes as a fresh paint draw
   expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, layout, TILE_OPTS)));
 });
 
-/** A group at `x` of `count` plain shapes, with `first` as its first child. */
-const heavyGroup = (id: number, x: number, count: number, first: string): string =>
+/** A group at `x` of `count` plain shapes, with `first` as its first child and `last` after. */
+const heavyGroup = (id: number, x: number, count: number, first: string, last = ''): string =>
   group(
     { id, x, y: 2 * IN, cx: IN, cy: IN },
     first +
       Array.from({ length: count - 1 }, (_, i) =>
         shape({ id: id + 1 + i, x, y: 2 * IN, cx: 9_525, cy: 9_525 })
-      ).join('')
+      ).join('') +
+      last
   );
 
 /** Paint `layout` a frame at a time with `budget`: the frames it takes, at most `max`. */
@@ -471,6 +472,30 @@ test('a group painted in part paints again when the items before it change', () 
   // Alone, it has every tile: its earlier children paint again with them.
   const svg = settles(painter, { ...all, items: [g!] }, 2_000, 10);
   expect(svg.querySelectorAll('image').length).toBe(1_600);
+});
+
+test('a group painted in part keeps what was left of a budget its later children read', () => {
+  // The group's first frame reads only tiles; its last child, a banded shape, reads bands in a
+  // later frame, after two banded shapes in front leave it too little band work.
+  const all = tiledLayout(
+    customBanded(2, 1_500) +
+      customBanded(3, 1_500) +
+      heavyGroup(10, 3 * IN, 2_100, tiledBox(5_000, 3 * IN), customBanded(7_000, 1_500))
+  );
+  const [b1, b2, g] = all.items;
+  const alone = { ...all, items: [g!] };
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  painter.paint(alone, 2_000);
+  settles(painter, { ...all, items: [b1!, b2!, g!] }, 2_000, 40);
+  // Alone again, the last child has its full band work: a fresh paint draws its bands.
+  settles(painter, alone, Infinity, 40);
+});
+
+test('an item twice in one layout lets the items after it paint and settle', () => {
+  const layout = tiledLayout(bandedStar(2, 0) + bandedStar(3, IN));
+  const [x, y] = layout.items;
+  const twice = { ...layout, items: [x!, x!, y!] };
+  settles(new SlidePainter(doc, TILE_OPTS), twice, 1, 10);
 });
 
 test('a group that paints again in part goes back to its node when the reason goes', () => {

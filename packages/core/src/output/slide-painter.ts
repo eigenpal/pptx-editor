@@ -35,9 +35,11 @@ interface PaintedItem {
   /**
    * What was left of each budget when it began to paint, and which budgets a fill in it read. Its
    * paint depends on nothing else of them, so a later paint keeps it only with as much left of
-   * each budget it read.
+   * each budget it read. A group painted in part that first reads a budget in a later frame
+   * records what was left of it at the start of that frame (`paintMore`): `startLeft` and
+   * `reads` change together.
    */
-  readonly startLeft: BudgetAmounts;
+  startLeft: BudgetAmounts;
   reads: { tiles: boolean; bands: boolean };
   /** A group painted in part (`paint`'s budget): the index of its first child left out. */
   rest?: number;
@@ -259,6 +261,9 @@ export class SlidePainter {
      * budgets. Answers the weight painted.
      */
     const paintMore = (item: LayoutItem, painted: PaintedItem, room: number): number => {
+      // Only fills that read a budget spend it, so what is left now is what was left when this
+      // group began, for each budget it has not read yet.
+      const atStart = { tiles: budgets.tiles.left, bands: budgets.bands.left };
       budgets.spend(painted.spent);
       if (item.kind !== 'group' || painted.rest === undefined || !painted.node) return 0;
       const node = painted.node;
@@ -267,6 +272,10 @@ export class SlidePainter {
       painted.spent = {
         tiles: painted.spent.tiles + more.spent.tiles,
         bands: painted.spent.bands + more.spent.bands,
+      };
+      painted.startLeft = {
+        tiles: painted.reads.tiles ? painted.startLeft.tiles : atStart.tiles,
+        bands: painted.reads.bands ? painted.startLeft.bands : atStart.bands,
       };
       painted.reads = {
         tiles: painted.reads.tiles || more.reads.tiles,
@@ -320,10 +329,11 @@ export class SlidePainter {
         continue;
       }
       if (next.has(item)) {
-        // An item twice in one layout paints twice: one node cannot stand in two places.
+        // An item twice in one layout paints twice: one node cannot stand in two places. The
+        // copy paints again on each paint, so it takes nothing of the frame's budget: the items
+        // after it still paint, and the slide settles.
         const [painted] = paintFresh(item, Infinity);
         this.#twice.push(painted);
-        left -= paintWeight(item);
         if (painted.node) nodes.push(painted.node);
         continue;
       }
