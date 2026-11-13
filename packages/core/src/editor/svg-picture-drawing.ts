@@ -633,7 +633,7 @@ function read(bytes: Uint8Array): SvgPictureDrawing | undefined {
 
   // The root: its own style and transform-free children, in view box space.
   const own = declared(root, 'svg', rules);
-  if (own.get('display') === 'none') return { viewBox, items: [] };
+  if (own.get('display') === 'none') return { viewBox: box, items: [] };
   const style = computed(INITIAL, own);
   const items: SvgPictureItem[] = [];
   for (const c of root.children)
