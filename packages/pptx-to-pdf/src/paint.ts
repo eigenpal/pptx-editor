@@ -668,7 +668,7 @@ async function drawItem(
         p.diag.add(
           'effect.group-text-order',
           'approximation',
-          'Under the soft edge of a group, text that many later shapes cover paints over them.'
+          'Under the soft edge of a group, text under later shapes with long outlines paints over them.'
         );
     }
     const drawContent = async (): Promise<void> => {

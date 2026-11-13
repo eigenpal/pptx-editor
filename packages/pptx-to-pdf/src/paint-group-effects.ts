@@ -111,7 +111,7 @@ export function groupEffectDiagnostics(
     p.diag.add(
       'effect.group-soft-edge',
       'approximation',
-      'The soft edge of a group fades the lightest of the soft edges of its shapes. Its text paints over it unfaded, cut at the outline of a later shape that covers it.'
+      'The soft edge of a group fades the lightest of the soft edges of its shapes. Its text paints over it unfaded, cut at the outline of a later opaque shape that covers it, and over later pictures, tables, and partly transparent shapes.'
     );
   // The mask covers the shapes' areas: their own shadows, glows, and reflections outside them do
   // not show, where the editor's filter fades them with the group.

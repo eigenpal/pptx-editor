@@ -4,13 +4,18 @@
 // to the outside of each later body over it. The SVG paint and the PDF export clip with the same
 // paths.
 
+import type { ResolvedFill } from '../cascade/index.ts';
 import type { LayoutItem, PathCommand } from '../layout/index.ts';
-import { boundsOf, cornersUnder, grow, type Bounds } from './effect-transforms.ts';
+import { boundsOf, grow, type Bounds } from './effect-transforms.ts';
 import { boxCorners, textCorners } from './item-corners.ts';
 import { mapCommands } from './path-data.ts';
 
-/** The most clip paths that the text of one soft-edged group takes (`groupTextCovers`). */
-export const MAX_GROUP_TEXT_CLIPS = 256;
+/**
+ * The most path commands in the clips of the text of one soft-edged group (`groupTextCovers`):
+ * each text that a body covers takes its own copy of the body's outline, so the clips of a group
+ * stay this size whatever the outlines and the number of texts.
+ */
+export const MAX_GROUP_TEXT_CLIP_COMMANDS = 65_536;
 
 /** The clip paths of the text of a soft-edged group's shapes. @internal */
 export interface GroupTextCovers {
@@ -21,19 +26,25 @@ export interface GroupTextCovers {
    */
   readonly clips: ReadonlyMap<LayoutItem, readonly (readonly PathCommand[])[]>;
   /**
-   * False when the text of some shape needs more clips than `MAX_GROUP_TEXT_CLIPS` leaves: that
-   * text paints over the later bodies.
+   * False when the clips of the text of some shape need more commands than
+   * `MAX_GROUP_TEXT_CLIP_COMMANDS` leaves: that text paints over the later bodies.
    */
   readonly complete: boolean;
 }
 
 type BoxItem = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
 
-/** A body that can cover text: its slide-space bounds and outlines. */
+/** A body that can cover text: its slide-space bounds, its outlines, and their commands. */
 interface Body {
   readonly bounds: Bounds;
-  readonly outlines: () => PathCommand[][];
+  readonly outlines: () => readonly PathCommand[][];
+  /** The number of outlines, and of commands in them. */
+  readonly count: number;
+  readonly commands: number;
 }
+
+/** The commands of `boundsPath`. */
+const AROUND = 5;
 
 /** A closed path around bounds. */
 function boundsPath(b: Bounds): PathCommand[] {
@@ -47,16 +58,41 @@ function boundsPath(b: Bounds): PathCommand[] {
 }
 
 /**
- * The body of a shape or picture: the filled paths of its geometry, in slide space. A shape with
- * no fill covers nothing: its outline alone is left out.
+ * Whether a fill surely hides what lies under it: an opaque color, a gradient of opaque stops, or
+ * a pattern of two opaque colors. A picture can hold clear pixels, and a group fill is the group's.
+ */
+function opaque(fill: ResolvedFill): boolean {
+  switch (fill.type) {
+    case 'solid':
+      return fill.color.a >= 1;
+    case 'linear':
+    case 'path':
+      return fill.stops.length > 0 && fill.stops.every((s) => s.color.a >= 1);
+    case 'pattern':
+      return fill.fg.a >= 1 && fill.bg.a >= 1;
+    default:
+      return false;
+  }
+}
+
+/**
+ * The body of a shape that surely hides the text under it: the filled paths of its geometry, in
+ * slide space, under an opaque fill. A picture, a table, a shape whose fill lets text show
+ * through, and a shape whose soft edge or blur fades its body cover nothing: the text paints over
+ * them unclipped.
  */
 function bodyOf(item: BoxItem): Body | undefined {
-  if (item.kind === 'shape' && item.element.fill.type === 'none') return undefined;
+  if (item.kind !== 'shape' || !opaque(item.element.fill)) return undefined;
+  if (item.element.effects?.softEdge || item.element.effects?.blur) return undefined;
   const filled = item.geometry.paths.filter((p) => p.fill !== 'none');
   if (filled.length === 0) return undefined;
+  let outlines: PathCommand[][] | undefined;
   return {
     bounds: boundsOf(boxCorners(item)),
-    outlines: () => filled.map((p) => mapCommands(p.commands, item.matrix)),
+    // Mapped once, when a text first takes it.
+    outlines: () => (outlines ??= filled.map((p) => mapCommands(p.commands, item.matrix))),
+    count: filled.length,
+    commands: filled.reduce((n, p) => n + p.commands.length, 0),
   };
 }
 
@@ -64,11 +100,11 @@ const overlaps = (a: Bounds, b: Bounds): boolean =>
   a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
 
 /**
- * The clips of the text of `group`'s shapes that a later body in the group covers: a shape,
- * picture, or table that paints after the text and whose box meets its text frame. The text of a
+ * The clips of the text of `group`'s shapes that a later body in the group covers: an opaque
+ * shape (`bodyOf`) that paints after the text and whose box meets its text frame. The text of a
  * 3-D shape paints in its face's turned space and takes no clip. A group with effects holds at
  * most `MAX_GROUP_EFFECT_ELEMENTS` items, so the check of each text against each later body stays
- * bounded, and `MAX_GROUP_TEXT_CLIPS` bounds the clips. @internal
+ * bounded, and `MAX_GROUP_TEXT_CLIP_COMMANDS` bounds the clips. @internal
  */
 export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): GroupTextCovers {
   // The bodies and texts in paint order: a shape's text paints over its own body.
@@ -80,13 +116,9 @@ export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): 
         for (const child of item.children) walk(child);
         return;
       case 'frame': {
+        // A table's cells can be clear: it covers nothing.
         if (item.poster) walk(item.poster);
         for (const child of item.drawing ?? item.chart ?? []) walk(child);
-        if (!item.table) return;
-        const w = Math.max(item.element.xfrm.cx, item.table.width);
-        const h = Math.max(item.element.xfrm.cy, item.table.height);
-        const bounds = boundsOf(cornersUnder(item.matrix, w, h));
-        order.push({ body: { bounds, outlines: () => [boundsPath(bounds)] } });
         return;
       }
       default: {
@@ -100,7 +132,7 @@ export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): 
   };
   for (const child of group.children) walk(child);
   const clips = new Map<LayoutItem, PathCommand[][]>();
-  let left = MAX_GROUP_TEXT_CLIPS;
+  let left = MAX_GROUP_TEXT_CLIP_COMMANDS;
   let complete = true;
   const later: Body[] = [];
   for (let i = order.length - 1; i >= 0; i -= 1) {
@@ -109,12 +141,15 @@ export function groupTextCovers(group: Extract<LayoutItem, { kind: 'group' }>): 
     if (!text) continue;
     const over = later.filter((b) => overlaps(b.bounds, text.bounds));
     if (over.length === 0) continue;
-    const outlines = over.flatMap((b) => b.outlines());
-    if (outlines.length > left) {
+    // Each clip is the rectangle around the text and one outline: counted before any is mapped.
+    const outlineCount = over.reduce((n, b) => n + b.count, 0);
+    const commands = over.reduce((n, b) => n + b.commands, 0) + AROUND * outlineCount;
+    if (commands > left) {
       complete = false;
       continue;
     }
-    left -= outlines.length;
+    left -= commands;
+    const outlines = over.flatMap((b) => b.outlines());
     // Around the text, grown by its larger side: text that overflows its frame stays inside.
     const b = text.bounds;
     const around = boundsPath(grow(b, Math.max(b.r - b.x, b.b - b.y)));
