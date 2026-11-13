@@ -501,7 +501,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Display approximate 3-D shapes and blur with @pptx-editor.dev/pro under the EigenPal Pro License. Preset shadows display without the module, but bottom bevels and text effects do not render. PDF export omits blur.',
+      'Display approximate 3-D shapes and blur with @pptx-editor.dev/pro under the EigenPal Pro License. Preset shadows display without the module, but bottom bevels and text effects do not render. PDF export draws blur approximately, with text inside the shape kept sharp.',
     docsLink: '/docs/guides/3d-effects',
   },
 

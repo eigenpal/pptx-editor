@@ -8,10 +8,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //
 // A bevel is a band along the outline, cut into strips. Each strip is tilted by the slope of
 // the preset's profile, and the light of the scene shades it (`three-d-scene.ts`). The profiles
-// are drawn from the preset names of `ST_BevelPresetType` (20.1.10.9) and the reference PDF of
-// the `three-d-effects` fixture; only `circle` and `angle` are fitted. An extrusion shows only
-// when the camera turns: its sides are the outline swept along the turned depth. The face of a
-// turned shape is the flat shape under the camera's linear transform, about its center.
+// of `ST_BevelPresetType` (20.1.10.9) are measured on the reference PDF of the `three-d-effects`
+// fixture: `circle` and `angle` follow their names, and the others are slope tables. The light
+// also shades the face itself (`faceColor`). An extrusion shows only when the camera turns: its
+// sides are the outline swept along the turned depth. The face of a turned shape is the flat
+// shape under the camera's linear transform, about its center.
 
 import type { ResolvedThreeD, Rgba, BevelPresetType } from '@pptx-editor.dev/core/cascade';
 import {
@@ -22,43 +23,68 @@ import {
   type ThreeDInput,
   type ThreeDPaint,
 } from '@pptx-editor.dev/core/layout';
-import { cameraView, lightingOf, normalize, turn, type Lighting } from './three-d-scene.ts';
+import {
+  cameraView,
+  lightingOf,
+  normalize,
+  turn,
+  viewDirection,
+  type Lighting,
+} from './three-d-scene.ts';
 
 type Pt = { readonly x: number; readonly y: number };
 
-/** Strips per bevel. */
-const STRIPS = 8;
+/** Strips per bevel: one for each measured slope. */
+const STRIPS = 12;
 /** Segments per curve when the outline is flattened. */
 const CURVE_STEPS = 12;
 /** The most outline points a 3-D paint takes: a resource limit. More draws the shape flat. */
 const MAX_POINTS = 4096;
 /**
  * The most outline points that bevel strips, contours, and extrusion sides follow: a longer
- * outline keeps every k-th point, so one shape paints at most about 10,000 polygons.
+ * outline keeps every k-th point, so one shape paints at most about 15,000 polygons.
  */
 const MAX_THREE_D_POINTS = 1024;
 
-/** The height of a bevel profile at `t` (0 at the outer edge, 1 at the inner edge), 0 to 1. */
+/**
+ * The measured slopes of the presets that are not `circle` or `angle`: the rise of the profile
+ * over each twelfth of the band, from the outer edge in, for a bevel as high as it is wide.
+ * Each slope is the one that gives, under the light of the scene, the colors of the reference
+ * PDF of the `three-d-effects` fixture (slide 1) on the four sides of the band. A negative slope
+ * falls toward the face: an inset.
+ */
+const MEASURED_SLOPES: Readonly<Record<Exclude<BevelPresetType, 'circle' | 'angle'>, number[]>> = {
+  relaxedInset: [5, 2.42, 1.5, 0.88, 0.82, -1.22, -1.32, -1.06, -0.86, -0.24, -0.24, -0.12],
+  cross: [0.88, 0.02, 0, 0, 0, 1.08, 0.88, 0.04, 0, 0, 0, 0],
+  coolSlant: [5, 4.04, 2.96, 1.96, 0.78, 0.18, 0.06, 0, 0, 0, 0, 0],
+  softRound: [5, 2.74, -1.76, -1.84, -1.38, -1.02, -0.84, -0.68, -0.3, -0.28, -0.2, -0.08],
+  convex: [0.88, 0.08, 0.24, 0.36, 0.68, 0.82, 1, 1.34, 1.64, 2.16, 1.9, 0.1],
+  slope: [5, 5, 1.58, 0.16, 0.04, -0.02, -0.12, -0.78, -2.22, -5, -2.42, -0.14],
+  divot: [5, 3.12, 1.7, 0.96, 0.74, 0.28, 0.18, 0, 0, 0.02, 0.1, 0.1],
+  riblet: [5, 2.02, 1.42, 1.22, 1, 0.82, 0.28, 0.2, 0.06, -0.02, 0.1, 0.12],
+  hardEdge: [5, 4.84, 0.16, 0.02, 0, 0, -0.08, -0.78, -0.66, -0.26, -0.12, -0.02],
+  artDeco: [2.04, 0.8, 0.3, 0.18, 2.2, 1.68, 1, 0.74, 0.32, 0.3, 0.2, 0.08],
+};
+
+/** A profile that rises by `slopes[k] / n` over each of its `n` equal parts. */
+function fromSlopes(slopes: readonly number[]): (t: number) => number {
+  const n = slopes.length;
+  const heights = [0];
+  for (const s of slopes) heights.push(heights[heights.length - 1]! + s / n);
+  return (t) => {
+    const u = Math.max(0, Math.min(1, t)) * n;
+    const k = Math.min(n - 1, Math.floor(u));
+    return heights[k]! + (u - k) * (heights[k + 1]! - heights[k]!);
+  };
+}
+
+/** The height of a bevel profile at `t` (0 at the outer edge, 1 at the inner edge). */
 const PROFILES: Readonly<Record<BevelPresetType, (t: number) => number>> = {
   circle: (t) => Math.sqrt(Math.max(0, 1 - (1 - t) ** 2)),
   angle: (t) => t,
-  relaxedInset: (t) => {
-    if (t < 0.4) return Math.sqrt(Math.max(0, 1 - (1 - t / 0.4) ** 2));
-    const u = (t - 0.4) / 0.6;
-    return 1 - 0.5 * u * (2 - u);
-  },
-  slope: (t) => Math.min(1, t / 0.6),
-  cross: (t) => 1 - 0.5 * Math.max(0, 1 - Math.abs(t - 0.45) / 0.1),
-  softRound: (t) => 1 - (1 - t) ** 3,
-  convex: (t) => Math.sin((Math.PI * t) / 2),
-  coolSlant: (t) => (t < 0.2 ? (0.6 * t) / 0.2 : 0.6 + (0.4 * (t - 0.2)) / 0.8),
-  divot: (t) =>
-    t < 0.5
-      ? Math.sqrt(Math.max(0, 1 - (1 - t / 0.5) ** 2))
-      : 1 - 0.3 * Math.sin((Math.PI * (t - 0.5)) / 0.5),
-  riblet: (t) => 0.5 * t + 0.5 * Math.abs(Math.sin(2 * Math.PI * t)),
-  hardEdge: (t) => Math.min(1, t / 0.15),
-  artDeco: (t) => (t < 0.15 ? t / 0.3 : t < 0.35 ? 0.5 : t < 0.5 ? 0.5 + (t - 0.35) / 0.3 : 1),
+  ...(Object.fromEntries(
+    Object.entries(MEASURED_SLOPES).map(([name, slopes]) => [name, fromSlopes(slopes)])
+  ) as Record<Exclude<BevelPresetType, 'circle' | 'angle'>, (t: number) => number>),
 };
 
 /** The closed outlines of the filled paths, flattened to polygons in the local box. */
@@ -263,7 +289,8 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
   if (!full || full.length === 0) return null;
   const polys = thinned(full);
   const view = cameraView(t);
-  const light = lightingOf(t);
+  const eye = viewDirection(view);
+  const light = lightingOf(t, eye);
   const m = input.matrix;
   const c = apply(m, input.width / 2, input.height / 2);
   const front: Matrix =
@@ -289,7 +316,9 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
     const cColor = t.contourColor ? { ...t.contourColor } : color;
     for (const p of polys) {
       const normals = edgeNormals(p);
-      const ring = offset(p, normals, -t.contourW);
+      // The contour lies across the edge: half of it shows outside the outline, and the face
+      // covers the rest (measured on the fixture, slide 2).
+      const ring = offset(p, normals, -t.contourW / 2);
       for (let i = 0; i < p.length; i += 1) {
         const j = (i + 1) % p.length;
         under.push({ points: [ring[i]!, ring[j]!, p[j]!, p[i]!], color: cColor });
@@ -297,6 +326,11 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
     }
   }
   const depth = t.extrusionH + (t.bevelBottom?.h ?? 0) + (t.bevelTop?.h ?? 0);
+  // The back of a turned extrusion, from the face: the turned depth axis.
+  const back =
+    depth > 0 && view.kind === 'turn'
+      ? { x: view.rotation[0][2] * depth, y: view.rotation[1][2] * depth }
+      : undefined;
   if (depth > 0 && view.kind !== 'front') {
     const side = t.extrusionColor ? { ...t.extrusionColor, a: 1 } : color;
     const faces: { facet: Quad; z: number }[] = [];
@@ -326,7 +360,7 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
           return { x: c.x + r[0], y: c.y + r[1], z: r[2] };
         };
         const corners = [proj(a, 0), proj(b, 0), proj(b, depth), proj(a, depth)];
-        // The light turns with the camera: a side keeps the light of its own normal.
+        // The light lies in the shape's axes: a side takes the light of its own normal.
         const { level, white } = light.shade([n.x, n.y, 0]);
         faces.push({
           facet: { points: corners.map(({ x, y }) => ({ x, y })), color: lit(side, level, white) },
@@ -351,9 +385,14 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
     return null;
   // A face turned edge-on has no area: only the extrusion shows (a turn of 90 degrees).
   const showsFace = Math.abs(front[0] * front[3] - front[1] * front[2]) >= MIN_DETERMINANT;
+  // The light of the face itself, for a solid fill: the face is a surface of the scene too.
+  // A camera behind the shape sees the back of the face.
+  const faceShade = light.shade([0, 0, eye[2] < 0 ? -1 : 1]);
   return {
     front,
     showsFace,
+    faceColor: lit(input.color, faceShade.level, faceShade.white),
+    ...(back && Number.isFinite(back.x) && Number.isFinite(back.y) ? { backOffset: back } : {}),
     behind: merge(behind),
     under: merge(under),
     over: merge(over),

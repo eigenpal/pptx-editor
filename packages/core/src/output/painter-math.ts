@@ -4,7 +4,13 @@
 // a public API.
 
 import type { EffectPlacement, GradientStop, ResolvedFill, Rgba } from '../cascade/index.ts';
-import type { GeometryPath, LayoutItem, Matrix, ThreeDFacet } from '../layout/index.ts';
+import type {
+  GeometryPath,
+  LayoutItem,
+  Matrix,
+  ThreeDFacet,
+  ThreeDPaint,
+} from '../layout/index.ts';
 import {
   applyBlipColorSteps,
   blipColorSteps,
@@ -99,6 +105,22 @@ export function threeDColor(fill: ResolvedFill): Rgba {
     return fill.stops[Math.floor(fill.stops.length / 2)]!.color;
   if (fill.type === 'pattern') return fill.fg;
   return { r: 128, g: 128, b: 128, a: 1 };
+}
+
+/**
+ * The shape or picture whose face a 3-D paint lights: a solid fill takes the paint's face color
+ * (`ThreeDPaint.faceColor`), so the SVG paint and the PDF writer fill the same lit face. Other
+ * fills keep their colors.
+ * @internal
+ */
+export function threeDFaceItem<
+  T extends Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
+>(item: T, paint: ThreeDPaint | null): T {
+  const face = paint?.faceColor;
+  const fill = item.element.fill;
+  if (!face || fill.type !== 'solid' || ![face.r, face.g, face.b, face.a].every(Number.isFinite))
+    return item;
+  return { ...item, element: { ...item.element, fill: { type: 'solid', color: face } } };
 }
 
 /**

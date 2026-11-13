@@ -41,7 +41,7 @@ import {
   stroke,
   type PDFName,
 } from 'pdf-lib';
-import type { Rgba } from '@pptx-editor.dev/core/cascade';
+import type { ResolvedFill, Rgba } from '@pptx-editor.dev/core/cascade';
 import {
   apply,
   ARROW_MITER_LIMIT,
@@ -58,7 +58,12 @@ import {
   type PathCommand,
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
-import { blurSigma, effectBoxCorners, effectMatrix } from '@pptx-editor.dev/core/output';
+import {
+  blurSigma,
+  effectBoxCorners,
+  effectMatrix,
+  threeDColor,
+} from '@pptx-editor.dev/core/output';
 import {
   glowSpread,
   innerShadowShift,
@@ -159,7 +164,11 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
       'Soft edges fade by the distance to the painted edge: corners round.'
     );
   if (pro && effects.blur && effects.blur.radius > 0)
-    p.diag.add('effect.blur', 'approximation', 'Blur is not drawn.');
+    p.diag.add(
+      'effect.blur',
+      'approximation',
+      'Blur is drawn as an edge fade and layered rings: text and detail inside the shape stay sharp.'
+    );
   if (
     pro &&
     reflection &&
@@ -704,13 +713,9 @@ function softEdgeSilhouette(
 
 /**
  * Paint `drawBody` (the geometry, its bevel, and the inner shadow, in slide space) through the
- * item's soft edge, as the SVG renderer's body filter: as one transparency group under a
- * luminosity soft mask whose alpha follows everything the body paints (the fill and the outline)
- * shrunk by 0.84 times the radius and blurred by the radius (`softEdgeSpread`). The mask holds
- * the alpha by the distance to the painted edge, in bands: inside a filled path, strokes of the
- * path from the widest band in; on the outline, outside the filled paths, strokes of the outline
- * from the full width in. At a corner a band rounds where the blur takes the product of the two
- * edges. Without a soft edge, `drawBody` paints as it is.
+ * item's soft edge, as the SVG renderer's body filter: an edge fade (`drawEdgeFade`) of
+ * everything the body paints, shrunk by 0.84 times the radius and blurred by the radius
+ * (`softEdgeSpread`). Without a soft edge, `drawBody` paints as it is.
  */
 export async function drawSoftEdge(
   item: Drawable,
@@ -734,6 +739,28 @@ export async function drawSoftEdge(
   const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
   if (Math.abs(spread) > narrow / 2) return;
   const inset = Math.min(Math.abs(spread), MAX_MORPH_SPREAD);
+  await drawEdgeFade(shape, p, inset, sigma, corners, drawBody);
+}
+
+/**
+ * Paint `drawBody` as one transparency group under a luminosity soft mask whose alpha follows
+ * the painted edge of `shape` (the fill and the outline) shrunk by `inset` and blurred by
+ * `sigma`. The mask holds the alpha by the distance to the painted edge, in bands: inside a
+ * filled path, strokes of the path from the widest band in; on the outline, outside the filled
+ * paths, strokes of the outline from the full width in. At a corner a band rounds where the blur
+ * takes the product of the two edges. `corners` bound the shape in slide space.
+ */
+async function drawEdgeFade(
+  shape: SoftEdgeSilhouette,
+  p: PageOps,
+  inset: number,
+  sigma: number,
+  corners: readonly { x: number; y: number }[],
+  drawBody: () => Promise<void>
+): Promise<void> {
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
   const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });
   const { reach, alpha } = softEdgeBands(inset, sigma);
   const extent = reach[reach.length - 1] ?? 0;
@@ -800,4 +827,62 @@ export async function drawSoftEdge(
     p.res.doc.context.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: mask } })
   );
   p.push(drawObject(p.name('XObject', body)), popGraphicsState());
+}
+
+/** The color of a painted edge: the representative color of a fill (`threeDColor`). */
+function edgeColor(fill: ResolvedFill, scope: FillScope): Rgba {
+  return threeDColor(ownFill(fill, scope).fill);
+}
+
+/**
+ * Paint `drawBody` through the item's blur (`a:blur`, ECMA-376 Part 1, 20.1.8.15), as the SVG
+ * renderer's blur filter with the kernel of the shadows (`blurSigma`): inside the painted edge,
+ * the body fades to half its alpha at the edge (an edge fade with no inset). With `grow`, a halo
+ * in the color of the painted edge (the outline, else the fill) lies outside the filled paths,
+ * as layered rings of the blurred profile. Text and detail inside the shape stay sharp.
+ */
+export async function drawBlur(
+  item: Drawable,
+  p: PageOps,
+  scope: FillScope,
+  groupScale: number,
+  drawBody: () => Promise<void>
+): Promise<void> {
+  const blur = item.element.effects?.blur;
+  const m = item.matrix;
+  const sigma = blur ? blurSigma(blur.radius) : 0;
+  if (!blur || sigma < MIN_SIGMA || !proEffects() || Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9)
+    return drawBody();
+  const shape = softEdgeSilhouette(item, scope, groupScale);
+  if (shape.filled.length === 0 && shape.outlines.length === 0) return drawBody();
+  const corners = effectBoxCorners(item);
+  if (blur.grow) {
+    const el = item.element;
+    const line = item.paintLine ?? el.line;
+    const color = shape.width > 0 && line ? edgeColor(line.fill, scope) : edgeColor(el.fill, scope);
+    p.push(pushGraphicsState());
+    // Outside the filled paths only: inside, the faded body gives the profile.
+    if (shape.filled.length) {
+      const xs = corners.map((c) => Math.abs(c.x));
+      const ys = corners.map((c) => Math.abs(c.y));
+      const r = 4 * (Math.max(...xs, ...ys) + 3 * sigma + shape.width);
+      tracePath(
+        [
+          { op: 'M', x: -r, y: -r },
+          { op: 'L', x: r, y: -r },
+          { op: 'L', x: r, y: r },
+          { op: 'L', x: -r, y: r },
+          { op: 'Z' },
+        ],
+        p
+      );
+      for (const path of shape.filled) tracePath(path, p);
+      p.push(clipEvenOdd(), endPath());
+    }
+    const identity: Matrix = [1, 0, 0, 1, 0, 0];
+    for (const cls of await silhouette(item, identity, p, scope))
+      await drawLayers(cls.parts, color, blurLayers(color.a, sigma, cls.bandWidth, 0), p);
+    p.push(popGraphicsState());
+  }
+  await drawEdgeFade(shape, p, 0, sigma, corners, drawBody);
 }

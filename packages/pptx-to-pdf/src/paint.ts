@@ -42,6 +42,7 @@ import {
   strokeCap,
   strokeWidth,
   type LayoutItem,
+  type Matrix,
   type PathCommand,
   type SlideLayout,
   type StrokePlan,
@@ -49,6 +50,7 @@ import {
 import {
   compoundPlan,
   MAX_OVERLAY_PATHS,
+  threeDFaceItem,
   type CompoundBand,
   type CompoundBandLine,
   type CompoundPlan,
@@ -58,6 +60,7 @@ import {
   drawShadows,
   drawInnerShadow,
   drawReflection,
+  drawBlur,
   drawSoftEdge,
   effectDiagnostics,
 } from './paint-effects.ts';
@@ -514,17 +517,20 @@ async function drawItem(
   const drawContent = async (): Promise<void> => {
     if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
     // The soft edge fades the body (the geometry, its bevel, and the inner shadow), not the text,
-    // as in the SVG paint.
-    await drawSoftEdge(item, p, local, groupScale, async () => {
-      p.push(pushGraphicsState());
-      p.matrix(item.matrix);
-      if (threeD) fillFacets(threeD.under, p);
-      await drawGeometry(item, p, local, groupScale);
-      if (threeD) fillFacets(threeD.over, p);
-      p.push(popGraphicsState());
-      // Over the geometry and under the text, in slide space.
-      if (shown) await drawInnerShadow(item, p, local);
-    });
+    // as in the SVG paint. The blur fades the body after the soft edge.
+    const drawBody = (): Promise<void> =>
+      drawSoftEdge(item, p, local, groupScale, async () => {
+        p.push(pushGraphicsState());
+        p.matrix(item.matrix);
+        if (threeD) fillFacets(threeD.under, p);
+        await drawGeometry(threeDFaceItem(item, threeD), p, local, groupScale);
+        if (threeD) fillFacets(threeD.over, p);
+        p.push(popGraphicsState());
+        // Over the geometry and under the text, in slide space.
+        if (shown) await drawInnerShadow(item, p, local);
+      });
+    if (shown) await drawBlur(item, p, local, groupScale, drawBody);
+    else await drawBody();
     // An empty body's caret line draws nothing: no operators for it.
     if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
       p.push(pushGraphicsState());
@@ -542,9 +548,14 @@ async function drawItem(
   // The reflection, shadows, glow, and extrusion paint under the content, in the SVG paint's
   // order; the shadows and the glow take the camera's turn of the face.
   const face = faceMatrix(threeD);
+  // A turned extrusion casts its shadows and its glow from its back, as in the SVG paint.
+  const back = threeD?.backOffset;
+  const cast: Matrix = back
+    ? [face[0], face[1], face[2], face[3], face[4] + back.x, face[5] + back.y]
+    : face;
   if (shown) await drawReflection(item, p, drawContent);
-  if (shown) await drawShadows(item, p, local, face);
-  if (shown) await drawGlow(item, p, local, face);
+  if (shown) await drawShadows(item, p, local, cast);
+  if (shown) await drawGlow(item, p, local, cast);
   if (threeD) fillFacets(threeD.behind, p);
   await drawContent();
 }
