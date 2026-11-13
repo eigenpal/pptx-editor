@@ -8,8 +8,8 @@
 // (`math-ink.ts`), and line extent (`math-line-extent.ts`) is DOCX Editor's equation layout
 // (eigenpal/docx-editor, packages/core/src/layout/equation-layout.ts and its other `equation-*.ts`
 // modules at adf0e178c, Apache-2.0), with its script sizes; each module names the constants that
-// the reference PDFs change. The constants are measured on the reference PDF of the `equations`
-// fixture (STIX Two Math, 18 pt). Where a run's font is not available, the runs draw in STIX Two
+// the reference PDFs change. The constants are measured on the reference PDFs of the `equations`
+// and `equation-lines` fixtures (STIX Two Math, 18 pt). Where a run's font is not available, the runs draw in STIX Two
 // Math or Latin Modern Math when the host has them, else in the serif text face, with italic
 // letters instead of math alphanumerics. The known approximation `equations` lists what differs.
 
@@ -37,7 +37,7 @@ import {
   rect,
   stroke,
 } from './math-marks.ts';
-import { mathLineExtent } from './math-line-extent.ts';
+import { MATH_LEADING, mathLineExtent } from './math-line-extent.ts';
 import { mathInkOf } from './math-ink.ts';
 import { scriptShifts } from './math-scripts.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
@@ -50,9 +50,9 @@ const C = {
   rule: 0.055,
   numDisplay: 0.76,
   denDisplay: 0.667,
-  numText: 0.52,
-  denText: 0.453,
-  gapDisplay: 0.165,
+  numText: 0.58,
+  denText: 0.51,
+  gapDisplay: 0.125,
   gapText: 0.055,
   sup: 0.36,
   supCramped: 0.293,
@@ -66,11 +66,6 @@ const C = {
   radGap: 0.178,
   radBottom: 0.087,
   radMinContent: 0.66,
-  // The room a radical claims on its line above its rule: the radical extra ascender of
-  // OpenType MATH, the value of STIX Two Math. On the reference PDF of `equations`, the lines of
-  // `√(x+1)`, `∛8 = 2`, and `a_(n+1) = √(a_n + 1)` come 0.29 pt nearer (0.66, 1.38, and 0.42 pt
-  // off, against 0.95, 1.67, and 0.71 pt with the rule's outline alone).
-  radExtraAscender: 0.078,
   delimMin: 0.927,
   delimFactor: 0.9,
   delimPad: 0.02,
@@ -111,6 +106,8 @@ export interface MathGlyphs {
   readonly props: RunProps;
   /** The script level of the piece: 0 for the base, 1 for a script, 2 for a script of a script. */
   readonly level: 0 | 1 | 2;
+  /** Normal text (`m:nor`): the run's own text, not math text. */
+  readonly normal?: true;
 }
 
 /** A filled mark: a rule, the radical sign, a delimiter, a brace, or an arrow. */
@@ -241,7 +238,14 @@ function mathFace(
 }
 
 /** One piece of text in one face as a box. */
-function textBox(text: string, face: ResolvedFace, size: number, props: RunProps, env: Env): Box {
+function textBox(
+  text: string,
+  face: ResolvedFace,
+  size: number,
+  props: RunProps,
+  env: Env,
+  normal = false
+): Box {
   const em = size * EMU_PER_PT;
   const adv = env.measurer.advances(face, text);
   const x = [0];
@@ -270,6 +274,7 @@ function textBox(text: string, face: ResolvedFace, size: number, props: RunProps
       sizePt: size,
       props,
       level: env.level,
+      ...(normal ? { normal: true as const } : {}),
     });
     i = j;
   }
@@ -300,7 +305,7 @@ function runItems(run: MathRun, env: Env): Item[] {
       bold: props.bold,
       italic: props.italic,
     });
-    return run.text ? [{ box: textBox(run.text, face, size, props, env), cls: 'ord' }] : [];
+    return run.text ? [{ box: textBox(run.text, face, size, props, env, true), cls: 'ord' }] : [];
   }
   const style: MathStyle = run.sty ?? env.sty ?? 'i';
   const bold = style === 'b' || style === 'bi';
@@ -448,10 +453,12 @@ function fraction(node: Extract<MathNode, { kind: 'frac' }>, env: Env): Box {
   // A stack with no bar (`noBar`) keeps the places of a fraction with one. Each part sits at
   // least a fixed shift from the baseline, and further when its ink would come closer to the
   // rule than the minimum gap, as in DOCX Editor (`equation-layout.ts`). The shifts and gaps
-  // are measured on the reference PDF of `equations`: with DOCX Editor's inline constants
-  // (1200/2048 and 1030/2048 em, gaps and rule 133/2048 em, axis 585/2048 em), the lines under
-  // a nested fraction move up to 2 pt from the reference (`equation-lines`, slide 1: 2.91 pt,
-  // against 0.91 pt).
+  // are measured on the reference PDFs of `equations` and `equation-lines`. A fraction in the
+  // numerator or the denominator of a display fraction is in text style: in `(1/x)/2`,
+  // `(a/b)/2`, and `2/(a/b)`, its baselines are 19.4 to 19.9 pt apart at 18 pt (1.09 em), and
+  // the gap of the outer fraction puts its numerator 0.44 em above the outer baseline (the axis,
+  // half the rule, and the display gap). With the earlier text constants (0.52 and 0.453 em)
+  // and display gap (0.165 em), the parts of a nested fraction were up to 2.5 pt off.
   const gap = (env.display ? C.gapDisplay : C.gapText) * em;
   const u = Math.max((env.display ? C.numDisplay : C.numText) * em, a + t / 2 + gap + n.desc);
   const v = Math.max((env.display ? C.denDisplay : C.denText) * em, d.asc + gap + t / 2 - a);
@@ -524,7 +531,11 @@ function radical(node: Extract<MathNode, { kind: 'rad' }>, env: Env): Box {
   out.marks.push({
     props,
     commands: rect(signX + signW, top - t, end - signX - signW, t),
-    claimAbove: C.radExtraAscender * em,
+    // The rule claims the math leading above it, as a glyph does above its ink. On the reference
+    // PDFs, the lines of `√(x+1)` (below and above a text line), `∛8 = 2`, and
+    // `a_(n+1) = √(a_n + 1)` are within 0.6 pt, against up to 2 pt with the radical extra
+    // ascender of STIX Two Math (0.078 em).
+    claimAbove: MATH_LEADING * em,
   });
   out.asc = Math.max(out.asc, top);
   out.desc = Math.max(out.desc, -bottom);
@@ -851,15 +862,10 @@ export function layoutMath(zone: MathZone, measurer: TextMeasurer, fontScale: nu
   const box = lines.length === 1 ? lines[0]! : stackRows(lines, C.eqArrRow, em, C.axis * em);
   const base = mathFace(measurer, zone.props.latin, false, false).face;
   const size = sizePt(zone.props, env);
-  // The line already holds the base runs' face (`face`, `sizePt`). Each other part claims its
-  // own extent on the line (`math-line-extent.ts`): a glyph its ink, and a mark its outline.
-  // Measured on the reference PDFs of `equations`, `equation-lines`, and `preserved-content`,
-  // slide 1, at single spacing: stacked superscript lines come within 0.12 pt, and a text line
-  // below an equation within 0.1 pt (`E = mc²`, normal-text scripts, `preserved-content`) to
-  // 1 pt (0.91 pt below a nested fraction, 0.99 pt below two superscript lines). Below a display
-  // fraction alone on its line, the text line is 9 pt low: the reference draws that fraction
-  // 8 pt shorter, with 2.5 pt between the numerator and the rule where this layout leaves 7.75
-  // pt. With each face's ascent and descent instead of the ink, the next line is 3 to 18 pt low.
+  // The line already holds the band of the base runs' size (`sizePt`). Each other part claims
+  // its own extent on the line (`math-line-extent.ts`): a glyph its ink and the math leading
+  // above it, and a mark its outline. With each face's ascent and descent instead of the ink,
+  // the next line is 3 to 18 pt low on the reference PDFs of `equations` and `equation-lines`.
   const extent = mathLineExtent(box.glyphs, box.marks, size, measurer);
   const out: MathBox = {
     lineAscent: extent.ascent,

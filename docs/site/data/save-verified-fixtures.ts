@@ -89,7 +89,8 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * `objects.diagrams` copy, which types in, adds, and deletes diagram shapes, and
  * `review.comments` and `slides.structure`, with comment parts saved as XML trees, no prompt.
  * On 8 November 2026: the new `objects.equations` copy, whose inserted equation box is shorter
- * after the change to equation line heights, no prompt.
+ * after the change to equation line heights, no prompt. On 13 November 2026: the
+ * `objects.equations` copy after the change to equation line spacing, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -112,7 +113,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
     'sha256:37e710090974cae1ffd0a0fb047f4ee7ffeffd845c72ffd4acd6bdd4b49be27f',
   'objects.charts': 'sha256:82b50397e0ff8613b6198d351393aa7e6953924f39a5064b18e6a909b412e1d8',
   'objects.diagrams': 'sha256:376fb84db5305fe825baeb1e64f7dc9cd7b0418fce156bda3238cf55498b3e8b',
-  'objects.equations': 'sha256:a3dfb32297e806f1c1879ef4746d646914def5fd40e338524cb1049dc5e0810a',
+  'objects.equations': 'sha256:41fb0b674839ee40af07cf38090533cec20e011c043ae95430db039ae952d773',
   'objects.media-ole': 'sha256:1bbe774aba3c5a603055c432f37718cd2acbfbd8e24fa7fe2beff9a04b63d5b2',
   'paragraphs.alignment': 'sha256:c0670263a946c3b5caa6e64dc55753b44a30ad25a0b535766ec3b3d86a813360',
   'paragraphs.autofit': 'sha256:b0817fe90eb17090756d5109eaf2860919aced976a527b515411e72e9fe54b64',
