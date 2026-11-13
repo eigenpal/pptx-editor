@@ -31,7 +31,7 @@ import {
 import { layoutMath, type MathBox } from './math-layout.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
 import { justifyExtra } from './justify.ts';
-import { leadingOffset, paragraphAlignment } from './paragraph-alignment.ts';
+import { leadingOffset, paragraphAlignment, rtlLeadingEdge } from './paragraph-alignment.ts';
 import { bidiPieces, paragraphBidiOf, type ParagraphBidi } from './rtl-paragraph.ts';
 import type { WarpedRun } from './text-warp.ts';
 import type { PathCommand } from '@eigenpal/ooxml-core';
@@ -511,6 +511,8 @@ export function layoutTextOn(
   const reduction = bp.autofit.kind === 'normal' ? bp.autofit.lineSpaceReduction : 0;
   const columns = bp.numCol;
   const colW = columns > 1 ? (innerW - bp.spcCol * (columns - 1)) / columns : innerW;
+  // A right-to-left line ends at the column width in whole points (`rtlLeadingEdge`).
+  const rtlEdge = rtlLeadingEdge(colW);
   const wrap = bp.wrap === 'square';
   const substitutions = new Set<string>();
   const lines: Line[] = [];
@@ -637,7 +639,7 @@ export function layoutTextOn(
     const placeMarker = (m: GlyphRun, shift: number): GlyphRun => {
       const x0 = m.x[0];
       const w = m.x[m.x.length - 1] - x0;
-      const at = (p.rtl ? colW - x0 - w - shift : x0 + shift) + bp.lIns;
+      const at = (p.rtl ? rtlEdge - x0 - w - shift : x0 + shift) + bp.lIns;
       return { ...m, x: m.x.map((v) => v - x0 + at) };
     };
     const avail = (first: boolean): number => colW - lineLeft(first) - p.marR;
@@ -834,7 +836,7 @@ export function layoutTextOn(
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;
       let caretX: number[] = [];
       let lineBidi: LineBidi | undefined;
-      const origin = (p.rtl ? colW - left - shift : left + shift) + bp.lIns;
+      const origin = (p.rtl ? rtlEdge - left - shift : left + shift) + bp.lIns;
       let x = origin;
       const runs: GlyphRun[] = [];
       const marks: LineMark[] = [];
@@ -870,7 +872,7 @@ export function layoutTextOn(
       if (bidiLine) {
         // Justification widened the line: its right edge moved with it.
         const shown = bidiLine.contentRight - bidiLine.contentLeft;
-        const lineLeftX = (p.rtl ? colW - left - shift - shown : left + shift) + bp.lIns;
+        const lineLeftX = (p.rtl ? rtlEdge - left - shift - shown : left + shift) + bp.lIns;
         placeBidiRuns(bidiLine, lineLeftX, range.start, units, segments, runs, marks);
         caretX = bidiCaretX(bidiLine, range.start, range.end - range.start, advance).map(
           (v) => v + lineLeftX
