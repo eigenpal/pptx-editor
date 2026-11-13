@@ -83,6 +83,7 @@ describe('approximations a slide uses', () => {
       'shadow-skew',
       'glow-soft-edge',
       'compound-lines',
+      'underline-styles',
       'script-fonts',
       'rtl',
       'script-size',

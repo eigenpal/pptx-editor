@@ -124,8 +124,8 @@ describe('underlineRings', () => {
       [7, 7],
       [14, 0],
     ]);
-    // It ends at the first half period past the run end.
-    expect(spans([wave!])).toEqual([[0, 105]]);
+    // It ends at the first top past the run end: 16 half periods.
+    expect(spans([wave!])).toEqual([[0, 112]]);
   });
 
   test('a heavy wave has a band of t / 2, at least 2 pt; a double wave has two of t', () => {
@@ -135,6 +135,20 @@ describe('underlineRings', () => {
       [-2, 2],
       [2, 6],
     ]);
+  });
+
+  test('where t is 1 pt, a heavy zigzag is 3 pt high and each double zigzag 2 pt', () => {
+    // A 1 pt thickness at 10 to 14 pt: the half period stays 1 pt, so the zigzags grow.
+    const small = (style: string): UnderlineRing[] =>
+      underlineRings(style, 0, 0, 20 * PT, 0, 0.5 * PT, PT);
+    expect(bands(small('wavy'))).toEqual([[0, 2]]);
+    expect(bands(small('wavyHeavy'))).toEqual([[0, 3]]);
+    expect(bands(small('wavyDbl'))).toEqual([
+      [-0.5, 1.5],
+      [1.5, 3.5],
+    ]);
+    // A zigzag, not a solid bar: 1 pt half periods.
+    expect(small('wavyHeavy')[0]!.length).toBeGreaterThan(20);
   });
 });
 

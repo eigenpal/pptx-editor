@@ -80,6 +80,31 @@ function lineSlide(): FixtureSlide {
   };
 }
 
+/** Underline outlines with dashes, caps, and a gradient, and waves at small sizes. */
+function outlineSlide(): FixtureSlide {
+  const row = (text: string, attrs: string, children: string): string =>
+    para(run(text, attrs, children), SPACED);
+  const grad =
+    '<a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="C00000"/></a:gs>' +
+    '<a:gs pos="100000"><a:srgbClr val="0070C0"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill>';
+  const waves = ['wavy', 'wavyHeavy', 'wavyDbl'];
+  return {
+    shapes:
+      box(2, 0.4 * IN, 0.3 * IN, 6.1 * IN, 6.9 * IN,
+        row('Outline red, dashed', 'sz="2800" u="sng"', uLn(25400, red + '<a:prstDash val="dash"/>')) +
+        row('Outline red, round dots', 'sz="2800" u="sng"', uLn(38100, red + '<a:prstDash val="sysDot"/>').replace('<a:uLn ', '<a:uLn cap="rnd" ')) +
+        row('Outline gradient', 'sz="2800" u="sng"', uLn(25400, grad)) +
+        row('Dashed style, outline red', 'sz="2800" u="dash"', uLn(12700, red)) +
+        row('Wavy, outline red', 'sz="2800" u="wavy"', uLn(12700, red)) +
+        row('Heavy, outline blue 1 pt', 'sz="2800" u="heavy"', uLn(12700, blue)),
+        'EEF3FA') +
+      box(3, 6.8 * IN, 0.3 * IN, 6.1 * IN, 6.9 * IN,
+        [1000, 1200, 1400, 1600].map((sz) =>
+          para(waves.map((u) => run(`${u} ${sz / 100} pt `, `sz="${sz}" u="${u}"`)).join(''), SPACED)).join(''),
+        'FDF2E9'),
+  };
+}
+
 const SIZES = [1000, 1400, 1800, 2400, 3200, 4400, 6000] as const;
 const OFFSETS = [10000, 30000, 50000, 80000, -10000, -25000, -50000] as const;
 
@@ -104,6 +129,6 @@ function capsScriptsSlide(): FixtureSlide {
 }
 
 export const underlineStylesFixtures: Record<string, FixtureSlide[]> = {
-  'underline-styles': [smallSlide(), largeSlide(), lineSlide()],
+  'underline-styles': [smallSlide(), largeSlide(), lineSlide(), outlineSlide()],
   'caps-scripts': [capsScriptsSlide()],
 };

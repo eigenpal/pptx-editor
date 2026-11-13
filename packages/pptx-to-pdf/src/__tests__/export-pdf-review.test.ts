@@ -459,6 +459,22 @@ describe('diagnostics placement', () => {
       )
     );
     expect(styles.diagnostics.filter((d) => d.severity !== 'information')).toEqual([]);
+    // A gradient underline outline draws in its middle color, as other gradient lines do.
+    const gradient = await exportPdf(
+      deckOf(
+        run(
+          'Gradient',
+          'u="sng"',
+          '<a:uLn w="25400"><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="C00000"/></a:gs>' +
+            '<a:gs pos="100000"><a:srgbClr val="0070C0"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></a:uLn>'
+        )
+      ),
+      BEST
+    );
+    expect(gradient.diagnostics.map((d) => [d.code, d.severity])).toContainEqual([
+      'line.gradient',
+      'approximation',
+    ]);
   });
 
   test('the font resolution lists no substitute failures when the packaged faces load', async () => {

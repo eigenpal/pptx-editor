@@ -30,6 +30,8 @@ const MAX_PIECES = 20_000;
 /** The thin wave's band, and the least band of the heavy wave, in EMU (1 and 2 pt). */
 const WAVE_BAND = EMU_PER_PT;
 const HEAVY_WAVE_MIN_BAND = 2 * EMU_PER_PT;
+/** The least half period of a zigzag, in EMU (1 pt). */
+const MIN_WAVE_HALF = EMU_PER_PT;
 
 /** The plain style of a heavy style, and whether the style is heavy. */
 function plainStyle(style: string): { readonly plain: string; readonly heavy: boolean } {
@@ -57,24 +59,27 @@ function rect(x0: number, x1: number, y0: number, y1: number): UnderlineRing {
 }
 
 /**
- * A zigzag from `x0` to at least `x1` between `top` and `bottom`, with a vertical band of `band`
- * and 45° slopes: each half period is the height less the band. The zigzag starts at the top
- * at `origin` plus a whole number of half periods, so runs of one line keep one phase, and it
- * ends at the first half period at or past `x1`.
+ * A zigzag from `x0` to at least `x1` that hangs from `top`, `height` high, with a vertical band
+ * of `band` and 45° slopes: each half period is the height less the band, at least 1 pt, and a
+ * band that leaves less makes the zigzag taller. The zigzag starts at the top at `origin` plus a
+ * whole number of half periods, so runs of one line keep one phase, and it ends at the first
+ * top at or past `x1`. Returns the zigzag and its bottom.
  */
 function wave(
   origin: number,
   x0: number,
   x1: number,
   top: number,
-  bottom: number,
+  height: number,
   band: number
-): UnderlineRing[] {
-  const half = bottom - top - band;
-  if (!(half > (bottom - top) / 4) || (x1 - x0) / half > MAX_PIECES)
-    return [rect(x0, x1, top, bottom)];
+): { readonly rings: UnderlineRing[]; readonly bottom: number } {
+  const half = Math.max(height - band, MIN_WAVE_HALF);
+  const bottom = top + half + band;
+  if ((x1 - x0) / half > MAX_PIECES) return { rings: [rect(x0, x1, top, bottom)], bottom };
   const k0 = Math.floor((x0 - origin) / half + 1e-9);
-  const k1 = Math.max(k0 + 1, Math.ceil((x1 - origin) / half - 1e-9));
+  // It ends on a top: at the first top at or past `x1`.
+  const end = Math.max(k0 + 1, Math.ceil((x1 - origin) / half - 1e-9));
+  const k1 = end + (end & 1);
   const upper: [number, number][] = [];
   const lower: [number, number][] = [];
   for (let k = k0; k <= k1; k += 1) {
@@ -83,7 +88,7 @@ function wave(
     upper.push([x, peak ? top : bottom - band]);
     lower.push([x, peak ? top + band : bottom]);
   }
-  return [[...upper, ...lower.reverse()]];
+  return { rings: [[...upper, ...lower.reverse()]], bottom };
 }
 
 /** Dashes of `pattern` × `unit` from `origin`, cut to [x0, x1], between `y0` and `y1`. */
@@ -116,8 +121,8 @@ function dashes(
 /**
  * The shapes of an underline of `style` from `x0` to `x1` on the baseline `y`, all in EMU, y
  * down. `top` is the distance from the baseline down to the top of a single underline, and
- * `thickness` is its thickness: the face's `post` underline position and thickness. `origin` is
- * where the dash pattern and the wave start.
+ * `thickness` is its thickness in whole points. `origin` is where the dash pattern and the
+ * zigzag start.
  *
  * Measured on the reference PDF of `underline-styles`, with `t` the thickness and `p` the top:
  * - `sng` and `words` are one bar from `p` to `p + t`. `words` underlines the spaces too.
@@ -127,10 +132,12 @@ function dashes(
  *   that start with a dash at `origin`: `dotted` 1 on and 1 off, `dash` 3 on and 2 off,
  *   `dashLong` 7 on and 4 off, `dotDash` 3, 2, 1, 2, and `dotDotDash` 3, 2, 1, 2, 1, 2, all in
  *   multiples of `t`, also for the heavy styles. The last dash ends at `x1`.
- * - `wavy` and `wavyHeavy` are a zigzag with 45° slopes, 2 `t` high, centered on the single
- *   bar. Its band is 1 pt high for `wavy` and `t / 2`, at least 2 pt, for `wavyHeavy`. `wavyDbl`
- *   is two zigzags of the thin band, each `t` high, from `p - t` to `p` and from `p` to `p + t`.
- *   A zigzag ends at the first half period at or past `x1`.
+ * - `wavy` and `wavyHeavy` are a zigzag with 45° slopes, 2 `t` high, that hangs from the
+ *   baseline. The band is 1 pt high for `wavy`, and `t / 2`, at least 2 pt, for `wavyHeavy`.
+ *   `wavyDbl` is two zigzags of the thin band, each `t` high, the first from `p - t`.
+ * - A half period is at least 1 pt, and a band that leaves less makes the zigzag taller: where
+ *   `t` is 1 pt, the heavy zigzag is 3 pt high and each double zigzag 2 pt. A zigzag ends at the
+ *   first top at or past `x1`.
  * @internal
  */
 export function underlineRings(
@@ -146,19 +153,19 @@ export function underlineRings(
   const t = thickness;
   const p = y + top;
   const { plain, heavy } = plainStyle(style);
-  const [y0, y1] = heavy ? [p - t, p + t / 2] : [p, p + t];
   const pattern = DASHES[plain];
+  const [y0, y1] = heavy ? [p - t, p + t / 2] : [p, p + t];
   if (pattern) return dashes(pattern, t, origin, x0, x1, y0, y1);
-  if (plain === 'dbl') return [rect(x0, x1, p - t, p - t / 2), rect(x0, x1, p + t / 2, p + t)];
-  if (plain === 'wavyDbl')
-    return [
-      ...wave(origin, x0, x1, p - t, p, WAVE_BAND),
-      ...wave(origin, x0, x1, p, p + t, WAVE_BAND),
-    ];
+  if (plain === 'dbl') {
+    return [rect(x0, x1, p - t, p - t / 2), rect(x0, x1, p + t / 2, p + t)];
+  }
+  if (plain === 'wavyDbl') {
+    const upper = wave(origin, x0, x1, p - t, t, WAVE_BAND);
+    return [...upper.rings, ...wave(origin, x0, x1, upper.bottom, t, WAVE_BAND).rings];
+  }
   if (plain === 'wavy') {
-    const center = p + t / 2;
     const band = heavy ? Math.max(HEAVY_WAVE_MIN_BAND, t / 2) : WAVE_BAND;
-    return wave(origin, x0, x1, center - t, center + t, band);
+    return wave(origin, x0, x1, y, 2 * t, band).rings;
   }
   return [rect(x0, x1, y0, y1)];
 }

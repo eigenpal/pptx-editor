@@ -113,11 +113,11 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Bold, italic, underline, strikethrough',
     category: 'text',
     editing: 'full',
-    rendering: 'full',
+    rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply bold, italic, underline, and strikethrough, including underline colors. Every underline style renders, with its underline color and outline.',
+      'Apply bold, italic, underline, and strikethrough, including underline colors. Every underline style and underline outline renders; dashed, dotted, and wavy underlines and outlines are approximate.',
   },
   {
     id: 'text.font-family-size',

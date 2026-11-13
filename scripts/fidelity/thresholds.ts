@@ -215,7 +215,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'text-warp': 0,
     'three-d-effects': 0,
     'three-d-turned-effects': 0,
-    'underline-styles': 53,
+    'underline-styles': 63,
     'vertical-columns': 12,
     'vertical-east-asian': 0,
   },
@@ -232,6 +232,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'picture-editing/1': ['pixels'],
     'picture-editing/2': ['pixels'],
     'pictures/1': ['pixels'],
+    'underline-styles/4': ['pixels'],
   },
 };
 
@@ -304,7 +305,7 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
     'text-warp': 0,
     'three-d-effects': 0,
     'three-d-turned-effects': 0,
-    'underline-styles': 53,
+    'underline-styles': 63,
     'vertical-columns': 12,
     'vertical-east-asian': 0,
   },
@@ -318,5 +319,6 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
     'equations/4': ['baseline'],
     'fill-fidelity/6': ['pixels'],
     'fills-lines/1': ['extra-text'],
+    'underline-styles/4': ['pixels'],
   },
 };
