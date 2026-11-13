@@ -75,6 +75,7 @@ import {
 } from '@pptx-editor.dev/pro/drawing';
 import { flatColor, ownFill, type FillScope } from './paint-fill.ts';
 import { fillTextOutlines } from './paint-text.ts';
+import { outerEdges } from './outer-edges.ts';
 import {
   clipEvenOdd,
   EMU_PER_PT,
@@ -774,9 +775,9 @@ export async function drawSoftEdge(
 /**
  * Paint `drawBody` as one transparency group under a luminosity soft mask whose alpha follows
  * the painted edge of `shape` (the fill and the outline) shrunk by `inset` and blurred by
- * `sigma`. The mask holds the alpha by the distance to the painted edge, in bands: inside a
- * filled path, strokes of the path from the widest band in; on the outline, outside the filled
- * paths, strokes of the outline from the full width in. At a corner a band rounds where the blur
+ * `sigma`. The mask holds the alpha by the distance to the painted edge, in bands: inside the
+ * filled paths, strokes of the outer edge of their union (`outerEdges`) from the widest band in;
+ * on the outline, outside the filled paths, strokes of the outline from the full width in. At a corner a band rounds where the blur
  * takes the product of the two edges. `corners` bound the shape in slide space.
  */
 async function drawEdgeFade(
@@ -818,19 +819,26 @@ export async function edgeFadeOps(
     for (const path of paths) tracePath(path, p);
   };
   const W = shape.width;
+  // The bands fade only the outer edge of the union of the filled paths: an edge inside another
+  // filled path stays white (`outerEdges`).
+  const edges = outerEdges(shape.filled);
   const ops = await p.capture(async () => {
     p.push(setLineJoin(LineJoinStyle.Round), setLineCap(LineCapStyle.Round));
-    // Inside a filled path: its own edge lies `off` inside the painted edge. Widest band first,
-    // so a point keeps the gray of the narrowest band that reaches it.
-    for (const rim of [false, true]) {
-      const paths = shape.filled.filter((_, i) => shape.rimmed[i] === rim);
-      if (paths.length === 0) continue;
-      const off = rim ? W / 2 : 0;
-      p.push(setFillingGrayscaleColor(1));
-      trace(paths);
+    // Each filled path fills white on its own, so where paths overlap the mask stays white.
+    p.push(setFillingGrayscaleColor(1));
+    for (const path of shape.filled) {
+      tracePath(path, p);
       p.push(fillEvenOdd());
-      for (let k = reach.length - 1; k >= 0; k -= 1) {
-        if (reach[k] <= off) break;
+    }
+    // Inside a filled path: its own edge lies `off` inside the painted edge. Widest band first,
+    // over the paths with and without an outline over their edge, so a point keeps the gray of
+    // the narrowest band that reaches it.
+    for (let k = reach.length - 1; k >= 0; k -= 1) {
+      for (const rim of [false, true]) {
+        const off = rim ? W / 2 : 0;
+        if (reach[k] <= off) continue;
+        const paths = edges.filter((path, i) => shape.rimmed[i] === rim && path.length > 0);
+        if (paths.length === 0) continue;
         p.push(setStrokingGrayscaleColor(alpha[k]), setLineWidth(2 * (reach[k] - off)));
         trace(paths);
         p.push(stroke());
@@ -843,18 +851,7 @@ export async function edgeFadeOps(
       if (shape.filled.length) {
         const r =
           4 * Math.max(narrow, W, extent) + Math.max(...xs.map(Math.abs), ...ys.map(Math.abs));
-        tracePath(
-          [
-            { op: 'M', x: -r, y: -r },
-            { op: 'L', x: r, y: -r },
-            { op: 'L', x: r, y: r },
-            { op: 'L', x: -r, y: r },
-            { op: 'Z' },
-          ],
-          p
-        );
-        trace([...shape.filled]);
-        p.push(clipEvenOdd(), endPath());
+        clipOutside(shape.filled, r, p);
       }
       for (let j = 0; j < reach.length; j += 1) {
         const from = j ? reach[j - 1] : 0;
@@ -872,6 +869,28 @@ export async function edgeFadeOps(
     }
   });
   return ops;
+}
+
+/**
+ * Clip to the outside of every path of `filled`: one clip per path, each a box of half-side `r`
+ * minus the path by the even-odd rule. The clips intersect, so overlapping paths clip as their
+ * union.
+ */
+function clipOutside(filled: readonly PathCommand[][], r: number, p: PageOps): void {
+  for (const path of filled) {
+    tracePath(
+      [
+        { op: 'M', x: -r, y: -r },
+        { op: 'L', x: r, y: -r },
+        { op: 'L', x: r, y: r },
+        { op: 'L', x: -r, y: r },
+        { op: 'Z' },
+      ],
+      p
+    );
+    tracePath(path, p);
+    p.push(clipEvenOdd(), endPath());
+  }
 }
 
 /** The color of a painted edge: the representative color of a fill (`threeDColor`). */
@@ -911,18 +930,7 @@ export async function drawBlur(
       const xs = corners.map((c) => Math.abs(c.x));
       const ys = corners.map((c) => Math.abs(c.y));
       const r = 4 * (Math.max(...xs, ...ys) + 3 * sigma + shape.width);
-      tracePath(
-        [
-          { op: 'M', x: -r, y: -r },
-          { op: 'L', x: r, y: -r },
-          { op: 'L', x: r, y: r },
-          { op: 'L', x: -r, y: r },
-          { op: 'Z' },
-        ],
-        p
-      );
-      for (const path of shape.filled) tracePath(path, p);
-      p.push(clipEvenOdd(), endPath());
+      clipOutside(shape.filled, r, p);
     }
     const identity: Matrix = [1, 0, 0, 1, 0, 0];
     for (const cls of await silhouette(item, identity, p, scope))
