@@ -13,9 +13,7 @@ afterAll(() => win.happyDOM.close());
 
 /** A paint that reads the tile budget and spends `n` tiles, as a tiled fill does. */
 const readTiles = (defs: Defs, n: number) => () => {
-  const tiles = paintBudgets(defs).tiles;
-  tiles.ask();
-  tiles.spend(n);
+  paintBudgets(defs).tiles.take(() => new Array<number>(n));
   return svg(doc, 'g');
 };
 
@@ -27,14 +25,14 @@ const readBands = (defs: Defs) => () => {
 
 test('a record that read one budget fits while that budget has as much left', () => {
   const defs = new Defs(doc, 't');
-  const first = PaintMeter.start(defs);
+  const first = PaintMeter.resetBudgets(defs);
   const record = first.recordWhole(readTiles(defs, 10));
   expect(record.reads).toEqual({ tiles: true, bands: false });
   expect(record.spent.tiles).toBe(10);
   expect(record.startLeft.tiles).toBe(MAX_SLIDE_TILE_IMAGES);
 
   // A new paint starts whole budgets: the record fits at the start.
-  const next = PaintMeter.start(defs);
+  const next = PaintMeter.resetBudgets(defs);
   expect(next.fits(record)).toBe(true);
   // A budget that it did not read does not matter.
   next.recordWhole(readBands(defs));
@@ -46,9 +44,9 @@ test('a record that read one budget fits while that budget has as much left', ()
 
 test('a record that read no budget always fits', () => {
   const defs = new Defs(doc, 't');
-  const record = PaintMeter.start(defs).recordWhole(() => svg(doc, 'rect'));
+  const record = PaintMeter.resetBudgets(defs).recordWhole(() => svg(doc, 'rect'));
   expect(record.reads).toEqual({ tiles: false, bands: false });
-  const next = PaintMeter.start(defs);
+  const next = PaintMeter.resetBudgets(defs);
   next.recordWhole(readTiles(defs, 100));
   next.recordWhole(readBands(defs));
   expect(next.fits(record)).toBe(true);
@@ -56,8 +54,8 @@ test('a record that read no budget always fits', () => {
 
 test('spendShare spends a kept record once, and never a record that this paint made', () => {
   const defs = new Defs(doc, 't');
-  const record = PaintMeter.start(defs).recordWhole(readTiles(defs, 10));
-  const next = PaintMeter.start(defs);
+  const record = PaintMeter.resetBudgets(defs).recordWhole(readTiles(defs, 10));
+  const next = PaintMeter.resetBudgets(defs);
   next.spendShare(record);
   next.spendShare(record);
   expect(paintBudgets(defs).tiles.spent).toBe(10);
@@ -68,11 +66,11 @@ test('spendShare spends a kept record once, and never a record that this paint m
 
 test('a group start is partial only when children are left', () => {
   const defs = new Defs(doc, 't');
-  const meter = PaintMeter.start(defs);
-  const some = meter.recordGroupStart(svg(doc, 'g'), 5, () => ({ next: 3, spent: 3 }));
+  const meter = PaintMeter.resetBudgets(defs);
+  const some = meter.recordGroupStart(svg(doc, 'g'), 5, () => ({ next: 3, weight: 3 }));
   expect(some.painted.rest).toBe(3);
   expect(some.weight).toBe(4);
-  const all = meter.recordGroupStart(svg(doc, 'g'), 5, () => ({ next: 5, spent: 5 }));
+  const all = meter.recordGroupStart(svg(doc, 'g'), 5, () => ({ next: 5, weight: 5 }));
   expect('rest' in all.painted).toBe(false);
   expect(all.weight).toBe(6);
 });
@@ -80,16 +78,19 @@ test('a group start is partial only when children are left', () => {
 test('extend starts a first budget read at what was left at the item turn', () => {
   const defs = new Defs(doc, 't');
   const node = svg(doc, 'g');
-  const start = PaintMeter.start(defs).recordGroupStart(node, 4, () => ({ next: 1, spent: 1 }));
+  const start = PaintMeter.resetBudgets(defs).recordGroupStart(node, 4, () => ({
+    next: 1,
+    weight: 1,
+  }));
   expect(start.painted.reads).toEqual({ tiles: false, bands: false });
 
-  const meter = PaintMeter.start(defs);
+  const meter = PaintMeter.resetBudgets(defs);
   meter.recordWhole(readTiles(defs, 100)); // An earlier item spends 100 tiles.
   const more = meter.extend(start.painted, 4, (into, from) => {
     expect(into).toBe(node);
     expect(from).toBe(1);
     readTiles(defs, 7)();
-    return { next: 3, spent: 2 };
+    return { next: 3, weight: 2 };
   });
   const extended = more.painted;
   expect(more.weight).toBe(2);
@@ -105,15 +106,15 @@ test('extend starts a first budget read at what was left at the item turn', () =
 test('extend keeps the start of a budget that the record read before', () => {
   const defs = new Defs(doc, 't');
   const node = svg(doc, 'g');
-  const start = PaintMeter.start(defs).recordGroupStart(node, 4, () => {
+  const start = PaintMeter.resetBudgets(defs).recordGroupStart(node, 4, () => {
     readTiles(defs, 5)();
-    return { next: 2, spent: 2 };
+    return { next: 2, weight: 2 };
   });
   expect(start.painted.startLeft.tiles).toBe(MAX_SLIDE_TILE_IMAGES);
-  const meter = PaintMeter.start(defs);
+  const meter = PaintMeter.resetBudgets(defs);
   const more = meter.extend(start.painted, 4, () => {
     readTiles(defs, 3)();
-    return { next: 4, spent: 2 };
+    return { next: 4, weight: 2 };
   });
   expect(more.painted.startLeft.tiles).toBe(MAX_SLIDE_TILE_IMAGES);
   expect(more.painted.spent.tiles).toBe(8);
@@ -127,8 +128,8 @@ test('extend keeps the start of a budget that the record read before', () => {
 
 test('extend of a whole record only spends its share', () => {
   const defs = new Defs(doc, 't');
-  const record: PaintedItem = PaintMeter.start(defs).recordWhole(readTiles(defs, 4));
-  const meter = PaintMeter.start(defs);
+  const record: PaintedItem = PaintMeter.resetBudgets(defs).recordWhole(readTiles(defs, 4));
+  const meter = PaintMeter.resetBudgets(defs);
   const more = meter.extend(record, 1, () => {
     throw new Error('a whole record paints nothing more');
   });

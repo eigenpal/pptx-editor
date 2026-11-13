@@ -9,12 +9,13 @@ import {
   paintChildren,
   paintItem,
   paintWeight,
+  type ChildPaint,
   type PaintOptions,
   type ViewRect,
 } from './paint.ts';
 import { groupPaintsEffects } from './paint-effects.ts';
 import type { PaintContext } from './paint-fill.ts';
-import { dropPainted, PaintMeter, type MeteredPaint, type PaintedItem } from './painted-items.ts';
+import { dropPainted, PaintMeter, type PaintedItem } from './painted-items.ts';
 import { Defs, svg, SVG_NS } from './svg.ts';
 
 /** Whether two views are the same rectangle (both absent counts). */
@@ -30,30 +31,42 @@ declare const checked: unique symbol;
  */
 type CurrentRecord = PaintedItem & { readonly [checked]: true };
 
-/** The state of one `paint` call. It lives only while that call runs. */
+/** An item and its record. */
+type Entry = readonly [LayoutItem, PaintedItem];
+
+/**
+ * The state of one `paint` call. It lives only while that call runs. It owns the frame's room and
+ * the nodes on screen: a paint step adds a node only through `show`, and counts its weight only
+ * through the `record` methods.
+ */
 class Frame {
   /** The paint budgets of this paint (tile images and shape gradient bands). */
-  readonly meter: PaintMeter;
+  readonly #meter: PaintMeter;
   /** Whether some item is left out or partial at the end of this frame. */
   pending = false;
-  /** The record on screen of each item after this frame. */
-  readonly shown = new Map<LayoutItem, PaintedItem>();
-  /** The nodes of the content group after this frame, in paint order. */
-  readonly nodes: SVGElement[] = [];
-  /** The records before this frame by `itemKey`, for `#standIn`. Made when first needed. */
-  earlier: Map<string, readonly [LayoutItem, PaintedItem]> | null = null;
-  /** The items of the layout, for `#standIn`. Made when first needed. */
-  inLayout: Set<LayoutItem> | null = null;
+  readonly #earlierItems: ReadonlyMap<LayoutItem, PaintedItem>;
+  readonly #shown = new Map<LayoutItem, PaintedItem>();
+  readonly #nodes: SVGElement[] = [];
+  /** The records before this frame by `itemKey`, made when the first stand-in is looked up. */
+  #byKey: Map<string, Entry> | null = null;
+  /** The items of the layout, made with `#byKey`. */
+  #inLayout: Set<LayoutItem> | null = null;
   #room: number;
 
+  /**
+   * A frame for `layout` within `budget` of paint weight. `earlierItems` are the records on screen
+   * before it, by item; the frame reads them only, to find stand-ins.
+   */
   constructor(
     readonly layout: SlideLayout,
     readonly ctx: PaintContext,
     defs: Defs,
-    budget: number
+    budget: number,
+    earlierItems: ReadonlyMap<LayoutItem, PaintedItem>
   ) {
-    this.meter = PaintMeter.start(defs);
+    this.#meter = PaintMeter.resetBudgets(defs);
     this.#room = budget;
+    this.#earlierItems = earlierItems;
   }
 
   /**
@@ -64,9 +77,14 @@ class Frame {
     return this.#room;
   }
 
-  /** Count `weight` of new paint against the frame's room. */
-  spendWeight(weight: number): void {
-    this.#room -= weight;
+  /** The record on screen of each item after this frame. */
+  get shown(): ReadonlyMap<LayoutItem, PaintedItem> {
+    return this.#shown;
+  }
+
+  /** The nodes of the content group after this frame, in paint order. */
+  get nodes(): readonly SVGElement[] {
+    return this.#nodes;
   }
 
   /**
@@ -75,9 +93,79 @@ class Frame {
    * record shown, by default) at this place in paint order, unless this paint already spent it.
    */
   show(item: LayoutItem | null, painted: PaintedItem, spentBy: PaintedItem = painted): void {
-    this.meter.spendShare(spentBy);
-    if (item) this.shown.set(item, painted);
-    if (painted.node) this.nodes.push(painted.node);
+    this.#meter.spendShare(spentBy);
+    if (item) this.#shown.set(item, painted);
+    if (painted.node) this.#nodes.push(painted.node);
+  }
+
+  /**
+   * Whether the nodes of `painted` fit the budgets at this place in paint order
+   * (`PaintMeter.fits`).
+   */
+  fits(painted: PaintedItem): boolean {
+    return this.#meter.fits(painted);
+  }
+
+  /** Paint the background with `paint`, first in the budgets. It takes nothing of the room. */
+  recordBackground(paint: () => SVGElement): PaintedItem {
+    return this.#meter.recordWhole(paint);
+  }
+
+  /** Paint a whole item with `paint`, and count its `weight` against the room. */
+  recordWhole(paint: () => SVGElement | null, weight: number): PaintedItem {
+    const painted = this.#meter.recordWhole(paint);
+    this.#room -= weight;
+    return painted;
+  }
+
+  /** Paint an extra copy whole with `paint`. A copy takes nothing of the room. */
+  recordCopy(paint: () => SVGElement | null): PaintedItem {
+    return this.#meter.recordWhole(paint);
+  }
+
+  /**
+   * Begin a group of `count` children in `node`: `paint` paints its first children within the
+   * room that it gets. Counts their weight, and the group node's, against the room.
+   */
+  recordGroupStart(
+    node: SVGElement,
+    count: number,
+    paint: (room: number) => ChildPaint
+  ): PaintedItem {
+    const made = this.#meter.recordGroupStart(node, count, () => paint(this.#room));
+    this.#room -= made.weight;
+    return made.painted;
+  }
+
+  /**
+   * Spend the share of `painted`, and continue it when it is a partial group of `count`
+   * children: `paint` paints from child `from` into `node` within the room that it gets. Counts
+   * the new children's weight against the room. Answers the new record.
+   */
+  extend(
+    painted: PaintedItem,
+    count: number,
+    paint: (node: SVGElement, from: number, room: number) => ChildPaint
+  ): PaintedItem {
+    const more = this.#meter.extend(painted, count, (node, from) => paint(node, from, this.#room));
+    this.#room -= more.weight;
+    return more.painted;
+  }
+
+  /**
+   * The earlier item and record that stand in for `item`, which has no record of its own: the
+   * record of an item at the same place (`itemKey`) that is no longer in the layout, such as the
+   * item that an edit replaced. None when that earlier item is on screen already.
+   */
+  standIn(item: LayoutItem): Entry | undefined {
+    // Made once for each frame, when the first item without a record is left out.
+    this.#byKey ??= new Map([...this.#earlierItems].map(([i, p]) => [itemKey(i), [i, p]] as const));
+    this.#inLayout ??= new Set(this.layout.items);
+    const replaced = this.#byKey.get(itemKey(item));
+    if (!replaced) return undefined;
+    const [earlierItem] = replaced;
+    if (this.#shown.has(earlierItem)) return undefined;
+    return earlierItem === item || !this.#inLayout.has(earlierItem) ? replaced : undefined;
   }
 }
 
@@ -107,8 +195,8 @@ class Frame {
  * - `#items` holds each record on screen, by its item. That item is in the layout, except for a
  *   stand-in of a replaced item: that record stays under the earlier item until the new item
  *   paints.
- * - Each record on screen spent its budget share once, at its place in paint order
- *   (`Frame.show`).
+ * - For each item on screen, the record on screen, or the partial record that will replace it,
+ *   spent its budget share once, at its place in paint order (`Frame.show`).
  * - `#building` holds a new partial paint of an item whose record in `#items` is not current.
  *   The earlier record stays on screen until the new one is whole. A building record is never
  *   stale, because `invalidate` and `view` drop all of them.
@@ -139,7 +227,7 @@ export class SlidePainter {
   #key: unknown = undefined;
   #pending = false;
   #background: PaintedItem | null = null;
-  #items = new Map<LayoutItem, PaintedItem>();
+  #items: ReadonlyMap<LayoutItem, PaintedItem> = new Map();
   #building = new Map<LayoutItem, PaintedItem>();
   /**
    * The extra copies of the last paint, one for each repeat of an item in the layout. One node
@@ -212,11 +300,15 @@ export class SlidePainter {
   }
 
   /**
-   * Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. With a
-   * `budget`, it paints at most that much new weight, in paint order, and keeps every item it
-   * painted before (`pending` tells when some are left): a slide of 24,000 shapes then goes on
-   * screen over several frames, and no frame blocks for seconds. The items in a group count
-   * (`paintWeight`): a group of 20,000 shapes paints its children over several frames too.
+   * Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`.
+   *
+   * With a `budget`, no new paint starts after the frame has painted that much weight
+   * (`paintWeight`), in paint order. Items that it leaves out keep their earlier nodes, and
+   * `pending` tells when some are left. A slide of 24,000 shapes then goes on screen over several
+   * frames, and no frame blocks for seconds. The items in a group count, so a group of 20,000
+   * shapes paints its children over several frames too. A frame can go past its budget: an item
+   * that is not a group paints whole, a group with effects paints whole, and a group paints at
+   * least one child each time. Extra copies of a repeated item take nothing of the budget.
    */
   paint(layout: SlideLayout, budget = Infinity): SVGSVGElement {
     const { root, content } = this.#begin(layout);
@@ -227,7 +319,7 @@ export class SlidePainter {
       ...(opts.imageSize ? { imageSize: opts.imageSize } : {}),
       sourcePart: layout.slide.backgroundPart,
     };
-    const frame = new Frame(layout, ctx, this.#defs, budget);
+    const frame = new Frame(layout, ctx, this.#defs, budget, this.#items);
     this.#paintBackground(frame, root, content);
     for (const item of layout.items) this.#paintItem(frame, item);
     this.#commit(frame, content);
@@ -254,7 +346,7 @@ export class SlidePainter {
     this.#content = content;
     this.#slide = slide;
     this.#background = null;
-    this.#items.clear();
+    this.#items = new Map();
     this.#building.clear();
     this.#stale = new WeakSet();
     this.#twice = [];
@@ -269,7 +361,7 @@ export class SlidePainter {
     if (this.#background) dropPainted(this.#background);
     for (const painted of this.#twice.splice(0)) dropPainted(painted);
     const { width, height, background } = frame.layout.slide;
-    const painted = frame.meter.recordWhole(() =>
+    const painted = frame.recordBackground(() =>
       paintBackground(this.#doc, background, width, height, frame.ctx)
     );
     this.#background = painted;
@@ -294,7 +386,7 @@ export class SlidePainter {
    * the item spends anything.
    */
   #current(frame: Frame, painted: PaintedItem | undefined): CurrentRecord | undefined {
-    if (!painted || this.#stale.has(painted) || !frame.meter.fits(painted)) return undefined;
+    if (!painted || this.#stale.has(painted) || !frame.fits(painted)) return undefined;
     return painted as CurrentRecord;
   }
 
@@ -310,24 +402,8 @@ export class SlidePainter {
   /** Leave `item` out of this frame, which has no room, and show its stand-in, if any. */
   #leaveOut(frame: Frame, item: LayoutItem, old: PaintedItem | undefined): void {
     frame.pending = true;
-    const stand = old ? ([item, old] as const) : this.#standIn(frame, item);
+    const stand = old ? ([item, old] as const) : frame.standIn(item);
     if (stand) frame.show(stand[0], stand[1]);
-  }
-
-  /**
-   * The earlier item and record that stand in for `item`, which has no record of its own: the
-   * record of an item at the same place (`itemKey`) that is no longer in the layout, such as the
-   * item that an edit replaced. None when that earlier item is on screen already.
-   */
-  #standIn(frame: Frame, item: LayoutItem): readonly [LayoutItem, PaintedItem] | undefined {
-    // Made once for each frame, when the first item without a record is left out.
-    frame.earlier ??= new Map([...this.#items].map(([i, p]) => [itemKey(i), [i, p]] as const));
-    frame.inLayout ??= new Set(frame.layout.items);
-    const replaced = frame.earlier.get(itemKey(item));
-    if (!replaced) return undefined;
-    const [earlierItem] = replaced;
-    if (frame.shown.has(earlierItem)) return undefined;
-    return earlierItem === item || !frame.inLayout.has(earlierItem) ? replaced : undefined;
   }
 
   /**
@@ -370,45 +446,36 @@ export class SlidePainter {
   }
 
   /**
-   * Paint `item` from nothing, and count its weight against the frame's room unless it is an
-   * extra `copy`. A group that weighs more than the room paints only its first children, unless
-   * it has effects: its shadow and filters cover all of its children, and the cascade bounds its
+   * Paint `item` from nothing. An extra `copy` paints whole and takes nothing of the frame's room.
+   * Otherwise, a group that weighs more than the room paints only its first children, unless it
+   * has effects: its shadow and filters cover all of its children, and the cascade bounds its
    * weight (`MAX_GROUP_EFFECT_ELEMENTS`) and nesting, so it fits a frame.
    */
   #paintNew(frame: Frame, item: LayoutItem, copy: boolean): PaintedItem {
     const doc = this.#doc;
     const opts = this.#opts;
-    const { meter, ctx } = frame;
-    const room = copy ? Infinity : frame.room;
-    let made: MeteredPaint;
-    if (item.kind === 'group' && paintWeight(item) > room && !groupPaintsEffects(item)) {
+    const { ctx } = frame;
+    const paint = () => paintItem(doc, item, ctx, opts, 1);
+    if (copy) return frame.recordCopy(paint);
+    if (item.kind === 'group' && paintWeight(item) > frame.room && !groupPaintsEffects(item)) {
       const g = groupNode(doc, item, opts);
-      made = meter.recordGroupStart(g, item.children.length, () =>
+      return frame.recordGroupStart(g, item.children.length, (room) =>
         paintChildren(doc, item, g, ctx, opts, 0, room)
       );
-    } else {
-      const painted = meter.recordWhole(() => paintItem(doc, item, ctx, opts, 1));
-      made = { painted, weight: paintWeight(item) };
     }
-    if (!copy) frame.spendWeight(made.weight);
-    return made.painted;
+    return frame.recordWhole(paint, paintWeight(item));
   }
 
   /**
    * Spend the share of the current record `painted`, and paint more of it within the frame's
-   * room when it is partial. Answers the new record.
+   * room when it is partial. Answers the new record. The callers pass only partial records, and
+   * only a group has one.
    */
   #continue(frame: Frame, item: LayoutItem, painted: CurrentRecord): PaintedItem {
-    // Only a group has a partial record (`rest`); any other record is only kept.
-    if (item.kind !== 'group') {
-      frame.meter.spendShare(painted);
-      return painted;
-    }
-    const more = frame.meter.extend(painted, item.children.length, (node, from) =>
-      paintChildren(this.#doc, item, node, frame.ctx, this.#opts, from, frame.room)
+    if (item.kind !== 'group') throw new Error('SlidePainter: only a group has a partial record');
+    return frame.extend(painted, item.children.length, (node, from, room) =>
+      paintChildren(this.#doc, item, node, frame.ctx, this.#opts, from, room)
     );
-    frame.spendWeight(more.weight);
-    return more.painted;
   }
 
   /**

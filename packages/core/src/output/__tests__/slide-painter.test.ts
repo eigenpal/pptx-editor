@@ -522,6 +522,30 @@ test('a group that paints again in part goes back to its node when the reason go
   expect(svg.querySelector('[data-kind="group"]')).toBe(node);
 });
 
+test('a replaced group stands in while it paints again over frames', () => {
+  // Node ids follow document order, so both layouts hold the box first.
+  const first = tiledLayout(tiledBox(2, 0) + heavyGroup(10, 0, 2_100, tiledBox(5_000, 0)));
+  // The same group (the same `itemKey`), moved.
+  const second = tiledLayout(tiledBox(2, 0) + heavyGroup(10, 12_700, 2_100, tiledBox(5_000, 0)));
+  const g = first.items[1]!;
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  const svg = painter.paint({ ...first, items: [g] });
+  const node = svg.querySelector('[data-kind="group"]');
+  // A new key makes it paint again: a partial paint builds while its node stays.
+  painter.invalidate(1);
+  painter.paint({ ...first, items: [g] }, 2_000);
+  expect(painter.pending).toBe(true);
+  expect(svg.querySelector('[data-kind="group"]')).toBe(node);
+  // An edit replaces it, and the box takes all of the room: the earlier node stands in.
+  painter.paint(second, 1);
+  expect(painter.pending).toBe(true);
+  expect(svg.querySelector('[data-kind="group"]')).toBe(node);
+  // Later frames paint the new group, and the stand-in goes.
+  settles(painter, second, 2_000, 10);
+  expect(svg.querySelectorAll('[data-kind="group"]').length).toBe(1);
+  expect(svg.querySelector('[data-kind="group"]')).not.toBe(node);
+});
+
 test('a group that painted again for its budgets is kept by later paints', () => {
   const all = tiledLayout(bandedStar(2, 0) + heavyGroup(10, 0, 2_100, bandedStar(5_000, 0)));
   const [star, g] = all.items;

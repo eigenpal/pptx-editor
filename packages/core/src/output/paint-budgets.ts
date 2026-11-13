@@ -14,6 +14,20 @@ import type { Defs } from './svg.ts';
  */
 export const MAX_SLIDE_TILE_IMAGES = 4096;
 
+/**
+ * The private way to spend a budget again: only `PaintBudgets.spend` uses it, to spend the share
+ * of a record that a later paint keeps. A fill spends only through `take` or `allow`, which read
+ * the budget first, so no fill can spend without reading.
+ */
+const replay = Symbol('replay');
+
+/**
+ * Why `left` stops at zero, and why that keeps `PaintMeter.fits` safe: a fill reads only `left`,
+ * so two paints with the same `left` draw the same, however far past the limit either spent.
+ * Equal `left` then means an equal drawing, which is what `fits` tests.
+ */
+const leftOf = (limit: number, spent: number): number => Math.max(0, limit - spent);
+
 /** The tile images left in one paint of a slide. */
 export class TileBudget {
   #spent = 0;
@@ -22,20 +36,27 @@ export class TileBudget {
   get asks(): number {
     return this.#asks;
   }
-  /** The images left, for a tiled fill that fits its tiles to them. */
-  ask(): number {
+  /**
+   * Read the budget and spend from it in one step. `fit` gets the images left and answers the
+   * tiles that fit in them, or undefined when they do not fit. This spends one image for each
+   * tile, and answers what `fit` answered.
+   */
+  take<T extends { readonly length: number }>(fit: (left: number) => T | undefined): T | undefined {
     this.#asks += 1;
-    return this.left;
+    const tiles = fit(this.left);
+    if (tiles) this.#spent += tiles.length;
+    return tiles;
   }
-  /** The images still allowed, never below zero. */
+  /** The images still allowed, never below zero (`leftOf`). */
   get left(): number {
-    return Math.max(0, MAX_SLIDE_TILE_IMAGES - this.#spent);
+    return leftOf(MAX_SLIDE_TILE_IMAGES, this.#spent);
   }
-  /** The images spent so far, past the budget too. */
+  /** The images spent so far, past the limit too. */
   get spent(): number {
     return this.#spent;
   }
-  spend(n: number): void {
+  /** Spend `n` again for a kept record (`PaintBudgets.spend`). */
+  [replay](n: number): void {
     this.#spent += n;
   }
 }
@@ -66,17 +87,22 @@ export class ShapeBandBudget {
   get asks(): number {
     return this.#asks;
   }
-  /** The band work still allowed, never below zero. */
+  /** The band work still allowed, never below zero (`leftOf`). */
   get left(): number {
-    return Math.max(0, MAX_SLIDE_BAND_WORK - this.#spent);
+    return leftOf(MAX_SLIDE_BAND_WORK, this.#spent);
   }
-  /** The band work spent so far, past the budget too. */
+  /** The band work spent so far, past the limit too. */
   get spent(): number {
     return this.#spent;
   }
-  spend(n: number): void {
+  /** Spend `n` again for a kept record (`PaintBudgets.spend`). */
+  [replay](n: number): void {
     this.#spent += n;
   }
+  /**
+   * Read the budget and spend from it in one step: whether a shape of `paths` and `commands`
+   * draws outline bands. When it does, this spends its band work.
+   */
   allow(paths: number, commands: number): boolean {
     // A shape past the limits of one shape uses the rectangle construction, whatever is left.
     if (paths > MAX_BANDED_PATHS || commands > MAX_BANDED_COMMANDS) return false;
@@ -113,9 +139,13 @@ export class PaintBudgets {
   get spent(): BudgetAmounts {
     return { tiles: this.tiles.spent, bands: this.bands.spent };
   }
+  /**
+   * Spend `s` again: the share of a record that a later paint keeps (`PaintMeter.spendShare`).
+   * This is the only spend that does not read, because the record read when it painted.
+   */
   spend(s: BudgetAmounts): void {
-    this.tiles.spend(s.tiles);
-    this.bands.spend(s.bands);
+    this.tiles[replay](s.tiles);
+    this.bands[replay](s.bands);
   }
 }
 

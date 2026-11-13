@@ -67,9 +67,13 @@ interface Measured<T> {
 
 /**
  * The budgets of one slide paint, and the records of what each item paint spends and reads of
- * them. The budgets start whole for each paint (`start`) and are spent in paint order: the
+ * them. The budgets start whole for each paint (`resetBudgets`) and are spent in paint order: the
  * background, then each item on screen. Each record on screen spends its share once, when the walk
  * reaches it (`spendShare`), so that `fits` compares with what is left at the item's own place.
+ *
+ * The accounting depends on fills that read a budget before they spend from it: a paint that read
+ * nothing spent nothing. `TileBudget.take` and `ShapeBandBudget.allow` read and spend in one step,
+ * so a fill cannot do otherwise.
  */
 export class PaintMeter {
   readonly #defs: Defs;
@@ -86,10 +90,12 @@ export class PaintMeter {
   }
 
   /**
-   * Start one slide paint with `defs`. This replaces the budgets that the fills find for `defs`
-   * (`paintBudgets`) with whole ones, so nothing that an earlier paint spent counts.
+   * Start one slide paint with `defs`. Side effect: this replaces the budgets that
+   * `paintBudgets(defs)` returns with whole ones, so the fills of this paint spend from them and
+   * nothing that an earlier paint spent counts. It is the only way to make a meter, so a meter
+   * always measures the budgets that its paint's fills spend.
    */
-  static start(defs: Defs): PaintMeter {
+  static resetBudgets(defs: Defs): PaintMeter {
     return new PaintMeter(defs);
   }
 
@@ -129,12 +135,12 @@ export class PaintMeter {
 
   /**
    * Begin a group of `count` children in its new `node`: `paint` paints its first children, as
-   * many as fit the frame. The record is partial (`rest`) when some children are left. The weight
-   * counts the group node as one.
+   * many as fit the frame. The record is partial (`rest`) when some children are left. The paint
+   * weight counts the group node as one.
    */
   recordGroupStart(node: SVGElement, count: number, paint: () => ChildPaint): MeteredPaint {
     const fresh = this.#measure(paint);
-    const { next, spent } = fresh.value;
+    const { next, weight } = fresh.value;
     const painted = this.#counts({
       node,
       defs: fresh.defs,
@@ -143,7 +149,7 @@ export class PaintMeter {
       reads: fresh.reads,
       ...(next < count ? { rest: next } : {}),
     });
-    return { painted, weight: spent + 1 };
+    return { painted, weight: weight + 1 };
   }
 
   /**
@@ -163,7 +169,7 @@ export class PaintMeter {
     const { node, rest } = painted;
     if (rest === undefined || !node) return { painted, weight: 0 };
     const more = this.#measure(() => paint(node, rest));
-    const { next, spent } = more.value;
+    const { next, weight } = more.value;
     const extended = this.#counts({
       node,
       defs: [...painted.defs, ...more.defs],
@@ -178,7 +184,7 @@ export class PaintMeter {
       },
       ...(next < count ? { rest: next } : {}),
     });
-    return { painted: extended, weight: spent };
+    return { painted: extended, weight };
   }
 
   /** Note that `painted` spent its share while it painted, and answer it. */

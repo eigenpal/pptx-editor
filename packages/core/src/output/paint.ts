@@ -882,13 +882,13 @@ export function groupNode(
 export interface ChildPaint {
   /** The index of the first child left out: the group's `children.length` when none is. */
   readonly next: number;
-  /** The weight (`paintWeight`) that it painted. */
-  readonly spent: number;
+  /** The paint weight (`paintWeight`) of the children that it painted. */
+  readonly weight: number;
 }
 
 /**
  * Paint the children of `group` into its node `g`, from child `from` on, while their weight
- * (`paintWeight`) fits in `budget`; at least one child. Answers the index of the first child
+ * (`paintWeight`) fits in `room`; at least one child. Answers the index of the first child
  * left out (`children.length` when none is) and the weight painted.
  */
 export function paintChildren(
@@ -898,7 +898,7 @@ export function paintChildren(
   ctx: PaintContext,
   opts: PaintOptions,
   from: number,
-  budget: number
+  room: number
 ): ChildPaint {
   const el = group.element;
   const scale = matrixScale(group.matrix);
@@ -910,17 +910,17 @@ export function paintChildren(
     groupFill: inherits ? ctx.groupFill : el.fill,
     groupSourcePart: inherits ? ctx.groupSourcePart : el.partName,
   };
-  let spent = 0;
+  let weight = 0;
   let i = from;
   for (; i < group.children.length; i += 1) {
     const child = group.children[i]!;
-    const weight = paintWeight(child);
-    if (i > from && spent + weight > budget) break;
+    const childWeight = paintWeight(child);
+    if (i > from && weight + childWeight > room) break;
     const painted = paintItem(doc, child, groupCtx, opts, scale);
     if (painted) g.appendChild(painted);
-    spent += weight;
+    weight += childWeight;
   }
-  return { next: i, spent };
+  return { next: i, weight };
 }
 
 /** The outline width that closes the antialiased seams between 3-D polygons: half a pixel. */
