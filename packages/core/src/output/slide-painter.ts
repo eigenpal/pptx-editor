@@ -5,14 +5,15 @@
 import type { LayoutItem, SlideLayout } from '../layout/index.ts';
 import {
   groupNode,
+  paintBackground,
   paintChildren,
   paintItem,
   paintWeight,
   type PaintOptions,
   type ViewRect,
 } from './paint.ts';
-import { fillPaint, type PaintContext } from './paint-fill.ts';
-import { Defs, num, svg, SVG_NS } from './svg.ts';
+import type { PaintContext } from './paint-fill.ts';
+import { Defs, svg, SVG_NS } from './svg.ts';
 
 /** Whether two views are the same rectangle (both absent counts). */
 function sameView(a: ViewRect | undefined, b: ViewRect | undefined): boolean {
@@ -172,16 +173,9 @@ export class SlidePainter {
     const drop = dropPainted;
     if (this.#background) drop(this.#background);
     for (const painted of this.#twice.splice(0)) drop(painted);
-    const background = this.#defs.capture(() => {
-      const bg = fillPaint(layout.slide.background, width, height, ctx);
-      return svg(doc, 'rect', {
-        width,
-        height,
-        fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
-        'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
-        'data-kind': 'background',
-      });
-    });
+    const background = this.#defs.capture(() =>
+      paintBackground(doc, layout.slide.background, width, height, ctx)
+    );
     this.#background = { node: background.value, defs: [...background.defs] };
     root.insertBefore(background.value, content);
     const next = new Map<LayoutItem, PaintedItem>();
