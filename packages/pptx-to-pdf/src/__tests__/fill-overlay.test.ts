@@ -9,6 +9,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { PDFBool, PDFDict, PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { buildPptx, shape, solid } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
@@ -66,5 +67,32 @@ describe('fill overlays', () => {
       );
     expect((await of(solid('4472C4'))).blends).toEqual(['Multiply']);
     expect((await of('<a:noFill/>')).blends).toEqual([]);
+  });
+
+  test('a shape gradient overlay draws as bands of the outline', async () => {
+    const shapeGradient =
+      '<a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs>' +
+      '<a:gs pos="100000"><a:srgbClr val="000080"/></a:gs></a:gsLst>' +
+      '<a:path path="shape"><a:fillToRect l="50000" t="50000" r="50000" b="50000"/></a:path>' +
+      '</a:gradFill>';
+    const effects = `<a:effectLst><a:fillOverlay blend="mult">${shapeGradient}</a:fillOverlay></a:effectLst>`;
+    const fill = solid('4472C4');
+    const shapes = shape({
+      id: 2,
+      x: IN,
+      y: IN,
+      cx: 2 * IN,
+      cy: IN,
+      prst: 'ellipse',
+      fill,
+      effects,
+    });
+    const result = await exportPdf(buildPptx({ slides: [{ layout: 'blank', shapes }] }), BEST);
+    const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
+    const { fnArray } = await (await pdf.getPage(1)).getOperatorList();
+    const count = (op: number) => fnArray.filter((f) => f === op).length;
+    // Bands of the ellipse are many paths; the rectangle construction would be shadings.
+    expect(count(OPS.shadingFill)).toBe(0);
+    expect(count(OPS.constructPath)).toBeGreaterThan(50);
   });
 });

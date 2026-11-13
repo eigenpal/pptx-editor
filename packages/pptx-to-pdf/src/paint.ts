@@ -218,7 +218,9 @@ async function withOverlay(
     p.state(`blend:${overlay.blend}`, () =>
       p.res.doc.context.obj({ Type: 'ExtGState', BM: PDF_BLEND[overlay.blend] })
     );
-    await paintFill(overlay.fill, w, h, trace, p, scope, 'fill overlays');
+    // A `path="shape"` overlay draws as bands of the outline, as the SVG paint draws it.
+    const banded = bandsShapeGradient(item, overlay.fill, p);
+    await paintFill(overlay.fill, w, h, trace, p, scope, 'fill overlays', 'norm', banded);
     p.push(popGraphicsState());
   });
   const group = p.form(ops, around(w, h), { S: 'Transparency', I: true });
