@@ -54,7 +54,7 @@ import {
 import { compoundStroke } from './compound-lines.ts';
 import { paintTable } from './paint-table.ts';
 import { paintText, type Shows } from './paint-text.ts';
-import { ShapeBandBudget } from './paint-gradient.ts';
+import { paintBudgets } from './paint-budgets.ts';
 import { Defs, matrixAttr, num, svg, SVG_NS } from './svg.ts';
 import { commandData, mapCommands, pathData } from './path-data.ts';
 
@@ -146,8 +146,6 @@ function matrixScale(m: Matrix): number {
   return Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
 }
 
-/** The shape gradient band work left on each slide, by its `Defs`. */
-const bandWork = new WeakMap<Defs, ShapeBandBudget>();
 /**
  * The most paths of one shape that draw a fill overlay. Each overlay is an isolated group (an
  * offscreen layer); a shape with more paths draws no overlay, and the report says so.
@@ -185,9 +183,7 @@ function shapePaints(
   // Decided at the first shape gradient, so only shapes that band spend the slide's budget.
   const bands = (): boolean => {
     if (banded === undefined) {
-      let budget = bandWork.get(ctx.defs);
-      if (!budget) bandWork.set(ctx.defs, (budget = new ShapeBandBudget()));
-      banded = budget.allow(paths.length, commands);
+      banded = paintBudgets(ctx.defs).bands.allow(paths.length, commands);
     }
     return banded;
   };

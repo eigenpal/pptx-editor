@@ -335,4 +335,41 @@ describe('text under a later body in a group', () => {
     expect(await covered(under + over(alpha(100_000)))).toEqual(['11']);
     expect(await covered(under + over(gradient(100_000)))).toEqual(['11']);
   });
+
+  test('a 3-D body, or a body that a nested group fades, covers nothing', async () => {
+    const under = labelled(11, IN, IN, 'C00000');
+    // A turned camera paints the face narrower than its flat outline.
+    const turned = shape({
+      id: 12,
+      x: 2 * IN,
+      y: IN,
+      cx: 2 * IN,
+      cy: IN,
+      fill: solid('0070C0'),
+      effects:
+        '<a:scene3d><a:camera prst="orthographicFront"><a:rot lat="0" lon="4800000" rev="0"/>' +
+        '</a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+    });
+    expect(await covered(under + turned)).toEqual([]);
+    const fadedBy = (effects: string) =>
+      group(
+        { id: 20, x: 2 * IN, y: IN, cx: 2 * IN, cy: IN, effects },
+        shape({ id: 21, x: 2 * IN, y: IN, cx: 2 * IN, cy: IN, fill: solid('00B050') })
+      );
+    expect(
+      await covered(under + fadedBy('<a:effectLst><a:softEdge rad="63500"/></a:effectLst>'))
+    ).toEqual([]);
+    expect(
+      await covered(under + fadedBy('<a:effectLst><a:blur rad="63500"/></a:effectLst>'))
+    ).toEqual([]);
+    // A nested group's shadow leaves its shapes opaque.
+    expect(
+      await covered(
+        under +
+          fadedBy(
+            '<a:effectLst><a:outerShdw blurRad="0" dist="38100" dir="0"><a:srgbClr val="000000"/></a:outerShdw></a:effectLst>'
+          )
+      )
+    ).toEqual(['11']);
+  });
 });

@@ -499,11 +499,28 @@ const MAX_SLIDE_BAND_WORK = 512_000;
  * The SVG paint and `pptx-to-pdf` share the limits.
  */
 export class ShapeBandBudget {
-  #left = MAX_SLIDE_BAND_WORK;
+  #spent = 0;
+  #asks = 0;
+  /** How many shapes read the budget (`allow`). */
+  get asks(): number {
+    return this.#asks;
+  }
+  /** The band work still allowed, never below zero. */
+  get left(): number {
+    return Math.max(0, MAX_SLIDE_BAND_WORK - this.#spent);
+  }
+  /** The band work spent so far, past the budget too. */
+  get spent(): number {
+    return this.#spent;
+  }
+  spend(n: number): void {
+    this.#spent += n;
+  }
   allow(paths: number, commands: number): boolean {
+    this.#asks += 1;
     const cost = commands * MAX_SHAPE_BANDS;
-    const ok = paths <= MAX_BANDED_PATHS && commands <= MAX_BANDED_COMMANDS && cost <= this.#left;
-    if (ok) this.#left -= cost;
+    const ok = paths <= MAX_BANDED_PATHS && commands <= MAX_BANDED_COMMANDS && cost <= this.left;
+    if (ok) this.#spent += cost;
     return ok;
   }
 }
