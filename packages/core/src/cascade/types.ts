@@ -275,6 +275,11 @@ export interface ResolvedGroup extends ResolvedBase {
   readonly childExtent: { readonly cx: number; readonly cy: number };
   readonly children: readonly ResolvedElement[];
   readonly fill: ResolvedFill;
+  /**
+   * The group's effects (`p:grpSpPr/a:effectLst`). They apply to the group's content as one
+   * picture: an outer shadow is the silhouette of all children together.
+   */
+  readonly effects?: ResolvedEffects;
 }
 
 /** The borders of one table cell. Absent: no line. */

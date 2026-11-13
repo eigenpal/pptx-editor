@@ -497,6 +497,7 @@ export interface ResolvedGroup extends ResolvedBase {
     };
     // (undocumented)
     readonly children: readonly ResolvedElement[];
+    readonly effects?: ResolvedEffects;
     // (undocumented)
     readonly fill: ResolvedFill;
     // (undocumented)

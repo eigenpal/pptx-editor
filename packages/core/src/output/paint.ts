@@ -28,6 +28,8 @@ import {
   effectDefs,
   effectElement,
   facetElements,
+  groupPaintsEffects,
+  paintGroupEffects,
   shadowCopy,
   type EffectSource,
 } from './paint-effects.ts';
@@ -654,7 +656,14 @@ export function paintItem(
   switch (item.kind) {
     case 'group': {
       const g = groupNode(doc, item, opts);
-      paintChildren(doc, item, g, ctx, opts, 0, Infinity);
+      if (!groupPaintsEffects(item)) {
+        paintChildren(doc, item, g, ctx, opts, 0, Infinity);
+        return g;
+      }
+      // A copy of the content can carry a line from out of view into it: every line paints.
+      const inner = svg(doc, 'g');
+      paintChildren(doc, item, inner, ctx, { ...opts, view: undefined }, 0, Infinity);
+      paintGroupEffects(doc, item, g, inner, ctx);
       return g;
     }
     case 'frame': {

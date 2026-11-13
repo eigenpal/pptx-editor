@@ -40,6 +40,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'preset-shadow', title: 'Preset shadows', perSlide: true },
   { id: 'three-d', title: '3-D shapes', perSlide: true },
   { id: 'effects-not-drawn', title: 'Effects not drawn', perSlide: true },
+  { id: 'group-effects', title: 'Group effects', perSlide: true },
   { id: 'fill-overlay', title: 'Fill overlay', perSlide: true },
   { id: 'gradient-colors', title: 'Gradient colors', perSlide: true },
   { id: 'path-gradient-focus', title: 'Path gradient focus', perSlide: true },
@@ -246,6 +247,14 @@ class Collector {
       case 'group': {
         // A group with `a:grpFill` passes its own group's fill on (ECMA-376 Part 1, 20.1.8.35).
         const outer = this.group;
+        // A group's effects paint over its content as one picture; a fill overlay does not draw.
+        const fx = item.element.effects;
+        this.effects(fx, false);
+        if (
+          fx &&
+          (fx.outerShadow || fx.glow || fx.softEdge || fx.reflection || fx.innerShadow || fx.blur)
+        )
+          this.add('group-effects');
         if (item.element.fill.type !== 'group') this.group = item.element.fill;
         for (const c of item.children) this.item(c);
         this.group = outer;

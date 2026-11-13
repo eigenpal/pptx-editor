@@ -12,6 +12,7 @@ import {
   type PaintOptions,
   type ViewRect,
 } from './paint.ts';
+import { groupPaintsEffects } from './paint-effects.ts';
 import type { PaintContext } from './paint-fill.ts';
 import { Defs, svg, SVG_NS } from './svg.ts';
 
@@ -183,7 +184,8 @@ export class SlidePainter {
     const opts = this.#opts;
     /** Paint `item` from nothing, a group in part when it weighs more than `room`. */
     const paintFresh = (item: LayoutItem, room: number): [PaintedItem, number] => {
-      if (item.kind === 'group' && paintWeight(item) > room) {
+      // A group with effects paints whole: its shadow and filters cover all of its children.
+      if (item.kind === 'group' && paintWeight(item) > room && !groupPaintsEffects(item)) {
         const g = groupNode(doc, item, opts);
         const fresh = this.#defs.capture(() => paintChildren(doc, item, g, ctx, opts, 0, room));
         const { next: rest, spent } = fresh.value;

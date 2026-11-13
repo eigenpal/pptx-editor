@@ -126,7 +126,8 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Glow and soft edge.** These effects require `@pptx-editor.dev/pro` under the EigenPal Pro License; without it, they remain saved but invisible. Curved edges, sharp corners, and transparent fills can differ from the reference. Soft edges can remove thin details, and large radii are capped.
 - **Preset shadows.** Preset shadows use measured silhouettes, including flattened perspective shadows and lighter copies for double shadows. Measurements cover all 20 presets at one distance. Other distances and colors remain unmeasured.
 - **3-D shapes.** 3-D rendering requires `@pptx-editor.dev/pro` under the EigenPal Pro License; without it, shapes render flat. Lighting, materials, bevels, and cameras are approximate, with perspective cameras rendered as parallel projections. Bottom bevels and 3-D text do not render; see [3-D effects](/docs/guides/3d-effects).
-- **Effects not drawn.** `a:effectDag`, group effects, text effects, and some fill overlays are not drawn. They stay in the file.
+- **Effects not drawn.** `a:effectDag`, text effects, some fill overlays, and a group's fill overlay and 3-D scene are not drawn. They stay in the file.
+- **Group effects.** A group's effects apply to everything the group draws as one picture, so its shadow is the silhouette of all its shapes together. Group effects are not measured against a reference PDF. Glow, inner shadow, soft edge, reflection, and blur on a group require `@pptx-editor.dev/pro` under the EigenPal Pro License, as on a shape.
 - **Fill overlay.** `a:fillOverlay` blends with the shape's own fill only. Over a semi-transparent fill, the result is opaque where the overlay is.
 - **Gradient colors.** Two-stop gradients favor the brighter value of each color channel. Gradients with three or more stops interpolate linearly in sRGB.
 - **Path gradient focus.** A circle path gradient draws as a focal radial gradient. A focus that is outside the circle or on it moves the circle out slightly.
@@ -202,6 +203,7 @@ Edits recalculate the slide layout and apply text autofit rules. The following o
 - **Soft edges.** The fade follows the distance to the painted edge of the fill and outline, so corners are rounder than a blur.
 - **Blur.** `a:blur` fades the shape to half its opacity at the painted edge and, when the blur grows the shape, adds rings in the color of that edge outside it. Text and detail inside the shape stay sharp.
 - **Reflection blur.** A reflection is drawn with its fade, without its blur.
+- **Group effects.** A group's shadow and glow use an opaque silhouette of the shapes in the group: a table casts its box, and the shapes' own effects cast nothing. A group's soft edge, inner shadow, and blur apply to each shape in the group. The `effect.group-silhouette` and `effect.group-body` diagnostics report them.
 - **Gradient lines.** Drawn in one color.
 - **Gradient stops.** At most 64 stops are drawn.
 - **Fills outside the box.** A rectangle path gradient or a picture fill paints the shape's box only.

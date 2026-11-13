@@ -353,7 +353,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'Group, ungroup, and edit inside a group. Group effects do not draw.',
+    notes:
+      'Group, ungroup, and edit inside a group. Group effects draw over the whole group as one picture and are approximate.',
   },
   {
     id: 'shapes.connectors',
@@ -467,7 +468,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply or clear shadow presets on supported shapes and pictures. Edit existing shadow color, opacity, blur, distance, and direction. Groups, tables, charts, and theme effect graphs reject these edits. Perspective shadows are unavailable, and blur is measured only for small radii.',
+      'Apply or clear shadow presets on supported shapes and pictures. Edit existing shadow color, opacity, blur, distance, and direction. Groups, tables, charts, and theme effect graphs reject these edits. A group shadow draws as the silhouette of the whole group. Perspective shadows are unavailable, and blur is measured only for small radii.',
   },
   {
     id: 'effects.glow-reflection',

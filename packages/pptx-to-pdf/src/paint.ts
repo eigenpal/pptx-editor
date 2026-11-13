@@ -33,7 +33,13 @@ import {
   PDFOperator,
   PDFOperatorNames,
 } from 'pdf-lib';
-import type { BlendMode, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
+import type {
+  BlendMode,
+  ResolvedEffects,
+  ResolvedFill,
+  ResolvedLine,
+  Rgba,
+} from '@pptx-editor.dev/core/cascade';
 import {
   ARROW_MITER_LIMIT,
   dashArray,
@@ -41,6 +47,7 @@ import {
   planStroke,
   strokeCap,
   strokeWidth,
+  type GeometryPath,
   type LayoutItem,
   type Matrix,
   type PathCommand,
@@ -57,12 +64,15 @@ import {
 } from '@pptx-editor.dev/core/output';
 import {
   drawGlow,
+  drawGroupShadowsAndGlow,
   drawShadows,
   drawInnerShadow,
   drawReflection,
   drawBlur,
   drawSoftEdge,
   effectDiagnostics,
+  groupEffectDiagnostics,
+  type GroupLeaf,
 } from './paint-effects.ts';
 import { canDrawPicture, drawPicture } from './paint-picture.ts';
 import { lineCapStyle, ownFill, paintFill, strokeStyle, type FillScope } from './paint-fill.ts';
@@ -464,35 +474,149 @@ function frameMessage(
   return 'A diagram is not drawn: it has no saved drawing.';
 }
 
+/** The effects of enclosing groups that the writer applies to each shape in them. */
+type GroupBody = Pick<ResolvedEffects, 'softEdge' | 'innerShadow' | 'blur'>;
+
+/** The fill scope of a group's children. */
+function groupScope(group: Extract<LayoutItem, { kind: 'group' }>, scope: FillScope): FillScope {
+  return {
+    ...scope,
+    sourcePart: group.element.partName,
+    groupFill: group.element.fill,
+    groupSourcePart: group.element.partName,
+  };
+}
+
+/** A path around a `w`×`h` box. */
+function boxPath(w: number, h: number): GeometryPath {
+  return {
+    commands: [
+      { op: 'M', x: 0, y: 0 },
+      { op: 'L', x: w, y: 0 },
+      { op: 'L', x: w, y: h },
+      { op: 'L', x: 0, y: h },
+      { op: 'Z' },
+    ],
+    fill: 'norm',
+    stroke: false,
+  } as GeometryPath;
+}
+
+/**
+ * The shapes and pictures that a group paints, with their fill scopes, for the silhouette of the
+ * group's shadow and glow: the shapes of nested groups, diagrams, and charts, an object's
+ * picture, and a table as its box (an opaque picture of the table's size). A picture that is not
+ * drawn casts nothing, as for its own shadow.
+ */
+async function groupLeaves(
+  item: LayoutItem,
+  scope: FillScope,
+  p: PageOps,
+  out: GroupLeaf[] = []
+): Promise<GroupLeaf[]> {
+  if (item.element.hidden) return out;
+  const local: FillScope = { ...scope, sourcePart: item.element.partName };
+  switch (item.kind) {
+    case 'group':
+      for (const child of item.children) await groupLeaves(child, groupScope(item, scope), p, out);
+      return out;
+    case 'frame':
+      if (item.poster) return groupLeaves(item.poster, local, p, out);
+      for (const child of item.drawing ?? []) await groupLeaves(child, scope, p, out);
+      for (const child of item.chart ?? []) await groupLeaves(child, local, p, out);
+      if (item.table) {
+        const w = Math.max(item.element.xfrm.cx, item.table.width);
+        const h = Math.max(item.element.xfrm.cy, item.table.height);
+        const box = {
+          ...item,
+          kind: 'picture',
+          element: { ...item.element, kind: 'picture', fill: { type: 'none' } },
+          geometry: { paths: [boxPath(w, h)] },
+        } as unknown as GroupLeaf['item'];
+        out.push({ item: box, scope: local });
+      }
+      return out;
+    default: {
+      const own = ownFill(item.element.fill, local);
+      if (own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p)))
+        out.push({ item, scope: local });
+      return out;
+    }
+  }
+}
+
+/**
+ * A shape or picture with the soft edge, inner shadow, and blur of its enclosing groups, where it
+ * has none of its own (`GroupBody`).
+ */
+function withGroupBody<T extends Extract<LayoutItem, { kind: 'shape' | 'picture' }>>(
+  item: T,
+  body: GroupBody | undefined
+): T {
+  if (!body || !(body.softEdge || body.innerShadow || body.blur)) return item;
+  const own = item.element.effects;
+  const softEdge = own?.softEdge ?? body.softEdge;
+  const innerShadow = own?.innerShadow ?? body.innerShadow;
+  const blur = own?.blur ?? body.blur;
+  const effects: ResolvedEffects = {
+    unsupported: [],
+    ...own,
+    ...(softEdge ? { softEdge } : {}),
+    ...(innerShadow ? { innerShadow } : {}),
+    ...(blur ? { blur } : {}),
+  };
+  return { ...item, element: { ...item.element, effects } };
+}
+
 async function drawItem(
   item: LayoutItem,
   p: PageOps,
   scope: FillScope,
-  groupScale: number
+  groupScale: number,
+  body?: GroupBody
 ): Promise<void> {
   if (item.element.hidden) return;
   await p.step();
   const local: FillScope = { ...scope, sourcePart: item.element.partName };
   if (item.kind === 'group') {
-    const inner: FillScope = {
-      ...local,
-      groupFill: item.element.fill,
-      groupSourcePart: item.element.partName,
+    const inner = groupScope(item, scope);
+    const fx = item.element.effects;
+    // The writer has no filter over a group's content: the soft edge, inner shadow, and blur of
+    // a group apply to each shape in it (`effect.group-body`).
+    const childBody: GroupBody | undefined =
+      fx && (fx.softEdge || fx.innerShadow || fx.blur)
+        ? {
+            softEdge: fx.softEdge ?? body?.softEdge,
+            innerShadow: fx.innerShadow ?? body?.innerShadow,
+            blur: fx.blur ?? body?.blur,
+          }
+        : body;
+    const scale = matrixScale(item.matrix);
+    const children = item.children;
+    const drawChildren = async (): Promise<void> => {
+      for (const child of children) await drawItem(child, p, inner, scale, childBody);
     };
-    for (const child of item.children) await drawItem(child, p, inner, matrixScale(item.matrix));
-    return;
+    if (!fx) return drawChildren();
+    // The group's reflection, shadows, and glow paint under its content, as in the SVG paint:
+    // one copy of all children together, placed by the group's box.
+    const leaves = await groupLeaves(item, scope, p);
+    groupEffectDiagnostics(item, leaves, p);
+    if (leaves.length > 0) await drawReflection(item, p, drawChildren);
+    await drawGroupShadowsAndGlow(item, leaves, p);
+    return drawChildren();
   }
   if (item.kind === 'frame') {
     // An OLE object shows its picture, as in the SVG paint.
-    if (item.poster) return drawItem(item.poster, p, local, groupScale);
+    if (item.poster) return drawItem(item.poster, p, local, groupScale, body);
     // A diagram draws its saved drawing, as in the SVG paint.
     if (item.drawing) {
-      for (const child of item.drawing) await drawItem(child, p, scope, matrixScale(item.matrix));
+      for (const child of item.drawing)
+        await drawItem(child, p, scope, matrixScale(item.matrix), body);
       return;
     }
     // A chart drawn by an installed renderer, as in the SVG paint.
     if (item.chart) {
-      for (const child of item.chart) await drawItem(child, p, local, groupScale);
+      for (const child of item.chart) await drawItem(child, p, local, groupScale, body);
       return;
     }
     if (!item.table) {
@@ -506,6 +630,7 @@ async function drawItem(
     p.push(popGraphicsState());
     return;
   }
+  item = withGroupBody(item, body);
   // A picture fill whose image is not drawn (a `p:pic`, or a shape's picture fill) casts no
   // shadow and has no inside to shade.
   const own = ownFill(item.element.fill, local);

@@ -41,7 +41,7 @@ import {
   stroke,
   type PDFName,
 } from 'pdf-lib';
-import type { ResolvedFill, Rgba } from '@pptx-editor.dev/core/cascade';
+import type { ResolvedEffects, ResolvedFill, Rgba, Xfrm } from '@pptx-editor.dev/core/cascade';
 import {
   apply,
   ARROW_MITER_LIMIT,
@@ -88,6 +88,12 @@ import {
 } from './page-ops.ts';
 
 type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
+
+/** A shape, picture, or group whose effects place copies of its content by its box. */
+type EffectHost = {
+  readonly element: { readonly effects?: ResolvedEffects; readonly xfrm: Xfrm };
+  readonly matrix: Matrix;
+};
 
 /** A blur below half a point is drawn as a hard edge: it is under one output pixel. */
 const MIN_SIGMA = 6_350;
@@ -464,6 +470,53 @@ async function drawLayers(
 }
 
 /**
+ * Cast the outer shadows of `effects` (a preset shadow's second copy under its first). `matrix`
+ * maps the `w`x`h` box of the shape or group to the slide; `classesUnder` gives the silhouette
+ * under an effect transform.
+ */
+async function castShadows(
+  effects: ResolvedEffects,
+  matrix: Matrix,
+  w: number,
+  h: number,
+  face: Matrix,
+  classesUnder: (m: Matrix) => Promise<PartClass[]>,
+  p: PageOps
+): Promise<void> {
+  for (const shadow of [effects.secondShadow, effects.outerShadow]) {
+    if (!shadow || shadow.color.a <= 0) continue;
+    const m = multiply(face, effectMatrix(shadow, matrix, w, h));
+    const sigma = blurSigma(shadow.blur);
+    for (const cls of await classesUnder(m))
+      await drawLayers(
+        cls.parts,
+        shadow.color,
+        blurLayers(shadow.color.a, sigma, cls.bandWidth, shadow.dist),
+        p
+      );
+  }
+}
+
+/** Cast a glow around the silhouette `classes`, as the SVG glow (`glowSpread`). */
+async function castGlow(
+  glow: ResolvedEffects['glow'],
+  classes: () => Promise<PartClass[]>,
+  p: PageOps
+): Promise<void> {
+  if (!glow || glow.radius <= 0 || glow.color.a <= 0 || !proEffects()) return;
+  // The silhouette grown by `spread` and blurred by sigma. The inside level is the profile at
+  // the edge, a * phi(spread / sigma).
+  const { spread, sigma } = glowSpread(glow.radius);
+  const a = glow.color.a;
+  const list = layers(
+    rings(spread + 3 * sigma, sigma / 2),
+    a * phi(spread / sigma),
+    (d) => a * (1 - phi((d - spread) / sigma))
+  );
+  for (const cls of await classes()) await drawLayers(cls.parts, glow.color, list, p);
+}
+
+/**
  * The outer shadows of a shape or picture, painted before its content. `face` is the camera's
  * turn of the face (`ThreeDPaint.front`): the shadow is placed on the face, then turns with it,
  * as in the SVG paint.
@@ -477,19 +530,7 @@ export async function drawShadows(
   const effects = item.element.effects;
   if (!effects) return;
   const { cx: w, cy: h } = item.element.xfrm;
-  // A preset shadow's second copy lies under its first.
-  for (const shadow of [effects.secondShadow, effects.outerShadow]) {
-    if (!shadow || shadow.color.a <= 0) continue;
-    const m = multiply(face, effectMatrix(shadow, item.matrix, w, h));
-    const sigma = blurSigma(shadow.blur);
-    for (const cls of await silhouette(item, m, p, scope))
-      await drawLayers(
-        cls.parts,
-        shadow.color,
-        blurLayers(shadow.color.a, sigma, cls.bandWidth, shadow.dist),
-        p
-      );
-  }
+  await castShadows(effects, item.matrix, w, h, face, (m) => silhouette(item, m, p, scope), p);
 }
 
 /**
@@ -502,20 +543,88 @@ export async function drawGlow(
   scope: FillScope,
   face: Matrix
 ): Promise<void> {
-  const glow = item.element.effects?.glow;
-  if (glow && glow.radius > 0 && glow.color.a > 0 && proEffects()) {
-    // As the SVG glow (`glowSpread`): the silhouette grown by `spread` and blurred by σ. The
-    // inside level is the profile at the edge, a·Φ(spread / σ).
-    const { spread, sigma } = glowSpread(glow.radius);
-    const a = glow.color.a;
-    const list = layers(
-      rings(spread + 3 * sigma, sigma / 2),
-      a * phi(spread / sigma),
-      (d) => a * (1 - phi((d - spread) / sigma))
+  await castGlow(item.element.effects?.glow, () => silhouette(item, face, p, scope), p);
+}
+
+/** A shape or picture that a group paints, with the fill scope it paints in. */
+export interface GroupLeaf {
+  readonly item: Drawable;
+  readonly scope: FillScope;
+}
+
+/**
+ * The silhouette of a group's content under `m`: the silhouettes of its shapes and pictures
+ * together. Parts of one blur profile join one class, so a layer paints them as one
+ * transparency group, and children that overlap cast one shadow, not two.
+ */
+async function groupSilhouette(
+  leaves: readonly GroupLeaf[],
+  m: Matrix,
+  p: PageOps
+): Promise<PartClass[]> {
+  const byWidth = new Map<number, Part[]>();
+  for (const leaf of leaves)
+    for (const cls of await silhouette(leaf.item, m, p, leaf.scope)) {
+      const parts = byWidth.get(cls.bandWidth);
+      if (parts) parts.push(...cls.parts);
+      else byWidth.set(cls.bandWidth, [...cls.parts]);
+    }
+  return [...byWidth].map(([bandWidth, parts]) => ({ parts, bandWidth }));
+}
+
+/**
+ * The outer shadows and the glow of a group (`p:grpSpPr/a:effectLst`), painted before its
+ * content, as in the SVG paint: one shadow of all `leaves` together, placed by the group's box.
+ */
+export async function drawGroupShadowsAndGlow(
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  leaves: readonly GroupLeaf[],
+  p: PageOps
+): Promise<void> {
+  const effects = group.element.effects;
+  if (!effects || leaves.length === 0) return;
+  const { cx: w, cy: h } = group.element.xfrm;
+  const identity: Matrix = [1, 0, 0, 1, 0, 0];
+  const under = (m: Matrix): Promise<PartClass[]> => groupSilhouette(leaves, m, p);
+  await castShadows(effects, group.matrix, w, h, identity, under, p);
+  await castGlow(effects.glow, () => under(identity), p);
+}
+
+/** Report how the writer draws a group's effects, when they draw something. */
+export function groupEffectDiagnostics(
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  leaves: readonly GroupLeaf[],
+  p: PageOps
+): void {
+  const fx = group.element.effects;
+  if (!fx || leaves.length === 0) return;
+  const pro = proEffects();
+  const shadow = fx.outerShadow ?? fx.secondShadow;
+  const shadowDrawn = shadow !== undefined && shadow.color.a > 0;
+  const glowDrawn = pro && fx.glow !== undefined && fx.glow.radius > 0 && fx.glow.color.a > 0;
+  if (shadowDrawn && blurSigma(shadow.blur) >= MIN_SIGMA)
+    p.diag.add('effect.shadow-blur', 'approximation', 'Shadow blur is drawn as layered rings.');
+  if (glowDrawn) p.diag.add('effect.glow', 'approximation', 'Glow is drawn as layered rings.');
+  if (shadowDrawn || glowDrawn)
+    p.diag.add(
+      'effect.group-silhouette',
+      'approximation',
+      'Group shadows and glow use an opaque silhouette of the shapes in the group: a table casts its box, and the effects of the shapes cast nothing.'
     );
-    for (const cls of await silhouette(item, face, p, scope))
-      await drawLayers(cls.parts, glow.color, list, p);
-  }
+  const ref = fx.reflection;
+  if (
+    pro &&
+    ref &&
+    (ref.startAlpha > 0 || ref.endAlpha > 0) &&
+    reflectionBlurSigma(ref.blur) >= MIN_SIGMA
+  )
+    p.diag.add('effect.reflection-blur', 'approximation', 'Reflections are drawn without blur.');
+  if (pro && (fx.softEdge || fx.innerShadow || fx.blur))
+    p.diag.add(
+      'effect.group-body',
+      'approximation',
+      'The soft edge, inner shadow, and blur of a group apply to each shape in the group.'
+    );
 }
 
 /**
@@ -580,14 +689,14 @@ export async function drawInnerShadow(item: Drawable, p: PageOps, scope: FillSco
 }
 
 /**
- * The reflection of a shape or picture, painted before its shadow and content, as the SVG
+ * The reflection of a shape, picture, or group, painted before its shadow and content, as the SVG
  * renderer paints it: `drawContent` (the geometry, inner shadow, and text, in slide space) under
  * the reflection's effect transform, as one transparency group, through a luminosity soft mask
  * that fades from `startAlpha` at `startPos` to `endAlpha` at `endPos` along `fadeDir`. The blur
  * is left out (`effectDiagnostics` reports it).
  */
 export async function drawReflection(
-  item: Drawable,
+  item: EffectHost,
   p: PageOps,
   drawContent: () => Promise<void>
 ): Promise<void> {

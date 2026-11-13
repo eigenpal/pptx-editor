@@ -2,7 +2,8 @@
 //
 // A shape paints as one content group (geometry and text). An outer shadow is a `<use>` copy of
 // that group under the effect transform, inside an untransformed group that holds the filter, so
-// blur and color always work in slide space.
+// blur and color always work in slide space. A group with effects paints its children as one
+// content group in the same way, placed by the group's box (`paintGroupEffects`).
 //
 // Glow, inner shadow, reflection, and soft edge come from the installed effects renderer
 // (`drawing-renderers.ts`, `@pptx-editor.dev/pro/drawing`) as plain data, which `effectDefs`
@@ -14,13 +15,17 @@
 import { toCss, type ResolvedEffects } from '../cascade/index.ts';
 import {
   apply,
+  drawingRenderers,
   multiply,
   type EffectCopySource,
+  type LayoutItem,
   type EffectNode,
   type Matrix,
   type ThreeDFacet,
 } from '../layout/index.ts';
 import { blurSigma, boundsOf, effectMatrix, grow, PX, type Bounds } from './effect-transforms.ts';
+import { groupContentCorners } from './item-corners.ts';
+import type { PaintContext } from './paint-fill.ts';
 import { matrixAttr, num, svg, type Defs } from './svg.ts';
 import { finiteFacet } from './painter-math.ts';
 
@@ -168,4 +173,82 @@ export function shadowCopy(
     ? svg(doc, 'use', { href: `#${face.id}`, transform: matrixAttr(m) })
     : copyOf(doc, source, m);
   return svg(doc, 'g', { filter, 'data-effect': 'shadow' }, [copy]);
+}
+
+/**
+ * Whether a group paints effects of its own (`p:grpSpPr/a:effectLst`): outer and preset shadows
+ * always, and glow, inner shadow, reflection, soft edge, and blur through the installed effects
+ * renderer, as for a shape. @internal
+ */
+export function groupPaintsEffects(group: Extract<LayoutItem, { kind: 'group' }>): boolean {
+  const fx = group.element.effects;
+  if (!fx) return false;
+  if (fx.outerShadow || fx.secondShadow) return true;
+  const pro = drawingRenderers().effects;
+  if (!pro) return false;
+  return !!(fx.glow || fx.reflection || fx.softEdge || fx.innerShadow || (pro.blur && fx.blur));
+}
+
+/**
+ * Paint a group's effects around its painted children (`inner`), into the group's node `outer`.
+ * The effects apply to the group's content as one picture (ECMA-376 Part 1, 19.3.1.22): the
+ * shadow, the glow, and the reflection copy all children together, and the soft edge, the inner
+ * shadow, and the blur filter them together. The order is the shape's: reflection, shadows,
+ * glow, then the content.
+ */
+export function paintGroupEffects(
+  doc: Document,
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  outer: SVGElement,
+  inner: SVGElement,
+  ctx: PaintContext
+): void {
+  const effects = group.element.effects!;
+  const pro = drawingRenderers().effects;
+  const ids = ctx.defs;
+  const corners = groupContentCorners(group);
+  const bounds = boundsOf(corners);
+  const bodyFx =
+    pro && (effects.softEdge || effects.innerShadow) ? pro.body(effects, bounds, ids) : null;
+  if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
+  const blurFx = pro?.blur && effects.blur ? pro.blur(effects, bounds, ids) : null;
+  if (blurFx) effectDefs(ctx.defs, blurFx.defs);
+  const content = svg(doc, 'g', {}, [
+    bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [inner]) : inner,
+  ]);
+  const contentId = ctx.defs.id('content');
+  content.setAttribute('id', contentId);
+  const shown = blurFx ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content]) : content;
+  const source: EffectSource = {
+    contentId,
+    matrix: group.matrix,
+    width: group.element.xfrm.cx,
+    height: group.element.xfrm.cy,
+    corners,
+  };
+  const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
+  if (reflection) {
+    effectDefs(ctx.defs, reflection.defs);
+    outer.appendChild(effectElement(doc, reflection.node));
+  }
+  // A preset shadow's second copy lies under its first.
+  const second = shadowCopy(ctx.defs, effects, source, 'secondShadow');
+  if (second) outer.appendChild(second);
+  const shadow = shadowCopy(ctx.defs, effects, source);
+  if (shadow) outer.appendChild(shadow);
+  const glow = pro && effects.glow ? pro.glow(effects, bounds, ids, true) : null;
+  if (glow) {
+    effectDefs(ctx.defs, glow.defs);
+    let glowSource = contentId;
+    if (shown !== content) {
+      glowSource = ctx.defs.id('shown');
+      shown.setAttribute('id', glowSource);
+    }
+    outer.appendChild(
+      svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
+        svg(doc, 'use', { href: `#${glowSource}` }),
+      ])
+    );
+  }
+  outer.appendChild(shown);
 }

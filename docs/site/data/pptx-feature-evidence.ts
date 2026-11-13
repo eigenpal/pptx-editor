@@ -93,7 +93,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['custom-geometry', 'follow-ups'],
     approximations: ['path-start'],
   },
-  'shapes.groups': { fixtures: ['groups-transforms'] },
+  'shapes.groups': { fixtures: ['groups-transforms'], approximations: ['group-effects'] },
   'shapes.connectors': { fixtures: ['lines-arrows', 'line-ends-dashes'] },
   'shapes.arrange': { fixtures: ['arrange-flip-hidden'] },
   'shapes.flip-rotate': {
@@ -129,14 +129,14 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   // --- Effects -----------------------------------------------------------
   'effects.outer-shadow': {
     fixtures: ['effects', 'shape-effects-presets'],
-    approximations: ['blur', 'shadow-skew'],
+    approximations: ['blur', 'shadow-skew', 'group-effects'],
   },
   // Painted by the drawing module of @pptx-editor.dev/pro: the harness installs it
   // (`examples/vite/src/harness.ts`), and `packages/pro/src/drawing/__tests__/effects-paint.test.ts`
   // proves that the free engine paints none of these effects.
   'effects.glow-reflection': {
     fixtures: ['effects', 'shape-effects-presets', 'picture-editing'],
-    approximations: ['blur', 'glow-soft-edge'],
+    approximations: ['blur', 'glow-soft-edge', 'group-effects'],
   },
   'effects.fill-overlay': {
     fixtures: ['fill-fidelity'],

@@ -46,6 +46,7 @@ import {
   resolveLine,
   styleRefContext,
   themeFill,
+  type ResolvedEffects,
   type ResolvedFill,
 } from './paint-props.ts';
 import { entryParts } from './picture-bullet.ts';
@@ -574,7 +575,22 @@ function diagramGroup(
     childExtent: { cx: intAttr(chExt, 'cx') ?? xfrm.cx, cy: intAttr(chExt, 'cy') ?? xfrm.cy },
     children,
     fill: resolveFillElement(fillElementOf(grpSpPr), scope.ctx) ?? { type: 'none' },
+    ...groupEffects(grpSpPr, scope.ctx),
   };
+}
+
+/**
+ * The effects of a group (`p:grpSpPr` or `dsp:grpSpPr`, ECMA-376 Part 1, 19.3.1.22): an effect
+ * list applies to the group's content as one picture. A group has no style, so it has no theme
+ * effect. A group's 3-D scene (`a:scene3d`) is reported unsupported.
+ */
+function groupEffects(
+  grpSpPr: Element | undefined,
+  ctx: ColorContext
+): { effects?: ResolvedEffects } {
+  const listed = resolveEffects(effectContainer(grpSpPr), ctx);
+  if (!child(grpSpPr, 'a:scene3d')) return listed ? { effects: listed } : {};
+  return { effects: { ...listed, unsupported: [...(listed?.unsupported ?? []), 'scene3d'] } };
 }
 
 /**
@@ -676,6 +692,7 @@ function resolveElement(
         childExtent: { cx: intAttr(chExt, 'cx') ?? xfrm.cx, cy: intAttr(chExt, 'cy') ?? xfrm.cy },
         children: kids,
         fill: resolveFillElement(fillElementOf(grpSpPr), scope.ctx) ?? { type: 'none' },
+        ...groupEffects(grpSpPr, scope.ctx),
       };
     }
     case 'graphicFrame': {
