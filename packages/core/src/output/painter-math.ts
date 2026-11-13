@@ -4,16 +4,35 @@
 // a public API.
 
 import type { EffectPlacement, GradientStop, ResolvedFill, Rgba } from '../cascade/index.ts';
-import type { GeometryPath, Matrix, ThreeDFacet } from '../layout/index.ts';
+import type {
+  GeometryPath,
+  LayoutItem,
+  Matrix,
+  ThreeDFacet,
+  ThreeDPaint,
+} from '../layout/index.ts';
 import {
+  applyBlipColorSteps,
+  blipColorSteps,
   blurSigma as sigmaFor,
   effectMatrix as placementOf,
+  LUMA_WEIGHTS,
   lumTransfer,
+  type BlipColorStep,
 } from './effect-transforms.ts';
-import { adjustForPathMode as adjusted } from './paint-fill.ts';
-import { circleGeometry, linearEnds, paintStops } from './paint-gradient.ts';
+import { boxCorners } from './item-corners.ts';
+import { adjustForPathMode as adjusted, tileGeometry, type TileGeometry } from './paint-fill.ts';
+import {
+  circleGeometry,
+  linearEnds,
+  paintStops,
+  rectGeometry,
+  shapeGradientBands as bandsOf,
+} from './paint-gradient.ts';
+import { ShapeBandBudget } from './paint-budgets.ts';
 
-export { lumTransfer };
+export { applyBlipColorSteps, blipColorSteps, LUMA_WEIGHTS, lumTransfer, tileGeometry };
+export type { BlipColorStep, TileGeometry };
 
 /**
  * Lighten or darken a color for a preset path fill mode (`a:path/@fill`), as the SVG paint does.
@@ -89,6 +108,22 @@ export function threeDColor(fill: ResolvedFill): Rgba {
 }
 
 /**
+ * The shape or picture whose face a 3-D paint lights: a solid fill takes the paint's face color
+ * (`ThreeDPaint.faceColor`), so the SVG paint and the PDF writer fill the same lit face. Other
+ * fills keep their colors.
+ * @internal
+ */
+export function threeDFaceItem<
+  T extends Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
+>(item: T, paint: ThreeDPaint | null): T {
+  const face = paint?.faceColor;
+  const fill = item.element.fill;
+  if (!face || fill.type !== 'solid' || ![face.r, face.g, face.b, face.a].every(Number.isFinite))
+    return item;
+  return { ...item, element: { ...item.element, fill: { type: 'solid', color: face } } };
+}
+
+/**
  * Whether every coordinate and color channel of a 3-D facet is a finite number. The SVG and PDF
  * paints skip a facet that is not, so a degenerate shape never writes `NaN`.
  * @internal
@@ -99,4 +134,53 @@ export function finiteFacet(f: ThreeDFacet): boolean {
     [c.r, c.g, c.b, c.a].every(Number.isFinite) &&
     f.polygons.every((poly) => poly.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)))
   );
+}
+
+/**
+ * The bands of a `path="shape"` gradient over a `w` × `h` box, as the SVG paint draws them:
+ * outline copies scaled about (`cx`, `cy`), outside in, each in one color. `stops` are the fill's
+ * stops after the path fill mode.
+ * @internal
+ */
+export function shapeGradientBands(
+  fill: Extract<ResolvedFill, { type: 'path' }>,
+  stops: readonly GradientStop[],
+  w: number,
+  h: number
+): { cx: number; cy: number; bands: { scale: number; color: Rgba }[] } {
+  return bandsOf(fill, stops, w, h);
+}
+
+/**
+ * The shape gradient band work of one slide, with the SVG paint's limits: a shape draws outline
+ * bands while `allow` returns true, and the rectangle construction after.
+ * @internal
+ */
+export function shapeBandBudget(): { allow(paths: number, commands: number): boolean } {
+  return new ShapeBandBudget();
+}
+
+/**
+ * The construction of a `path="rect"` gradient over a `w` × `h` box, as the SVG paint draws it:
+ * the first stop on the focus rectangle (`l`, `t`, `r`, `b`), the last on the outer rectangle
+ * (`x0`, `y0`, `x1`, `y1`), four trapezoids between them.
+ * @internal
+ */
+export function rectGradientGeometry(
+  fill: Extract<ResolvedFill, { type: 'path' }>,
+  w: number,
+  h: number
+): { l: number; t: number; r: number; b: number; x0: number; y0: number; x1: number; y1: number } {
+  return rectGeometry(fill, w, h);
+}
+
+/**
+ * The slide-space corners of an item's box, geometry, and outline: the bounds that the SVG
+ * paint's body effects (soft edge, inner shadow) read.
+ * @internal
+ */
+export function effectBoxCorners(
+  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>
+): { x: number; y: number }[] {
+  return boxCorners(item);
 }

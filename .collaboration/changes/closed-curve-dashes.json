@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Where the dashes of closed outlines start, on curves and on paths that end at their first point, affects painted output and PDF output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/__tests__/line-strokes.test.ts",
+    "packages/core/src/layout/__tests__/approximations.test.ts"
+  ]
+}

@@ -15,14 +15,18 @@ import { shapeFormatFixtures } from './shape-format.ts';
 import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
+import { underlineStylesFixtures } from './underline-styles.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
 import { chartDataDeck } from './chart-data.ts';
 import { diagramEditingDeck } from './diagram-editing.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
 import { pictureBulletsDeck } from './picture-bullets.ts';
+import { pictureAdjustmentsDeck } from './picture-adjustments.ts';
+import { closedDashesDeck } from './closed-dashes.ts';
 import { textWarpFixtures } from './text-warp.ts';
 import { equationFixtures } from './equations.ts';
 import { THREE_D_EFFECT_STYLES, threeDFixtures } from './three-d.ts';
+import { groupEffectsFixtures } from './group-effects.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -105,9 +109,11 @@ const fixtures: Record<string, FixtureSlide[]> = {
   ...textWarpFixtures,
   ...equationFixtures,
   ...threeDFixtures,
+  ...groupEffectsFixtures,
   ...textScriptFixtures,
   ...followUpFixtures,
   ...lineEndsDashesFixtures,
+  ...underlineStylesFixtures,
   'tables': [
     {
       // The default style, referenced but not written in tableStyles.xml.
@@ -861,6 +867,10 @@ writeFileSync(`${OUT}/slide-layouts.pptx`, buildPptx(slideLayoutsDeck()));
 writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
 // Picture bullets at several sizes, levels, and alignments.
 writeFileSync(`${OUT}/picture-bullets.pptx`, buildPptx(pictureBulletsDeck()));
+// Picture borders with dashes and caps, and picture corrections.
+writeFileSync(`${OUT}/picture-adjustments.pptx`, buildPptx(pictureAdjustmentsDeck()));
+// Dashed outlines with round and square caps on closed shapes other than a rectangle.
+writeFileSync(`${OUT}/closed-dashes.pptx`, buildPptx(closedDashesDeck()));
 // East Asian faces from the theme script fonts, by each run's language.
 writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFontsDeck()));
 // Custom kinsoku lists, and justified and distributed East Asian text.
@@ -878,4 +888,4 @@ writeFileSync(`${OUT}/diagram-editing.pptx`, buildPptx(diagramEditingDeck()));
 // Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.
 const roundTrip = buildRoundTripDecks(image);
 for (const [name, bytes] of Object.entries(roundTrip)) writeFileSync(`${OUT}/${name}.pptx`, bytes);
-console.log(`${Object.keys(fixtures).length + 8 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);
+console.log(`${Object.keys(fixtures).length + 10 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);

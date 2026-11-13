@@ -2,7 +2,8 @@
 //
 // A shape paints as one content group (geometry and text). An outer shadow is a `<use>` copy of
 // that group under the effect transform, inside an untransformed group that holds the filter, so
-// blur and color always work in slide space.
+// blur and color always work in slide space. A group with effects paints its children as one
+// content group in the same way, placed by the group's box (`paintGroupEffects`).
 //
 // Glow, inner shadow, reflection, and soft edge come from the installed effects renderer
 // (`drawing-renderers.ts`, `@pptx-editor.dev/pro/drawing`) as plain data, which `effectDefs`
@@ -14,13 +15,20 @@
 import { toCss, type ResolvedEffects } from '../cascade/index.ts';
 import {
   apply,
+  drawingRenderers,
   multiply,
   type EffectCopySource,
+  type LayoutItem,
   type EffectNode,
   type Matrix,
+  type PathCommand,
   type ThreeDFacet,
 } from '../layout/index.ts';
 import { blurSigma, boundsOf, effectMatrix, grow, PX, type Bounds } from './effect-transforms.ts';
+import { groupTextCovers } from './group-text-covers.ts';
+import { groupContentCorners } from './item-corners.ts';
+import { commandData } from './path-data.ts';
+import type { PaintContext } from './paint-fill.ts';
 import { matrixAttr, num, svg, type Defs } from './svg.ts';
 import { finiteFacet } from './painter-math.ts';
 
@@ -168,4 +176,161 @@ export function shadowCopy(
     ? svg(doc, 'use', { href: `#${face.id}`, transform: matrixAttr(m) })
     : copyOf(doc, source, m);
   return svg(doc, 'g', { filter, 'data-effect': 'shadow' }, [copy]);
+}
+
+/**
+ * Whether a group paints effects of its own (`p:grpSpPr/a:effectLst`): outer and preset shadows
+ * always, and glow, inner shadow, reflection, soft edge, and blur through the installed effects
+ * renderer, as for a shape. @internal
+ */
+export function groupPaintsEffects(group: Extract<LayoutItem, { kind: 'group' }>): boolean {
+  const fx = group.element.effects;
+  if (!fx) return false;
+  if (fx.outerShadow || fx.secondShadow) return true;
+  const pro = drawingRenderers().effects;
+  if (!pro) return false;
+  return !!(fx.glow || fx.reflection || fx.softEdge || (pro.blur && fx.blur));
+}
+
+/**
+ * Paint a group's effects around its painted children (`inner`), into the group's node `outer`.
+ * The effects apply to the group's content as one picture (ECMA-376 Part 1, 19.3.1.22): the
+ * shadow, the glow, and the reflection copy all children together, and the soft edge, the inner
+ * shadow, and the blur filter them together. The order is the shape's: reflection, shadows,
+ * glow, then the content.
+ */
+export function paintGroupEffects(
+  doc: Document,
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  outer: SVGElement,
+  inner: SVGElement,
+  ctx: PaintContext
+): void {
+  const effects = group.element.effects!;
+  const pro = drawingRenderers().effects;
+  const ids = ctx.defs;
+  const corners = groupContentCorners(group);
+  const bounds = boundsOf(corners);
+  // A group's inner shadow is not resolved (`ResolvedGroup.effects`): the body is its soft edge.
+  const bodyFx = pro && effects.softEdge ? pro.body(effects, bounds, ids) : null;
+  if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
+  const blurFx = pro?.blur && effects.blur ? pro.blur(effects, bounds, ids) : null;
+  if (blurFx) effectDefs(ctx.defs, blurFx.defs);
+  const content = svg(doc, 'g', {}, [
+    bodyFx ? softEdged(doc, group, inner, bodyFx.filter, ctx) : inner,
+  ]);
+  const contentId = ctx.defs.id('content');
+  content.setAttribute('id', contentId);
+  const shown = blurFx ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content]) : content;
+  const source: EffectSource = {
+    contentId,
+    matrix: group.matrix,
+    width: group.element.xfrm.cx,
+    height: group.element.xfrm.cy,
+    corners,
+  };
+  const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
+  if (reflection) {
+    effectDefs(ctx.defs, reflection.defs);
+    outer.appendChild(effectElement(doc, reflection.node));
+  }
+  // A preset shadow's second copy lies under its first.
+  const second = shadowCopy(ctx.defs, effects, source, 'secondShadow');
+  if (second) outer.appendChild(second);
+  const shadow = shadowCopy(ctx.defs, effects, source);
+  if (shadow) outer.appendChild(shadow);
+  const glow = pro && effects.glow ? pro.glow(effects, bounds, ids, true) : null;
+  if (glow) {
+    effectDefs(ctx.defs, glow.defs);
+    let glowSource = contentId;
+    if (shown !== content) {
+      glowSource = ctx.defs.id('shown');
+      shown.setAttribute('id', glowSource);
+    }
+    outer.appendChild(
+      svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
+        svg(doc, 'use', { href: `#${glowSource}` }),
+      ])
+    );
+  }
+  outer.appendChild(shown);
+}
+
+/** The custom property that hides the text of shapes in the filtered copy (`softEdged`). */
+const COPY_TEXT = '--pptx-group-text';
+
+/**
+ * The shape of each painted text body, for the soft edge of a group that holds it. `paintItem`
+ * notes each body with `ownText`, and `softEdged` reads it to clip the text that a later body
+ * covers (`groupTextCovers`).
+ */
+const textOwners = new WeakMap<Element, LayoutItem>();
+
+/** Note that `item` painted the text body `node`. Returns `node`. @internal */
+export function ownText(item: LayoutItem, node: SVGElement): SVGElement {
+  textOwners.set(node, item);
+  return node;
+}
+
+/**
+ * Clip the text body `body` to each of `paths` (`groupTextCovers`), in the slide space of its
+ * parent: one group with a clip path for each, around the body in its place.
+ */
+function clipText(
+  body: Element,
+  paths: readonly (readonly PathCommand[])[],
+  ctx: PaintContext
+): void {
+  const { doc } = ctx.defs;
+  const parent = body.parentNode;
+  if (!parent) return;
+  const next = body.nextSibling;
+  let node = body as SVGElement;
+  for (const path of paths) {
+    const id = ctx.defs.id('cover');
+    ctx.defs.add(
+      svg(doc, 'clipPath', { id, clipPathUnits: 'userSpaceOnUse' }, [
+        svg(doc, 'path', { d: commandData(path), 'clip-rule': 'evenodd' }),
+      ])
+    );
+    node = svg(doc, 'g', { 'clip-path': `url(#${id})` }, [node]);
+  }
+  parent.insertBefore(node, next);
+}
+
+/**
+ * The soft edge of a group (`filter`) over its painted children (`inner`), with the text of its
+ * shapes painted once, unfaded, over the faded picture. The filter takes a `<use>` copy of the
+ * children; in the copy, the text of shapes is hidden (`COPY_TEXT`, inherited from the copy).
+ * The children themselves keep their nodes and their text, with everything but that text hidden,
+ * so the text stays in its shape's node and paints once at its own alpha. A table's text fades
+ * with the picture, as the PDF export draws it. A soft-edged group inside the children hides its
+ * own text in the copy in the same way. Text that a later body in the group covers paints clipped
+ * to the outside of that body (`groupTextCovers`), so the body still shows over it.
+ */
+function softEdged(
+  doc: Document,
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  inner: SVGElement,
+  filter: string,
+  ctx: PaintContext
+): SVGElement {
+  const { clips } = groupTextCovers(group);
+  for (const body of inner.querySelectorAll('[data-pptx-text]')) {
+    if (body.closest('[data-kind="table"]')) continue;
+    const style = body.getAttribute('style') ?? '';
+    if (!style.includes(COPY_TEXT))
+      body.setAttribute('style', `${style};visibility:var(${COPY_TEXT},visible)`);
+    const owner = textOwners.get(body);
+    const paths = owner && clips.get(owner);
+    if (paths) clipText(body, paths, ctx);
+  }
+  const innerId = ctx.defs.id('soft');
+  inner.setAttribute('id', innerId);
+  return svg(doc, 'g', {}, [
+    svg(doc, 'g', { filter: `url(#${filter})` }, [
+      svg(doc, 'use', { href: `#${innerId}`, style: `${COPY_TEXT}:hidden` }),
+    ]),
+    svg(doc, 'g', { visibility: 'hidden' }, [inner]),
+  ]);
 }

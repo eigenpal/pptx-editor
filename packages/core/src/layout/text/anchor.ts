@@ -66,7 +66,7 @@ export const STACKED_LETTER_EM = 1.425;
  * `wordArtVertRtl`) centers each letter in a square cell of its advance at the line's start
  * edge; the line's `baseline` is then the axis through those centers, which the paint reads
  * (ECMA-376 Part 1, 20.1.10.83). Reference PDFs of `text-direction` and
- * `vertical-east-asian`: stacked letters are within 1.4 pt of the reference.
+ * `vertical-east-asian`: stacked letters are within 1.8 pt of the reference across the line.
  * @internal
  */
 export function columnLines(lines: readonly Line[], vert: string, frameHeight: number): Line[] {

@@ -215,9 +215,12 @@ function layoutPlaced(
 ): LayoutItem | null {
   const matrix = multiply(parent, boxMatrix(el.xfrm));
   const placement: ItemPlacement = { parentMatrix: parent, toSource: map };
-  if (el.kind === 'shape' || el.kind === 'connector' || el.kind === 'picture')
+  if (el.kind !== 'graphicFrame')
     for (const name of el.effects?.unsupported ?? [])
       diagnostics.add(`effect not rendered: ${name}`);
+  // A group's fill overlay does not draw: the paint has no fill of the group's content to blend.
+  if (el.kind === 'group' && el.effects?.fillOverlay)
+    diagnostics.add('effect not rendered: fillOverlay');
   switch (el.kind) {
     case 'shape':
     case 'connector': {

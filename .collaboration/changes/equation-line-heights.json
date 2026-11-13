@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The equation line height, math leading, text-style fraction shifts, and superscript rise affect text layout and painted output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/text/__tests__/math-line-extent.test.ts",
+    "packages/core/src/layout/text/__tests__/text-layout.test.ts",
+    "packages/core/src/editor/__tests__/equations.test.ts"
+  ]
+}

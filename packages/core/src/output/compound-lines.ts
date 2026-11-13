@@ -23,7 +23,10 @@ export const COMPOUND_BANDS: Readonly<Record<string, readonly number[]>> = {
   tri: [1 / 6, 1 / 6, 1 / 3, 1 / 6, 1 / 6],
 };
 
-/** A drawn band as distances from the center line, on one side (`a` < `b`). */
+/**
+ * A drawn band as distances from the center line, on one side (`a` < `b`).
+ * @internal
+ */
 export interface Band {
   readonly a: number;
   readonly b: number;
@@ -325,58 +328,119 @@ export function compoundBandLines(
 /** The bands of a compound line as offset strokes (`compoundBandLines`), as SVG paths. */
 function offsetBands(
   doc: Document,
-  commands: readonly PathCommand[],
-  cmpd: string,
+  bands: readonly CompoundBandLine[],
   stroke: Record<string, string | undefined>,
-  width: number
-): SVGElement[] | null {
-  const join = stroke['stroke-linejoin'] ?? 'miter';
-  const limit = Number(stroke['stroke-miterlimit']) || 4;
-  const bands = compoundBandLines(commands, cmpd, width, join, limit);
+  limit: number
+): SVGElement[] {
   // The corners are in the offset geometry: a miter join keeps them as built.
-  return bands
-    ? bands.map((band) =>
-        svg(doc, 'path', {
-          d: polylineData(band.lines),
-          fill: 'none',
-          ...stroke,
-          'stroke-width': num(band.width),
-          'stroke-linejoin': 'miter',
-          'stroke-miterlimit': num(Math.max(limit, 4)),
-        })
-      )
-    : null;
+  return bands.map((band) =>
+    svg(doc, 'path', {
+      d: polylineData(band.lines),
+      fill: 'none',
+      ...stroke,
+      'stroke-width': num(band.width),
+      'stroke-linejoin': 'miter',
+      'stroke-miterlimit': num(Math.max(limit, 4)),
+    })
+  );
 }
 
 /**
- * Path data for one closed subpath that starts with its closing segment, or undefined for any
- * other path. The dashes of a compound line on a closed path start where the closing segment
- * starts (`fixtures/fills-lines.pdf`, slide 2: a dashed `tri` `roundRect`), and SVG starts them
+ * One closed subpath that starts with its closing segment, or undefined for any other path. The
+ * dashes of a compound line on a closed path start where the closing segment starts
+ * (`fixtures/fills-lines.pdf`, slide 2: a dashed `tri` `roundRect`), and SVG and PDF dashes start
  * at the first point.
  */
-function closingFirst(commands: readonly PathCommand[]): string | undefined {
+function closingFirstCommands(commands: readonly PathCommand[]): PathCommand[] | undefined {
   const n = commands.length;
   const first = commands[0];
   const last = commands[n - 2];
   if (n < 3 || first.op !== 'M' || commands[n - 1].op !== 'Z' || last.op === 'Z') return undefined;
   if (commands.slice(1, -1).some((c) => c.op === 'M' || c.op === 'Z')) return undefined;
   if (Math.abs(last.x - first.x) < 1e-6 && Math.abs(last.y - first.y) < 1e-6) return undefined;
+  const out: PathCommand[] = [
+    { op: 'M', x: last.x, y: last.y },
+    { op: 'L', x: first.x, y: first.y },
+  ];
+  for (const c of commands.slice(1, -1)) out.push(c.op === 'M' ? { op: 'L', x: c.x, y: c.y } : c);
+  out.push({ op: 'Z' });
+  return out;
+}
+
+/** Path data for commands from `closingFirstCommands`. */
+function closingFirstData(commands: readonly PathCommand[]): string {
   const pt = (x: number, y: number): string => `${num(x)} ${num(y)}`;
-  let d = `M${pt(last.x, last.y)}L${pt(first.x, first.y)}`;
-  for (const c of commands.slice(1, -1)) {
-    if (c.op === 'C') d += `C${pt(c.x1, c.y1)} ${pt(c.x2, c.y2)} ${pt(c.x, c.y)}`;
+  let d = '';
+  for (const c of commands) {
+    if (c.op === 'M') d += `M${pt(c.x, c.y)}`;
+    else if (c.op === 'L') d += `L${pt(c.x, c.y)}`;
+    else if (c.op === 'C') d += `C${pt(c.x1, c.y1)} ${pt(c.x2, c.y2)} ${pt(c.x, c.y)}`;
     else if (c.op === 'Q') d += `Q${pt(c.x1, c.y1)} ${pt(c.x, c.y)}`;
-    else if (c.op === 'L' || c.op === 'M') d += `L${pt(c.x, c.y)}`;
+    else d += 'Z';
   }
-  return `${d}Z`;
+  return d;
+}
+
+/**
+ * How a compound line draws (design D5 of `fill-and-line-fidelity`). The SVG paint and
+ * `pptx-to-pdf` share it.
+ *
+ * - `offset`: each band is a stroke of the path offset to the band's center (`compoundBandLines`).
+ * - `masked`: each band is the line's own stroke, cut to the band by a stroke of width `2b` minus
+ *   a stroke of width `2a`. On a closed path, `outer` bands lie outside the path and `inner` bands
+ *   inside it; on an open path, every band is in `outer`, on both sides. `commands`, when set,
+ *   replace the path, so the dashes start where the reference PDF starts them.
+ * @internal
+ */
+export type CompoundPlan =
+  | { readonly kind: 'offset'; readonly bands: readonly CompoundBandLine[] }
+  | {
+      readonly kind: 'masked';
+      readonly closed: boolean;
+      readonly commands?: readonly PathCommand[];
+      readonly outer: readonly Band[];
+      readonly inner: readonly Band[];
+    };
+
+/**
+ * The plan of a compound line of `width` (`CompoundPlan`), or null for a single line, an unknown
+ * type, or no width. A dashed line keeps the masked bands, which cut every band at the dashes of
+ * the center line, except where only offset bands can draw it: an asymmetric type on an open
+ * path. Without `commands`, or past `MAX_OFFSET_POINTS`, the bands are masked, and an open path
+ * draws asymmetric types with `dbl` bands.
+ * @internal
+ */
+export function compoundPlan(
+  cmpd: string,
+  width: number,
+  closed: boolean,
+  dashed: boolean,
+  join: string,
+  miterLimit: number,
+  commands?: readonly PathCommand[]
+): CompoundPlan | null {
+  if (!(width > 0) || !Object.hasOwn(COMPOUND_BANDS, cmpd)) return null;
+  const offset =
+    commands && (!dashed || (!closed && isAsymmetric(cmpd)))
+      ? compoundBandLines(commands, cmpd, width, join, miterLimit)
+      : null;
+  if (offset) return { kind: 'offset', bands: offset };
+  const moved = dashed && closed && commands ? closingFirstCommands(commands) : undefined;
+  const bands = compoundBands(!closed && isAsymmetric(cmpd) ? 'dbl' : cmpd, width);
+  if (!bands) return null;
+  if (!closed) {
+    // Symmetric bands: both sides of the center line at once.
+    const all = [...bands.outer, ...bands.inner];
+    const merged = all.filter((b, i) => all.findIndex((c) => c.a === b.a && c.b === b.b) === i);
+    return { kind: 'masked', closed, commands: moved, outer: merged, inner: [] };
+  }
+  return { kind: 'masked', closed, commands: moved, outer: bands.outer, inner: bands.inner };
 }
 
 /**
  * The SVG for a compound outline of path `given` in a `w`×`h` local box, or null when `cmpd` is a
  * single line. `stroke` is the single-line stroke (its paint, width, joins, caps, dashes).
- * `commands` are the path's commands, for the offset bands. Without them, or past
- * `MAX_OFFSET_POINTS`, the bands are masked strokes of `d`, and an open path draws asymmetric
- * types with `dbl` bands.
+ * `commands` are the path's commands, for the offset bands. The bands follow `compoundPlan`.
  */
 export function compoundStroke(
   defs: Defs,
@@ -392,17 +456,14 @@ export function compoundStroke(
   if (!Number.isFinite(width) || width <= 0 || stroke.stroke === 'none') return null;
   if (!Object.hasOwn(COMPOUND_BANDS, cmpd)) return null;
   const doc = defs.doc;
-  // A dashed line keeps the masked bands, which cut every band at the dashes of the center line,
-  // except where only offset bands can draw it: an asymmetric type on an open path.
   const dashed = !!stroke['stroke-dasharray'] && stroke['stroke-dasharray'] !== 'none';
-  const offset =
-    commands && (!dashed || (!closed && isAsymmetric(cmpd)))
-      ? offsetBands(doc, commands, cmpd, stroke, width)
-      : null;
-  if (offset) return svg(doc, 'g', { 'data-compound': cmpd }, offset);
-  const d = (dashed && closed && commands && closingFirst(commands)) || given;
-  const bands = compoundBands(!closed && isAsymmetric(cmpd) ? 'dbl' : cmpd, width);
-  if (!bands) return null;
+  const join = stroke['stroke-linejoin'] ?? 'miter';
+  const limit = Number(stroke['stroke-miterlimit']) || 4;
+  const plan = compoundPlan(cmpd, width, closed, dashed, join, limit, commands);
+  if (!plan) return null;
+  if (plan.kind === 'offset')
+    return svg(doc, 'g', { 'data-compound': cmpd }, offsetBands(doc, plan.bands, stroke, limit));
+  const d = plan.commands ? closingFirstData(plan.commands) : given;
   const grow = width + Math.max(w, h);
   const area = {
     x: num(-grow),
@@ -424,28 +485,25 @@ export function compoundStroke(
       svg(doc, 'mask', { id: defs.id('cmpd'), maskUnits: 'userSpaceOnUse', ...area }, content)
     );
   if (!closed) {
-    // Symmetric bands: both sides of the center line at once.
-    const all = [...bands.outer, ...bands.inner];
-    const merged = all.filter((b, i) => all.findIndex((c) => c.a === b.a && c.b === b.b) === i);
-    out.appendChild(painted(mask(bandStrokes(doc, d, merged, stroke))));
+    out.appendChild(painted(mask(bandStrokes(doc, d, plan.outer, stroke))));
     return out;
   }
-  if (bands.outer.length)
+  if (plan.outer.length)
     out.appendChild(
       painted(
         mask([
-          ...bandStrokes(doc, d, bands.outer, stroke),
+          ...bandStrokes(doc, d, plan.outer, stroke),
           // Remove the inside of the path: these bands lie outside it.
           svg(doc, 'path', { d, fill: '#000000', stroke: 'none' }),
         ])
       )
     );
-  if (bands.inner.length) {
+  if (plan.inner.length) {
     // Keep the inside of the path with a mask, not a clipPath: Chromium can misplace a clipPath
     // edge in EMU coordinates under a translation (design D7 of `fill-fidelity`).
     const inside = mask([svg(doc, 'path', { d, fill: '#ffffff', stroke: 'none' })]);
     out.appendChild(
-      svg(doc, 'g', { mask: inside }, [painted(mask(bandStrokes(doc, d, bands.inner, stroke)))])
+      svg(doc, 'g', { mask: inside }, [painted(mask(bandStrokes(doc, d, plan.inner, stroke)))])
     );
   }
   return out;

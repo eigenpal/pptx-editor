@@ -46,6 +46,15 @@
         540
       ]
     },
+    "caps-scripts": {
+      "deck": "55d0886849820b043cd176beab97c203b73d483bcf42b26fa69190b95d14aa04",
+      "pdf": "f8e9da3d11311e5170cd4419d492342e01a1f7a2604e9762dbb96b5afa942caa",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "chart-data": {
       "deck": "5c1b7e7b88fdea2e8764eced47e692c33f09612232c0379063ed98d56699ebcb",
       "pdf": "d7b15e318fcabd82bef2d3d06f6078343d224b963f979a508f995e43ac8979bc",
@@ -68,6 +77,15 @@
       "deck": "9069c345ccb969ab50a00b4c251ab9e77342d925ca3b8490c0f2f635eefeb471",
       "pdf": "41a95904b6833f96c9e08ac42dcf41afbf407c5152786ddac1e2b4ec82b9b6a0",
       "pages": 8,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "closed-dashes": {
+      "deck": "8677e53d3ff9b7956289392ae3bcb4aab33a25aa3215c1a4999b658b330b2b29",
+      "pdf": "3476986a7750af815e06c7f76f19f8083f8af90014407fd4a16922f9b3c2321f",
+      "pages": 3,
       "pageSizePt": [
         960,
         540
@@ -147,7 +165,7 @@
     },
     "equation-lines": {
       "deck": "7cf6b4149a26c3ddbe92fd6d02c87c399145c833483406baca7a3e5dc7955ab1",
-      "pdf": "c4cfd2bd10e426756e7260121e3186b10c51077fd9521af108da36e3f0eb9575",
+      "pdf": "53cbb9363c54a62d5f059082efde5362d97274d30ae4ac9e60ed35059492d1fb",
       "pages": 2,
       "pageSizePt": [
         960,
@@ -156,7 +174,7 @@
     },
     "equations": {
       "deck": "c6d6b6e4861218f2fe3fd363f9e3d458eae7aed0bc45e54aa293f16049a17383",
-      "pdf": "f90ee61397bdc11431ef1ce70c5110fcd3633d7dfd0952781b7fed089cf9f960",
+      "pdf": "2b346b617b1dfb32bc1ce96518e041a2b159e5c0359aa227599305f46b9e3ccb",
       "pages": 4,
       "pageSizePt": [
         960,
@@ -203,6 +221,15 @@
       "deck": "002f16981fb950baaa6794d7c3d8004c2bff14719e5601fa9fede0ed4a3cecf0",
       "pdf": "7f429efedfc6ad2bbc6093c15f62d0e7e8cc3f1f52a7b682f31955c734af5b91",
       "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "group-effects": {
+      "deck": "6d7443bbdd595b258f6572e9238aadf358ca4e17090e73f04c1e1ffe53b309b2",
+      "pdf": "530354d4536c2d868d19f7346b092f050643ff69b01d2a261044828dc4771d0e",
+      "pages": 2,
       "pageSizePt": [
         960,
         540
@@ -275,6 +302,15 @@
       "deck": "9208098ef49aa308faafad5d9587260a6dc55281f51a08460902097da3a3e53c",
       "pdf": "26d089799d8e9d1fa08a6e5806728f86e8d63dbb474dd1f042a0020d4f7d3669",
       "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "picture-adjustments": {
+      "deck": "4506d320b58f6fc7098b7f556e917c8529f9bd15b7aa7c5deaed225091485900",
+      "pdf": "47097e815c1a4c4f02514139d39f2bf2b1ee6c96c285b2a225680c29d6f20bf8",
+      "pages": 5,
       "pageSizePt": [
         960,
         540
@@ -482,6 +518,15 @@
       "deck": "f49084a9cb9b92460b862731e351318070fa34a489ef00ee562f639cdd610115",
       "pdf": "abd7b4d22750ec96cc8e05fb64ea0bba8fad028378495280b91191cb1ab94b15",
       "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "underline-styles": {
+      "deck": "c18026a2480a732b0bc49588650278a19cf139747428199566018756687d7e3b",
+      "pdf": "d8aba71a5a1ab29dcc4c3286860ce148e955684dfae3eb5251567c7fca3b2933",
+      "pages": 4,
       "pageSizePt": [
         960,
         540

@@ -47,6 +47,36 @@ describe('the HarfBuzz measurer (P7, P8)', () => {
     expect(kerned[0] + kerned[1]).toBeLessThan(plain[0] + plain[1]);
   });
 
+  test('math script levels measure the script-style forms of a math face', () => {
+    const stix = {
+      family: 'STIX Two Math',
+      bold: false,
+      italic: false,
+      origin: 'embedded',
+      bytes: new Uint8Array(
+        readFileSync(
+          join(import.meta.dir, '../../../../../../fixtures/fonts/STIXTwoMath-Regular.otf')
+        )
+      ),
+    };
+    const m = createHarfBuzzMeasurer([stix]);
+    const face = m.resolve({ family: 'STIX Two Math', bold: false, italic: false });
+    // 𝑛 (U+1D45B): 565 font units, 654 in the first script style, 721 in the second.
+    expect(m.advances(face, '𝑛')[0]).toBeCloseTo(0.565, 3);
+    expect(m.advances(face, '𝑛', { mathScript: 1 })[0]).toBeCloseTo(0.654, 3);
+    expect(m.advances(face, '𝑛', { mathScript: 2 })[0]).toBeCloseTo(0.721, 3);
+    // The plain advance stays cached apart from the script forms.
+    expect(m.advances(face, '𝑛')[0]).toBeCloseTo(0.565, 3);
+    // The MATH table of the face's data marks it, whatever its name.
+    expect(face.hasMathTable).toBe(true);
+    // A face with no script-style forms keeps its advances.
+    const sans = measurer.resolve({ family: 'Liberation Sans', bold: false, italic: false });
+    expect(sans.hasMathTable).toBeUndefined();
+    expect(Array.from(measurer.advances(sans, 'n+1', { mathScript: 1 }))).toEqual(
+      Array.from(measurer.advances(sans, 'n+1'))
+    );
+  });
+
   test('two measurers never share a face id, so two documents never collide', () => {
     const a = createHarfBuzzMeasurer([liberation(), liberation()]);
     const b = createHarfBuzzMeasurer([liberation()]);

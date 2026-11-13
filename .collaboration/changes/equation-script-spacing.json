@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The script-style advances, script sizes, space after scripts, radical geometry, and upper limit gap affect text measurement, equation layout, and painted output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/text/__tests__/math-layout.test.ts",
+    "packages/core/src/layout/text/__tests__/math-line-extent.test.ts",
+    "packages/core/src/layout/text/__tests__/harfbuzz-measurer.test.ts"
+  ]
+}

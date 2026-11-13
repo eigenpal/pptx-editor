@@ -31,7 +31,7 @@ import {
 import { layoutMath, type MathBox } from './math-layout.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
 import { justifyExtra } from './justify.ts';
-import { leadingOffset, paragraphAlignment } from './paragraph-alignment.ts';
+import { leadingOffset, paragraphAlignment, rtlLeadingEdge } from './paragraph-alignment.ts';
 import { bidiPieces, paragraphBidiOf, type ParagraphBidi } from './rtl-paragraph.ts';
 import type { WarpedRun } from './text-warp.ts';
 import type { PathCommand } from '@eigenpal/ooxml-core';
@@ -45,6 +45,7 @@ import {
   SCRIPT_SIZE_SCALE,
   SMALL_CAPS_SCALE,
   placeBaseline,
+  placeColumn,
 } from './line-metrics.ts';
 
 const EMU_PER_PT = 12_700;
@@ -357,7 +358,8 @@ function buildSegments(
     let local = 0;
     for (const piece of bidiPieces(slotted, bidi?.levels, offset)) {
       const face = piece.face;
-      const sizePt = piece.small ? baseSize * SMALL_CAPS_SCALE : baseSize;
+      // In a superscript or subscript, small caps draw as capitals at the script size.
+      const sizePt = piece.small && scriptScale === 1 ? baseSize * SMALL_CAPS_SCALE : baseSize;
       const kerning = props.kern !== undefined && props.size >= props.kern;
       const em = measurer.advances(face, piece.text, { kerning });
       const adv = new Float64Array(piece.text.length);
@@ -511,6 +513,8 @@ export function layoutTextOn(
   const reduction = bp.autofit.kind === 'normal' ? bp.autofit.lineSpaceReduction : 0;
   const columns = bp.numCol;
   const colW = columns > 1 ? (innerW - bp.spcCol * (columns - 1)) / columns : innerW;
+  // A right-to-left line ends at the column width in whole points (`rtlLeadingEdge`).
+  const rtlEdge = rtlLeadingEdge(colW);
   const wrap = bp.wrap === 'square';
   const substitutions = new Set<string>();
   const lines: Line[] = [];
@@ -637,7 +641,7 @@ export function layoutTextOn(
     const placeMarker = (m: GlyphRun, shift: number): GlyphRun => {
       const x0 = m.x[0];
       const w = m.x[m.x.length - 1] - x0;
-      const at = (p.rtl ? colW - x0 - w - shift : x0 + shift) + bp.lIns;
+      const at = (p.rtl ? rtlEdge - x0 - w - shift : x0 + shift) + bp.lIns;
       return { ...m, x: m.x.map((v) => v - x0 + at) };
     };
     const avail = (first: boolean): number => colW - lineLeft(first) - p.marR;
@@ -763,36 +767,35 @@ export function layoutTextOn(
       const heightPt = lineHeightInPt(single, p.lineSpacing, reduction);
       let height = heightPt * EMU_PER_PT;
       let baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
-      // An equation that needs more room than the line has makes the line taller. Above single
-      // percent spacing (`a:spcPct`), the equation grows the single line, and the spacing then
-      // adds its share of the text band on top, as DOCX Editor's `equationSpacingBand` does for
-      // its `auto` rule: the line keeps the equation's own extent. The extra goes above and
-      // below the baseline as on a text line. At 150 % (`equation-lines`, slide 1), the first
-      // line of stacked display fractions comes 8.2 pt above the reference and the line pitch
-      // 3 pt over it, against 14.2 pt and 5 pt when the equation fills the extra space. At
-      // single spacing and below, and at exact spacing (`a:spcPts`), the equation fills the
-      // line's own space first (the reference PDFs of `equations` and `preserved-content`).
-      const raised = 'pct' in p.lineSpacing && heightPt > single + 1e-9;
+      // An equation that claims more room than the band of a single line (`MathBox.lineAscent`
+      // and `lineDescent`) makes a new single line: the band and the claims together. Line
+      // spacing then applies to that line as to text: percent spacing scales it, exact spacing
+      // replaces it, and the baseline takes the place that the line model gives a face with the
+      // same ascent share. So 90 % spacing makes an equation line 10 % shorter than its claims.
+      // Measured on reference PDFs of stacked display fractions at 18 pt: at 80 % to 200 %
+      // spacing, the line pitch is the percentage of one value (37.2 pt), and each baseline is
+      // within the 1 pt baseline rounding. A text line below a fraction then starts above the
+      // denominator's baseline, as in `equation-lines`, slide 1. Exact spacing of 30 pt stacks
+      // the same fractions 30 pt apart, closer than their ink.
       const singleBase = baselineInLinePt(single, single, lineMetrics) * EMU_PER_PT;
-      let growAbove = 0;
-      let growBelow = 0;
+      let above = singleBase;
+      let below = single * EMU_PER_PT - singleBase;
+      let grows = false;
       for (let i = range.start, last = -1; i < range.end; i += 1) {
         if (units[i].seg === last) continue;
         last = units[i].seg;
         const box = segments[last].math;
         if (!box) continue;
-        if (raised) {
-          growAbove = Math.max(growAbove, box.lineAscent - singleBase);
-          growBelow = Math.max(growBelow, box.lineDescent - (single * EMU_PER_PT - singleBase));
-          continue;
-        }
-        const above = Math.max(0, box.lineAscent - baseline);
-        const below = Math.max(0, box.lineDescent - (height - baseline));
-        height += above + below;
-        baseline += above;
+        if (box.lineAscent > above) [above, grows] = [box.lineAscent, true];
+        if (box.lineDescent > below) [below, grows] = [box.lineDescent, true];
       }
-      height += growAbove + growBelow;
-      baseline += growAbove;
+      if (grows) {
+        const mathSingle = (above + below) / EMU_PER_PT;
+        const mathHeight = lineHeightInPt(mathSingle, p.lineSpacing, reduction);
+        const share = { ...lineMetrics, ascent: above, descent: below };
+        height = mathHeight * EMU_PER_PT;
+        baseline = baselineInLinePt(mathSingle, mathHeight, share) * EMU_PER_PT;
+      }
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.
@@ -834,7 +837,7 @@ export function layoutTextOn(
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;
       let caretX: number[] = [];
       let lineBidi: LineBidi | undefined;
-      const origin = (p.rtl ? colW - left - shift : left + shift) + bp.lIns;
+      const origin = (p.rtl ? rtlEdge - left - shift : left + shift) + bp.lIns;
       let x = origin;
       const runs: GlyphRun[] = [];
       const marks: LineMark[] = [];
@@ -870,7 +873,7 @@ export function layoutTextOn(
       if (bidiLine) {
         // Justification widened the line: its right edge moved with it.
         const shown = bidiLine.contentRight - bidiLine.contentLeft;
-        const lineLeftX = (p.rtl ? colW - left - shift - shown : left + shift) + bp.lIns;
+        const lineLeftX = (p.rtl ? rtlEdge - left - shift - shown : left + shift) + bp.lIns;
         placeBidiRuns(bidiLine, lineLeftX, range.start, units, segments, runs, marks);
         caretX = bidiCaretX(bidiLine, range.start, range.end - range.start, advance).map(
           (v) => v + lineLeftX
@@ -925,7 +928,8 @@ export function layoutTextOn(
   });
 
   // Columns: flow lines into the next column when the box height is exceeded. Baselines are
-  // placed from the top of their column, before anchoring (`placeBaseline`).
+  // placed from the top of their column, before anchoring (`placeBaseline`), and each column
+  // starts a whole number of points right of the first (`placeColumn`).
   let placed: Line[];
   let contentHeight = y;
   // What autofit reads: with columns, the bottom of the lowest line, so an overflowing last
@@ -942,7 +946,7 @@ export function layoutTextOn(
         col += 1;
         offset = line.top;
       }
-      const dx = col * (colW + bp.spcCol);
+      const dx = placeColumn(col, colW, bp.spcCol);
       placed.push({
         ...line,
         column: col,

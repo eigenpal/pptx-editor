@@ -93,16 +93,18 @@ describe('text decoration alpha (R8)', () => {
     const text = root.querySelector('[data-pptx-text]')!;
     const glyphs = [...text.querySelectorAll('text')];
     expect(glyphs[0].getAttribute('fill-opacity')).toBe('0.4');
-    const bars = [...text.querySelectorAll('rect')];
-    // Two underline bars and two strike bars for the faded run, two bars for the solid one.
-    expect(bars.length).toBe(6);
-    expect(bars.slice(0, 4).map((b) => b.getAttribute('fill-opacity'))).toEqual([
+    // One underline path of two bars and two strike bars for the faded run, one underline path
+    // for the solid one.
+    const unders = [...text.querySelectorAll('path')];
+    const strikes = [...text.querySelectorAll('rect')];
+    expect(unders.map((u) => (u.getAttribute('d') ?? '').split('Z').length - 1)).toEqual([2, 2]);
+    expect(strikes.length).toBe(2);
+    expect([...unders, ...strikes].map((b) => b.getAttribute('fill-opacity'))).toEqual([
       '0.4',
-      '0.4',
+      null,
       '0.4',
       '0.4',
     ]);
-    expect(bars.slice(4).map((b) => b.getAttribute('fill-opacity'))).toEqual([null, null]);
   });
 });
 
@@ -128,17 +130,67 @@ describe('underline color (EG_TextUnderlineFill)', () => {
     );
     const text = root.querySelector('[data-pptx-text]')!;
     const glyphs = [...text.querySelectorAll('text')];
-    const bars = [...text.querySelectorAll('rect')];
-    const fills = bars.map((b) => [b.getAttribute('fill'), b.getAttribute('fill-opacity')]);
-    // Two underline bars in the underline color with its alpha, then the strike bar in the
+    const fillOf = (b: Element): (string | null)[] => [
+      b.getAttribute('fill'),
+      b.getAttribute('fill-opacity'),
+    ];
+    const unders = [...text.querySelectorAll('path')].map(fillOf);
+    const strikes = [...text.querySelectorAll('rect')].map(fillOf);
+    // The double underline in the underline color with its alpha, then the strike bar in the
     // text color; the second run's underline follows its text.
-    expect(fills.slice(0, 2)).toEqual([
-      [fills[0][0], '0.5'],
-      [fills[0][0], '0.5'],
-    ]);
-    expect(fills[0][0]).not.toBe(glyphs[0].getAttribute('fill'));
-    expect(fills[2]).toEqual([glyphs[0].getAttribute('fill'), null]);
-    expect(fills[3]).toEqual([glyphs[1].getAttribute('fill'), null]);
+    expect(unders[0][1]).toBe('0.5');
+    expect(unders[0][0]).not.toBe(glyphs[0].getAttribute('fill'));
+    expect(strikes).toEqual([[glyphs[0].getAttribute('fill'), null]]);
+    expect(unders[1]).toEqual([glyphs[1].getAttribute('fill'), null]);
+  });
+});
+
+describe('underline outline (EG_TextUnderlineLine)', () => {
+  const underlines = (children: string): Element[] => {
+    const root = paint(
+      shape({
+        id: 2,
+        x: 0,
+        y: 0,
+        cx: 4_000_000,
+        cy: 1_000_000,
+        text: para(run('Outlined', 'u="sng"', children)),
+      })
+    );
+    return [...root.querySelectorAll('[data-pptx-text] path')];
+  };
+
+  test('a:uLn with a fill strokes the underline; its width does not change the bar', () => {
+    const plain = underlines('');
+    const [outlined] = underlines(
+      '<a:uLn w="25400"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:uLn>'
+    );
+    expect(outlined.getAttribute('d')).toBe(plain[0].getAttribute('d'));
+    expect(outlined.getAttribute('stroke-width')).toBe('2');
+    expect(outlined.getAttribute('stroke')).toBeTruthy();
+  });
+
+  test('the outline takes the dash, caps, and gradient fill of a:uLn', () => {
+    const red = '<a:solidFill><a:srgbClr val="C00000"/></a:solidFill>';
+    const [dashed] = underlines(`<a:uLn w="25400">${red}<a:prstDash val="dash"/></a:uLn>`);
+    // A 2 pt line: `dash` is 4 widths on and 3 off.
+    expect(dashed.getAttribute('stroke-dasharray')).toBe('8 6');
+    expect(dashed.getAttribute('stroke-linecap')).toBe('butt');
+    const [dots] = underlines(
+      `<a:uLn w="38100" cap="rnd">${red}<a:prstDash val="sysDot"/></a:uLn>`
+    );
+    expect(dots.getAttribute('stroke-linecap')).toBe('round');
+    expect(dots.getAttribute('stroke-dasharray')).toBeTruthy();
+    const [gradient] = underlines(
+      '<a:uLn w="25400"><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="C00000"/></a:gs>' +
+        '<a:gs pos="100000"><a:srgbClr val="0070C0"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></a:uLn>'
+    );
+    expect(gradient.getAttribute('stroke')).toMatch(/^url\(/);
+  });
+
+  test('a:uLn without a fill, and a:uLnTx on text without an outline, draw no outline', () => {
+    expect(underlines('<a:uLn w="76200"/>')[0].getAttribute('stroke')).toBeNull();
+    expect(underlines('<a:uLnTx/>')[0].getAttribute('stroke')).toBeNull();
   });
 });
 
@@ -318,11 +370,10 @@ describe('tab glyph paint', () => {
     expect(text.map((t) => t.textContent)).toEqual(['A', 'B']);
     expect(Number(text[0].getAttribute('x'))).toBeCloseTo(source.x[0] / 12_700, 3);
     expect(Number(text[1].getAttribute('x'))).toBeCloseTo(source.x[3] / 12_700, 3);
-    const underline = root.querySelector('[data-pptx-text] rect');
-    expect(Number(underline?.getAttribute('width'))).toBeCloseTo(
-      (source.x[4] - source.x[0]) / 12_700,
-      3
-    );
+    // The underline is a path of one rectangle: M x0 y L x1 y L x1 y1 L x0 y1 Z.
+    const d = root.querySelector('[data-pptx-text] path')?.getAttribute('d') ?? '';
+    const xs = [...d.matchAll(/[ML]([-\d.]+) /g)].map((m) => Number(m[1]));
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo((source.x[4] - source.x[0]) / 12_700, 3);
   });
 
   test('a long tab-only run emits no SVG text node', () => {

@@ -33,16 +33,19 @@ import {
 } from 'pdf-lib';
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
 import {
-  hasCharacters,
+  isIdeographic,
+  lineUnderlines,
   runGlyphs,
   strikeoutBars,
   type GlyphRun,
   type PathCommand,
   type TextLayout,
+  type UnderlineRing,
   type WarpedRun,
 } from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
-import { drawPicture, flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
+import { flatColor, gradientBox, ownFill, strokeStyle, type FillScope } from './paint-fill.ts';
+import { drawPicture } from './paint-picture.ts';
 import { clip, clipNonZero, EMU_PER_PT, rgb, tracePath, type PageOps } from './page-ops.ts';
 
 /** The embedded face for a layout face id, or null with a diagnostic. */
@@ -90,6 +93,40 @@ function enterFrame(layout: TextLayout, p: PageOps): void {
   }
 }
 
+/**
+ * Whether a character of a vertical line draws upright, as `uprightPieces` of the SVG paint
+ * decides: every character but a space in stacked text, and an ideograph in `eaVert` text.
+ */
+function drawsUpright(ch: string, mode: TextLayout['upright']): boolean {
+  if (mode === 'all') return ch !== ' ' && ch !== '\t';
+  return mode === 'eastAsian' && isIdeographic(ch.codePointAt(0) ?? 0);
+}
+
+/**
+ * The text-space origin of an upright glyph in a turned line, for a glyph whose cell runs from
+ * `x0` to `x1` and that is `advance` wide (EMU). As in the SVG paint, the glyph turns back
+ * around its cell center on the axis across the line. An East Asian character centers on the
+ * line box, and its baseline is 0.38 em below the center (the ideographic em box ends 0.12 em
+ * below the baseline). A stacked letter centers on the line's baseline, and its baseline sits
+ * at the face's ascent share of its cell. Turned back by 90°, the glyph's baseline runs across
+ * the line, and its advance runs up the frame, so it starts `advance / 2` below the axis.
+ */
+function uprightOrigin(
+  mode: TextLayout['upright'],
+  line: Pick<TextLayout['lines'][number], 'top' | 'height' | 'baseline'>,
+  run: Pick<GlyphRun, 'rise' | 'sizePt' | 'face'>,
+  x0: number,
+  x1: number,
+  advance: number
+): [number, number] {
+  const stacked = mode === 'all';
+  const m = run.face.metrics;
+  const share = m.ascent / Math.max(0.01, m.ascent + m.descent);
+  const cy = stacked ? line.baseline - run.rise : line.top + line.height / 2 - run.rise;
+  const drop = stacked ? (share - 0.5) * (x1 - x0) : 0.38 * run.sizePt * EMU_PER_PT;
+  return [(x0 + x1) / 2 + drop, cy + advance / 2];
+}
+
 /** Draw a text layout in its frame's space. `scope` resolves group fills. */
 export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope): Promise<void> {
   enterFrame(layout, p);
@@ -100,9 +137,8 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
   }
   let bounds: ReturnType<typeof textBounds> | undefined;
   const markBounds: { box?: ReturnType<typeof textBounds> } = {};
-  if (layout.upright !== 'none' && hasCharacters(layout))
-    p.diag.add('text.upright', 'approximation', 'Upright vertical characters are drawn rotated.');
   for (const line of layout.lines) {
+    const unders = lineUnderlines(line.runs, line.baseline);
     const rtlOnly = line.runs.some((r) => r.rtl) && line.runs.every((r) => r.rtl || !r.text.trim());
     // Emit visual order across font/style boundaries too, so readers infer word spaces.
     const runs = line.runs.some((r) => r.rtl)
@@ -131,7 +167,14 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       // and on text whose font has no bytes.
       const decorate = (): void => {
         if (run.kind === 'text')
-          drawDecorations(run, line.baseline, scope, p, () => (bounds ??= textBounds(layout)));
+          drawDecorations(
+            run,
+            line.baseline,
+            scope,
+            p,
+            () => (bounds ??= textBounds(layout)),
+            unders.get(run)
+          );
       };
       if (run.props.outline)
         p.diag.add('text.outline', 'unsupported', 'Text outlines are not drawn yet.');
@@ -164,7 +207,11 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       const m = run.face.metrics;
       const across = layout.upright === 'all' ? ((m.ascent - m.descent) / 2) * size : 0;
       const y = line.baseline - run.rise + across;
-      p.push(pushGraphicsState(), beginText(), setFontAndSize(key, 1));
+      // The font size goes in `Tf`, not in the text matrix: a reader starts a new text item where
+      // the size changes, so a smaller subscript or superscript run reads as its own item, as
+      // in the editor's printed PDF. With one size for all runs, a reader joins a subscript to
+      // the text around it ("H2O" in place of "H", "2", and "O").
+      p.push(pushGraphicsState(), beginText(), setFontAndSize(key, size));
       if (runColor) {
         p.alpha(runColor.a, 1);
         p.push(setFillingRgbColor(...rgb(runColor)));
@@ -172,15 +219,16 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       let shown = 0;
       const extra: { id: number; x: number; y: number; scaleX: number }[] = [];
       const glyphs =
-        run.glyphs?.map((g) => ({ ...g, x: run.x[0] + g.x })) ??
-        [...runGlyphs(run)].map(({ char, x }) => ({
+        run.glyphs?.map((g) => ({ ...g, x: run.x[0] + g.x, index: -1 })) ??
+        [...runGlyphs(run)].map(({ index, char, x }) => ({
           id: font.font.glyphForCodePoint(char.codePointAt(0) ?? 0)?.id ?? 0,
           text: char,
           x,
           y: 0,
           scaleX: 1,
+          index,
         }));
-      for (const { id: glyph, text: ch, x, y: dy, scaleX } of glyphs) {
+      for (const { id: glyph, text: ch, x, y: dy, scaleX, index } of glyphs) {
         if (rtlOnly && /^ +$/.test(ch)) continue;
         if (ch === '') {
           if (glyph > 0) extra.push({ id: glyph, x, y: y + dy, scaleX });
@@ -195,14 +243,21 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
             );
           continue;
         }
+        const encoded = (): PDFHexString =>
+          // Readers reorder visual RTL text, including the characters inside one cluster.
+          PDFHexString.of(font.encode(glyph, run.rtl ? Array.from(ch).reverse().join('') : ch));
+        if (!run.rtl && index >= 0 && drawsUpright(ch, layout.upright)) {
+          const end = run.x[index + ch.length] ?? x;
+          const advance = (font.font.getGlyph(glyph).advanceWidth / font.font.unitsPerEm) * size;
+          const [ux, uy] = uprightOrigin(layout.upright, line, run, x, end, advance * scaleX);
+          // The glyph turns back by 90° in the turned frame: its advance runs up the frame and
+          // its ascent points against the line, as in the SVG paint.
+          p.push(setTextMatrix(0, -scaleX, -1, 0, ux, uy), showText(encoded()));
+          shown += 1;
+          continue;
+        }
         // Text space: y up again inside the flipped page, at the size layout measured.
-        p.push(
-          setTextMatrix(size * scaleX, 0, 0, -size, x, y + dy),
-          showText(
-            // Readers reorder visual RTL text, including the characters inside one cluster.
-            PDFHexString.of(font.encode(glyph, run.rtl ? Array.from(ch).reverse().join('') : ch))
-          )
-        );
+        p.push(setTextMatrix(scaleX, 0, 0, -1, x, y + dy), showText(encoded()));
         shown += 1;
       }
       p.push(endText());
@@ -359,50 +414,29 @@ async function drawWarpedPicture(
   p.push(popGraphicsState());
 }
 
-/** Underline styles the bars draw exactly; the SVG paint draws every other style the same way. */
-const EXACT_UNDERLINES = new Set(['none', 'sng', 'dbl']);
-
 /**
- * Underline and strikethrough as filled bars, with the geometry of the SVG paint
- * (`core/src/output/paint-text.ts`, `decorationRects`): face metrics, trailing spaces trimmed,
- * the underline in its own fill (`a:uFill`) when the run has one, the strikethrough in the
- * run's fill. A gradient fill spans the text body's bounds, as the glyphs' does.
+ * Underline and strikethrough as filled shapes, with the geometry of the SVG paint
+ * (`core/src/output/paint-text.ts`, `decorationRects`): the underline shapes of the line
+ * (`lineUnderlines`) in their own fill (`a:uFill`) when the run has one and stroked with a solid
+ * underline outline (`a:uLn`), and the strikethrough bars in the run's fill, trailing spaces
+ * trimmed. A gradient fill spans the text body's bounds, as the glyphs' does.
  */
 function drawDecorations(
   run: GlyphRun,
   baseline: number,
   scope: FillScope,
   p: PageOps,
-  bounds: () => { x: number; y: number; w: number; h: number }
+  bounds: () => { x: number; y: number; w: number; h: number },
+  underline: readonly UnderlineRing[] | undefined
 ): void {
-  const { underline, strike } = run.props;
-  if (underline === 'none' && strike === 'noStrike') return;
-  if (!EXACT_UNDERLINES.has(underline))
-    p.diag.add(
-      'text.underline-style',
-      'approximation',
-      'Dotted, dashed, wavy, heavy, and word-only underlines are drawn as single lines.'
-    );
-  let end = run.text.length;
-  while (end > 0 && run.text[end - 1] === ' ') end -= 1;
-  const x0 = run.rtl ? run.x[run.text.length - end] : run.x[0];
-  const x1 = run.rtl ? run.x[run.x.length - 1] : (run.x[end] ?? run.x[run.x.length - 1]);
-  if (!(x1 > x0)) return;
-  const size = run.sizePt * EMU_PER_PT;
-  const m = run.face.metrics;
-  const thickness = Math.max(m.underlineThickness * size, size / 20);
-  const y = baseline - run.rise;
-  const bars = (fillValue: ResolvedFill, tops: readonly number[], height = thickness): void => {
+  const { strike } = run.props;
+  const shapes = (fillValue: ResolvedFill, rings: readonly UnderlineRing[]): void => {
     const own = ownFill(fillValue, scope).fill;
     const trace = (): void => {
-      for (const top of tops)
-        p.push(
-          moveTo(x0, top),
-          lineTo(x1, top),
-          lineTo(x1, top + height),
-          lineTo(x0, top + height),
-          closePath()
-        );
+      for (const ring of rings) {
+        ring.forEach(([x, y], i) => p.push(i ? lineTo(x, y) : moveTo(x, y)));
+        p.push(closePath());
+      }
     };
     if (own.type === 'solid') {
       p.push(pushGraphicsState());
@@ -422,21 +456,45 @@ function drawDecorations(
       flatColor(fillValue, scope, p, 'text');
     }
   };
-  if (underline !== 'none') {
-    const top = y - m.underlinePosition * size;
-    bars(
-      run.props.underlineFill ?? run.props.fill,
-      underline === 'dbl' ? [top, top + thickness * 2] : [top]
-    );
+  if (underline?.length) {
+    shapes(run.props.underlineFill ?? run.props.fill, underline);
+    // The outline strokes as a shape outline does: width, dash, cap, and join, and a gradient
+    // in its middle color with a diagnostic, as on every line of the export.
+    const line = run.props.underlineLine;
+    if (line && line.width > 0) {
+      p.push(pushGraphicsState());
+      const color = strokeStyle(line, p, scope);
+      if (color) {
+        p.alpha(1, color.a);
+        for (const ring of underline) {
+          ring.forEach(([x, y], i) => p.push(i ? lineTo(x, y) : moveTo(x, y)));
+          p.push(closePath());
+        }
+        p.push(stroke());
+      }
+      p.push(popGraphicsState());
+    }
   }
-  if (strike !== 'noStrike') {
-    const bar = strikeoutBars(m, size, strike === 'dblStrike');
-    bars(
-      run.props.fill,
-      bar.tops.map((top) => y + top),
-      bar.thickness
-    );
-  }
+  if (strike === 'noStrike') return;
+  let end = run.text.length;
+  while (end > 0 && run.text[end - 1] === ' ') end -= 1;
+  const x0 = run.rtl ? run.x[run.text.length - end] : run.x[0];
+  const x1 = run.rtl ? run.x[run.x.length - 1] : (run.x[end] ?? run.x[run.x.length - 1]);
+  if (!(x1 > x0)) return;
+  const y = baseline - run.rise;
+  const bar = strikeoutBars(run.face.metrics, run.sizePt * EMU_PER_PT, strike === 'dblStrike');
+  shapes(
+    run.props.fill,
+    bar.tops.map((top): UnderlineRing => {
+      const [a, b] = [y + top, y + top + bar.thickness];
+      return [
+        [x0, a],
+        [x1, a],
+        [x1, b],
+        [x0, b],
+      ];
+    })
+  );
 }
 
 /**

@@ -643,8 +643,14 @@ export interface LineMark {
     readonly runIndex: number;
 }
 
+// @internal
+export function lineUnderlines(runs: readonly GlyphRun[], baseline: number): Map<GlyphRun, UnderlineRing[]>;
+
 // @public
 export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & FontResolverMark;
+
+// @public
+export type MathScriptLevel = 1 | 2;
 
 // @public
 export type Matrix = readonly [number, number, number, number, number, number];
@@ -660,9 +666,6 @@ export function multiply(m: Matrix, n: Matrix): Matrix;
 
 // @public
 export function normalizeFontResolverResult(result: FontConfigurationBase | null | undefined): FontConfigurationBase | undefined;
-
-// @internal
-export function outsideDashArray(line: ResolvedLine, width: number): number[] | undefined;
 
 // @public
 export function paragraphSpacingPt(spacing: {
@@ -698,7 +701,23 @@ export type PathCommand = {
 export const PICTURE_BULLET_SCALE = 0.7;
 
 // @internal
+export type PictureBorder = {
+    readonly kind: 'grown';
+    readonly paths: readonly StrokePlan[];
+    readonly clip: boolean;
+} | {
+    readonly kind: 'doubled';
+    readonly paths: readonly (readonly PathCommand[])[];
+};
+
+// @internal
+export function pictureBorder(paths: readonly (readonly PathCommand[])[], rect: boolean, line: ResolvedLine, w: number, h: number, scale?: number): PictureBorder;
+
+// @internal
 export function placeBaseline(emu: number): number;
+
+// @internal
+export function placeColumn(column: number, columnWidth: number, gap: number): number;
 
 // @internal
 export function planStroke(commands: readonly PathCommand[], line: ResolvedLine, scale?: number): StrokePlan;
@@ -783,6 +802,7 @@ export interface ResolvedFace {
     // (undocumented)
     readonly bold: boolean;
     readonly family: string;
+    readonly hasMathTable?: true;
     readonly id: string;
     // (undocumented)
     readonly italic: boolean;
@@ -879,6 +899,7 @@ export function strokeCap(line: ResolvedLine): 'butt' | 'round' | 'square';
 export interface StrokePlan {
     readonly caps: readonly (readonly PathCommand[])[];
     readonly commands: readonly PathCommand[];
+    readonly dashPhase?: number;
     readonly ends: readonly LineEndShape[];
 }
 
@@ -926,6 +947,7 @@ export interface TextLayout {
 export interface TextMeasurer {
     advances(face: ResolvedFace, text: string, options?: {
         readonly kerning?: boolean;
+        readonly mathScript?: MathScriptLevel;
     }): Float64Array;
     fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
     glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
@@ -962,12 +984,26 @@ export interface ThreeDInput {
 
 // @internal
 export interface ThreeDPaint {
+    readonly backOffset?: {
+        readonly x: number;
+        readonly y: number;
+    };
     readonly behind: readonly ThreeDFacet[];
+    readonly faceColor?: Rgba;
     readonly front: Matrix;
     readonly over: readonly ThreeDFacet[];
     readonly showsFace: boolean;
     readonly under: readonly ThreeDFacet[];
 }
+
+// @internal
+export type UnderlineRing = readonly (readonly [number, number])[];
+
+// @internal
+export function underlineRings(style: string, origin: number, x0: number, x1: number, y: number, top: number, thickness: number): UnderlineRing[];
+
+// @internal
+export function unmeasuredDashStart(commands: readonly PathCommand[], line: ResolvedLine): boolean;
 
 // @public
 export interface WarpedRun {

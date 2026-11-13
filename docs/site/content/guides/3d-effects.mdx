@@ -47,7 +47,7 @@ Pass a radius in points to blur the shape and its text:
 editor.exec({ type: 'setShapeEffect', effect: { kind: 'blur', size: 3 } });
 ```
 
-No menu offers blur. The PDF export does not draw it.
+No menu offers blur. The PDF export draws it approximately: text inside the shape stays sharp.
 
 ## Remove an effect
 
@@ -67,8 +67,8 @@ A bevel that the shape inherits from its theme effect style goes with an own emp
 
 ## How 3-D shapes draw
 
-- A bevel draws as shaded strips along the outline. The light model is measured for the circle and angle bevels under the three-point light from the top. Other profiles, lights, and materials are approximate.
-- The face of the shape keeps its fill color.
+- A bevel draws as shaded strips along the outline. The light model is measured under the three-point light from the top, for the warm matte, matte, plastic, and metal materials. Other lights and materials are approximate.
+- The light also shades the face of a shape with a solid fill, so a lit face is brighter than its fill color.
 - A turned camera draws as a parallel projection, also for perspective presets. The face and its text turn about the center of the shape. A face turned edge-on draws only its extrusion.
 - The outer shadow and the glow of a turned shape follow its face. The glow lies under the extrusion.
 - Bottom bevels and text in 3-D (`a:bodyPr/a:scene3d`) are not drawn.

@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Under the soft edge of a group, the SVG paint and the PDF export clip the text that a later opaque, flat shape in the group, in no nested group that fades it, covers to the outside of that shape, so the later shape shows over it, within one budget of clip path commands for each group. Each text still paints once. This changes painted output and PDF output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/output/__tests__/group-effects.test.ts",
+    "packages/pro/src/drawing/__tests__/group-effects.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/group-effects.test.ts"
+  ]
+}

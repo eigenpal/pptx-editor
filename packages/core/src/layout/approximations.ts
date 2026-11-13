@@ -5,6 +5,7 @@
 // for every slide. Entries that layout cannot see in a laid-out slide (`perSlide: false`) are
 // listed once, in the report header.
 
+import { drawsGroupEffects } from '../cascade/index.ts';
 import type {
   RelRect,
   ResolvedEffects,
@@ -17,6 +18,7 @@ import { AutonumberCounters, isExactScheme, isSymbolFont } from './text/autonumb
 import { hasCharacters } from './text/text-layout.ts';
 import { isIdeographic } from './text/line-break.ts';
 import { hasLongPaintCluster } from './text/paint-clusters.ts';
+import { unmeasuredDashStart } from './line-strokes.ts';
 
 /** One known approximation. */
 export interface Approximation {
@@ -40,6 +42,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'preset-shadow', title: 'Preset shadows', perSlide: true },
   { id: 'three-d', title: '3-D shapes', perSlide: true },
   { id: 'effects-not-drawn', title: 'Effects not drawn', perSlide: true },
+  { id: 'group-effects', title: 'Group effects', perSlide: true },
   { id: 'fill-overlay', title: 'Fill overlay', perSlide: true },
   { id: 'gradient-colors', title: 'Gradient colors', perSlide: true },
   { id: 'path-gradient-focus', title: 'Path gradient focus', perSlide: true },
@@ -59,11 +62,11 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'inset-lines', title: 'Inset lines', perSlide: false },
   { id: 'hyperlink-text', title: 'Hyperlink text', perSlide: true },
   { id: 'dash-complexity', title: 'Dash complexity', perSlide: true },
+  { id: 'closed-curve-dashes', title: 'Dashes on closed curves', perSlide: true },
   { id: 'compound-lines', title: 'Compound lines', perSlide: true },
   { id: 'path-start', title: 'Paths without a move', perSlide: false },
   { id: 'flipped-text', title: 'Text in flipped shapes', perSlide: true },
   { id: 'content-placeholders', title: 'Content placeholders', perSlide: true },
-  { id: 'small-caps', title: 'Small caps', perSlide: true },
   { id: 'underline-styles', title: 'Underline styles', perSlide: true },
   { id: 'missing-glyphs', title: 'Missing glyphs', perSlide: false },
   { id: 'script-fonts', title: 'East Asian, complex-script, and symbol fonts', perSlide: true },
@@ -89,6 +92,8 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
+/** Underline types whose bars agree with the reference PDFs at every measured size. */
+const EXACT_UNDERLINES = new Set(['none', 'sng', 'words', 'dbl', 'heavy']);
 const ROTATED_TEXT = new Set([
   'vert',
   'vert270',
@@ -97,7 +102,6 @@ const ROTATED_TEXT = new Set([
   'wordArtVertRtl',
   'mongolianVert',
 ]);
-const DRAWN_UNDERLINES = new Set(['none', 'sng', 'dbl']);
 const RECOLOR_EFFECTS = new Set(['grayscale', 'duotone', 'biLevel']);
 
 /**
@@ -160,11 +164,12 @@ class Collector {
       this.add('fill-rotation');
   }
 
-  line(line: ResolvedLine | undefined, picture = false): void {
+  /** `outsidePicture` is true for the border of a picture whose geometry is not a rectangle. */
+  line(line: ResolvedLine | undefined, outsidePicture = false): void {
     if (!line || line.fill.type === 'none') return;
     this.fill(line.fill, false);
-    // Any dash on a picture border: dashes outside a picture are not checked against a reference PDF.
-    if (picture && line.dash !== 'solid') this.add('picture-border-dots');
+    // Dashes outside a geometry other than a rectangle are not checked against a reference PDF.
+    if (outsidePicture && line.dash !== 'solid') this.add('picture-border-dots');
     if (line.compound !== 'sng') this.add('compound-lines');
   }
 
@@ -226,10 +231,13 @@ class Collector {
         const props = run.props;
         if (hasLongPaintCluster(run.text)) this.add('long-text-clusters');
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');
-        if (props.caps === 'small') this.add('small-caps');
         if (props.baseline !== 0) this.add('script-size');
         if (props.hyperlink || props.hyperlinkAction) this.add('hyperlink-text');
-        if (!DRAWN_UNDERLINES.has(props.underline)) this.add('underline-styles');
+        if (
+          !EXACT_UNDERLINES.has(props.underline) ||
+          (props.underline !== 'none' && props.underlineLine)
+        )
+          this.add('underline-styles');
         const fill = props.fill.type === 'group' ? this.group : props.fill;
         if (fill?.type === 'linear' || fill?.type === 'path') this.add('gradient-text');
         this.fill(fill, false);
@@ -246,6 +254,10 @@ class Collector {
       case 'group': {
         // A group with `a:grpFill` passes its own group's fill on (ECMA-376 Part 1, 20.1.8.35).
         const outer = this.group;
+        // A group's effects paint over its content as one picture; a fill overlay does not draw.
+        const fx = item.element.effects;
+        this.effects(fx, false);
+        if (drawsGroupEffects(fx)) this.add('group-effects');
         if (item.element.fill.type !== 'group') this.group = item.element.fill;
         for (const c of item.children) this.item(c);
         this.group = outer;
@@ -279,9 +291,21 @@ class Collector {
         const rotated = el.xfrm.rot % 360 !== 0;
         this.effects(item.element.effects, item.geometry.paths.length <= MAX_OVERLAY_PATHS);
         this.fill(item.element.fill, rotated, unscaled(item.matrix));
-        this.line(item.element.line, item.kind === 'picture');
-        for (const p of item.geometry.paths)
+        const { geometry } = item.element;
+        const rect = geometry.kind === 'preset' && geometry.preset === 'rect';
+        this.line(item.element.line, item.kind === 'picture' && !rect);
+        for (const p of item.geometry.paths) {
           if (p.fill !== 'norm' && p.fill !== 'none') this.add('path-fill-modes');
+          const outline = item.element.line;
+          if (
+            item.kind === 'shape' &&
+            p.stroke &&
+            outline &&
+            outline.fill.type !== 'none' &&
+            unmeasuredDashStart(p.commands, outline)
+          )
+            this.add('closed-curve-dashes');
+        }
         if (item.kind === 'shape' && item.text && hasCharacters(item.text)) {
           this.text(item.element.text);
           if (item.textMatrix && flipped(item.matrix)) this.add('flipped-text');

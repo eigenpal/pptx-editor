@@ -168,6 +168,18 @@ export interface ResolvedEffects {
   readonly unsupported: readonly string[];
 }
 
+/**
+ * Whether a group's effects copy or filter its content (an inner shadow of a group draws
+ * nothing). The cascade bounds these, and the approximation report lists them.
+ * @internal
+ */
+export function drawsGroupEffects(fx: ResolvedEffects | undefined): boolean {
+  return !!(
+    fx &&
+    (fx.outerShadow || fx.secondShadow || fx.glow || fx.reflection || fx.softEdge || fx.blur)
+  );
+}
+
 const ALIGNS = new Set<EffectAlign>(['tl', 't', 'tr', 'l', 'ctr', 'r', 'bl', 'b', 'br']);
 const BLEND_MODES = new Set<BlendMode>(['over', 'mult', 'screen', 'darken', 'lighten']);
 const MAX_EFFECT_LENGTH = 51_206_400;

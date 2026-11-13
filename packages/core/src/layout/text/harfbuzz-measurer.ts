@@ -23,6 +23,7 @@ import {
   fontSubstitutes,
   type FaceMetrics,
   type FontRequest,
+  type MathScriptLevel,
   type ResolvedFace,
   type TextMeasurer,
   type ShapedGlyph,
@@ -153,6 +154,8 @@ interface LoadedFace {
    * Unit tests cover this substitution rule; no reference PDF measures it.
    */
   readonly kerns: boolean;
+  /** The face has a `MATH` table, so it has math constants and script-style forms. */
+  readonly hasMathTable: boolean;
   /**
    * The face's Unicode cmap subtable (`unicodeCmapSubtable`), or null for a face without one,
    * such as a symbol face. Coverage then comes from HarfBuzz alone.
@@ -258,6 +261,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         upem,
         kerns:
           entry.origin === HOST_SUBSTITUTE_ORIGIN || sfntTable(entry.bytes, 'kern') !== undefined,
+        hasMathTable: sfntTable(entry.bytes, 'MATH') !== undefined,
         cmap: unicodeCmapSubtable(entry.bytes, 0),
         metrics: {
           ascent: (line ? line[0] : Math.abs(ext.ascender)) / upem,
@@ -325,6 +329,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
           substituted,
           // A missing face keeps its own line metrics when the table knows them.
           metrics: substituted ? withFaceLineMetrics(r.family, chosen.metrics) : chosen.metrics,
+          ...(chosen.hasMathTable ? { hasMathTable: true as const } : {}),
         }
       : {
           id: r.family,
@@ -399,11 +404,12 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
   const advances = (
     face: ResolvedFace,
     text: string,
-    options?: { readonly kerning?: boolean }
+    options?: { readonly kerning?: boolean; readonly mathScript?: MathScriptLevel }
   ): Float64Array => {
     const lf = loaded.get(face.id);
     const kerning = options?.kerning === true && (lf?.kerns === true || face.substituted);
-    const key = `${face.id}${kerning ? 'k' : ''}\u0000${text}`;
+    const ssty = lf?.hasMathTable ? options?.mathScript : undefined;
+    const key = `${face.id}${kerning ? 'k' : ''}${ssty ? `s${ssty}` : ''}\u0000${text}`;
     const hit = cache.get(key);
     if (hit) return hit;
     const out = new Float64Array(text.length);
@@ -414,10 +420,18 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     buffer ??= new module.Buffer();
     buffer.reset();
     buffer.addText(text);
+    // Script-style forms are features of the math script (`Zmth`), which no character of the
+    // text names: set it before the other properties are guessed.
+    if (ssty) buffer.setScript('Zmth');
     buffer.guessSegmentProperties();
     // Slide text takes no standard or contextual ligatures, and embedded subset fonts
     // often lack the ligature glyphs. Paint disables them too.
-    module.shape(lf.font, buffer, featuresFor(module, kerning, text));
+    const features = featuresFor(module, kerning, text);
+    module.shape(
+      lf.font,
+      buffer,
+      ssty ? [...features, new module.Feature('ssty', ssty)] : features
+    );
     // `addText` adds UTF-16, so clusters are UTF-16 offsets into `text`.
     const infos = buffer.getGlyphInfos();
     const positions = buffer.getGlyphPositions();

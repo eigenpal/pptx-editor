@@ -31,15 +31,18 @@ import {
   popGraphicsState,
   pushGraphicsState,
   setDashPattern,
+  setFillingGrayscaleColor,
   setFillingRgbColor,
   setLineCap,
   setLineJoin,
   setLineWidth,
+  setStrokingGrayscaleColor,
   setStrokingRgbColor,
   stroke,
   type PDFName,
+  type PDFRef,
 } from 'pdf-lib';
-import type { Rgba } from '@pptx-editor.dev/core/cascade';
+import type { ResolvedEffects, ResolvedFill, Rgba, Xfrm } from '@pptx-editor.dev/core/cascade';
 import {
   apply,
   ARROW_MITER_LIMIT,
@@ -49,21 +52,30 @@ import {
   invert,
   multiply,
   planStroke,
+  strokeWidth,
   type GeometryPath,
   type LayoutItem,
   type Matrix,
   type PathCommand,
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
-import { blurSigma, effectMatrix } from '@pptx-editor.dev/core/output';
+import {
+  blurSigma,
+  effectBoxCorners,
+  effectMatrix,
+  threeDColor,
+} from '@pptx-editor.dev/core/output';
 import {
   glowSpread,
   innerShadowShift,
+  MAX_MORPH_SPREAD,
   reflectionBlurSigma,
   reflectionFade,
+  softEdgeSpread,
 } from '@pptx-editor.dev/pro/drawing';
 import { flatColor, ownFill, type FillScope } from './paint-fill.ts';
 import { fillTextOutlines } from './paint-text.ts';
+import { outerEdges } from './outer-edges.ts';
 import {
   clipEvenOdd,
   EMU_PER_PT,
@@ -77,16 +89,22 @@ import {
   type PageOps,
 } from './page-ops.ts';
 
-type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
+export type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
+
+/** A shape, picture, or group whose effects place copies of its content by its box. */
+type EffectHost = {
+  readonly element: { readonly effects?: ResolvedEffects; readonly xfrm: Xfrm };
+  readonly matrix: Matrix;
+};
 
 /** A blur below half a point is drawn as a hard edge: it is under one output pixel. */
-const MIN_SIGMA = 6_350;
+export const MIN_SIGMA = 6_350;
 
 /** A typical stem of a glyph, as a fraction of the font size: the width of a text silhouette. */
 const STEM_PER_EM = 0.1;
 
 /** Whether the Pro drawing renderers are installed, so glow, inner shadow, and reflection paint. */
-function proEffects(): boolean {
+export function proEffects(): boolean {
   return drawingRenderers().effects !== undefined;
 }
 
@@ -148,9 +166,17 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
       'Inner shadows start at the fill: outlines and overlapping paths are shaded differently.'
     );
   if (pro && softEdge && softEdge.radius > 0)
-    p.diag.add('effect.soft-edge', 'approximation', 'Soft edges are drawn hard.');
+    p.diag.add(
+      'effect.soft-edge',
+      'approximation',
+      'Soft edges fade by the distance to the painted edge: corners round.'
+    );
   if (pro && effects.blur && effects.blur.radius > 0)
-    p.diag.add('effect.blur', 'approximation', 'Blur is not drawn.');
+    p.diag.add(
+      'effect.blur',
+      'approximation',
+      'Blur is drawn as an edge fade and layered rings: text and detail inside the shape stay sharp.'
+    );
   if (
     pro &&
     reflection &&
@@ -251,7 +277,7 @@ function pathUnder(commands: readonly PathCommand[], m: Matrix): PathCommand[] {
 }
 
 /** The bounds of every form here: the slide and its surroundings, in slide EMU. */
-function formBox(p: PageOps): number[] {
+export function formBox(p: PageOps): number[] {
   const { width, height } = p.page.getSize();
   const [w, h] = [width * EMU_PER_PT, height * EMU_PER_PT];
   return [-w, -h, 2 * w, 2 * h];
@@ -271,14 +297,14 @@ async function form(p: PageOps, draw: () => void): Promise<PDFName> {
  * `flat` (when present) only filled, for a layer that does not grow. `width(grow)` is the line
  * width that grows the part by `grow` slide EMU.
  */
-interface Part {
+export interface Part {
   readonly grown: PDFName;
   readonly flat?: PDFName;
   readonly width: (grow: number) => number;
 }
 
 /** A class of silhouette parts with one blur profile: wide areas, or bands of one width. */
-interface PartClass {
+export interface PartClass {
   readonly parts: readonly Part[];
   /** Infinity for areas; the band width in slide EMU for outlines and text. */
   readonly bandWidth: number;
@@ -290,7 +316,7 @@ interface PartClass {
  * a band of the line width; the text is a third, a band of a glyph stem, when the shape has no
  * fill to cover it.
  */
-async function silhouette(
+export async function silhouette(
   item: Drawable,
   m: Matrix,
   p: PageOps,
@@ -446,6 +472,53 @@ async function drawLayers(
 }
 
 /**
+ * Cast the outer shadows of `effects` (a preset shadow's second copy under its first). `matrix`
+ * maps the `w`x`h` box of the shape or group to the slide; `classesUnder` gives the silhouette
+ * under an effect transform.
+ */
+export async function castShadows(
+  effects: ResolvedEffects,
+  matrix: Matrix,
+  w: number,
+  h: number,
+  face: Matrix,
+  classesUnder: (m: Matrix) => Promise<PartClass[]>,
+  p: PageOps
+): Promise<void> {
+  for (const shadow of [effects.secondShadow, effects.outerShadow]) {
+    if (!shadow || shadow.color.a <= 0) continue;
+    const m = multiply(face, effectMatrix(shadow, matrix, w, h));
+    const sigma = blurSigma(shadow.blur);
+    for (const cls of await classesUnder(m))
+      await drawLayers(
+        cls.parts,
+        shadow.color,
+        blurLayers(shadow.color.a, sigma, cls.bandWidth, shadow.dist),
+        p
+      );
+  }
+}
+
+/** Cast a glow around the silhouette `classes`, as the SVG glow (`glowSpread`). */
+export async function castGlow(
+  glow: ResolvedEffects['glow'],
+  classes: () => Promise<PartClass[]>,
+  p: PageOps
+): Promise<void> {
+  if (!glow || glow.radius <= 0 || glow.color.a <= 0 || !proEffects()) return;
+  // The silhouette grown by `spread` and blurred by sigma. The inside level is the profile at
+  // the edge, a * phi(spread / sigma).
+  const { spread, sigma } = glowSpread(glow.radius);
+  const a = glow.color.a;
+  const list = layers(
+    rings(spread + 3 * sigma, sigma / 2),
+    a * phi(spread / sigma),
+    (d) => a * (1 - phi((d - spread) / sigma))
+  );
+  for (const cls of await classes()) await drawLayers(cls.parts, glow.color, list, p);
+}
+
+/**
  * The outer shadows of a shape or picture, painted before its content. `face` is the camera's
  * turn of the face (`ThreeDPaint.front`): the shadow is placed on the face, then turns with it,
  * as in the SVG paint.
@@ -459,19 +532,7 @@ export async function drawShadows(
   const effects = item.element.effects;
   if (!effects) return;
   const { cx: w, cy: h } = item.element.xfrm;
-  // A preset shadow's second copy lies under its first.
-  for (const shadow of [effects.secondShadow, effects.outerShadow]) {
-    if (!shadow || shadow.color.a <= 0) continue;
-    const m = multiply(face, effectMatrix(shadow, item.matrix, w, h));
-    const sigma = blurSigma(shadow.blur);
-    for (const cls of await silhouette(item, m, p, scope))
-      await drawLayers(
-        cls.parts,
-        shadow.color,
-        blurLayers(shadow.color.a, sigma, cls.bandWidth, shadow.dist),
-        p
-      );
-  }
+  await castShadows(effects, item.matrix, w, h, face, (m) => silhouette(item, m, p, scope), p);
 }
 
 /**
@@ -484,20 +545,7 @@ export async function drawGlow(
   scope: FillScope,
   face: Matrix
 ): Promise<void> {
-  const glow = item.element.effects?.glow;
-  if (glow && glow.radius > 0 && glow.color.a > 0 && proEffects()) {
-    // As the SVG glow (`glowSpread`): the silhouette grown by `spread` and blurred by σ. The
-    // inside level is the profile at the edge, a·Φ(spread / σ).
-    const { spread, sigma } = glowSpread(glow.radius);
-    const a = glow.color.a;
-    const list = layers(
-      rings(spread + 3 * sigma, sigma / 2),
-      a * phi(spread / sigma),
-      (d) => a * (1 - phi((d - spread) / sigma))
-    );
-    for (const cls of await silhouette(item, face, p, scope))
-      await drawLayers(cls.parts, glow.color, list, p);
-  }
+  await castGlow(item.element.effects?.glow, () => silhouette(item, face, p, scope), p);
 }
 
 /**
@@ -562,14 +610,14 @@ export async function drawInnerShadow(item: Drawable, p: PageOps, scope: FillSco
 }
 
 /**
- * The reflection of a shape or picture, painted before its shadow and content, as the SVG
+ * The reflection of a shape, picture, or group, painted before its shadow and content, as the SVG
  * renderer paints it: `drawContent` (the geometry, inner shadow, and text, in slide space) under
  * the reflection's effect transform, as one transparency group, through a luminosity soft mask
  * that fades from `startAlpha` at `startPos` to `endAlpha` at `endPos` along `fadeDir`. The blur
  * is left out (`effectDiagnostics` reports it).
  */
 export async function drawReflection(
-  item: Drawable,
+  item: EffectHost,
   p: PageOps,
   drawContent: () => Promise<void>
 ): Promise<void> {
@@ -617,4 +665,330 @@ export async function drawReflection(
     ctx.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: mask } })
   );
   p.push(drawObject(p.name('XObject', group)), popGraphicsState());
+}
+
+/** At most this many bands across a soft edge: each is one stroke of the mask. */
+const MAX_SOFT_EDGE_BANDS = 48;
+/** The narrowest band of a soft edge, half a point: a narrower one is under one output pixel. */
+const MIN_SOFT_EDGE_BAND = 6_350;
+/** The most path commands that the bands of one edge fade trace, over all of its bands. */
+const MAX_BAND_WORK = 200_000;
+/** The fewest bands that still draw a fade: with fewer, an edge fade draws a hard edge. */
+const MIN_FADE_BANDS = 4;
+
+/**
+ * The alpha of a soft edge as bands of the distance inside the outline (`softEdgeSpread`): the
+ * outline shrunk by `inset`, blurred with Gaussian σ `sigma`. Band `k` reaches `reach[k]` inside
+ * the outline and takes `alpha[k]`, the profile at its middle; beyond the last band the alpha is 1.
+ * At most `maxBands` bands.
+ */
+export function softEdgeBands(
+  inset: number,
+  sigma: number,
+  maxBands = MAX_SOFT_EDGE_BANDS
+): { reach: number[]; alpha: number[] } {
+  const extent = inset + 3 * sigma;
+  if (!(extent > 0)) return { reach: [], alpha: [] };
+  const count = Math.max(
+    1,
+    Math.min(
+      maxBands,
+      MAX_SOFT_EDGE_BANDS,
+      Math.ceil(extent / Math.max(sigma / 6, MIN_SOFT_EDGE_BAND))
+    )
+  );
+  const profile = (d: number): number =>
+    sigma < MIN_SIGMA ? (d >= inset ? 1 : 0) : phi((d - inset) / sigma);
+  const reach = Array.from({ length: count }, (_, k) => (extent * (k + 1)) / count);
+  const alpha = reach.map((r, k) => profile((r + (k ? reach[k - 1] : 0)) / 2));
+  return { reach, alpha };
+}
+
+/**
+ * What a soft edge fades, as the SVG renderer's body filter reads it (`SourceAlpha`): the filled
+ * paths, and the outline at `width` in slide space (a picture's border lies outside the picture:
+ * twice its width, clipped outside). `rimmed` are the filled paths whose outline lies over their
+ * edge, so their own edge is `width / 2` inside the painted edge.
+ */
+export interface SoftEdgeSilhouette {
+  readonly filled: readonly PathCommand[][];
+  readonly rimmed: readonly boolean[];
+  readonly outlines: readonly PathCommand[][];
+  readonly width: number;
+}
+
+export function softEdgeSilhouette(
+  item: Drawable,
+  scope: FillScope,
+  groupScale: number
+): SoftEdgeSilhouette {
+  const el = item.element;
+  const m = item.matrix;
+  const picture = item.kind === 'picture';
+  const fills = picture || ownFill(el.fill, scope).fill.type !== 'none';
+  const line = item.paintLine ?? el.line;
+  const lineFill = line ? ownFill(line.fill, scope).fill.type : 'none';
+  const drawn = !!line && (lineFill === 'solid' || lineFill === 'linear' || lineFill === 'path');
+  const { cx: w, cy: h } = el.xfrm;
+  // A picture with no geometry shows in its box, as `drawGeometry` draws it.
+  const box: GeometryPath = {
+    commands: [
+      { op: 'M', x: 0, y: 0 },
+      { op: 'L', x: w, y: 0 },
+      { op: 'L', x: w, y: h },
+      { op: 'L', x: 0, y: h },
+      { op: 'Z' },
+    ],
+    fill: 'norm',
+    stroke: true,
+  } as GeometryPath;
+  const paths = picture && item.geometry.paths.length === 0 ? [box] : item.geometry.paths;
+  const filledPaths = fills ? paths.filter((path) => path.fill !== 'none') : [];
+  const stroked = drawn ? paths.filter((path) => picture || path.stroke) : [];
+  const width = drawn ? strokeWidth(line, groupScale) * matrixScale(m) * (picture ? 2 : 1) : 0;
+  return {
+    filled: filledPaths.map((path) => pathUnder(path.commands, m)),
+    rimmed: filledPaths.map((path) => stroked.includes(path)),
+    outlines: stroked.map((path) => pathUnder(path.commands, m)),
+    width,
+  };
+}
+
+/**
+ * Paint `drawBody` (the geometry, its bevel, and the inner shadow, in slide space) through the
+ * item's soft edge, as the SVG renderer's body filter: an edge fade (`drawEdgeFade`) of
+ * everything the body paints, shrunk by 0.84 times the radius and blurred by the radius
+ * (`softEdgeSpread`). Without a soft edge, `drawBody` paints as it is.
+ */
+export async function drawSoftEdge(
+  item: Drawable,
+  p: PageOps,
+  scope: FillScope,
+  groupScale: number,
+  drawBody: () => Promise<void>
+): Promise<void> {
+  const soft = item.element.effects?.softEdge;
+  const m = item.matrix;
+  if (!soft || soft.radius <= 0 || !proEffects() || Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9)
+    return drawBody();
+  const shape = softEdgeSilhouette(item, scope, groupScale);
+  if (shape.filled.length === 0 && shape.outlines.length === 0) return drawBody();
+  const { spread, sigma } = softEdgeSpread(soft.radius);
+  // A shrink by more than half the narrower side of the bounds leaves nothing, as in the SVG
+  // renderer, which compares the spread before its cap: the shape paints nothing.
+  const corners = effectBoxCorners(item);
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  if (Math.abs(spread) > narrow / 2) return;
+  const inset = Math.min(Math.abs(spread), MAX_MORPH_SPREAD);
+  await drawEdgeFade(shape, p, inset, sigma, corners, drawBody, 'effect.soft-edge-complex');
+}
+
+/**
+ * Paint `drawBody` as one transparency group under a luminosity soft mask whose alpha follows
+ * the painted edge of `shape` (the fill and the outline) shrunk by `inset` and blurred by
+ * `sigma`. The mask holds the alpha by the distance to the painted edge, in bands: inside the
+ * filled paths, strokes of the outer edge of their union (`outerEdges`) from the widest band in;
+ * on the outline, outside the filled paths, strokes of the outline from the full width in. At a
+ * corner a band rounds where the blur takes the product of the two edges. `corners` bound the
+ * shape in slide space. `code` reports a fade drawn with fewer bands or as a hard edge.
+ */
+async function drawEdgeFade(
+  shape: SoftEdgeSilhouette,
+  p: PageOps,
+  inset: number,
+  sigma: number,
+  corners: readonly { x: number; y: number }[],
+  drawBody: () => Promise<void>,
+  code: string
+): Promise<void> {
+  const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });
+  drawThroughMask(p, body, await edgeFadeOps(shape, p, inset, sigma, corners, code));
+}
+
+/** Draw the transparency group `body` under a luminosity soft mask of the gray `maskOps`. */
+export function drawThroughMask(p: PageOps, body: PDFRef, maskOps: PDFOperator[]): void {
+  const mask = p.form(maskOps, formBox(p), { S: 'Transparency', CS: 'DeviceGray' });
+  p.push(pushGraphicsState());
+  p.state(`smask:${mask.toString()}`, () =>
+    p.res.doc.context.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: mask } })
+  );
+  p.push(drawObject(p.name('XObject', body)), popGraphicsState());
+}
+
+/**
+ * The gray operators of the edge fade of `shape` (`drawEdgeFade`), white where it is opaque.
+ * The bands trace at most `MAX_BAND_WORK` path commands: a shape with more edge commands gets
+ * fewer bands. With fewer than `MIN_FADE_BANDS` bands, or when the outer edge of the filled paths
+ * is past the search (`outerEdges`), the mask is a hard edge: the filled paths and the outline,
+ * white. `code` reports both cases.
+ */
+export async function edgeFadeOps(
+  shape: SoftEdgeSilhouette,
+  p: PageOps,
+  inset: number,
+  sigma: number,
+  corners: readonly { x: number; y: number }[],
+  code: string
+): Promise<PDFOperator[]> {
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const trace = (paths: readonly PathCommand[][]): void => {
+    for (const path of paths) tracePath(path, p);
+  };
+  const W = shape.width;
+  // The bands fade only the outer edge of the union of the filled paths: an edge inside another
+  // filled path stays white (`outerEdges`).
+  const edges = outerEdges(shape.filled);
+  const commands = (paths: readonly PathCommand[][]): number =>
+    paths.reduce((n, path) => n + path.length, 0);
+  const work = commands(edges ?? shape.filled) + (W > 0 ? commands(shape.outlines) : 0);
+  const full = softEdgeBands(inset, sigma);
+  const maxBands = Math.floor(MAX_BAND_WORK / Math.max(1, work));
+  const hard = !edges || (full.reach.length > maxBands && maxBands < MIN_FADE_BANDS);
+  if (hard)
+    p.diag.add(
+      code,
+      'approximation',
+      'An edge fade of a shape with too many paths or points is drawn as a hard edge.'
+    );
+  else if (full.reach.length > maxBands)
+    p.diag.add(
+      code,
+      'approximation',
+      'An edge fade of a shape with many points is drawn with fewer bands.'
+    );
+  const { reach, alpha } = hard
+    ? { reach: [], alpha: [] }
+    : full.reach.length > maxBands
+      ? softEdgeBands(inset, sigma, maxBands)
+      : full;
+  const extent = reach[reach.length - 1] ?? 0;
+  const ops = await p.capture(async () => {
+    p.push(setLineJoin(LineJoinStyle.Round), setLineCap(LineCapStyle.Round));
+    // Each filled path fills white on its own, so where paths overlap the mask stays white.
+    p.push(setFillingGrayscaleColor(1));
+    for (const path of shape.filled) {
+      tracePath(path, p);
+      p.push(fillEvenOdd());
+    }
+    if (hard) {
+      if (shape.outlines.length && W > 0) {
+        p.push(setStrokingGrayscaleColor(1), setLineWidth(W));
+        trace([...shape.outlines]);
+        p.push(stroke());
+      }
+      return;
+    }
+    const outer = edges ?? [];
+    // Inside a filled path: its own edge lies `off` inside the painted edge. Widest band first,
+    // over the paths with and without an outline over their edge, so a point keeps the gray of
+    // the narrowest band that reaches it.
+    for (let k = reach.length - 1; k >= 0; k -= 1) {
+      for (const rim of [false, true]) {
+        const off = rim ? W / 2 : 0;
+        if (reach[k] <= off) continue;
+        const paths = outer.filter((path, i) => shape.rimmed[i] === rim && path.length > 0);
+        if (paths.length === 0) continue;
+        p.push(setStrokingGrayscaleColor(alpha[k]), setLineWidth(2 * (reach[k] - off)));
+        trace(paths);
+        p.push(stroke());
+      }
+    }
+    // On the outline, outside the filled paths: the painted edge is the outline's outer edge.
+    // From the full width in, each stroke covers the points at least its band inside that edge.
+    if (shape.outlines.length && W > 0) {
+      p.push(pushGraphicsState());
+      if (shape.filled.length) {
+        const r =
+          4 * Math.max(narrow, W, extent) + Math.max(...xs.map(Math.abs), ...ys.map(Math.abs));
+        clipOutside(shape.filled, r, p);
+      }
+      for (let j = 0; j < reach.length; j += 1) {
+        const from = j ? reach[j - 1] : 0;
+        if (from >= W / 2) break;
+        p.push(setStrokingGrayscaleColor(alpha[j]), setLineWidth(W - 2 * from));
+        trace([...shape.outlines]);
+        p.push(stroke());
+      }
+      if (extent < W / 2) {
+        p.push(setStrokingGrayscaleColor(1), setLineWidth(W - 2 * extent));
+        trace([...shape.outlines]);
+        p.push(stroke());
+      }
+      p.push(popGraphicsState());
+    }
+  });
+  return ops;
+}
+
+/**
+ * Clip to the outside of every path of `filled`: one clip per path, each a box of half-side `r`
+ * minus the path by the even-odd rule. The clips intersect, so overlapping paths clip as their
+ * union.
+ */
+function clipOutside(filled: readonly PathCommand[][], r: number, p: PageOps): void {
+  for (const path of filled) {
+    tracePath(
+      [
+        { op: 'M', x: -r, y: -r },
+        { op: 'L', x: r, y: -r },
+        { op: 'L', x: r, y: r },
+        { op: 'L', x: -r, y: r },
+        { op: 'Z' },
+      ],
+      p
+    );
+    tracePath(path, p);
+    p.push(clipEvenOdd(), endPath());
+  }
+}
+
+/** The color of a painted edge: the representative color of a fill (`threeDColor`). */
+function edgeColor(fill: ResolvedFill, scope: FillScope): Rgba {
+  return threeDColor(ownFill(fill, scope).fill);
+}
+
+/**
+ * Paint `drawBody` through the item's blur (`a:blur`, ECMA-376 Part 1, 20.1.8.15), as the SVG
+ * renderer's blur filter with the kernel of the shadows (`blurSigma`): inside the painted edge,
+ * the body fades to half its alpha at the edge (an edge fade with no inset). With `grow`, a halo
+ * in the color of the painted edge (the outline, else the fill) lies outside the filled paths,
+ * as layered rings of the blurred profile. Text and detail inside the shape stay sharp.
+ */
+export async function drawBlur(
+  item: Drawable,
+  p: PageOps,
+  scope: FillScope,
+  groupScale: number,
+  drawBody: () => Promise<void>
+): Promise<void> {
+  const blur = item.element.effects?.blur;
+  const m = item.matrix;
+  const sigma = blur ? blurSigma(blur.radius) : 0;
+  if (!blur || sigma < MIN_SIGMA || !proEffects() || Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9)
+    return drawBody();
+  const shape = softEdgeSilhouette(item, scope, groupScale);
+  if (shape.filled.length === 0 && shape.outlines.length === 0) return drawBody();
+  const corners = effectBoxCorners(item);
+  if (blur.grow) {
+    const el = item.element;
+    const line = item.paintLine ?? el.line;
+    const color = shape.width > 0 && line ? edgeColor(line.fill, scope) : edgeColor(el.fill, scope);
+    p.push(pushGraphicsState());
+    // Outside the filled paths only: inside, the faded body gives the profile.
+    if (shape.filled.length) {
+      const xs = corners.map((c) => Math.abs(c.x));
+      const ys = corners.map((c) => Math.abs(c.y));
+      const r = 4 * (Math.max(...xs, ...ys) + 3 * sigma + shape.width);
+      clipOutside(shape.filled, r, p);
+    }
+    const identity: Matrix = [1, 0, 0, 1, 0, 0];
+    for (const cls of await silhouette(item, identity, p, scope))
+      await drawLayers(cls.parts, color, blurLayers(color.a, sigma, cls.bandWidth, 0), p);
+    p.push(popGraphicsState());
+  }
+  await drawEdgeFade(shape, p, 0, sigma, corners, drawBody, 'effect.blur-complex');
 }

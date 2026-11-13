@@ -15,6 +15,8 @@ import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { MAX_OVERLAY_PATHS as REPORTED_OVERLAY_PATHS } from '../../layout/approximations.ts';
 import { paintSlide } from '../index.ts';
 import { MAX_OVERLAY_PATHS } from '../paint.ts';
+import { MAX_SLIDE_TILE_IMAGES, ShapeBandBudget } from '../paint-budgets.ts';
+import { tilePlacements } from '../paint-fill.ts';
 import {
   colorAt,
   linearEnds,
@@ -25,7 +27,9 @@ import {
   TWO_STOP_STEPS,
   MAX_SHAPE_BANDS,
   MIN_SHAPE_BANDS,
+  rectGeometry,
   shapeBands,
+  shapeGradientBands,
 } from '../paint-gradient.ts';
 
 const win = new GlobalWindow();
@@ -189,6 +193,57 @@ describe('gradient colors (design D2)', () => {
       { pos: 1, color: gray(100) },
     ];
     expect(shapeBands(three)).toBe(60);
+  });
+
+  test('shape gradient bands run outside in about the focus center (shared with pptx-to-pdf)', () => {
+    const gray = (v: number): GradientStop['color'] => ({ r: v, g: v, b: v, a: 1 });
+    const stops: GradientStop[] = [
+      { pos: 0, color: gray(100) },
+      { pos: 1, color: gray(110) },
+    ];
+    const fill = {
+      type: 'path',
+      path: 'shape',
+      stops,
+      fillToRect: { l: 0.25, t: 0.5, r: 0.75, b: 0.5 },
+    } as unknown as Extract<ResolvedFill, { type: 'path' }>;
+    const { cx, cy, bands } = shapeGradientBands(fill, stops, 100, 40);
+    expect([cx, cy]).toEqual([25, 20]);
+    expect(bands).toHaveLength(MIN_SHAPE_BANDS);
+    expect(bands[0].scale).toBe(1);
+    expect(bands[0].color).toEqual(colorAt(stops, 1 - 0.5 / MIN_SHAPE_BANDS));
+    expect(bands[bands.length - 1].scale).toBeCloseTo(1 / MIN_SHAPE_BANDS);
+  });
+
+  test('the shape band budget bounds paths, commands, and the work of a slide', () => {
+    const budget = new ShapeBandBudget();
+    expect(budget.allow(17, 10)).toBe(false);
+    expect(budget.allow(1, 2001)).toBe(false);
+    // 512,000 commands × bands per slide: two shapes of 2,000 commands fit, a third does not.
+    expect(budget.allow(1, 2000)).toBe(true);
+    expect(budget.allow(1, 2000)).toBe(true);
+    expect(budget.allow(1, 2000)).toBe(false);
+    expect(budget.allow(1, 1)).toBe(false);
+  });
+
+  test('a rectangle gradient reaches the tile rectangle grown to hold the focus', () => {
+    const fill = {
+      type: 'path',
+      path: 'rect',
+      stops: [],
+      fillToRect: { l: 0.5, t: 0.5, r: 0.5, b: 0.5 },
+      tileRect: { l: 0.1, t: 0, r: 0.1, b: 0 },
+    } as unknown as Extract<ResolvedFill, { type: 'path' }>;
+    expect(rectGeometry(fill, 100, 40)).toEqual({
+      l: 50,
+      t: 20,
+      r: 50,
+      b: 20,
+      x0: 10,
+      y0: 0,
+      x1: 90,
+      y1: 40,
+    });
   });
 
   test('a tile rectangle with negative insets extends the box; an empty one falls back', () => {
@@ -414,7 +469,7 @@ describe('paint', () => {
       }),
       [['rIdImg', IMAGE_REL, '../media/image1.png']]
     );
-    const tile = [...root.querySelectorAll('pattern')].find((p) => p.id.includes('tile'))!;
+    const tile = root.querySelector('image')!;
     expect(Number(tile.getAttribute('width'))).toBe(51_206_400);
     expect(Number(tile.getAttribute('height'))).toBe(9525);
   });
@@ -488,8 +543,8 @@ describe('paint', () => {
         }),
         [['rIdImg', IMAGE_REL, '../media/image1.png']]
       );
-      const tile = [...root.querySelectorAll('pattern')].find((p) => p.id.includes('tile'))!;
-      expect(tile.getAttribute('x')).toBe('0');
+      const tile = root.querySelector('image')!;
+      expect([tile.getAttribute('x'), tile.getAttribute('y')]).toEqual(['0', '0']);
       expect(root.querySelector('path[stroke]')!.hasAttribute('stroke-dasharray')).toBe(false);
     }
   });
@@ -682,9 +737,138 @@ describe('paint', () => {
       }),
       [['rIdImg', IMAGE_REL, '../media/image1.png']]
     );
-    const tile = [...root.querySelectorAll('pattern')].find((p) => p.id.includes('tile'))!;
+    const tile = root.querySelector('image')!;
     expect(tile.getAttribute('width')).toBe('609600');
-    expect(tile.querySelector('g')!.getAttribute('filter')).toMatch(/^url\(#t-blip/);
+    expect(tile.parentElement!.getAttribute('filter')).toMatch(/^url\(#t-blip/);
+  });
+
+  const tiled = (cx: number, cy: number, tile: string, prst = 'rect', alpha = ''): string =>
+    shape({
+      id: 2,
+      x: 0,
+      y: 0,
+      cx,
+      cy,
+      prst,
+      fill: `<a:blipFill><a:blip r:embed="rIdImg">${alpha}</a:blip><a:tile ${tile}/></a:blipFill>`,
+      line: '<a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>',
+    });
+  const IMG_REL: [string, string, string][] = [['rIdImg', IMAGE_REL, '../media/image1.png']];
+
+  test('a tiled picture draws one image per tile inside its box, not a printed pattern', () => {
+    // Tiles of 1_219_200 × 914_400 at 50 %, mirrored both ways, in a box of 4 × 3 tiles.
+    const root = paint(
+      tiled(
+        2_438_400,
+        1_371_600,
+        'sx="50000" sy="50000" flip="xy" algn="tl"',
+        'rect',
+        '<a:alphaModFix amt="50000"/>'
+      ),
+      IMG_REL
+    );
+    expect([...root.querySelectorAll('pattern')].some((p) => p.id.includes('tile'))).toBe(false);
+    const images = [...root.querySelectorAll('image')];
+    expect(images.length).toBe(12);
+    // The box clips the tiles as a nested viewport; the outline draws on top, unfilled.
+    const box = images[0]!.parentElement!.parentElement!;
+    expect(box.tagName.toLowerCase()).toBe('svg');
+    expect([box.getAttribute('width'), box.getAttribute('height')]).toEqual(['2438400', '1371600']);
+    expect(images[0]!.parentElement!.getAttribute('opacity')).toBe('0.5');
+    expect(root.querySelector('path[stroke="#000000"]')!.getAttribute('fill')).toBe('none');
+    // The second tile of a row turns about the far edge of its cell.
+    expect(images[1]!.getAttribute('transform')).toBe('translate(1219200 0) scale(-1 1)');
+    expect(images[2]!.getAttribute('transform')).toBe('translate(0 914400) scale(1 -1)');
+    expect(images[3]!.getAttribute('transform')).toBe('translate(1219200 914400) scale(-1 -1)');
+    expect([images[4]!.getAttribute('x'), images[4]!.getAttribute('y')]).toEqual(['1219200', '0']);
+  });
+
+  test('a tiled picture in another shape keeps inside it with a mask', () => {
+    const root = paint(
+      tiled(2_438_400, 1_371_600, 'sx="50000" sy="50000" algn="tl"', 'ellipse'),
+      IMG_REL
+    );
+    const image = root.querySelector('image')!;
+    expect(image.closest('g[mask]')).not.toBeNull();
+  });
+
+  test('tiles past the slide budget fill with the pattern, across shapes', () => {
+    // Tiles of 9_525 EMU, 40 × 40 in each box: two boxes fit in the slide budget, the third
+    // does not and draws the pattern, which holds one image.
+    const box = (id: number): string =>
+      shape({
+        id,
+        x: id * 400_000,
+        y: 0,
+        cx: 9_525 * 40,
+        cy: 9_525 * 40,
+        fill: '<a:blipFill><a:blip r:embed="rIdImg"/><a:tile sx="781" sy="1041" algn="tl"/></a:blipFill>',
+      });
+    expect(2 * 1_600).toBeLessThanOrEqual(MAX_SLIDE_TILE_IMAGES);
+    expect(3 * 1_600).toBeGreaterThan(MAX_SLIDE_TILE_IMAGES);
+    const root = paint(box(2) + box(3) + box(4), IMG_REL);
+    expect(root.querySelectorAll('image').length).toBe(2 * 1_600 + 1);
+    expect([...root.querySelectorAll('pattern')].filter((p) => p.id.includes('tile')).length).toBe(
+      1
+    );
+  });
+
+  test('tiles fill a path outside the box, as the PDF pattern does', () => {
+    // The pointer of a callout reaches below its box (to 1.125 × its height): the tiles cover it.
+    const h = 1_371_600;
+    const root = paint(
+      tiled(2_438_400, h, 'sx="50000" sy="50000" algn="tl"', 'wedgeRectCallout'),
+      IMG_REL
+    );
+    const ys = [...root.querySelectorAll('image')].map((i) => Number(i.getAttribute('y')));
+    expect(Math.max(...ys)).toBe(h);
+    expect(root.querySelector('image')!.closest('g[mask]')).not.toBeNull();
+  });
+
+  test('a tiled background draws its tiles in the slide viewport', () => {
+    const r = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            rels: IMG_REL,
+            background:
+              '<p:bg><p:bgPr><a:blipFill><a:blip r:embed="rIdImg"/><a:tile sx="100000" sy="100000" algn="tl"/></a:blipFill><a:effectLst/></p:bgPr></p:bg>',
+            shapes: '',
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const root = paintSlide(doc, layout, {
+      images: () => 'blob:test',
+      imageSize: () => ({ cx: 1_219_200, cy: 914_400 }),
+      idPrefix: 't',
+    });
+    const bg = root.querySelector('[data-kind="background"]')!;
+    expect(bg.tagName.toLowerCase()).toBe('svg');
+    // 12_192_000 × 6_858_000 in tiles of 1_219_200 × 914_400: 10 × 8 tiles, the last row cut.
+    expect(bg.querySelectorAll('image').length).toBe(80);
+  });
+
+  test('tile placements cover the area once and stop at the image budget', () => {
+    const g = { x: -100, y: 0, width: 400, height: 300, flipX: true, flipY: false };
+    const tiles = tilePlacements(g, { x0: 0, y0: 0, x1: 1000, y1: 300 }, 100)!;
+    // Cells of 800 from -100: tiles at -100, 300, 700 meet the box; 1100 does not.
+    expect(tiles.map((t) => [t.x + (t.mirrorX ? g.width : 0), t.mirrorX])).toEqual([
+      [-100, false],
+      [300, true],
+      [700, false],
+    ]);
+    const tiny = { ...g, x: 0, width: 1, height: 1, flipX: false };
+    const row = (x1: number) => ({ x0: 0, y0: 0, x1, y1: 1 });
+    expect(tilePlacements(tiny, row(50), 50)!.length).toBe(50);
+    expect(tilePlacements(tiny, row(51), 50)).toBeUndefined();
+    // An area left of the box: tiles at negative places.
+    expect(tilePlacements(tiny, { x0: -3, y0: 0, x1: 0, y1: 1 }, 50)!.map((t) => t.x)).toEqual([
+      -3, -2, -1,
+    ]);
   });
 
   const picture = (crop: string): string =>

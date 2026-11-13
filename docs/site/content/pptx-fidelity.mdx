@@ -116,7 +116,7 @@ The editor lists the families it substituted in `snapshot().substitutedFonts`, a
 
 These entries summarize rendering differences and behavior that ECMA-376 does not define precisely.
 
-- **Line model.** Line heights and baselines use measured rules for Latin, Japanese, and Arabic text. Other scripts, vertical text, missing fonts, and overflowing centered or bottom-aligned text can shift baselines by several points.
+- **Line model.** Line heights, baselines, and column positions use measured rules for Latin, Japanese, and Arabic text. Other scripts, vertical text, missing fonts, and overflowing centered or bottom-aligned text can shift baselines by several points.
 - **Long text clusters.** Grapheme clusters longer than 256 UTF-16 units render in bounded pieces without shaping across piece boundaries. Surrogate pairs, source text, and caret boundaries stay intact.
 - **Glyph advances.** Small glyph-width differences can shift aligned text or change line breaks near a box edge. Original and substitute fonts can use different kerning rules. Substitution fidelity is not measured against reference PDFs.
 - **Color transform spaces.** `a:tint`, `a:shade`, and `a:inv` use linear RGB, and the `a:lum*` transforms use HSL. The other transforms are not measured against a reference.
@@ -126,7 +126,8 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Glow and soft edge.** These effects require `@pptx-editor.dev/pro` under the EigenPal Pro License; without it, they remain saved but invisible. Curved edges, sharp corners, and transparent fills can differ from the reference. Soft edges can remove thin details, and large radii are capped.
 - **Preset shadows.** Preset shadows use measured silhouettes, including flattened perspective shadows and lighter copies for double shadows. Measurements cover all 20 presets at one distance. Other distances and colors remain unmeasured.
 - **3-D shapes.** 3-D rendering requires `@pptx-editor.dev/pro` under the EigenPal Pro License; without it, shapes render flat. Lighting, materials, bevels, and cameras are approximate, with perspective cameras rendered as parallel projections. Bottom bevels and 3-D text do not render; see [3-D effects](/docs/guides/3d-effects).
-- **Effects not drawn.** `a:effectDag`, group effects, text effects, and some fill overlays are not drawn. They stay in the file.
+- **Effects not drawn.** `a:effectDag`, text effects, some fill overlays, and a group's fill overlay and 3-D scene are not drawn. They stay in the file.
+- **Group effects.** A group's effects apply to everything the group draws as one picture, so its shadow is the silhouette of all its shapes together. A group's soft edge fades that picture, and the text of its shapes then paints once over it, unfaded, cut by any later opaque shape that covers it; a table's text fades with the picture. A group's inner shadow draws nothing; it stays in the file. The effects of a group inside two groups that draw effects, and of a group of more than 1,000 elements, do not draw; the approximation report lists them. Glow, soft edge, reflection, and blur on a group require `@pptx-editor.dev/pro` under the EigenPal Pro License, as on a shape.
 - **Fill overlay.** `a:fillOverlay` blends with the shape's own fill only. Over a semi-transparent fill, the result is opaque where the overlay is.
 - **Gradient colors.** Two-stop gradients favor the brighter value of each color channel. Gradients with three or more stops interpolate linearly in sRGB.
 - **Path gradient focus.** A circle path gradient draws as a focal radial gradient. A focus that is outside the circle or on it moves the circle out slightly.
@@ -137,30 +138,30 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Path fill modes.** The darken and lighten path fill modes use fixed factors to shift colors toward black or white. ECMA-376 does not specify these factors.
 - **Fill rotation.** Gradient and picture fills always turn with a rotated shape. `rotWithShape="0"` is ignored.
 - **Gradient text.** A gradient on text spans the bounds of the whole text body.
-- **Tiled pictures.** The tile size comes from the image's pixels and resolution, at 72 DPI when the image states none.
+- **Tiled pictures.** The tile size comes from the image's pixels and resolution, at 72 DPI when the image states none. A resolution stated in pixels per meter reads as whole DPI when it is within the rounding of a whole DPI. A slide draws at most 4,096 tile images; further tiles draw as a pattern.
 - **Picture shape fill.** A picture's own fill, behind the transparent areas of the image, is not drawn.
-- **Picture brightness and contrast.** `a:lum` adds brightness to each component, then scales around mid-gray by contrast. The specification gives no formula, so washed-out pictures can draw lighter than expected.
+- **Picture brightness and contrast.** `a:lum` scales each component around mid-gray by contrast, and adds half of the brightness before that scale and half after it. The specification gives no formula. Some settings are measured against reference PDFs; others remain unmeasured.
 - **Picture recolor.** Grayscale, duotone, and black and white take the luminance with Rec. 709 weights. The specification gives no weights.
-- **Dashes on picture borders.** A picture's border draws outside the picture. Dashes get butt caps, and round dots draw as squares.
+- **Dashes on picture borders.** A picture's border draws outside the picture, as the outline of the picture's shape grown by the line width. On a rectangle, the border is measured with its dashes, caps, and joins. On other shapes, the grown outline is the shape scaled to the border's outer size, and the dashes are unmeasured.
 - **EMF and WMF pictures.** These pictures render as PNG at 192 DPI, capped at 4096 pixels per side. Text uses loaded fonts or substitutes, which can change its appearance. A placeholder appears during conversion, and high zoom can reveal pixels.
 - **Inset lines.** `a:ln/@algn="in"` draws as a centered line. A picture's border always draws outside the picture.
 - **Hyperlink text.** Link text draws in the theme `hlink` color with a single underline, unless the run states otherwise.
 - **Dash complexity.** Outlines and table borders render solid when their estimated dash count exceeds 100,000. SVG and PDF use the same limit. Save preserves the original dash pattern.
+- **Dashes on closed curves.** On a closed path that ends at its first point, such as an ellipse, dashes with round or square caps start at the last chord of the last curve. The chord length is estimated from measured curves, so on other curves the dashes can sit slightly off along the outline.
 - **Compound lines.** Compound line widths are measured on closed paths and straight lines. Curved, counterclockwise, self-crossing, capped, and dashed paths remain approximate. Complex open thick-thin lines can render as equal-width double lines.
 - **Paths without a move.** A custom geometry path renders only if its first drawing command is `a:moveTo`. Later move commands do not repair an invalid start.
 - **Text in flipped shapes.** Glyphs are never mirrored. Under a net horizontal flip, text stays upright. Under a net vertical flip, it turns 180°.
 - **Content placeholders.** `pic`, `tbl`, and `chart` placeholders inherit the master's body placeholder and its text style. `clipArt`, `dgm`, and `media` placeholders inherit no master placeholder.
-- **Small caps.** Lowercase letters draw at 80 % of the size.
-- **Underline styles.** Underline styles other than `sng` and `dbl` draw as a single line. `a:uLn` is ignored.
+- **Underline styles.** Every underline type and the underline outline (`a:uLn`) draw with measured shapes. Reference PDFs place underline edges on whole points, and the editor does not, so dashed, dotted, and wavy underlines and outlines can differ by a fraction of a point. PDF export draws a gradient underline outline in its middle color.
 - **Missing glyphs.** Characters missing from the selected font use a loaded fallback font. If no font contains a character, layout estimates its width. The estimate can change spacing and line breaks.
 - **East Asian, complex-script, and symbol fonts.** Characters use their script font, with language settings controlling theme fonts and some shared characters. Missing glyphs use loaded fallback faces. Mixed fonts can shift baselines, and East Asian punctuation does not compress.
 - **Right-to-left text.** The editor uses Unicode bidirectional layout, with some punctuation and caret-boundary differences. Arabic letters join in the editor and PDF export when a suitable font is available. PDF export can load open fallback fonts with `fonts: googleFonts({ cjk: true })`. See [East Asian and complex-script text](/docs/guides/east-asian-text).
 - **Tab stops.** Right, center, and decimal tab stops in right-to-left text, or in text that does not wrap, are not measured.
 - **Anchoring and alignment variants.** `anchorCtr` is ignored, and justified or distributed vertical anchoring behaves as top anchoring. `justLow` and `thaiDist` use standard justification and distribution. These variants remain unmeasured.
 - **Upright East Asian text (`eaVert`).** East Asian characters render upright without vertical font metrics or alternate glyphs. Rotated Latin characters can sit 1 pt off their baseline.
-- **Stacked text (`wordArtVert`, `wordArtVertRtl`).** Stacked text places characters in square cells sized from the font. The text type controls whether columns progress left or right. Characters can sit up to 1.5 pt off across the line.
+- **Stacked text (`wordArtVert`, `wordArtVertRtl`).** Stacked text places characters in square cells sized from the font. The text type controls whether columns progress left or right. Characters can sit up to 1.8 pt off across the line.
 - **Other vertical text types.** `mongolianVert` uses rotated text with columns progressing from left to right. Mongolian vertical letter forms are not drawn. The editor cannot set this text type.
-- **Superscript and subscript.** Raised and lowered text is two thirds of the run size.
+- **Superscript and subscript.** The offset is a percentage of the run size. A subscript can sit up to 1.6 pt lower than in the reference PDFs.
 - **Bullets on aligned lines.** On a centered or right-aligned line, the bullet moves with the text.
 - **Numbering schemes.** All `a:buAutoNum` schemes render counters and punctuation, but reference measurements cover only selected schemes and values. Other schemes and larger values remain approximate. Unknown schemes use decimal numbering.
 - **Symbol font bullets.** A Wingdings, Webdings, or Symbol bullet draws with that font. When the font is not available, the editor draws a Unicode character that looks the same.
@@ -172,7 +173,7 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Inconsistent cell merges.** Merge markers outside a declared span render as normal cells. Spans stop at the table boundary or an earlier merged cell. These recovery rules are not measured against reference PDFs.
 - **Text warp.** Warped text loses ligatures, complex-script shaping, and synthetic bold or italic; the caret and selection follow flat text. Vertical, rotated, diagram, and very long text render flat. Other warps can differ in spacing and placement; see [Text warp](/docs/guides/text-warp).
 - **Diagram drawings.** Diagrams display their saved drawing instead of regenerating their layout from data. Resizing the frame does not recalculate the drawing. Missing drawings or drawings above complexity limits show placeholders; see [Diagrams](/docs/guides/diagrams).
-- **Equations.** Equation spacing, baselines, and line heights are approximate, especially around display fractions and increased line spacing. Unsupported constructs or equations above complexity limits use the text box fallback. See [Equations](/docs/guides/equations) for editing and font requirements.
+- **Equations.** Equation spacing, baselines, and line heights are approximate, especially around radicals and nested scripts. Scripts draw the regular glyph forms of the math font at the places of its script-style forms. Unsupported constructs or equations above complexity limits use the text box fallback. See [Equations](/docs/guides/equations) for editing and font requirements.
 
 ## Approximations after editing
 
@@ -199,17 +200,17 @@ Edits recalculate the slide layout and apply text autofit rules. The following o
 - **Shadow and glow blur.** Drawn as layers of growing outlines, not as a Gaussian blur.
 - **Opaque silhouettes.** Fill transparency does not lighten a shadow, and a picture's shadow takes the shape of its frame.
 - **Inner shadows.** The outer half of an outline is not shaded, and an unfilled shape gets no inner shadow.
-- **Soft edges.** Drawn hard.
-- **Blur.** `a:blur` is not drawn.
+- **Soft edges.** The fade follows the distance to the painted edge of the fill and outline, so corners are rounder than a blur. The fade follows the outer edge of the shape's paths together. A shape with more than 256 filled paths, or with more than 8,000 segments across two or more filled paths, gets a hard edge. A shape with many points gets fewer fade steps, or a hard edge when too few steps remain. The `effect.soft-edge-complex` diagnostic reports both cases.
+- **Blur.** `a:blur` fades the shape to half its opacity at the painted edge and, when the blur grows the shape, adds rings in the color of that edge outside it. Text and detail inside the shape stay sharp. A shape too complex for the fade gets a hard edge or fewer fade steps, as with soft edges, and the `effect.blur-complex` diagnostic reports it.
 - **Reflection blur.** A reflection is drawn with its fade, without its blur.
+- **Group effects.** A group's shadow and glow use an opaque silhouette of the shapes in the group: a table casts its box, and the shapes' own effects cast nothing. A group's soft edge fades the shapes' bodies through the lightest of their own soft edges, so the fade differs only where the edges of two shapes cross; their text paints over it unfaded, cut at the outline of a later shape with an opaque fill that covers it, and a table's text fades with them. Text paints over later pictures, tables, 3-D shapes, partly transparent shapes, and shapes that a nested group fades. The shapes' own shadows, glows, and reflections show only over the shapes. A group's blur applies to each shape in the group. The `effect.group-silhouette`, `effect.group-soft-edge`, `effect.group-soft-edge-effects`, `effect.group-text-order`, and `effect.group-body` diagnostics report them.
 - **Gradient lines.** Drawn in one color.
 - **Gradient stops.** At most 64 stops are drawn.
 - **Fills outside the box.** A rectangle path gradient or a picture fill paints the shape's box only.
-- **Tiled pictures.** Drawn stretched over the box.
-- **Picture color effects.** Grayscale, duotone, brightness and contrast, and black and white are not applied.
-- **Compound lines.** Dashed compound lines and compound table borders render as single lines. Compound bands requiring more than 16,384 points also render as single lines.
-- **SVG pictures.** The PNG fallback of the picture is drawn.
-- **Text.** Synthetic bold and italic do not render, upright vertical characters rotate, and missing glyphs disappear. Underline styles other than single and double render as single lines.
+- **Picture color effects on CMYK pictures.** Grayscale, duotone, brightness and contrast, and black and white are not applied to CMYK JPEG pictures.
+- **Compound lines.** Compound table borders render as single lines. Dashed compound lines, and lines whose bands need more than 16,384 points, cut their bands from the line with a mask.
+- **SVG pictures.** Simple SVG pictures, the ones the editor draws as vectors, export as vector paths. The export draws the PNG fallback for SVG pictures with color effects or tiles, and for SVG pictures with a nested `svg` element, a clip path of more than one shape, a clip path in `objectBoundingBox` units, more than 1,000 style rules, or a coordinate, transform, or line width outside ±10⁹. The `picture.svg-fallback` diagnostic reports each fallback.
+- **Text.** Synthetic bold and italic do not render, and missing glyphs disappear.
 - **Not drawn.** Text patterns, line patterns, picture-filled text, and text outlines do not render. Unsupported picture formats and frames without usable drawings, pictures, or grids do not render. Unsupported charts show placeholders; see [Charts](/docs/guides/charts).
 
 ## See also

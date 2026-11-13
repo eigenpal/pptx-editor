@@ -54,7 +54,15 @@ export interface ResolvedFace {
   /** True when the requested family was not available and a substitute answered. */
   readonly substituted: boolean;
   readonly metrics: FaceMetrics;
+  /**
+   * The face has a `MATH` table (OpenType math): math layout takes its script-style forms
+   * (`TextMeasurer.advances`, `mathScript`). Absent for other faces.
+   */
+  readonly hasMathTable?: true;
 }
+
+/** The script level of math text: 1 for scripts, 2 for scripts of scripts. */
+export type MathScriptLevel = 1 | 2;
 
 /** One shaped glyph, in em units with y up. */
 export interface ShapedGlyph {
@@ -81,7 +89,14 @@ export interface TextMeasurer {
   advances(
     face: ResolvedFace,
     text: string,
-    options?: { readonly kerning?: boolean }
+    options?: {
+      readonly kerning?: boolean;
+      /**
+       * The script level of math text (1 or 2): the face's script-style forms (the `ssty`
+       * feature of the math script) give the advances. A face without them keeps its forms.
+       */
+      readonly mathScript?: MathScriptLevel;
+    }
   ): Float64Array;
   /**
    * Another face that draws a character `face` lacks: the East Asian fallback faces first for

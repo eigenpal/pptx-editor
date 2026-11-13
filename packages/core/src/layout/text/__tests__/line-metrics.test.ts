@@ -14,6 +14,7 @@ import {
   lineHeightInPt,
   lineHeightPt,
   paragraphSpacingPt,
+  placeColumn,
   roundToWholePoint,
   singleLinePt,
   WHOLE_POINT_BASELINES,
@@ -184,6 +185,21 @@ describe('layout', () => {
       6
     );
     expect(firstOf(1).top).toBe(firstOf(0).top);
+  });
+
+  test('each column starts a whole number of points right of the first', () => {
+    const t = lay(
+      Array.from({ length: 60 }, (_, i) => para(`line ${i}`)).join(''),
+      '<a:bodyPr tIns="0" bIns="0" numCol="3" spcCol="274320"/>'
+    );
+    const startOf = (column: number): number =>
+      t.lines.find((l) => l.column === column)!.runs[0].x[0];
+    // Inner width 6000000 − 2 × 91440 EMU: a column is 138.28 pt and the gap 21.6 pt, so the
+    // exact steps are 159.88 and 319.76 pt.
+    expect((startOf(1) - startOf(0)) / EMU_PER_PT).toBe(160);
+    expect((startOf(2) - startOf(0)) / EMU_PER_PT).toBe(320);
+    expect(placeColumn(2, 1_756_160, 274_320)).toBe(320 * EMU_PER_PT);
+    expect(placeColumn(0, 1_756_160, 274_320)).toBe(0);
   });
 
   test('a bullet larger than the text does not make its line taller', () => {

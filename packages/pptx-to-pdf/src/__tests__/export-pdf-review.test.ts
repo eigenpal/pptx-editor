@@ -327,21 +327,55 @@ describe('pictures', () => {
 
   test('a picture border is drawn outside the picture', async () => {
     const ln = '<a:ln w="38100"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:ln>';
+    const ops = async (bytes: Uint8Array) => {
+      const result = await exportPdf(bytes, BEST);
+      const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
+      return (await pdf.getPage(1)).getOperatorList();
+    };
+    // A rectangle: the outline of the rectangle grown by the line width, unclipped.
+    const rect = await ops(pictureDeck(tinyPng(), '', '', ln));
+    expect(rect.fnArray).not.toContain(OPS.eoClip);
+    const rectWidths = rect.fnArray.flatMap((op, i) =>
+      op === OPS.setLineWidth ? [rect.argsArray[i][0] as number] : []
+    );
+    expect(rectWidths).toEqual([38_100]);
+    // An ellipse: an even-odd clip to the outside of the frame, then a stroke twice as wide.
+    const ellipse = await ops(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: picture('', '', ln).replace('prst="rect"', 'prst="ellipse"'),
+            rels: [['rIdImg', `${R}/image`, '../media/img.png']],
+          },
+        ],
+        media: [{ name: 'img.png', bytes: tinyPng(), contentType: 'image/png' }],
+      })
+    );
+    const clip = ellipse.fnArray.indexOf(OPS.eoClip);
+    expect(clip).toBeGreaterThan(-1);
+    const widths = ellipse.fnArray.flatMap((op, i) =>
+      op === OPS.setLineWidth && i > clip ? [ellipse.argsArray[i][0] as number] : []
+    );
+    // 3 pt in EMU, doubled; the page matrix maps EMU to points.
+    expect(widths.at(-1)).toBeCloseTo(76_200, 0);
+  });
+
+  test('a round-dotted picture border has round caps and starts one width in', async () => {
+    const ln =
+      '<a:ln w="38100" cap="rnd"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill>' +
+      '<a:prstDash val="sysDot"/></a:ln>';
     const result = await exportPdf(pictureDeck(tinyPng(), '', '', ln), BEST);
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
-    // An even-odd clip to the outside of the frame, then a stroke twice the line width.
-    const clip = fnArray.indexOf(OPS.eoClip);
-    expect(clip).toBeGreaterThan(-1);
-    const widths = fnArray.flatMap((op, i) =>
-      op === OPS.setLineWidth && i > clip ? [argsArray[i][0] as number] : []
-    );
-    expect(widths.length).toBe(1);
-    // 3 pt in EMU, doubled; the page matrix maps EMU to points.
-    expect(widths[0]).toBeCloseTo(76_200, 0);
+    const caps = fnArray.flatMap((op, i) => (op === OPS.setLineCap ? [argsArray[i][0]] : []));
+    expect(caps).toContain(1);
+    const dash = argsArray[fnArray.lastIndexOf(OPS.setDash)] as [number[], number];
+    expect(dash[0][1]).toBeCloseTo(76_200, 0);
+    expect(dash[1]).toBeCloseTo(38_100, 0);
   });
 
-  test('a picture cropped to a shape is clipped to it; effects are reported', async () => {
+  test('a picture cropped to a shape is clipped to it; its effects are drawn', async () => {
     const deck = buildPptx({
       slides: [
         {
@@ -353,7 +387,7 @@ describe('pictures', () => {
       media: [{ name: 'img.png', bytes: tinyPng(), contentType: 'image/png' }],
     });
     const result = await exportPdf(deck, BEST);
-    expect(result.diagnostics.map((d) => d.code)).toContain('picture.color-effects');
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('picture.color-effects');
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     const { fnArray } = await (await pdf.getPage(1)).getOperatorList();
     // A nonzero clip to the ellipse comes before the image.
@@ -393,7 +427,7 @@ describe('diagnostics placement', () => {
     expect(fill).toMatchObject({ slideIndex: 2, slideNumber: 3, pageIndex: 1, pageNumber: 2 });
   });
 
-  test('single and double underline and strikethrough pass strict; other underline styles are approximate', async () => {
+  test('every underline style and strikethrough passes strict', async () => {
     const deckOf = (runs: string): Uint8Array =>
       buildPptx({
         slides: [
@@ -412,9 +446,33 @@ describe('diagnostics placement', () => {
       )
     );
     expect(exact.diagnostics.filter((d) => d.severity !== 'information')).toEqual([]);
-    const wavy = await exportPdf(deckOf(run('Wavy', 'u="wavy"')), BEST);
-    expect(wavy.diagnostics.map((d) => [d.code, d.severity])).toContainEqual([
-      'text.underline-style',
+    const styles = await exportPdf(
+      deckOf(
+        run('Wavy', 'u="wavy"') +
+          run('Dashed', 'u="dashHeavy"') +
+          run('Words', 'u="words"') +
+          run(
+            'Outlined',
+            'u="dotDash"',
+            '<a:uLn w="12700"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:uLn>'
+          )
+      )
+    );
+    expect(styles.diagnostics.filter((d) => d.severity !== 'information')).toEqual([]);
+    // A gradient underline outline draws in its middle color, as other gradient lines do.
+    const gradient = await exportPdf(
+      deckOf(
+        run(
+          'Gradient',
+          'u="sng"',
+          '<a:uLn w="25400"><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="C00000"/></a:gs>' +
+            '<a:gs pos="100000"><a:srgbClr val="0070C0"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></a:uLn>'
+        )
+      ),
+      BEST
+    );
+    expect(gradient.diagnostics.map((d) => [d.code, d.severity])).toContainEqual([
+      'line.gradient',
       'approximation',
     ]);
   });
@@ -439,6 +497,74 @@ describe('diagnostics placement', () => {
     expect(missing.map((d) => [d.slideNumber, d.message])).toEqual([
       [1, 'A diagram is not drawn: it has no saved drawing.'],
     ]);
+  });
+
+  test('a subscript run reads as its own text item, below the baseline', async () => {
+    const bytes = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 6 * IN,
+            cy: IN,
+            text: para(
+              run('H', 'sz="1800"') +
+                run('2', 'sz="1800" baseline="-25000"') +
+                run('O', 'sz="1800"')
+            ),
+          }),
+        },
+      ],
+    });
+    const [page] = await pdfText(await exportPdf(bytes, BEST));
+    expect(page.map((i) => i.str)).toEqual(['H', '2', 'O']);
+    const [h, two, o] = page;
+    // pdf.js y is up: the subscript sits lower, and the runs around it share one baseline.
+    expect(two.transform[5]).toBeLessThan(h.transform[5] - 1);
+    expect(o.transform[5]).toBeCloseTo(h.transform[5], 3);
+    // The subscript is drawn at its smaller size, left to right after the H.
+    expect(two.transform[3]).toBeLessThan(h.transform[3]);
+    expect(two.transform[4]).toBeGreaterThan(h.transform[4]);
+    expect(o.transform[4]).toBeGreaterThan(two.transform[4]);
+  });
+
+  test('stacked vertical letters draw upright, one below the other', async () => {
+    const bytes = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: IN,
+            cy: 4 * IN,
+            bodyPr: '<a:bodyPr vert="wordArtVert" wrap="square"/>',
+            text: para(run('ABC', 'sz="2400"')),
+          }),
+        },
+      ],
+    });
+    const result = await exportPdf(bytes, BEST);
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('text.upright');
+    const [page] = await pdfText(result);
+    const letters = ['A', 'B', 'C'].map((c) => page.find((i) => i.str === c));
+    for (const item of letters) {
+      if (!item) throw new Error('letter not found');
+      // Upright: no turn in the text transform.
+      expect(item.transform[0]).toBeGreaterThan(0);
+      expect(Math.abs(item.transform[1])).toBeLessThan(0.01);
+      expect(Math.abs(item.transform[2])).toBeLessThan(0.01);
+      expect(item.transform[3]).toBeGreaterThan(0);
+    }
+    const [a, b, c] = letters as { transform: number[] }[];
+    // One column: the same center line, and each letter lower than the one before.
+    expect(b.transform[5]).toBeLessThan(a.transform[5]);
+    expect(c.transform[5]).toBeLessThan(b.transform[5]);
+    expect(Math.abs(b.transform[4] - a.transform[4])).toBeLessThan(5);
   });
 
   test('diagnostic codes are fixed strings, not file text', async () => {

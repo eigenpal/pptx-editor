@@ -79,7 +79,23 @@ export class Defs {
   }
 }
 
-/** Format a matrix for `transform`. */
+/** A linear coefficient of a matrix, to 1e-6: it scales coordinates of up to 10^8 EMU. */
+const coefficient = (v: number): string => {
+  if (!Number.isFinite(v)) return '0';
+  const r = Math.round(v * 1e6) / 1e6;
+  return Object.is(r, -0) ? '0' : String(r);
+};
+
+/**
+ * Format a matrix for `transform`: the linear part to 1e-6, the offset to 0.01. A coefficient
+ * rounded to 0.01 would move a point at 10^7 EMU by up to 50,000 EMU.
+ * @internal
+ */
 export function matrixAttr(m: readonly number[]): string {
-  return `matrix(${m.map(round).join(' ')})`;
+  return `matrix(${matrixParts(m).join(' ')})`;
+}
+
+/** The entries of a matrix as `matrixAttr` writes them. */
+export function matrixParts(m: readonly number[]): string[] {
+  return m.map((v, i) => (i < 4 ? coefficient(v) : round(v)));
 }

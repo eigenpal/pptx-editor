@@ -514,6 +514,40 @@ export function shape(o: {
   );
 }
 
+/**
+ * A `p:grpSp` around `children`: its box, its child space (`chOff`, `chExt`; the box when
+ * absent), and optional fill and effect XML in `p:grpSpPr`.
+ */
+export function group(
+  o: {
+    id: number;
+    name?: string;
+    x: number;
+    y: number;
+    cx: number;
+    cy: number;
+    chX?: number;
+    chY?: number;
+    chCx?: number;
+    chCy?: number;
+    rot?: number;
+    flipH?: boolean;
+    flipV?: boolean;
+    fill?: string;
+    effects?: string;
+  },
+  children: string
+): string {
+  const n = (v: number): number => Math.round(v);
+  const xfrmAttrs = `${o.rot ? ` rot="${n(o.rot)}"` : ''}${o.flipH ? ' flipH="1"' : ''}${o.flipV ? ' flipV="1"' : ''}`;
+  return (
+    `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${o.id}" name="${o.name ?? `Group ${o.id}`}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>` +
+    `<p:grpSpPr><a:xfrm${xfrmAttrs}><a:off x="${n(o.x)}" y="${n(o.y)}"/><a:ext cx="${n(o.cx)}" cy="${n(o.cy)}"/>` +
+    `<a:chOff x="${n(o.chX ?? o.x)}" y="${n(o.chY ?? o.y)}"/><a:chExt cx="${n(o.chCx ?? o.cx)}" cy="${n(o.chCy ?? o.cy)}"/></a:xfrm>` +
+    `${o.fill ?? ''}${o.effects ?? ''}</p:grpSpPr>${children}</p:grpSp>`
+  );
+}
+
 /** One run: `a:rPr` attributes and children, then the text. */
 export function run(text: string, attrs = '', children = ''): string {
   return `<a:r><a:rPr lang="en-US" dirty="0"${attrs ? ` ${attrs}` : ''}>${children}</a:rPr><a:t>${escapeText(text)}</a:t></a:r>`;

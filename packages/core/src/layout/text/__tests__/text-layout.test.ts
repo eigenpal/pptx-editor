@@ -349,3 +349,51 @@ describe('large explicit tab lists', () => {
     expect(lay(body(stops))).toEqual(lay(body(canonical)));
   });
 });
+
+describe('the line of an equation', () => {
+  const A14 = 'http://schemas.microsoft.com/office/drawing/2010/main';
+  const M = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
+  const mr = (t: string): string => `<m:r><a:rPr lang="en-US" sz="1800"/><m:t>${t}</m:t></m:r>`;
+  const fraction =
+    `<a14:m xmlns:a14="${A14}"><m:oMathPara xmlns:m="${M}"><m:oMath>` +
+    `<m:f><m:num>${mr('a')}</m:num><m:den>${mr('b')}</m:den></m:f>` +
+    '</m:oMath></m:oMathPara></a14:m>';
+  const spaced = (lnSpc: string): TextLayout =>
+    lay(`<a:p><a:pPr><a:lnSpc>${lnSpc}</a:lnSpc></a:pPr>${fraction}${end()}</a:p>`);
+  const pct = (v: number) => spaced(`<a:spcPct val="${v * 1000}"/>`).lines[0];
+
+  test('percent spacing scales the line that the band and the equation claim together', () => {
+    const single = pct(100);
+    // A display fraction claims more than the 1.2 × size band of its size.
+    expect(single.height).toBeGreaterThan(1.2 * 18 * 12_700);
+    for (const v of [80, 90, 150, 200])
+      expect(pct(v).height / single.height).toBeCloseTo(v / 100, 6);
+  });
+
+  test('the extra space of a taller line goes 75 % above the baseline', () => {
+    const [single, double] = [pct(100), pct(200)];
+    const above = (l: typeof single) => l.baseline - l.top;
+    // Baselines round to whole points.
+    expect(Math.abs(above(double) - above(single) - 0.75 * single.height)).toBeLessThan(12_700);
+  });
+
+  test('exact spacing sets the line height, also below the equation height', () => {
+    expect(spaced('<a:spcPts val="1200"/>').lines[0].height).toBe(12 * 12_700);
+  });
+});
+
+describe('small caps and scripts', () => {
+  const sizes = (attrs: string): number[] =>
+    lay(
+      `<a:p><a:r><a:rPr lang="en-US" sz="1800" ${attrs}/><a:t>Hx</a:t></a:r></a:p>`
+    ).lines[0].runs.map((run) => run.sizePt);
+
+  test('small caps draw lowercase letters as capitals at 0.8 of the size', () => {
+    expect(sizes('cap="small"')).toEqual([18, 18 * 0.8]);
+  });
+
+  test('a script draws at two thirds of the size, and its small caps keep that size', () => {
+    expect(sizes('baseline="30000"')).toEqual([12]);
+    expect(sizes('baseline="-25000" cap="small"')).toEqual([12, 12]);
+  });
+});

@@ -29,6 +29,10 @@
 //   are the first column of `tables/2` (the table style's major face, bold italic), which the
 //   PDF puts one grid step above the other cells of its row; the rounding moves them from
 //   0.04 pt to 0.36 pt off.
+// - Each column starts a whole number of points right of the first column (`placeColumn`), as
+//   each baseline sits a whole number of points below its column top. ECMA-376 does not say
+//   this; the reference PDF of `text-direction` shows it for three columns with a gap and two
+//   columns without one: the column starts are then within 0.01 pt of the PDF glyph origins.
 // - Diagram text (`dsp:txBody`, ECMA-376 Part 1, 21.4) has another single line: the face's
 //   ascent plus descent (the values above), not 1.2 × the size. Percent spacing and the baseline
 //   rules above then take that line (`LineBasis`). Measured on 6 November 2026 on the reference
@@ -179,6 +183,20 @@ export function placeBaseline(emu: number): number {
 }
 
 /**
+ * The left edge of column `column` (0-based), in EMU from the left edge of the first column:
+ * `column` times the column width plus the gap (`spcCol`), rounded to a whole point, as
+ * baselines round from the column top (`placeBaseline`). ECMA-376 Part 1, 21.1.2.1.1 (bodyPr)
+ * gives the gap but no grid. Reference PDF of `text-direction`: the columns of a 6 in box start
+ * 146 and 293 pt (three columns, 0.3 in gap) and 209 pt (two columns, no gap) right of the
+ * first column, where the exact steps are 146.4, 292.8, and 208.8 pt.
+ * @internal
+ */
+export function placeColumn(column: number, columnWidth: number, gap: number): number {
+  const emu = column * (columnWidth + gap);
+  return WHOLE_POINT_BASELINES ? roundToWholePoint(emu) : emu;
+}
+
+/**
  * Paragraph spacing (`spcBef`/`spcAft`) in points. Points round to a whole point, as exact line
  * spacing does. Percent is of 1.2 × the first run size and does not round.
  */
@@ -190,8 +208,17 @@ export function paragraphSpacingPt(
   return spacing.pct * SINGLE_LINE_FACTOR * sizePt;
 }
 
-/** Small caps render lowercase letters at this fraction of the size. */
+/**
+ * Small caps (`cap="small"`) draw lowercase letters as capitals at this fraction of the run
+ * size. Measured on glyph advances in reference PDFs at 9 to 41 pt: the capitals advance by
+ * 0.8 of the size, within 0.01. In a superscript or subscript, the capitals keep the script size
+ * (`caps-scripts`).
+ */
 export const SMALL_CAPS_SCALE = 0.8;
 
-/** Superscript/subscript (`baseline` ≠ 0) shrink runs to this fraction (measured). */
+/**
+ * A superscript or subscript (`baseline` ≠ 0) draws at this fraction of the run size, whatever
+ * its offset. Measured on glyph advances in reference PDFs at 9 to 41 pt, and at offsets from
+ * -50 % to 80 % (`caps-scripts`): two thirds of the size, within 0.01.
+ */
 export const SCRIPT_SIZE_SCALE = 2 / 3;

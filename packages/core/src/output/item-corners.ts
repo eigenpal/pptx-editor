@@ -54,16 +54,94 @@ export function boxCorners(item: BoxItem): { x: number; y: number }[] {
   ];
 }
 
+/**
+ * The slide-space corners of a shape's text frame, grown to text that overflows it. Empty for a
+ * picture or a shape with no characters.
+ */
+export function textCorners(item: BoxItem): { x: number; y: number }[] {
+  if (item.kind !== 'shape' || !item.text || !item.textMatrix || !hasCharacters(item.text))
+    return [];
+  const b = item.text.box;
+  const h = Math.max(b.height, item.text.contentHeight);
+  const frame: Matrix = [1, 0, 0, 1, b.x, b.y];
+  // Rotated text can extend either way: take the box as a square of its larger side.
+  const side = item.text.rotation % 180 !== 0 ? Math.max(b.width, h) : 0;
+  return cornersUnder(multiplyMatrix(item.textMatrix, frame), side || b.width, side || h);
+}
+
 /** Slide-space corners of a shape's box, its outline, and its text frame (text can overflow the box). */
 export function contentCorners(item: BoxItem): { x: number; y: number }[] {
-  const out = boxCorners(item);
-  if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
-    const b = item.text.box;
-    const h = Math.max(b.height, item.text.contentHeight);
-    const frame: Matrix = [1, 0, 0, 1, b.x, b.y];
-    // Rotated text can extend either way: take the box as a square of its larger side.
-    const side = item.text.rotation % 180 !== 0 ? Math.max(b.width, h) : 0;
-    out.push(...cornersUnder(multiplyMatrix(item.textMatrix, frame), side || b.width, side || h));
+  return [...boxCorners(item), ...textCorners(item)];
+}
+
+/**
+ * How far an item's own copies (shadows, glow, reflection) can paint past its content, in slide
+ * space, for content whose larger side is `side`. A scaled shadow or a reflection can move a
+ * copy of the whole content, so they reach past it by its side.
+ */
+function effectReach(item: LayoutItem, side: number): number {
+  const fx = item.element.kind === 'graphicFrame' ? undefined : item.element.effects;
+  if (!fx) return 0;
+  let reach = 0;
+  for (const s of [fx.outerShadow, fx.secondShadow]) {
+    if (!s) continue;
+    const scale = Math.max(Math.abs(s.sx), Math.abs(s.sy), 1);
+    const skew = Math.abs(s.kx) > 0 || Math.abs(s.ky) > 0 ? side : 0;
+    reach = Math.max(reach, s.dist + s.blur + side * (scale - 1) + skew);
   }
+  if (fx.glow) reach = Math.max(reach, fx.glow.radius);
+  if (fx.reflection) reach = Math.max(reach, fx.reflection.dist + fx.reflection.blur + side);
+  if (fx.blur?.grow) reach = Math.max(reach, fx.blur.radius);
+  return reach;
+}
+
+/**
+ * The slide-space corners of a group's box and of everything its children paint, their own
+ * effects included. The group's own effects copy and filter this content.
+ */
+export function groupContentCorners(
+  group: Extract<LayoutItem, { kind: 'group' }>
+): { x: number; y: number }[] {
+  const out = cornersUnder(group.matrix, group.element.xfrm.cx, group.element.xfrm.cy);
+  for (const child of group.children) out.push(...itemCorners(child));
   return out;
+}
+
+/**
+ * The slide-space corners of everything an item paints: a shape's or picture's content, a
+ * frame's box, table, picture, diagram, or chart, and the children of a group. An item's own
+ * shadows, glow, and reflection widen its corners, so the effects of a group that holds it copy
+ * them whole.
+ */
+export function itemCorners(item: LayoutItem): { x: number; y: number }[] {
+  let out: { x: number; y: number }[];
+  switch (item.kind) {
+    case 'shape':
+    case 'picture':
+      out = contentCorners(item);
+      break;
+    case 'group':
+      out = groupContentCorners(item);
+      break;
+    case 'frame': {
+      const { cx, cy } = item.element.xfrm;
+      // A table's rows grow with their text, past the frame's box.
+      const w = Math.max(cx, item.table?.width ?? 0);
+      const h = Math.max(cy, item.table?.height ?? 0);
+      out = cornersUnder(item.matrix, w, h);
+      if (item.poster) out.push(...itemCorners(item.poster));
+      for (const child of item.drawing ?? item.chart ?? []) out.push(...itemCorners(child));
+      break;
+    }
+  }
+  const b = boundsOf(out);
+  const reach = effectReach(item, Math.max(b.r - b.x, b.b - b.y));
+  if (!(reach > 0)) return out;
+  const g = grow(b, reach);
+  return [
+    { x: g.x, y: g.y },
+    { x: g.r, y: g.y },
+    { x: g.r, y: g.b },
+    { x: g.x, y: g.b },
+  ];
 }

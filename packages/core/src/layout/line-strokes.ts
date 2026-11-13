@@ -19,6 +19,19 @@
 //   gap one width longer, so the caps keep the rhythm. With square caps, a preset dash keeps its
 //   flat length, and only the ends of the line get the half-width square cap: the start, and the
 //   end when it falls in a dash. A custom dash with square caps gets a cap on every dash.
+// - On a closed path, a preset dash with round or square caps starts at the closing segment
+//   (from the last point back to the first), and a round-capped pattern starts one width into
+//   its last gap. A flat-capped pattern starts at the first point. Measured at 3 pt and 9 pt on
+//   rectangles (`picture-adjustments`, as shapes and as picture borders) and on rounded
+//   rectangles, stars, triangles, hexagons, and a custom path of lines and a curve
+//   (`closed-dashes`). A path that ends at its first point, such as an ellipse, has no closing
+//   segment: its pattern starts at the start of the last chord of its last segment, where a
+//   curve is cut into a power of two of equal parameter steps (`CHORD_STEPS_PER_POINT`). The
+//   chord count is fitted to circles of 0.8, 1.7, and 3 in and a 3 × 1.2 in ellipse
+//   (`closed-dashes`), so it is an estimate (approximation `closed-curve-dashes`).
+// - A picture's border lies outside the picture: it is the outline of the geometry grown by
+//   the line width, half a width on each side, with the dashes, caps, and joins of a shape's
+//   outline. Measured on rectangles (`picture-adjustments`).
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import type { LineEnd, ResolvedLine } from '../cascade/index.ts';
@@ -99,19 +112,6 @@ export function strokeCap(line: ResolvedLine): 'butt' | 'round' | 'square' {
   return 'butt';
 }
 
-/**
- * The dash array of a picture's border, which lies outside the picture: a stroke twice as wide,
- * of which only the outer half shows. A round or square cap of the wider stroke would reach
- * twice as far along the path, so its dashes get butt caps, and each dash grows by the caps of
- * a centered line. Undefined for a solid border.
- * @internal
- */
-export function outsideDashArray(line: ResolvedLine, width: number): number[] | undefined {
-  const dashes = dashArray(line, width);
-  if (!dashes || strokeCap(line) === 'butt') return dashes;
-  return dashes.map((v, i) => Math.max(0, v + (i % 2 === 0 ? width : -width)));
-}
-
 /** A line end's length and width in units (`sm`, `med`, `lg`). */
 const END_SIZE = { sm: 2, med: 3, lg: 5 } as const;
 /** How far an open arrow's arms reach back along the line, in units (`len`). */
@@ -184,6 +184,8 @@ export interface StrokePlan {
   readonly ends: readonly LineEndShape[];
   /** Short solid paths to stroke with butt caps: the square caps of a dashed line. */
   readonly caps: readonly (readonly PathCommand[])[];
+  /** How far into its dash pattern the stroke starts (SVG `stroke-dashoffset`, PDF dash phase). */
+  readonly dashPhase?: number;
 }
 
 /**
@@ -511,7 +513,8 @@ export function planStroke(
   const head = drawsEnd(line.head) ? line.head : undefined;
   const tail = drawsEnd(line.tail) ? line.tail : undefined;
   const plain = { commands, ends: [], caps: [] };
-  if (!isOpenPath(commands) || (!head && !tail && !capsAtEndsOnly(line))) return plain;
+  if (!isOpenPath(commands)) return closedDashStart(commands, line, scale) ?? plain;
+  if (!head && !tail && !capsAtEndsOnly(line)) return plain;
   const width = strokeWidth(line, scale);
   const unit = lineEndUnit(line, scale);
   // A lone move draws nothing, so the ends go on the first and last subpaths that draw.
@@ -555,4 +558,209 @@ export function planStroke(
     }
   }
   return { commands: changed ? commandsOf(parts) : commands, ends, caps };
+}
+
+/**
+ * Where the dashes of a closed path start: a preset dash with round or square caps starts at
+ * each closed subpath's closing segment, and a round-capped one a width later. Undefined when
+ * the dashes start at the first point with no phase: a solid line, flat caps, or a custom dash.
+ */
+function closedDashStart(
+  commands: readonly PathCommand[],
+  line: ResolvedLine,
+  scale: number
+): StrokePlan | undefined {
+  if (!startsAtClosingSegment(line)) return undefined;
+  const width = strokeWidth(line, scale);
+  const pattern = dashArray(line, width);
+  if (!pattern) return undefined;
+  const period = pattern.reduce((sum, v) => sum + v, 0);
+  // Round caps: the pattern starts one width before its end, so the first dash begins one
+  // width after the start. `dashArray` keeps each round dash a width shorter.
+  const phase = line.cap === 'rnd' ? (((period - width) % period) + period) % period : 0;
+  const out: PathCommand[] = [];
+  let changed = false;
+  for (const part of subpathCommands(commands)) {
+    const first = part[0];
+    const last = part[part.length - 2];
+    const closed =
+      part[part.length - 1]?.op === 'Z' &&
+      first?.op === 'M' &&
+      last &&
+      last.op !== 'M' &&
+      last.op !== 'Z';
+    if (closed && !samePoint(last, first)) {
+      // Start at the last point, draw the closing segment, then the path as it was.
+      out.push({ op: 'M', x: last.x, y: last.y }, { op: 'L', x: first.x, y: first.y });
+      for (let i = 1; i < part.length; i += 1) out.push(part[i]!);
+      changed = true;
+      continue;
+    }
+    const before = part[part.length - 3];
+    if (closed && before && before.op !== 'Z' && part.length > 3) {
+      // Start at the last chord of the last segment: its tail, the path, then its head.
+      const [head, tail] = splitLast({ x: before.x, y: before.y }, last, scale);
+      out.push({ op: 'M', x: tail.from.x, y: tail.from.y }, tail.command);
+      for (let i = 1; i < part.length - 2; i += 1) out.push(part[i]!);
+      out.push(head, { op: 'Z' });
+      changed = true;
+      continue;
+    }
+    for (const c of part) out.push(c);
+  }
+  if (!changed && phase === 0) return undefined;
+  return {
+    commands: changed ? out : commands,
+    ends: [],
+    caps: [],
+    ...(phase > 0 ? { dashPhase: phase } : {}),
+  };
+}
+
+/**
+ * How finely the chords of a curve fall, for where dashes start: a curve is cut into n equal
+ * parameter steps, n the smallest power of two with n² ≥ this × M, where M is the largest
+ * second difference of its control points in points. Fitted to the circles and the ellipse of
+ * the `closed-dashes` fixture, whose quarter arcs take 16 or 32 steps.
+ */
+const CHORD_STEPS_PER_POINT = 14;
+
+/** The most steps a curve is cut into. */
+const MAX_CHORD_STEPS = 1024;
+
+/**
+ * Cut the last segment of a closed path, from `from`, before its last chord: the head (a
+ * command from `from`) and the tail (its start and command). A line is all one chord.
+ */
+function splitLast(
+  from: Pt,
+  last: PathCommand,
+  scale: number
+): [PathCommand, { from: Pt; command: PathCommand }] {
+  if (last.op !== 'C' && last.op !== 'Q')
+    return [
+      { op: 'L', x: from.x, y: from.y },
+      { from, command: last },
+    ];
+  const to = { x: last.x, y: last.y };
+  const pts: Pt[] =
+    last.op === 'Q'
+      ? [from, { x: last.x1, y: last.y1 }, to]
+      : [from, { x: last.x1, y: last.y1 }, { x: last.x2, y: last.y2 }, to];
+  let m = 0;
+  for (let i = 0; i + 2 < pts.length; i += 1)
+    m = Math.max(m, len(sub(sub(pts[i]!, pts[i + 1]!), sub(pts[i + 1]!, pts[i + 2]!))));
+  const need = (CHORD_STEPS_PER_POINT * m * (scale || 1)) / 12_700;
+  let n = 1;
+  while (n * n < need && n < MAX_CHORD_STEPS) n *= 2;
+  const t = 1 - 1 / n;
+  // de Casteljau at t: the head keeps the first points of each level, the tail the last.
+  const levels: Pt[][] = [pts];
+  while (levels[levels.length - 1]!.length > 1) {
+    const prev = levels[levels.length - 1]!;
+    levels.push(prev.slice(1).map((q, i) => lerp(prev[i]!, q, t)));
+  }
+  const head = levels.map((l) => l[0]!);
+  const tail = levels.map((l) => l[l.length - 1]!).reverse();
+  const cmd = (q: Pt[]): PathCommand =>
+    q.length === 3
+      ? { op: 'Q', x1: q[1]!.x, y1: q[1]!.y, x: q[2]!.x, y: q[2]!.y }
+      : { op: 'C', x1: q[1]!.x, y1: q[1]!.y, x2: q[2]!.x, y2: q[2]!.y, x: q[3]!.x, y: q[3]!.y };
+  return [cmd(head), { from: tail[0]!, command: cmd(tail) }];
+}
+
+/** Whether two path points are the same within one EMU, past the rounding of evaluated arcs. */
+function samePoint(a: Pt, b: Pt): boolean {
+  return Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
+}
+
+/** Whether the dashes of an outline start at a closed path's closing segment (`planStroke`). */
+function startsAtClosingSegment(line: ResolvedLine): boolean {
+  return (
+    line.dash !== 'custom' && (line.cap === 'rnd' || line.cap === 'sq') && !!dashMultiples(line)
+  );
+}
+
+/**
+ * Whether an outline of `line` on `commands` has dashes whose start is estimated: a preset dash
+ * with round or square caps on a closed subpath that ends at its first point, such as an
+ * ellipse, starts at a chord whose length `CHORD_STEPS_PER_POINT` estimates (approximation
+ * `closed-curve-dashes`).
+ * @internal
+ */
+export function unmeasuredDashStart(commands: readonly PathCommand[], line: ResolvedLine): boolean {
+  if (!startsAtClosingSegment(line)) return false;
+  return subpathCommands(commands).some((part) => {
+    const first = part[0];
+    const last = part[part.length - 2];
+    return (
+      part[part.length - 1]?.op === 'Z' &&
+      first?.op === 'M' &&
+      !!last &&
+      last.op !== 'M' &&
+      last.op !== 'Z' &&
+      samePoint(last, first)
+    );
+  });
+}
+
+/** The commands of each subpath, from its move up to and including its close. */
+function subpathCommands(commands: readonly PathCommand[]): PathCommand[][] {
+  const parts: PathCommand[][] = [];
+  let current: PathCommand[] | undefined;
+  for (const c of commands) {
+    if (c.op === 'M' || !current) {
+      current = [];
+      parts.push(current);
+    }
+    current.push(c);
+    if (c.op === 'Z') current = undefined;
+  }
+  return parts;
+}
+
+/**
+ * How a picture's border draws. The border lies outside the picture.
+ * - `grown`: each path grown by the line width, scaled about the box's center, and stroked as a
+ *   shape's outline (`planStroke`). On a rectangle this is exact, as reference PDFs show, and
+ *   needs no clip. On other geometries, `clip` is true: a clip hides any part over the picture.
+ * - `doubled`: a solid border on a geometry other than a rectangle. Each path is stroked twice
+ *   as wide, and a clip hides the inner half, so the border follows the exact outline.
+ * @internal
+ */
+export type PictureBorder =
+  | { readonly kind: 'grown'; readonly paths: readonly StrokePlan[]; readonly clip: boolean }
+  | { readonly kind: 'doubled'; readonly paths: readonly (readonly PathCommand[])[] };
+
+/**
+ * The border of a picture with the `w` × `h` box, the geometry `paths`, and the outline `line`,
+ * in a group that scales by `scale`. `rect` is true for a rectangle (`a:prstGeom prst="rect"`).
+ * @internal
+ */
+export function pictureBorder(
+  paths: readonly (readonly PathCommand[])[],
+  rect: boolean,
+  line: ResolvedLine,
+  w: number,
+  h: number,
+  scale = 1
+): PictureBorder {
+  const width = strokeWidth(line, scale);
+  if ((!rect && !dashArray(line, width)) || !(w > 0) || !(h > 0)) return { kind: 'doubled', paths };
+  const sx = (w + width) / w;
+  const sy = (h + width) / h;
+  const x = (v: number): number => w / 2 + (v - w / 2) * sx;
+  const y = (v: number): number => h / 2 + (v - h / 2) * sy;
+  const grow = (c: PathCommand): PathCommand => {
+    if (c.op === 'M' || c.op === 'L') return { op: c.op, x: x(c.x), y: y(c.y) };
+    if (c.op === 'Q') return { op: 'Q', x1: x(c.x1), y1: y(c.y1), x: x(c.x), y: y(c.y) };
+    if (c.op === 'C')
+      return { op: 'C', x1: x(c.x1), y1: y(c.y1), x2: x(c.x2), y2: y(c.y2), x: x(c.x), y: y(c.y) };
+    return c;
+  };
+  return {
+    kind: 'grown',
+    paths: paths.map((commands) => planStroke(commands.map(grow), line, scale)),
+    clip: !rect,
+  };
 }

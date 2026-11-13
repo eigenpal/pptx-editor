@@ -14,11 +14,9 @@ import {
   ARROW_MITER_LIMIT,
   drawingRenderers,
   hasCharacters,
-  outsideDashArray,
+  pictureBorder,
   planStroke,
-  strokeWidth,
   type GeometryPath,
-  type PathCommand,
   type StrokePlan,
   type LayoutItem,
   type Matrix,
@@ -28,10 +26,13 @@ import {
   effectDefs,
   effectElement,
   facetElements,
+  groupPaintsEffects,
+  ownText,
+  paintGroupEffects,
   shadowCopy,
   type EffectSource,
 } from './paint-effects.ts';
-import { threeDColor } from './painter-math.ts';
+import { threeDColor, threeDFaceItem } from './painter-math.ts';
 import { boundsOf, PX } from './effect-transforms.ts';
 import { boxCorners, contentCorners } from './item-corners.ts';
 import {
@@ -41,6 +42,9 @@ import {
   pictureUrl,
   slideSpaceFill,
   strokeAttrs,
+  pathBounds,
+  tileArea,
+  tiledPictureContent,
   type ImageSizePort,
   type FillContext,
   type ImageUrlPort,
@@ -50,8 +54,11 @@ import {
 import { compoundStroke } from './compound-lines.ts';
 import { paintTable } from './paint-table.ts';
 import { paintText, type Shows } from './paint-text.ts';
-import { MAX_SHAPE_BANDS } from './paint-gradient.ts';
+import { paintBudgets } from './paint-budgets.ts';
 import { Defs, matrixAttr, num, svg, SVG_NS } from './svg.ts';
+import { commandData, mapCommands, pathData } from './path-data.ts';
+
+export { pathData } from './path-data.ts';
 
 /** Paint options. */
 export interface PaintOptions {
@@ -134,52 +141,15 @@ function pictureAria(
   return name ? { role: 'img', 'aria-label': name } : { 'aria-hidden': 'true' };
 }
 
-/** Path data for an evaluated path in local EMU. */
-export function pathData(path: GeometryPath): string {
-  let d = '';
-  for (const c of path.commands) {
-    switch (c.op) {
-      case 'M':
-      case 'L':
-        d += `${c.op}${num(c.x)} ${num(c.y)}`;
-        break;
-      case 'C':
-        d += `C${num(c.x1)} ${num(c.y1)} ${num(c.x2)} ${num(c.y2)} ${num(c.x)} ${num(c.y)}`;
-        break;
-      case 'Q':
-        d += `Q${num(c.x1)} ${num(c.y1)} ${num(c.x)} ${num(c.y)}`;
-        break;
-      case 'Z':
-        d += 'Z';
-        break;
-    }
-  }
-  return d;
-}
-
 /** The uniform scale a matrix applies (for line widths inside scaled groups). */
 function matrixScale(m: Matrix): number {
   return Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
 }
 
 /**
- * The most paths of one shape that draw a `path="shape"` gradient (fill or overlay) as outline
- * bands; a shape with more paths uses the rectangle construction, so a file cannot multiply the
- * bands.
- */
-const MAX_BANDED_PATHS = 16;
-/** The most path commands of one shape that draw outline bands: bands repeat every command. */
-const MAX_BANDED_COMMANDS = 2000;
-/**
- * The band work (path commands × `MAX_SHAPE_BANDS`) one slide may spend. Later shapes use the
- * rectangle construction, so many shapes cannot multiply the bands either.
- */
-const MAX_SLIDE_BAND_WORK = 512_000;
-/** The band work left on each slide, by its `Defs`. */
-const bandWork = new WeakMap<Defs, { left: number }>();
-/**
  * The most paths of one shape that draw a fill overlay. Each overlay is an isolated group (an
  * offscreen layer); a shape with more paths draws no overlay, and the report says so.
+ * @internal `pptx-to-pdf` applies the same limit.
  */
 export const MAX_OVERLAY_PATHS = 64;
 
@@ -213,12 +183,7 @@ function shapePaints(
   // Decided at the first shape gradient, so only shapes that band spend the slide's budget.
   const bands = (): boolean => {
     if (banded === undefined) {
-      let budget = bandWork.get(ctx.defs);
-      if (!budget) bandWork.set(ctx.defs, (budget = { left: MAX_SLIDE_BAND_WORK }));
-      const cost = commands * MAX_SHAPE_BANDS;
-      banded =
-        paths.length <= MAX_BANDED_PATHS && commands <= MAX_BANDED_COMMANDS && cost <= budget.left;
-      if (banded) budget.left -= cost;
+      banded = paintBudgets(ctx.defs).bands.allow(paths.length, commands);
     }
     return banded;
   };
@@ -273,26 +238,7 @@ function geometryMask(
   w: number,
   h: number
 ): string {
-  let x0 = 0;
-  let y0 = 0;
-  let x1 = w;
-  let y1 = h;
-  for (const p of paths)
-    for (const c of p.commands) {
-      if (c.op === 'Z') continue;
-      const pts =
-        c.op === 'C'
-          ? [c.x1, c.y1, c.x2, c.y2, c.x, c.y]
-          : c.op === 'Q'
-            ? [c.x1, c.y1, c.x, c.y]
-            : [c.x, c.y];
-      for (let i = 0; i < pts.length; i += 2) {
-        x0 = Math.min(x0, pts[i]);
-        x1 = Math.max(x1, pts[i]);
-        y0 = Math.min(y0, pts[i + 1]);
-        y1 = Math.max(y1, pts[i + 1]);
-      }
-    }
+  const { x0, y0, x1, y1 } = pathBounds(paths, w, h);
   const id = defs.id('clip');
   defs.add(
     svg(
@@ -313,64 +259,117 @@ function geometryMask(
 }
 
 /**
- * A picture's outline. It lies outside the picture, not centered on its edge,
- * as reference PDFs show. So the stroke is twice as wide, and a mask hides the half inside the
- * geometry. Its dashes come from `outsideDashArray`, as in the PDF export: the dash period of a
- * centered line stays, and round dots draw as squares. Dashes outside a picture are not checked
- * against a reference PDF (approximation `picture-border-dots`).
+ * Picture content kept inside one filled path: the box of a rectangle as a nested viewport, which
+ * a printed page clips with a path, and any other path with a mask (`geometryMask`).
  */
-function outsideOutline(
+function keepInside(
   doc: Document,
   ctx: PaintContext,
+  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
+  path: GeometryPath,
   d: string,
-  stroke: Record<string, string | number | undefined>,
-  line: ResolvedLine,
-  groupScale: number,
-  w: number,
-  h: number
+  content: SVGElement
 ): SVGElement {
-  const width = Number(stroke['stroke-width']) || 0;
-  const pad = width * 2 + Math.max(w, h);
-  const id = ctx.defs.id('outside');
-  ctx.defs.add(
-    svg(
-      doc,
-      'mask',
-      {
-        id,
-        maskUnits: 'userSpaceOnUse',
-        x: -pad,
-        y: -pad,
-        width: w + 2 * pad,
-        height: h + 2 * pad,
-      },
-      [
-        svg(doc, 'rect', {
-          x: -pad,
-          y: -pad,
-          width: w + 2 * pad,
-          height: h + 2 * pad,
-          fill: '#fff',
-        }),
-        svg(doc, 'path', { d, fill: '#000' }),
-      ]
-    )
-  );
-  const dashes = outsideDashArray(line, strokeWidth(line, groupScale));
-  return svg(doc, 'path', {
-    d,
-    fill: 'none',
-    ...stroke,
-    'stroke-width': num(width * 2),
-    ...(dashes ? { 'stroke-linecap': 'butt', 'stroke-dasharray': dashes.map(num).join(' ') } : {}),
-    mask: `url(#${id})`,
+  const { geometry, xfrm } = item.element;
+  const box =
+    geometry.kind === 'preset' && geometry.preset === 'rect' && item.geometry.paths.length === 1;
+  return box
+    ? svg(doc, 'svg', { width: num(xfrm.cx), height: num(xfrm.cy), overflow: 'hidden' }, [content])
+    : svg(doc, 'g', { mask: geometryMask(ctx.defs, [path], d, xfrm.cx, xfrm.cy) }, [content]);
+}
+
+/**
+ * The slide background: one rectangle, or the images of a tiled picture (`tiledPictureContent`)
+ * in the slide's viewport. Both carry `data-kind="background"`.
+ */
+export function paintBackground(
+  doc: Document,
+  fill: ResolvedFill,
+  width: number,
+  height: number,
+  ctx: PaintContext
+): SVGElement {
+  const content = tiledPictureContent(fill, width, height, ctx);
+  if (content)
+    return svg(doc, 'svg', { width, height, overflow: 'hidden', 'data-kind': 'background' }, [
+      content,
+    ]);
+  const bg = fillPaint(fill, width, height, ctx);
+  return svg(doc, 'rect', {
+    width,
+    height,
+    fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
+    'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
+    'data-kind': 'background',
   });
 }
 
 /**
- * The context with the matrix of a shape's box to the slide, for pattern tiles that sit on the
- * slide's grid, square to the slide.
+ * A picture's outline. It lies outside the picture, as reference PDFs show: the outline of the
+ * geometry grown by the line width, with a shape's dashes, caps, and joins, as in the PDF export
+ * (`layout/line-strokes.ts`, `pictureBorder`). A solid border on a geometry other than a
+ * rectangle is a stroke twice as wide, of which a mask hides the half inside the geometry.
+ * Dashes outside a geometry other than a rectangle are not checked against a reference PDF
+ * (approximation `picture-border-dots`).
  */
+function outsideOutline(
+  doc: Document,
+  ctx: PaintContext,
+  item: Extract<LayoutItem, { kind: 'picture' }>,
+  d: string,
+  stroke: Record<string, string | undefined>,
+  line: ResolvedLine,
+  groupScale: number
+): SVGElement[] {
+  const { geometry, xfrm } = item.element;
+  const { cx: w, cy: h } = xfrm;
+  const rect = geometry.kind === 'preset' && geometry.preset === 'rect';
+  const paths = item.geometry.paths.map((path) => path.commands);
+  const border = pictureBorder(paths, rect, line, w, h, groupScale);
+  const width = Number(stroke['stroke-width']) || 0;
+  const mask = (): string => {
+    const pad = width * 2 + Math.max(w, h);
+    const box = { x: -pad, y: -pad, width: w + 2 * pad, height: h + 2 * pad };
+    const id = ctx.defs.id('outside');
+    const shapes = [
+      svg(doc, 'rect', { ...box, fill: '#fff' }),
+      svg(doc, 'path', { d, fill: '#000' }),
+    ];
+    ctx.defs.add(svg(doc, 'mask', { id, maskUnits: 'userSpaceOnUse', ...box }, shapes));
+    return `url(#${id})`;
+  };
+  if (border.kind === 'doubled')
+    return [
+      svg(doc, 'path', {
+        d,
+        fill: 'none',
+        ...stroke,
+        'stroke-width': num(width * 2),
+        mask: mask(),
+      }),
+    ];
+  const clip = border.clip ? mask() : undefined;
+  return border.paths.map((plan) =>
+    svg(doc, 'path', {
+      d: pathData({ commands: plan.commands, fill: 'none', stroke: true }),
+      fill: 'none',
+      ...withDashPhase(stroke, plan),
+      mask: clip,
+    })
+  );
+}
+
+/** The stroke attributes of a path whose dash pattern starts at `plan.dashPhase`. */
+function withDashPhase(
+  stroke: Record<string, string | undefined>,
+  plan: StrokePlan | undefined
+): Record<string, string | undefined> {
+  return plan?.dashPhase && stroke['stroke-dasharray']
+    ? { ...stroke, 'stroke-dashoffset': num(plan.dashPhase) }
+    : stroke;
+}
+
+/** The context with a shape's box-to-slide matrix, for pattern tiles on the slide's grid. */
 function withFillMatrix(
   item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
   ctx: PaintContext
@@ -450,7 +449,7 @@ function paintGeometry(
         })
       );
     if (line && stroke.stroke !== 'none')
-      out.push(outsideOutline(doc, ctx, d, stroke, line, groupScale, w, h));
+      out.push(...outsideOutline(doc, ctx, item, d, stroke, line, groupScale));
     return out;
   }
   // A picture fill whose image does not resolve (a missing or damaged part) fills the geometry
@@ -468,8 +467,19 @@ function paintGeometry(
     const strokeD =
       plan && plan.commands !== path.commands ? pathData({ ...path, commands: plan.commands }) : d;
     const extras = plan ? strokeExtras(doc, plan, stroke) : [];
+    const pathStroke = withDashPhase(stroke, plan);
+    // A tiled picture draws as images inside the path (`tiledPictureContent`); the stroke follows.
+    const content =
+      path.fill === 'none' || lostPicture
+        ? undefined
+        : tiledPictureContent(el.fill, w, h, ctx, tileArea(path, w, h));
+    if (content) {
+      const kept = keepInside(doc, ctx, item, path, d, content);
+      const over = overlayPath(doc, d, effects, paintFor);
+      out.push(over ? isolated(doc, [kept, over]) : kept);
+    }
     const fill =
-      path.fill === 'none'
+      path.fill === 'none' || content
         ? { paint: 'none', opacity: 1 }
         : lostPicture
           ? { paint: PICTURE_PLACEHOLDER, opacity: 1 }
@@ -494,7 +504,7 @@ function paintGeometry(
             ctx.defs,
             strokeD,
             line.compound,
-            stroke,
+            pathStroke,
             w,
             h,
             plan?.commands ?? path.commands
@@ -515,7 +525,7 @@ function paintGeometry(
           })
         );
       if (compound) out.push(compound);
-      else if (path.stroke) out.push(svg(doc, 'path', { d: strokeD, fill: 'none', ...stroke }));
+      else if (path.stroke) out.push(svg(doc, 'path', { d: strokeD, fill: 'none', ...pathStroke }));
       out.push(...extras);
       continue;
     }
@@ -525,41 +535,12 @@ function paintGeometry(
         fill: own.paint,
         'fill-opacity': own.opacity < 1 ? num(own.opacity) : undefined,
         'fill-rule': 'evenodd',
-        ...(path.stroke ? stroke : { stroke: 'none' }),
+        ...(path.stroke ? pathStroke : { stroke: 'none' }),
       }),
       ...extras
     );
   }
   return out;
-}
-
-/** Path commands mapped through a matrix. */
-function mapCommands(commands: readonly PathCommand[], m: Matrix): PathCommand[] {
-  return commands.map((c): PathCommand => {
-    switch (c.op) {
-      case 'Z':
-        return c;
-      case 'M':
-      case 'L': {
-        const p = applyMatrix(m, c.x, c.y);
-        return { op: c.op, x: p.x, y: p.y };
-      }
-      case 'Q': {
-        const [p1, p] = [applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x, c.y)];
-        return { op: 'Q', x1: p1.x, y1: p1.y, x: p.x, y: p.y };
-      }
-      case 'C': {
-        const [p1, p2] = [applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x2, c.y2)];
-        const p = applyMatrix(m, c.x, c.y);
-        return { op: 'C', x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, x: p.x, y: p.y };
-      }
-    }
-  });
-}
-
-/** SVG path data for path commands. */
-function commandData(commands: readonly PathCommand[]): string {
-  return pathData({ commands, fill: 'none', stroke: true });
 }
 
 /**
@@ -629,7 +610,14 @@ export function paintItem(
   switch (item.kind) {
     case 'group': {
       const g = groupNode(doc, item, opts);
-      paintChildren(doc, item, g, ctx, opts, 0, Infinity);
+      if (!groupPaintsEffects(item)) {
+        paintChildren(doc, item, g, ctx, opts, 0, Infinity);
+        return g;
+      }
+      // A copy of the content can carry a line from out of view into it: every line paints.
+      const inner = svg(doc, 'g');
+      paintChildren(doc, item, inner, ctx, { ...opts, view: undefined }, 0, Infinity);
+      paintGroupEffects(doc, item, g, inner, ctx);
       return g;
     }
     case 'frame': {
@@ -742,7 +730,9 @@ export function paintItem(
       // A turned camera turns the face and its text about the shape's center, and the regions
       // of the effects that copy the face turn with it.
       const front = threeD?.front.some((v, i) => v !== IDENTITY[i]) ? threeD.front : undefined;
-      for (const node of paintGeometry(doc, item, local, parentScale, front))
+      // A solid face takes the scene's light (ECMA-376 Part 1, 20.1.5).
+      const faceItem = threeDFaceItem(item, threeD);
+      for (const node of paintGeometry(doc, faceItem, local, parentScale, front))
         body.appendChild(node);
       // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.1).
       if (threeD) for (const node of facetElements(doc, threeD.over, SEAM)) body.appendChild(node);
@@ -779,7 +769,9 @@ export function paintItem(
           effects?.outerShadow || effects?.reflection || effects?.glow || blurFx || threeD
             ? undefined
             : showsIn(opts.view, item.textMatrix);
-        parts.appendChild(paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix)));
+        const text = paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix));
+        // `ownText` links the body to its shape, for the clips of a soft-edged group (`softEdged`).
+        parts.appendChild(ownText(item, text));
       }
       const shown = blurFx
         ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content])
@@ -789,6 +781,10 @@ export function paintItem(
         return outer;
       }
       const corners = cornersOf();
+      // A turned extrusion casts its shadows and its glow from its back.
+      const back = threeD?.backOffset;
+      const castFrom = (m: Matrix): Matrix =>
+        back ? [m[0], m[1], m[2], m[3], m[4] + back.x, m[5] + back.y] : m;
       // Shadow, reflection, and glow use the content, text included (design D1 of `effects-fidelity`).
       const contentId = ctx.defs.id('content');
       content.setAttribute('id', contentId);
@@ -800,7 +796,9 @@ export function paintItem(
         width: el.xfrm.cx,
         height: el.xfrm.cy,
         corners,
-        ...(front && faceId ? { face: { id: faceId, corners: contentCorners(item), front } } : {}),
+        ...(front && faceId
+          ? { face: { id: faceId, corners: contentCorners(item), front: castFrom(front) } }
+          : {}),
       };
       const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
       if (reflection) {
@@ -814,8 +812,11 @@ export function paintItem(
       if (shadow) outer.appendChild(shadow);
       // The glow is a copy that paints the glow alone, under the extrusion and the content. The
       // content itself paints with no filter, so its text stays text in a printed PDF.
-      const glow =
-        pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids, true) : null;
+      // The glow of a turned extrusion lies around the face and its back.
+      const glowCorners = back
+        ? [...corners, ...corners.map((q) => ({ x: q.x + back.x, y: q.y + back.y }))]
+        : corners;
+      const glow = pro && effects.glow ? pro.glow(effects, boundsOf(glowCorners), ids, true) : null;
       if (glow) {
         effectDefs(ctx.defs, glow.defs);
         let glowSource = contentId;
@@ -825,7 +826,10 @@ export function paintItem(
         }
         outer.appendChild(
           svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
-            svg(doc, 'use', { href: `#${glowSource}` }),
+            svg(doc, 'use', {
+              href: `#${glowSource}`,
+              transform: back ? matrixAttr([1, 0, 0, 1, back.x, back.y]) : undefined,
+            }),
           ])
         );
       }
@@ -930,16 +934,7 @@ export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOption
     ...(opts.imageSize ? { imageSize: opts.imageSize } : {}),
     sourcePart: layout.slide.backgroundPart,
   };
-  const bg = fillPaint(layout.slide.background, width, height, ctx);
-  root.appendChild(
-    svg(doc, 'rect', {
-      width,
-      height,
-      fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
-      'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
-      'data-kind': 'background',
-    })
-  );
+  root.appendChild(paintBackground(doc, layout.slide.background, width, height, ctx));
   const content = svg(doc, 'g', { 'data-kind': 'content' });
   for (const item of layout.items) {
     const painted = paintItem(doc, item, ctx, opts, 1);

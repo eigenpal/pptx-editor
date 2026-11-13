@@ -1,0 +1,13 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The shared paint rules for picture borders, the dash start of closed outlines, and picture brightness and contrast affect painted output and PDF output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/__tests__/line-strokes.test.ts",
+    "packages/core/src/output/__tests__/painter-math.test.ts",
+    "packages/core/src/output/__tests__/picture-paint.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/export-pdf-review.test.ts"
+  ]
+}

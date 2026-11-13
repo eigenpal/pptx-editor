@@ -6,11 +6,15 @@ import { createFixedMeasurer, layoutSlide, type Line, type TextLayout } from '..
 import { paragraphBidi, visualOrderOfLevels } from '../rtl-paragraph.ts';
 import { runGlyphs } from '../bidi-line.ts';
 import { bidiAlgorithm } from '../bidi.ts';
-import { leadingOffset, paragraphAlignment } from '../paragraph-alignment.ts';
+import { leadingOffset, paragraphAlignment, rtlLeadingEdge } from '../paragraph-alignment.ts';
 
 // The shape is 6,000,000 EMU wide with the default insets (91,440 EMU on each side).
 const BOX_RIGHT = 6_000_000 - 91_440;
 const BOX_LEFT = 91_440;
+// The text area is 458.04 pt wide. A right-to-left line ends 458 pt from the left inset
+// (`rtlLeadingEdge`), so right-to-left lines sit `CUT` (0.04 pt) left of the left-to-right ones.
+const RTL_RIGHT = BOX_LEFT + 458 * 12_700;
+const CUT = BOX_RIGHT - RTL_RIGHT;
 
 const shape = (body: string): string =>
   '<p:sp><p:nvSpPr><p:cNvPr id="2" name="S"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
@@ -200,14 +204,14 @@ describe('physical alignment', () => {
       const SPACE = 0.25 * 18 * 12_700;
       if (side === 'center') {
         const last = t.lines[t.lines.length - 1];
-        expect((left(last) + right(last)) / 2).toBeCloseTo((BOX_LEFT + BOX_RIGHT) / 2, 3);
+        expect((left(last) + right(last)) / 2).toBeCloseTo((BOX_LEFT + BOX_RIGHT) / 2 - CUT, 3);
       } else {
-        expect(right(first)).toBeCloseTo(BOX_RIGHT, 3);
-        expect(left(first) + SPACE).toBeCloseTo(BOX_LEFT, 3);
+        expect(right(first)).toBeCloseTo(RTL_RIGHT, 3);
+        expect(left(first) + SPACE).toBeCloseTo(BOX_LEFT - CUT, 3);
       }
       const last = t.lines[t.lines.length - 1];
       // A justified last line starts at the leading (right) edge; a distributed one fills.
-      if (algn === 'justLow') expect(right(last)).toBeCloseTo(BOX_RIGHT, 3);
+      if (algn === 'justLow') expect(right(last)).toBeCloseTo(RTL_RIGHT, 3);
     });
 
   test('DrawingML algn names physical edges, also in a right-to-left paragraph', () => {
@@ -219,19 +223,37 @@ describe('physical alignment', () => {
     expect(leadingOffset('both', true, 10)).toBe(0);
   });
 
+  test('a right-to-left line ends at the column width in whole points', () => {
+    // The text areas of the `rtl-text` boxes and where their right-to-left lines end.
+    for (const [area, edge] of [
+      [273.6, 273],
+      [417.6, 417],
+      [410.4, 410],
+      [266.4, 266],
+      [871.2, 871],
+      [300, 300],
+    ])
+      expect(rtlLeadingEdge(Math.round(area * 12_700))).toBe(edge * 12_700);
+    expect(rtlLeadingEdge(0)).toBe(0);
+    // A left-to-right line in the same box still ends at the right inset.
+    const ltr = lay(para(r('Hello', 'en-US'), '<a:pPr algn="r"/>')).lines[0];
+    expect(right(ltr)).toBeCloseTo(BOX_RIGHT, 3);
+    expect(CUT).toBe(520);
+  });
+
   test('algn="r" ends a right-to-left line at the right inset', () => {
     const line = lay(para(r(SALAM), '<a:pPr rtl="1" algn="r"/>')).lines[0];
-    expect(right(line)).toBeCloseTo(BOX_RIGHT, 3);
+    expect(right(line)).toBeCloseTo(RTL_RIGHT, 3);
   });
 
   test('algn="l" starts a right-to-left line at the left inset', () => {
     const line = lay(para(r(SALAM), '<a:pPr rtl="1" algn="l"/>')).lines[0];
-    expect(left(line)).toBeCloseTo(BOX_LEFT, 3);
+    expect(left(line)).toBeCloseTo(BOX_LEFT - CUT, 3);
   });
 
   test('marL is measured from the right in a right-to-left paragraph', () => {
     const line = lay(para(r(SALAM), '<a:pPr rtl="1" algn="r" marL="457200"/>')).lines[0];
-    expect(right(line)).toBeCloseTo(BOX_RIGHT - 457_200, 3);
+    expect(right(line)).toBeCloseTo(RTL_RIGHT - 457_200, 3);
   });
 
   test('a number bullet stands right of the text and reads in the paragraph direction', () => {
@@ -244,9 +266,9 @@ describe('physical alignment', () => {
     const line = t.lines[0];
     const bullets = line.runs.filter((run) => run.kind === 'bullet');
     expect(visual({ ...line, runs: bullets })).toBe('.1');
-    expect(Math.max(...bullets.map((b) => b.x[b.x.length - 1]))).toBeCloseTo(BOX_RIGHT, 3);
+    expect(Math.max(...bullets.map((b) => b.x[b.x.length - 1]))).toBeCloseTo(RTL_RIGHT, 3);
     const text = line.runs.filter((run) => run.kind === 'text');
-    expect(Math.max(...text.map((b) => b.x[b.x.length - 1]))).toBeCloseTo(BOX_RIGHT - 457_200, 3);
+    expect(Math.max(...text.map((b) => b.x[b.x.length - 1]))).toBeCloseTo(RTL_RIGHT - 457_200, 3);
   });
 });
 
@@ -259,7 +281,7 @@ describe('trailing spaces', () => {
     const t = lay(para(r(words)));
     expect(t.lines.length).toBeGreaterThan(1);
     const first = t.lines[0];
-    expect(right(first)).toBeCloseTo(BOX_RIGHT, 3);
+    expect(right(first)).toBeCloseTo(RTL_RIGHT, 3);
     // The space that ends the line in source order stands at its left end.
     const run = first.runs[0];
     expect(run.rtl).toBe(true);
@@ -273,30 +295,30 @@ describe('trailing spaces', () => {
     const first = t.lines[0];
     const latin = first.runs.find((run) => !run.rtl)!;
     const lastLetter = latin.x[latin.text.trimEnd().length];
-    expect(lastLetter).toBeCloseTo(BOX_RIGHT, 3);
+    expect(lastLetter).toBeCloseTo(RTL_RIGHT, 3);
   });
 
   test('a justified right-to-left line fills the line, and its last line starts at the right', () => {
     const t = lay(para(r(words), '<a:pPr rtl="1" algn="just"/>'));
     // The space that ends the line in source order hangs past the left inset.
     const SPACE = 0.25 * 18 * 12_700;
-    expect(left(t.lines[0]) + SPACE).toBeCloseTo(BOX_LEFT, 3);
-    expect(right(t.lines[0])).toBeCloseTo(BOX_RIGHT, 3);
-    expect(right(t.lines[t.lines.length - 1])).toBeCloseTo(BOX_RIGHT, 3);
+    expect(left(t.lines[0]) + SPACE).toBeCloseTo(BOX_LEFT - CUT, 3);
+    expect(right(t.lines[0])).toBeCloseTo(RTL_RIGHT, 3);
+    expect(right(t.lines[t.lines.length - 1])).toBeCloseTo(RTL_RIGHT, 3);
   });
 });
 
 describe('caret positions', () => {
   test('offsets of a right-to-left line run from the right edge to the left', () => {
     const line = lay(para(r(SALAM))).lines[0];
-    expect(line.caretX[0]).toBeCloseTo(BOX_RIGHT, 3);
+    expect(line.caretX[0]).toBeCloseTo(RTL_RIGHT, 3);
     for (let i = 1; i < line.caretX.length; i += 1)
       expect(line.caretX[i]).toBeLessThan(line.caretX[i - 1]);
   });
 
   test('an empty right-to-left paragraph puts the caret at the right', () => {
     const line = lay(para('<a:endParaRPr lang="ar-SA" sz="1800"/>')).lines[0];
-    expect(line.caretX[0]).toBeCloseTo(BOX_RIGHT, 3);
+    expect(line.caretX[0]).toBeCloseTo(RTL_RIGHT, 3);
   });
 });
 

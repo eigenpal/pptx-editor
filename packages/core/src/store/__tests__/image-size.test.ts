@@ -28,7 +28,14 @@ describe('image header sizes', () => {
     expect(imageSize(png(128, 96))).toEqual({ width: 128, height: 96 });
     const hi = imageSize(png(300, 150, 5906))!; // 150 DPI
     expect(hi.width).toBe(300);
-    expect(Math.round(hi.dpiX!)).toBe(150);
+    expect(hi.dpiX).toBe(150);
+    // 144 DPI is 5669.29 pixels per metre: the whole count reads back as whole DPI.
+    expect(imageSize(png(128, 96, 5669))!.dpiY).toBe(144);
+    // A count beyond that rounding keeps its exact DPI: 5680 per metre is 144.272 DPI.
+    expect(imageSize(png(128, 96, 5680))!.dpiX).toBeCloseTo(144.272, 6);
+    // A tiny count stays rejected: 20 and 39 per metre are under 1 DPI.
+    expect(imageSize(png(128, 96, 20))).toEqual({ width: 128, height: 96 });
+    expect(imageSize(png(128, 96, 39))).toEqual({ width: 128, height: 96 });
     expect(imageSizeEmu(imageSize(png(96, 48))!)).toEqual({ cx: 914_400, cy: 457_200 });
   });
 
@@ -52,7 +59,7 @@ describe('image header sizes', () => {
     v.setInt32(38, 3780, true);
     v.setInt32(42, 3780, true);
     const s = imageSize(bmp)!;
-    expect([s.width, s.height, Math.round(s.dpiX!)]).toEqual([40, 30, 96]);
+    expect([s.width, s.height, s.dpiX]).toEqual([40, 30, 96]);
   });
 
   test('truncated, oversized, and unknown input', () => {

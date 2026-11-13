@@ -83,7 +83,6 @@ describe('approximations a slide uses', () => {
       'shadow-skew',
       'glow-soft-edge',
       'compound-lines',
-      'small-caps',
       'underline-styles',
       'script-fonts',
       'rtl',
@@ -262,12 +261,12 @@ describe('approximations a slide uses', () => {
     expect(approximationsOf(empty)).toEqual([]);
   });
 
-  test('every dashed picture border is flagged, round cap or not; a solid one is not', () => {
-    const picture = (ln: string): string =>
+  test('a dashed border off a rectangle picture is flagged; a rectangle or solid one is not', () => {
+    const picture = (ln: string, prst = 'ellipse'): string =>
       '<p:pic><p:nvPicPr><p:cNvPr id="2" name="P"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
       '<p:blipFill><a:blip/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
       `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm>` +
-      `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${ln}</p:spPr></p:pic>`;
+      `<a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom>${ln}</p:spPr></p:pic>`;
     const line = (dash: string, cap = ''): string =>
       `<a:ln w="38100"${cap}><a:solidFill><a:srgbClr val="000000"/></a:solidFill>` +
       `<a:prstDash val="${dash}"/></a:ln>`;
@@ -276,6 +275,36 @@ describe('approximations a slide uses', () => {
       'picture-border-dots'
     );
     expect(approximationsOf(picture(line('solid')))).not.toContain('picture-border-dots');
+    // A rectangle's border is measured (`picture-adjustments`), with dots and caps.
+    expect(approximationsOf(picture(line('sysDot', ' cap="rnd"'), 'rect'))).not.toContain(
+      'picture-border-dots'
+    );
+  });
+
+  test('capped dashes on a closed curve are flagged; on measured shapes they are not', () => {
+    const dashed = (prst: string, dash = 'sysDot', cap = 'rnd'): string =>
+      shape({
+        id: 2,
+        x: 0,
+        y: 0,
+        cx: IN,
+        cy: IN,
+        prst,
+        fill: '<a:noFill/>',
+        line:
+          `<a:ln w="38100" cap="${cap}"><a:solidFill><a:srgbClr val="000000"/></a:solidFill>` +
+          `<a:prstDash val="${dash}"/></a:ln>`,
+      });
+    expect(approximationsOf(dashed('ellipse'))).toContain('closed-curve-dashes');
+    expect(approximationsOf(dashed('ellipse', 'dash', 'sq'))).toContain('closed-curve-dashes');
+    // Flat caps start at the first point, as reference PDFs show; so does a solid line.
+    expect(approximationsOf(dashed('ellipse', 'dash', 'flat'))).not.toContain(
+      'closed-curve-dashes'
+    );
+    expect(approximationsOf(dashed('ellipse', 'solid'))).not.toContain('closed-curve-dashes');
+    // The `closed-dashes` fixture measures these with a closing segment.
+    for (const prst of ['rect', 'roundRect', 'star5', 'triangle', 'hexagon'])
+      expect(approximationsOf(dashed(prst))).not.toContain('closed-curve-dashes');
   });
 
   test('pattern tiles of a turned or flipped shape are measured; a pattern line is not', () => {

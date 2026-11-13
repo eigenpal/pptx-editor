@@ -5,11 +5,15 @@
 
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
 import {
+  dashArray,
   isIdeographic,
+  lineUnderlines,
+  strokeCap,
   strikeoutBars,
   type GlyphRun,
   type PathCommand,
   type TextLayout,
+  type UnderlineRing,
   type WarpedRun,
 } from '../layout/index.ts';
 import { fillPaint, STORED_PIXELS_STYLE, type PaintContext } from './paint-fill.ts';
@@ -70,44 +74,89 @@ function decorationRects(
   run: GlyphRun,
   baselineEmu: number,
   text: TextPaint,
-  underline: TextPaint
+  underline: TextPaint,
+  underlineRings: readonly UnderlineRing[] | undefined,
+  outline: Record<string, string | undefined> | undefined
 ): SVGElement[] {
   const out: SVGElement[] = [];
+  // The underline's shapes come from its line (`lineUnderlines`). It takes its own fill
+  // (`a:uFill`) when the run has one, and its outline (`a:uLn`) strokes it.
+  if (underlineRings?.length) {
+    out.push(
+      svg(doc, 'path', {
+        d: ringPathData(underlineRings),
+        fill: underline.paint,
+        'fill-opacity': underline.opacity < 1 ? num(underline.opacity) : undefined,
+        ...outline,
+      })
+    );
+  }
+  if (run.props.strike === 'noStrike') return out;
   const size = run.sizePt;
   const baseline = baselineEmu / EMU_PER_PT;
   const xs = run.x.map((v) => v / EMU_PER_PT);
-  // Trailing spaces at a line end are not underlined; the layout already
-  // excludes them from alignment, and runs keep them, so trim here.
+  // Trailing spaces are not struck through; the layout already excludes them from
+  // alignment, and runs keep them, so trim here.
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
   // A right-to-left run ends at its left: its trailing spaces are its leftmost cells.
   const x0 = run.rtl ? xs[run.text.length - end] : xs[0];
   const x1 = run.rtl ? xs[xs.length - 1] : (xs[end] ?? xs[xs.length - 1]);
   if (x1 <= x0) return out;
-  const m = run.face.metrics;
-  const thickness = Math.max(m.underlineThickness * size, size / 20);
   const y = baseline - run.rise / EMU_PER_PT;
-  // A strikethrough takes the run's fill and its alpha, as the glyphs do; an underline takes
-  // its own fill (`a:uFill`) when the run has one.
-  const bar = (top: number, { paint, opacity }: TextPaint, height = thickness): SVGElement =>
-    svg(doc, 'rect', {
-      x: num(x0),
-      y: num(top),
-      width: num(x1 - x0),
-      height: num(height),
-      fill: paint,
-      'fill-opacity': opacity < 1 ? num(opacity) : undefined,
-    });
-  if (run.props.underline !== 'none') {
-    const ty = y - m.underlinePosition * size;
-    out.push(bar(ty, underline));
-    if (run.props.underline === 'dbl') out.push(bar(ty + thickness * 2, underline));
-  }
-  if (run.props.strike !== 'noStrike') {
-    const strike = strikeoutBars(m, size, run.props.strike === 'dblStrike');
-    for (const top of strike.tops) out.push(bar(y + top, text, strike.thickness));
-  }
+  // A strikethrough takes the run's fill and its alpha, as the glyphs do.
+  const strike = strikeoutBars(run.face.metrics, size, run.props.strike === 'dblStrike');
+  for (const top of strike.tops)
+    out.push(
+      svg(doc, 'rect', {
+        x: num(x0),
+        y: num(y + top),
+        width: num(x1 - x0),
+        height: num(strike.thickness),
+        fill: text.paint,
+        'fill-opacity': text.opacity < 1 ? num(text.opacity) : undefined,
+      })
+    );
   return out;
+}
+
+/**
+ * The stroke of a run's underline outline (`a:uLn`, or the text outline for `a:uLnTx`), in
+ * points: its fill, its width, dash, cap, and join, as a shape outline takes them
+ * (`layout/line-strokes.ts`). The reference PDF of `underline-styles` strokes the underline's
+ * outline with the line, dashes and caps included, and a gradient spans the run's underline.
+ */
+function underlineStroke(
+  run: GlyphRun,
+  rings: readonly UnderlineRing[],
+  ctx: PaintContext
+): Record<string, string | undefined> | undefined {
+  const line = run.props.underlineLine;
+  if (!line || !(line.width > 0)) return undefined;
+  const xs = rings.flatMap((r) => r.map((q) => q[0] / EMU_PER_PT));
+  const ys = rings.flatMap((r) => r.map((q) => q[1] / EMU_PER_PT));
+  const [x, y] = [Math.min(...xs), Math.min(...ys)];
+  const box = { x, y, w: Math.max(Math.max(...xs) - x, 1), h: Math.max(Math.max(...ys) - y, 1) };
+  const paint = textFill(line.fill, box, ctx);
+  if (paint.paint === 'none') return undefined;
+  const width = line.width / EMU_PER_PT;
+  return {
+    stroke: paint.paint,
+    'stroke-opacity': paint.opacity < 1 ? num(paint.opacity) : undefined,
+    'stroke-width': num(width),
+    'stroke-linecap': strokeCap(line),
+    'stroke-linejoin': line.join,
+    'stroke-miterlimit': line.join === 'miter' ? num(Math.max(1, line.miterLimit)) : undefined,
+    'stroke-dasharray': dashArray(line, width)?.map(num).join(' '),
+  };
+}
+
+/** The path data of closed rings in EMU, in points. */
+function ringPathData(rings: readonly UnderlineRing[]): string {
+  const pt = (emu: number): string => num(emu / EMU_PER_PT);
+  return rings
+    .map((ring) => ring.map(([x, y], i) => `${i ? 'L' : 'M'}${pt(x)} ${pt(y)}`).join('') + 'Z')
+    .join('');
 }
 
 /**
@@ -439,6 +488,7 @@ export function paintText(
   }
   for (const line of layout.lines) {
     if (shows && !shows(lineCorners(layout, line))) continue;
+    const unders = lineUnderlines(line.runs, line.baseline);
     for (const run of line.runs) {
       if (run.picture) {
         const image = bulletPicture(doc, run, line.baseline, ctx);
@@ -570,7 +620,10 @@ export function paintText(
         const under = run.props.underlineFill
           ? textFill(run.props.underlineFill, bounds, ctx)
           : fill;
-        for (const d of decorationRects(doc, run, line.baseline, fill, under)) group.appendChild(d);
+        const rings = unders.get(run);
+        const outline = rings?.length ? underlineStroke(run, rings, ctx) : undefined;
+        for (const d of decorationRects(doc, run, line.baseline, fill, under, rings, outline))
+          group.appendChild(d);
       }
     }
     if (line.marks) paintMarks(doc, line, group, bounds, ctx);

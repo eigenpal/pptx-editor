@@ -27,9 +27,8 @@ import {
   type EffectFilterPaint,
   type EffectIds,
   type EffectNode,
-  type Matrix,
 } from '@pptx-editor.dev/core/layout';
-import { blurSigma } from '@pptx-editor.dev/core/output';
+import { blurSigma, matrixAttr } from '@pptx-editor.dev/core/output';
 import {
   boundsOf,
   glowSpread,
@@ -57,10 +56,6 @@ function node(
   return children.length > 0 ? { tag, attrs, children } : { tag, attrs };
 }
 
-function matrixAttr(m: Matrix): string {
-  return `matrix(${m.map(num).join(' ')})`;
-}
-
 /** The filter region attributes for bounds in user space. */
 function region(b: EffectBounds): Record<string, string> {
   return {
@@ -79,8 +74,10 @@ function region(b: EffectBounds): Record<string, string> {
  * inches stops the page for seconds. Glows of up to 200 pt and soft edges of up to 100 pt draw
  * as stored. A larger glow draws as a 200 pt glow, and a larger soft edge shrinks the outline
  * by 100 pt and keeps its blur.
+ *
+ * @internal
  */
-const MAX_MORPH_SPREAD = 1_270_000;
+export const MAX_MORPH_SPREAD = 1_270_000;
 
 /** `SourceAlpha` as an opaque gray image: each color channel holds the alpha. */
 const ALPHA_TO_GRAY = '0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1';

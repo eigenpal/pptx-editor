@@ -117,7 +117,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply bold, italic, underline, and strikethrough, including underline colors. Underline styles other than single are approximate.',
+      'Apply bold, italic, underline, and strikethrough, including underline colors. Every underline style and underline outline renders; dashed, dotted, and wavy underlines and outlines are approximate.',
   },
   {
     id: 'text.font-family-size',
@@ -151,7 +151,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Superscript and subscript toggles. The Font dialog sets the offset, caps, and strikethrough kinds. Small caps and script size are approximate.',
+      'Superscript and subscript toggles. The Font dialog sets the offset, caps, and strikethrough kinds. Superscript and subscript offsets are approximate.',
   },
   {
     id: 'text.character-spacing',
@@ -353,7 +353,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'Group, ungroup, and edit inside a group. Group effects do not draw.',
+    notes:
+      'Group, ungroup, and edit inside a group. Group effects draw over the whole group as one picture and are approximate.',
   },
   {
     id: 'shapes.connectors',
@@ -467,7 +468,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply or clear shadow presets on supported shapes and pictures. Edit existing shadow color, opacity, blur, distance, and direction. Groups, tables, charts, and theme effect graphs reject these edits. Perspective shadows are unavailable, and blur is measured only for small radii.',
+      'Apply, clear, or edit shadows on shapes and pictures; groups, tables, charts, and theme effects reject these edits. A group shadow draws as the silhouette of the whole group. Perspective shadows are unavailable, and blur is measured only for small radii.',
   },
   {
     id: 'effects.glow-reflection',
@@ -501,7 +502,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Display approximate 3-D shapes and blur with @pptx-editor.dev/pro under the EigenPal Pro License. Preset shadows display without the module, but bottom bevels and text effects do not render. PDF export omits blur.',
+      'Display approximate 3-D shapes and blur with @pptx-editor.dev/pro under the EigenPal Pro License. Preset shadows display without the module, but bottom bevels and text effects do not render. PDF export draws blur approximately, with text inside the shape kept sharp.',
     docsLink: '/docs/guides/3d-effects',
   },
 
@@ -527,7 +528,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply correction, recolor, and transparency presets, or reset a picture. Saturation, color tone, and artistic effects are unavailable. Rendering is approximate, and some existing picture effects prevent corrections or reset.',
+      'Apply correction, recolor, and transparency presets, or reset a picture; some existing effects prevent this. Saturation, color tone, and artistic effects cannot be edited and display as the stored image. Rendering is approximate.',
   },
   {
     id: 'pictures.crop',
@@ -550,7 +551,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply five picture styles and set border color, weight, and dashes. Style and border fidelity remains approximate. Round border dots display as squares.',
+      'Apply five picture styles and set border color, weight, and dashes. Borders of rectangular pictures display with their dashes, caps, and joins. Style fidelity, and dashed borders on other picture shapes, remain approximate.',
   },
   {
     id: 'pictures.alt-text',

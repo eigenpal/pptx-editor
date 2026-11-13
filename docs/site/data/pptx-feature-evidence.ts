@@ -19,7 +19,7 @@ export interface FeatureEvidence {
 export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   // --- Text & formatting -------------------------------------------------
   'text.basic-formatting': {
-    fixtures: ['text-runs', 'font-effects'],
+    fixtures: ['text-runs', 'font-effects', 'underline-styles'],
     approximations: ['underline-styles'],
   },
   'text.font-family-size': {
@@ -31,8 +31,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['gradient-text'],
   },
   'text.caps-baseline': {
-    fixtures: ['text-runs', 'font-effects'],
-    approximations: ['line-model', 'small-caps', 'script-size'],
+    fixtures: ['text-runs', 'font-effects', 'caps-scripts'],
+    approximations: ['line-model', 'script-size'],
   },
   'text.character-spacing': {
     fixtures: ['text-runs', 'font-effects'],
@@ -93,7 +93,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['custom-geometry', 'follow-ups'],
     approximations: ['path-start'],
   },
-  'shapes.groups': { fixtures: ['groups-transforms'] },
+  'shapes.groups': {
+    fixtures: ['groups-transforms', 'group-effects'],
+    approximations: ['group-effects'],
+  },
   'shapes.connectors': { fixtures: ['lines-arrows', 'line-ends-dashes'] },
   'shapes.arrange': { fixtures: ['arrange-flip-hidden'] },
   'shapes.flip-rotate': {
@@ -119,8 +122,14 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['pattern-bitmaps', 'fill-rotation', 'tiled-pictures'],
   },
   'fills-lines.lines': {
-    fixtures: ['lines-arrows', 'line-ends-dashes', 'fills-lines'],
-    approximations: ['inset-lines', 'dash-complexity', 'compound-lines'],
+    fixtures: [
+      'lines-arrows',
+      'line-ends-dashes',
+      'fills-lines',
+      'picture-adjustments',
+      'closed-dashes',
+    ],
+    approximations: ['inset-lines', 'dash-complexity', 'closed-curve-dashes', 'compound-lines'],
   },
   'fills-lines.theme-colors': {
     fixtures: ['colors', 'follow-ups'],
@@ -128,15 +137,15 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   },
   // --- Effects -----------------------------------------------------------
   'effects.outer-shadow': {
-    fixtures: ['effects', 'shape-effects-presets'],
-    approximations: ['blur', 'shadow-skew'],
+    fixtures: ['effects', 'shape-effects-presets', 'group-effects'],
+    approximations: ['blur', 'shadow-skew', 'group-effects'],
   },
   // Painted by the drawing module of @pptx-editor.dev/pro: the harness installs it
   // (`examples/vite/src/harness.ts`), and `packages/pro/src/drawing/__tests__/effects-paint.test.ts`
   // proves that the free engine paints none of these effects.
   'effects.glow-reflection': {
     fixtures: ['effects', 'shape-effects-presets', 'picture-editing'],
-    approximations: ['blur', 'glow-soft-edge'],
+    approximations: ['blur', 'glow-soft-edge', 'group-effects'],
   },
   'effects.fill-overlay': {
     fixtures: ['fill-fidelity'],
@@ -152,12 +161,12 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['picture-shape-fill'],
   },
   'pictures.adjustments': {
-    fixtures: ['pictures', 'fill-fidelity', 'picture-editing'],
+    fixtures: ['pictures', 'fill-fidelity', 'picture-editing', 'picture-adjustments'],
     approximations: ['picture-luminance', 'picture-recolor'],
   },
   'pictures.crop': { fixtures: ['pictures', 'picture-editing'] },
   'pictures.styles-border': {
-    fixtures: ['picture-editing'],
+    fixtures: ['picture-editing', 'picture-adjustments'],
     approximations: ['blur', 'glow-soft-edge', 'picture-border-dots', 'inset-lines'],
   },
   'pictures.alt-text': { fixtures: ['picture-editing'] },

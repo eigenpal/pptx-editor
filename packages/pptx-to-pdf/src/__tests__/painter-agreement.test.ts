@@ -14,7 +14,7 @@ import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { PNG } from 'pngjs';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
+import { decodePDFRawStream, PDFArray, PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { openPresentation } from '@pptx-editor.dev/core/editor';
 import { paintSlide } from '@pptx-editor.dev/core/output';
 import { installDrawing } from '@pptx-editor.dev/pro/drawing';
@@ -26,13 +26,14 @@ const BEST = { fidelityPolicy: 'best-effort' } as const;
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 /** The editor's SVG of slide 1, painted into a document of this test's own window. */
-async function svgOf(bytes: Uint8Array): Promise<Element> {
+async function svgOf(bytes: Uint8Array, imageSizes = false): Promise<Element> {
   const opened = await openPresentation(bytes);
   if (!opened.ok) throw new Error('deck');
   const layout = opened.session.layout(0)!;
   const { document } = new Window();
   const root = paintSlide(document as unknown as Document, layout, {
     images: () => 'blob:picture',
+    ...(imageSizes ? { imageSize: opened.session.imageSize } : {}),
     idPrefix: 't',
     hitTargets: false,
   });
@@ -210,6 +211,55 @@ describe('the PDF writer and the SVG paint agree', () => {
       await pictureAgrees(blip);
     });
 
+  for (const tile of [
+    '<a:tile tx="25400" ty="-12700" sx="150000" sy="80000" flip="xy" algn="br"/>',
+    '<a:tile tx="0" ty="0" sx="100000" sy="100000" flip="y" algn="ctr"/>',
+  ])
+    test(`on the tiles of a tiled picture: ${tile}`, async () => {
+      const png = new PNG({ width: 3, height: 2 });
+      png.data.fill(200);
+      const bytes = buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: IN,
+              y: IN,
+              cx: 2 * IN,
+              cy: IN,
+              fill: `<a:blipFill><a:blip r:embed="rIdImg"/>${tile}</a:blipFill>`,
+            }),
+            rels: [['rIdImg', `${R}/image`, '../media/img.png']],
+          },
+        ],
+        media: [{ name: 'img.png', bytes: PNG.sync.write(png), contentType: 'image/png' }],
+      });
+      // The SVG paint draws each tile as an image: an unmirrored one sits at a cell's corner.
+      const svg = await svgOf(bytes, true);
+      const mirrored = /flip="(x|y|xy)"/.exec(tile)?.[1] ?? '';
+      const first = [...svg.querySelectorAll('image')].find((i) => !i.hasAttribute('transform'));
+      const [x, y, width, height] = attrs(first ?? null, ['x', 'y', 'width', 'height']);
+      const cw = mirrored.includes('x') ? 2 * width! : width!;
+      const ch = mirrored.includes('y') ? 2 * height! : height!;
+      const doc = await PDFDocument.load((await exportPdf(bytes, BEST)).bytes);
+      const patterns = [...doc.context.enumerateIndirectObjects()].flatMap(([, obj]) =>
+        obj instanceof PDFRawStream && obj.dict.get(PDFName.of('PatternType'))?.toString() === '1'
+          ? [obj.dict]
+          : []
+      );
+      expect(patterns).toHaveLength(1);
+      const dict = patterns[0]!;
+      const num = (key: string): number => Number(dict.get(PDFName.of(key))!.toString());
+      const matrix = dict.lookup(PDFName.of('Matrix'), PDFArray).asArray().map(Number);
+      expect(num('XStep')).toBeCloseTo(cw, 0);
+      expect(num('YStep')).toBeCloseTo(ch, 0);
+      // The pattern's origin is a corner of the same grid.
+      const cells = (d: number, size: number): number => Math.abs(d / size - Math.round(d / size));
+      expect(cells(x! - matrix[4]!, cw)).toBeLessThan(1e-6);
+      expect(cells(y! - matrix[5]!, ch)).toBeLessThan(1e-6);
+    });
+
   test('on the bars of underline, double underline, and strikethrough', async () => {
     const fill = (rgb: string): string => `<a:solidFill><a:srgbClr val="${rgb}"/></a:solidFill>`;
     const uFill = (rgb: string): string => `<a:uFill>${fill(rgb)}</a:uFill>`;
@@ -228,12 +278,23 @@ describe('the PDF writer and the SVG paint agree', () => {
       ],
     });
     // The SVG bars are in points inside the frame; the PDF bars are in EMU inside the frame.
-    const svgBars = [...(await svgOf(bytes)).querySelectorAll('rect')]
-      .filter((r) => r.getAttribute('data-kind') !== 'background')
-      .map((r) => ({
-        fill: r.getAttribute('fill')!,
-        box: attrs(r, ['x', 'y', 'width', 'height']),
-      }));
+    // The underline is a path with one rectangle for each bar; the strikethrough is rects.
+    const svgBars = [
+      ...(await svgOf(bytes)).querySelectorAll('[data-pptx-text] rect, [data-pptx-text] path'),
+    ].flatMap((r) => {
+      const fill = r.getAttribute('fill')!;
+      if (r.tagName === 'rect') return [{ fill, box: attrs(r, ['x', 'y', 'width', 'height']) }];
+      return (r.getAttribute('d') ?? '')
+        .split('Z')
+        .filter(Boolean)
+        .map((ring) => {
+          const v = [...ring.matchAll(/[ML]([-\d.]+) ([-\d.]+)/g)];
+          const xs = v.map((m) => Number(m[1]));
+          const ys = v.map((m) => Number(m[2]));
+          const [x, y] = [Math.min(...xs), Math.min(...ys)];
+          return { fill, box: [x, y, Math.max(...xs) - x, Math.max(...ys) - y] };
+        });
+    });
     const pdf = await getDocument({
       data: (await exportPdf(bytes, BEST)).bytes.slice(),
       useSystemFonts: false,

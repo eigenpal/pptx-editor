@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Text layout places each column of a multi-column text body a whole number of points right of the first column. This changes laid-out and painted positions only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/text/__tests__/line-metrics.test.ts",
+    "packages/core/src/editor/__tests__/text-body-commands.test.ts"
+  ]
+}

@@ -61,8 +61,10 @@ Parentheses and brackets that are not operands draw as delimiters that grow with
 Equations lay out with the rules of TeX: the spacing of operators and relations, smaller scripts, and fraction and radical shifts. Rules, radical signs, and delimiters draw as filled outlines. The editor canvas and `@pptx-editor.dev/pptx-to-pdf` draw the same layout.
 
 - When the run font is not available, the equation draws in STIX Two Math or Latin Modern Math if the host has one of them. Otherwise, it draws in Liberation Serif with italic letters.
+- Scripts take the advances of the script-style forms (`ssty`) of a math font, and the spacing constants of STIX Two Math. The glyphs draw in their regular forms at those positions.
 - An equation with a construct that the layout does not read draws the fallback of its text box.
 - Font and color commands on the text box do not change the math runs. They keep the format that the equation has.
+- A line that holds an equation is as tall as the equation and a small space above it. Percent line spacing scales that height, and exact line spacing replaces it, as for text.
 - In a text box, an equation is one character. The caret moves over it, and Backspace after it removes it. You cannot type in an equation.
 
 For the measured rules and their limits, see the equations item of [PPTX fidelity](/docs/pptx-fidelity).

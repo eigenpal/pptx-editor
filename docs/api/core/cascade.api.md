@@ -145,6 +145,9 @@ export function defaultTableStyleId(pkg: PptxPackage): string;
 // @public
 export type DiagramFallback = 'no-drawing' | 'unsupported' | 'limit';
 
+// @internal
+export function drawsGroupEffects(fx: ResolvedEffects | undefined): boolean;
+
 // @public
 export type EffectAlign = 'tl' | 't' | 'tr' | 'l' | 'ctr' | 'r' | 'bl' | 'b' | 'br';
 
@@ -497,6 +500,7 @@ export interface ResolvedGroup extends ResolvedBase {
     };
     // (undocumented)
     readonly children: readonly ResolvedElement[];
+    readonly effects?: ResolvedEffects;
     // (undocumented)
     readonly fill: ResolvedFill;
     // (undocumented)
@@ -784,6 +788,7 @@ export interface RunProps {
     // (undocumented)
     readonly underline: string;
     readonly underlineFill?: ResolvedFill;
+    readonly underlineLine?: ResolvedLine;
 }
 
 // @public
