@@ -701,6 +701,9 @@ export const PICTURE_BULLET_SCALE = 0.7;
 export function placeBaseline(emu: number): number;
 
 // @internal
+export function placeColumn(column: number, columnWidth: number, gap: number): number;
+
+// @internal
 export function planStroke(commands: readonly PathCommand[], line: ResolvedLine, scale?: number): StrokePlan;
 
 // @public

@@ -45,6 +45,7 @@ import {
   SCRIPT_SIZE_SCALE,
   SMALL_CAPS_SCALE,
   placeBaseline,
+  placeColumn,
 } from './line-metrics.ts';
 
 const EMU_PER_PT = 12_700;
@@ -925,7 +926,8 @@ export function layoutTextOn(
   });
 
   // Columns: flow lines into the next column when the box height is exceeded. Baselines are
-  // placed from the top of their column, before anchoring (`placeBaseline`).
+  // placed from the top of their column, before anchoring (`placeBaseline`), and each column
+  // starts a whole number of points right of the first (`placeColumn`).
   let placed: Line[];
   let contentHeight = y;
   // What autofit reads: with columns, the bottom of the lowest line, so an overflowing last
@@ -942,7 +944,7 @@ export function layoutTextOn(
         col += 1;
         offset = line.top;
       }
-      const dx = col * (colW + bp.spcCol);
+      const dx = placeColumn(col, colW, bp.spcCol);
       placed.push({
         ...line,
         column: col,

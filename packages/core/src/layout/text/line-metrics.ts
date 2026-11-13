@@ -29,6 +29,10 @@
 //   are the first column of `tables/2` (the table style's major face, bold italic), which the
 //   PDF puts one grid step above the other cells of its row; the rounding moves them from
 //   0.04 pt to 0.36 pt off.
+// - Each column starts a whole number of points right of the first column (`placeColumn`), as
+//   each baseline sits a whole number of points below its column top. ECMA-376 does not say
+//   this; the reference PDF of `text-direction` shows it for three columns with a gap and two
+//   columns without one: the column starts are then within 0.01 pt of the PDF glyph origins.
 // - Diagram text (`dsp:txBody`, ECMA-376 Part 1, 21.4) has another single line: the face's
 //   ascent plus descent (the values above), not 1.2 × the size. Percent spacing and the baseline
 //   rules above then take that line (`LineBasis`). Measured on 6 November 2026 on the reference
@@ -175,6 +179,20 @@ export const WHOLE_POINT_BASELINES = true;
 
 /** A baseline in EMU from the top of the text, placed as `WHOLE_POINT_BASELINES` says. @internal */
 export function placeBaseline(emu: number): number {
+  return WHOLE_POINT_BASELINES ? roundToWholePoint(emu) : emu;
+}
+
+/**
+ * The left edge of column `column` (0-based), in EMU from the left edge of the first column:
+ * `column` times the column width plus the gap (`spcCol`), rounded to a whole point, as
+ * baselines round from the column top (`placeBaseline`). ECMA-376 Part 1, 21.1.2.1.1 (bodyPr)
+ * gives the gap but no grid. Reference PDF of `text-direction`: the columns of a 6 in box start
+ * 146 and 293 pt (three columns, 0.3 in gap) and 209 pt (two columns, no gap) right of the
+ * first column, where the exact steps are 146.4, 292.8, and 208.8 pt.
+ * @internal
+ */
+export function placeColumn(column: number, columnWidth: number, gap: number): number {
+  const emu = column * (columnWidth + gap);
   return WHOLE_POINT_BASELINES ? roundToWholePoint(emu) : emu;
 }
 
