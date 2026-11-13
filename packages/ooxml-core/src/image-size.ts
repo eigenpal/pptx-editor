@@ -35,6 +35,13 @@ const valid = (w: number, h: number): boolean =>
 const dpi = (v: number): number | undefined =>
   Number.isFinite(v) && v >= 1 && v <= 10_000 ? v : undefined;
 
+/**
+ * A resolution stated in whole pixels per metre (PNG `pHYs`, BMP), in whole DPI. A whole count
+ * per metre cannot hold most DPI values (144 DPI is 5669.29 per metre), so the stated count is
+ * the DPI rounded: a reference PDF tiles a 128-pixel image at 5669 per metre exactly 64 pt wide.
+ */
+const perMetre = (v: number): number | undefined => dpi(Math.round(v * 0.0254));
+
 function png(b: Uint8Array): ImageSize | null {
   if (b.length < 33 || u32be(b, 12) !== 0x49484452) return null; // IHDR
   const width = u32be(b, 16);
@@ -48,8 +55,8 @@ function png(b: Uint8Array): ImageSize | null {
     if (type === 0x49444154) break; // IDAT
     if (type === 0x70485973 && length === 9 && i + 17 <= b.length && b[i + 16] === 1) {
       // pHYs in pixels per metre.
-      const x = dpi(u32be(b, i + 8) * 0.0254);
-      const y = dpi(u32be(b, i + 12) * 0.0254);
+      const x = perMetre(u32be(b, i + 8));
+      const y = perMetre(u32be(b, i + 12));
       return { width, height, ...(x ? { dpiX: x } : {}), ...(y ? { dpiY: y } : {}) };
     }
     if (length > b.length) break;
@@ -108,8 +115,8 @@ function bmp(b: Uint8Array): ImageSize | null {
   const width = i32le(b, 18);
   const height = Math.abs(i32le(b, 22));
   if (!valid(width, height)) return null;
-  const x = dpi(i32le(b, 38) * 0.0254);
-  const y = dpi(i32le(b, 42) * 0.0254);
+  const x = perMetre(i32le(b, 38));
+  const y = perMetre(i32le(b, 42));
   return { width, height, ...(x ? { dpiX: x } : {}), ...(y ? { dpiY: y } : {}) };
 }
 

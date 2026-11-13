@@ -26,12 +26,11 @@ describe('DocumentSession.imageSize', () => {
     if (!r.ok) throw new Error('open failed');
     const part = '/ppt/slides/slide3.xml';
     // The fixture states 144 and 150 DPI as 5669 and 5906 pixels per metre (`pHYs`), which
-    // read back as 143.99 and 150.01 DPI.
-    for (const [rel, ppm] of [
-      ['rIdImg', 5669],
-      ['rIdDpi', 5906],
+    // read back as whole DPI: 128 × 96 px at 144 DPI is exactly 64 × 48 pt.
+    for (const [rel, dpi] of [
+      ['rIdImg', 144],
+      ['rIdDpi', 150],
     ] as const) {
-      const dpi = ppm * 0.0254;
       expect(r.session.imageSize(part, rel)).toEqual({
         cx: Math.round((128 * 914_400) / dpi),
         cy: Math.round((96 * 914_400) / dpi),
