@@ -319,7 +319,6 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
     'fill-fidelity/6': ['pixels'],
     'fills-lines/1': ['extra-text'],
     'preserved-content/1': ['pixels'],
-    'rtl-text/2': ['line-position'],
     'svg-tab-stops/1': ['pixels'],
     'three-d-effects/1': ['pixels'],
     'three-d-effects/2': ['pixels'],

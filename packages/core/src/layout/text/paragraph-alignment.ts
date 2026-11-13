@@ -38,3 +38,19 @@ export function leadingOffset(alignment: Alignment, rtl: boolean, room: number):
   if (alignment === 'center') return room / 2;
   return alignment === (rtl ? 'left' : 'right') ? room : 0;
 }
+
+const EMU_PER_PT = 12_700;
+
+/**
+ * The leading edge of a right-to-left paragraph, measured from the left edge of its column, for
+ * a column `width` wide (EMU): the column width in whole points, rounded down. This is the line
+ * model's whole-point grid (`placeBaseline`, `placeColumn` in `line-metrics.ts`) on the mirrored
+ * axis; ECMA-376 gives no grid. In the `rtl-text` reference PDF, boxes with text areas of 273.6,
+ * 417.6, 410.4, 266.4, and 871.2 pt end their right-to-left lines 273, 417, 410, 266, and 871 pt
+ * from the left inset, also bullets and lines with a right indent. Line breaks, the room of an
+ * aligned line, and justification still use the whole width, so every line of the paragraph
+ * moves left by the cut.
+ */
+export function rtlLeadingEdge(width: number): number {
+  return Math.max(0, Math.floor(width / EMU_PER_PT + 1e-6)) * EMU_PER_PT;
+}
