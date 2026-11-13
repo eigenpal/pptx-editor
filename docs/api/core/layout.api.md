@@ -488,6 +488,9 @@ export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): v
 export function invert(m: Matrix): Matrix;
 
 // @internal
+export function isDrawnUnderline(style: string): boolean;
+
+// @internal
 export function isExactScheme(scheme: string, upTo?: number): boolean;
 
 // @public
@@ -642,6 +645,9 @@ export interface LineMark {
     readonly props: RunProps;
     readonly runIndex: number;
 }
+
+// @internal
+export function lineUnderlines(runs: readonly GlyphRun[], baseline: number): Map<GlyphRun, UnderlineRing[]>;
 
 // @public
 export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & FontResolverMark;
@@ -976,6 +982,12 @@ export interface ThreeDPaint {
     readonly showsFace: boolean;
     readonly under: readonly ThreeDFacet[];
 }
+
+// @internal
+export type UnderlineRing = readonly (readonly [number, number])[];
+
+// @internal
+export function underlineRings(style: string, origin: number, x0: number, x1: number, y: number, top: number, thickness: number): UnderlineRing[];
 
 // @public
 export interface WarpedRun {

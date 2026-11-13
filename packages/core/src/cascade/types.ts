@@ -95,6 +95,11 @@ export interface RunProps {
   readonly fill: ResolvedFill;
   /** The underline's own fill (`a:uFill`); absent when the underline takes the text fill. */
   readonly underlineFill?: ResolvedFill;
+  /**
+   * The outline of the underline (`a:uLn`, or the text outline for `a:uLnTx`); absent when the
+   * underline has no outline or the line has no fill.
+   */
+  readonly underlineLine?: ResolvedLine;
   readonly highlight?: Rgba;
   readonly outline?: ResolvedLine;
   /** The run's language (`lang`), a BCP 47 tag. */

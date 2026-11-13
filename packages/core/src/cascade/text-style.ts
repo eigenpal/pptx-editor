@@ -216,6 +216,13 @@ export function resolveRunProps(
   const uFillEl = lastChild(chain, ['uFill', 'uFillTx']);
   const uFill = uFillEl?.local === 'uFill' ? fillElementOf(uFillEl) : undefined;
   const underlineFill = uFill ? resolveFillElement(uFill, ctx) : undefined;
+  // `a:uLn` outlines the underline with its own line, and `a:uLnTx` with the text's outline
+  // (`EG_TextUnderlineLine`). The underline's thickness comes from the font, not from the line
+  // width, and a line without a fill draws nothing (the reference PDF of `underline-styles`).
+  const uLnEl = lastChild(chain, ['uLn', 'uLnTx']);
+  const ownUnderlineLine =
+    uLnEl?.local === 'uLn' ? resolveLine(uLnEl, undefined, ctx, ctx) : undefined;
+  const underlineLine = uLnEl?.local === 'uLnTx' ? outline : ownUnderlineLine;
   const capRaw = pick('cap');
   const size = Number(pick('sz') ?? '1800');
   const spc = Number(pick('spc') ?? '0');
@@ -254,6 +261,7 @@ export function resolveRunProps(
     ...(sym ? { sym } : {}),
     fill: fill ?? { type: 'solid', color: { r: 0, g: 0, b: 0, a: 1 } },
     ...(underlineFill ? { underlineFill } : {}),
+    ...(underlineLine && underlineLine.fill.type !== 'none' ? { underlineLine } : {}),
     ...(highlight ? { highlight } : {}),
     ...(outline && outline.fill.type !== 'none' ? { outline } : {}),
     ...(lang ? { lang } : {}),

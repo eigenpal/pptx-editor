@@ -34,6 +34,7 @@ import { evaluatePresetTextWarp } from '@eigenpal/ooxml-core';
 import type { ResolvedTextBody, TextWarp } from '../../cascade/index.ts';
 import type { TextMeasurer } from './measurer.ts';
 import { strikeoutBars } from './strikeout-bars.ts';
+import { lineUnderlines, type UnderlineRing } from './underline-marks.ts';
 import type { GlyphRun, TextLayout } from './text-layout.ts';
 
 const EMU_PER_PT = 12_700;
@@ -257,28 +258,47 @@ function rectRing(
   step: number,
   budget: Budget
 ): Polyline {
+  return polyRing(
+    [
+      [x0, y0],
+      [x1, y0],
+      [x1, y1],
+      [x0, y1],
+    ],
+    step,
+    budget
+  );
+}
+
+/** A closed polygon in the flat frame, its edges cut at `step` (EMU). */
+function polyRing(
+  points: readonly (readonly [number, number])[],
+  step: number,
+  budget: Budget
+): Polyline {
   const ring: Polyline = [];
-  const edge = (a: Point, b: Point): void => {
+  points.forEach((a, i) => {
+    const b = points[(i + 1) % points.length]!;
     const n = Math.min(256, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)));
-    for (let i = 0; i < n; i += 1)
-      ring.push([a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n]);
-  };
-  edge([x0, y0], [x1, y0]);
-  edge([x1, y0], [x1, y1]);
-  edge([x1, y1], [x0, y1]);
-  edge([x0, y1], [x0, y0]);
+    for (let k = 0; k < n; k += 1)
+      ring.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+  });
   budget.left -= ring.length + 1;
   return ring;
 }
 
-/** The underline, strikethrough, and highlight bars of a run, as the flat paint draws them. */
+/**
+ * The underline, strikethrough, and highlight bars of a run, as the flat paint draws them. The
+ * underline's shapes come from its line (`lineUnderlines`).
+ */
 function runBars(
   run: GlyphRun,
   top: number,
   height: number,
   baseline: number,
   step: number,
-  budget: Budget
+  budget: Budget,
+  underline: readonly UnderlineRing[] | undefined
 ): [Polyline[], Polyline[], Polyline[]] {
   const size = run.sizePt * EMU_PER_PT;
   let end = run.text.length;
@@ -293,17 +313,11 @@ function runBars(
     rectRing(a, b, c, d, step, budget);
   if (run.props.highlight && run.kind === 'text')
     highlight.push(rect(x0, top, run.x[run.x.length - 1]!, top + height));
+  for (const ring of underline ?? []) under.push(polyRing(ring, step, budget));
   if (run.kind === 'text' && x1 > x0) {
-    const m = run.face.metrics;
-    const thick = Math.max(m.underlineThickness * size, size / 20);
     const y = baseline - run.rise;
-    if (run.props.underline !== 'none') {
-      const ty = y - m.underlinePosition * size;
-      under.push(rect(x0, ty, x1, ty + thick));
-      if (run.props.underline === 'dbl') under.push(rect(x0, ty + thick * 2, x1, ty + thick * 3));
-    }
     if (run.props.strike !== 'noStrike') {
-      const bars = strikeoutBars(m, size, run.props.strike === 'dblStrike');
+      const bars = strikeoutBars(run.face.metrics, size, run.props.strike === 'dblStrike');
       for (const top of bars.tops) strike.push(rect(x0, y + top, x1, y + top + bars.thickness));
     }
   }
@@ -349,6 +363,7 @@ export function warpTextLayout(
   const lines = layout.lines;
   for (let li = 0; li < lines.length; li += 1) {
     const line = lines[li]!;
+    const unders = lineUnderlines(line.runs, line.baseline);
     for (let ri = 0; ri < line.runs.length; ri += 1) {
       const run = line.runs[ri]!;
       const pic = run.picture;
@@ -382,7 +397,15 @@ export function warpTextLayout(
           glyphs.push(ring);
         if (budget.left < 0) return { flat: 'too much text' };
       }
-      const bars = runBars(run, line.top, line.height, line.baseline, size * step, budget);
+      const bars = runBars(
+        run,
+        line.top,
+        line.height,
+        line.baseline,
+        size * step,
+        budget,
+        unders.get(run)
+      );
       if (budget.left < 0) return { flat: 'too much text' };
       const [strike, under, highlight] = bars;
       for (const ring of strike) glyphs.push(ring);

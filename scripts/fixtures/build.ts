@@ -15,6 +15,7 @@ import { shapeFormatFixtures } from './shape-format.ts';
 import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
+import { underlineStylesFixtures } from './underline-styles.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
 import { chartDataDeck } from './chart-data.ts';
 import { diagramEditingDeck } from './diagram-editing.ts';
@@ -108,6 +109,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
   ...textScriptFixtures,
   ...followUpFixtures,
   ...lineEndsDashesFixtures,
+  ...underlineStylesFixtures,
   'tables': [
     {
       // The default style, referenced but not written in tableStyles.xml.

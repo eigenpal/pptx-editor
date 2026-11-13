@@ -784,6 +784,7 @@ export interface RunProps {
     // (undocumented)
     readonly underline: string;
     readonly underlineFill?: ResolvedFill;
+    readonly underlineLine?: ResolvedLine;
 }
 
 // @public

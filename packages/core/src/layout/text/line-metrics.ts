@@ -208,8 +208,17 @@ export function paragraphSpacingPt(
   return spacing.pct * SINGLE_LINE_FACTOR * sizePt;
 }
 
-/** Small caps render lowercase letters at this fraction of the size. */
+/**
+ * Small caps (`cap="small"`) draw lowercase letters as capitals at this fraction of the run
+ * size. Measured on glyph advances in reference PDFs at 9 to 41 pt: the capitals advance by
+ * 0.8 of the size, within 0.01. In a superscript or subscript, the capitals keep the script size
+ * (`caps-scripts`).
+ */
 export const SMALL_CAPS_SCALE = 0.8;
 
-/** Superscript/subscript (`baseline` ≠ 0) shrink runs to this fraction (measured). */
+/**
+ * A superscript or subscript (`baseline` ≠ 0) draws at this fraction of the run size, whatever
+ * its offset. Measured on glyph advances in reference PDFs at 9 to 41 pt, and at offsets from
+ * -50 % to 80 % (`caps-scripts`): two thirds of the size, within 0.01.
+ */
 export const SCRIPT_SIZE_SCALE = 2 / 3;

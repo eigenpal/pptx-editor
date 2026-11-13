@@ -113,11 +113,11 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Bold, italic, underline, strikethrough',
     category: 'text',
     editing: 'full',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Apply bold, italic, underline, and strikethrough, including underline colors. Underline styles other than single are approximate.',
+      'Apply bold, italic, underline, and strikethrough, including underline colors. Every underline style renders, with its underline color and outline.',
   },
   {
     id: 'text.font-family-size',
@@ -151,7 +151,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Superscript and subscript toggles. The Font dialog sets the offset, caps, and strikethrough kinds. Small caps and script size are approximate.',
+      'Superscript and subscript toggles. The Font dialog sets the offset, caps, and strikethrough kinds. Superscript and subscript offsets are approximate.',
   },
   {
     id: 'text.character-spacing',
