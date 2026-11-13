@@ -25,12 +25,21 @@ const SUPERSCRIPT_SHIFT_UP_CRAMPED = 0.293;
  * square of `(a + b)` (slide 3) 6.48 pt, the least rise. With 0.3 em, they rise 7.3 and 8.2 pt.
  */
 const SUPERSCRIPT_BASELINE_DROP_MAX = 0.4;
-/** The least ink gap between a superscript and a subscript of one base. */
-const SUB_SUPERSCRIPT_GAP_MIN = 300 / 2048;
+/**
+ * The least ink gap between a superscript and a subscript of one base. DOCX Editor uses
+ * 300/2048 em. The reference PDF of `equations`, slide 1, puts the square of `x_i^2` 7.44 pt
+ * above the baseline and the `i` 4.56 pt below it at 18 pt: a gap of 0.187 em, with
+ * `SUPERSCRIPT_BOTTOM_MAX_WITH_SUBSCRIPT`. A fit to that one construct; with DOCX Editor's
+ * constants, the square is 0.71 pt low.
+ */
+const SUB_SUPERSCRIPT_GAP_MIN = 0.187;
 /** How high the top of a subscript's ink may reach above the base baseline. */
 const SUBSCRIPT_TOP_MAX = 760 / 2048;
-/** How high a superscript bottom may rise to open the gap above a subscript. */
-const SUPERSCRIPT_BOTTOM_MAX_WITH_SUBSCRIPT = 765 / 2048;
+/**
+ * How high a superscript bottom may rise to open the gap above a subscript. DOCX Editor uses
+ * 765/2048 em; the reference PDF gives 0.413 em (see `SUB_SUPERSCRIPT_GAP_MIN`).
+ */
+const SUPERSCRIPT_BOTTOM_MAX_WITH_SUBSCRIPT = 0.413;
 /** The least subscript baseline drop. */
 const SUBSCRIPT_SHIFT_DOWN = 0.2;
 

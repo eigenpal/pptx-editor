@@ -81,7 +81,14 @@ export interface TextMeasurer {
   advances(
     face: ResolvedFace,
     text: string,
-    options?: { readonly kerning?: boolean }
+    options?: {
+      readonly kerning?: boolean;
+      /**
+       * The script level of math text (1 or 2): the face's script-style forms (the `ssty`
+       * feature of the math script) give the advances. A face without them keeps its forms.
+       */
+      readonly mathScript?: 1 | 2;
+    }
   ): Float64Array;
   /**
    * Another face that draws a character `face` lacks: the East Asian fallback faces first for

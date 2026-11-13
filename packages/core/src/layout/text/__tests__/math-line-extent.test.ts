@@ -170,8 +170,8 @@ describe('script shifts', () => {
   test('scripts on one base keep an ink gap: the superscript rises first, then the subscript drops', () => {
     const { u, v } = scriptShifts(part(0.5), part(0.5, 0.1), part(0.5), EM, false);
     // The ink gap between the bottom of the superscript and the top of the subscript.
-    expect((u - 0.1 * EM - (0.5 * EM - v)) / EM).toBeCloseTo(300 / 2048);
-    // The superscript bottom rises to its limit, 765/2048 em.
-    expect((u - 0.1 * EM) / EM).toBeCloseTo(765 / 2048);
+    expect((u - 0.1 * EM - (0.5 * EM - v)) / EM).toBeCloseTo(0.187);
+    // The superscript bottom rises to its limit, 0.413 em.
+    expect((u - 0.1 * EM) / EM).toBeCloseTo(0.413);
   });
 });

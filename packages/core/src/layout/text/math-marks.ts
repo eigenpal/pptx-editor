@@ -21,7 +21,7 @@ export function rect(x: number, y: number, w: number, h: number): Cmd[] {
 /**
  * The radical sign from `x` (its left edge) between `bottom` and `top` (the top of its stroke),
  * `width` wide, for a font size of `em`. The tick on the left keeps its size; the long stroke
- * rises to `top`.
+ * rises to `top`, `width` from the left edge.
  */
 export function radicalSign(
   x: number,
@@ -31,8 +31,7 @@ export function radicalSign(
   em: number
 ): Cmd[] {
   const t = 0.055 * em;
-  const sx = width / 0.655;
-  const px = (v: number): number => x + v * sx;
+  const px = (v: number): number => x + v * em;
   const py = (v: number): number => bottom + v * em;
   return [
     M(px(0), py(0.434)),

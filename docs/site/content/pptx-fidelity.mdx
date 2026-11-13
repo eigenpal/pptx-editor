@@ -172,7 +172,7 @@ These entries summarize rendering differences and behavior that ECMA-376 does no
 - **Inconsistent cell merges.** Merge markers outside a declared span render as normal cells. Spans stop at the table boundary or an earlier merged cell. These recovery rules are not measured against reference PDFs.
 - **Text warp.** Warped text loses ligatures, complex-script shaping, and synthetic bold or italic; the caret and selection follow flat text. Vertical, rotated, diagram, and very long text render flat. Other warps can differ in spacing and placement; see [Text warp](/docs/guides/text-warp).
 - **Diagram drawings.** Diagrams display their saved drawing instead of regenerating their layout from data. Resizing the frame does not recalculate the drawing. Missing drawings or drawings above complexity limits show placeholders; see [Diagrams](/docs/guides/diagrams).
-- **Equations.** Equation spacing, baselines, and line heights are approximate, especially around radicals and nested scripts. Unsupported constructs or equations above complexity limits use the text box fallback. See [Equations](/docs/guides/equations) for editing and font requirements.
+- **Equations.** Equation spacing, baselines, and line heights are approximate, especially around radicals and nested scripts. Scripts draw the regular glyph forms of the math font at the places of its script-style forms. Unsupported constructs or equations above complexity limits use the text box fallback. See [Equations](/docs/guides/equations) for editing and font requirements.
 
 ## Approximations after editing
 
