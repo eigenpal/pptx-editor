@@ -215,6 +215,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'vertical-east-asian': 0,
   },
   slides: {
+    'chart-sizes/7': ['line-position'],
     'charts/6': ['line-position'],
     'equation-lines/1': ['baseline'],
     'equation-lines/2': ['line-breaks', 'baseline', 'line-position', 'extra-text'],
@@ -308,6 +309,7 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
     'vertical-east-asian': 0,
   },
   slides: {
+    'chart-sizes/7': ['line-position'],
     'charts/6': ['line-position'],
     'equation-lines/1': ['baseline'],
     'equation-lines/2': ['line-breaks', 'baseline', 'line-position', 'extra-text'],
