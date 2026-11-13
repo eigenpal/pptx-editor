@@ -6,10 +6,12 @@
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
 import {
   isIdeographic,
+  lineUnderlines,
   strikeoutBars,
   type GlyphRun,
   type PathCommand,
   type TextLayout,
+  type UnderlineRing,
   type WarpedRun,
 } from '../layout/index.ts';
 import { fillPaint, STORED_PIXELS_STYLE, type PaintContext } from './paint-fill.ts';
@@ -70,44 +72,61 @@ function decorationRects(
   run: GlyphRun,
   baselineEmu: number,
   text: TextPaint,
-  underline: TextPaint
+  underline: TextPaint,
+  underlineRings: readonly UnderlineRing[] | undefined
 ): SVGElement[] {
   const out: SVGElement[] = [];
+  // The underline's shapes come from its line (`lineUnderlines`). It takes its own fill
+  // (`a:uFill`) when the run has one, and its outline (`a:uLn`) strokes it in a solid color.
+  if (underlineRings?.length) {
+    const line = run.props.underlineLine;
+    const color = line?.fill.type === 'solid' ? line.fill.color : undefined;
+    out.push(
+      svg(doc, 'path', {
+        d: ringPathData(underlineRings),
+        fill: underline.paint,
+        'fill-opacity': underline.opacity < 1 ? num(underline.opacity) : undefined,
+        stroke: color ? toCss(color) : undefined,
+        'stroke-width': color && line ? num(line.width / EMU_PER_PT) : undefined,
+        'stroke-linejoin': color && line ? line.join : undefined,
+      })
+    );
+  }
+  if (run.props.strike === 'noStrike') return out;
   const size = run.sizePt;
   const baseline = baselineEmu / EMU_PER_PT;
   const xs = run.x.map((v) => v / EMU_PER_PT);
-  // Trailing spaces at a line end are not underlined; the layout already
-  // excludes them from alignment, and runs keep them, so trim here.
+  // Trailing spaces are not struck through; the layout already excludes them from
+  // alignment, and runs keep them, so trim here.
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
   // A right-to-left run ends at its left: its trailing spaces are its leftmost cells.
   const x0 = run.rtl ? xs[run.text.length - end] : xs[0];
   const x1 = run.rtl ? xs[xs.length - 1] : (xs[end] ?? xs[xs.length - 1]);
   if (x1 <= x0) return out;
-  const m = run.face.metrics;
-  const thickness = Math.max(m.underlineThickness * size, size / 20);
   const y = baseline - run.rise / EMU_PER_PT;
-  // A strikethrough takes the run's fill and its alpha, as the glyphs do; an underline takes
-  // its own fill (`a:uFill`) when the run has one.
-  const bar = (top: number, { paint, opacity }: TextPaint, height = thickness): SVGElement =>
-    svg(doc, 'rect', {
-      x: num(x0),
-      y: num(top),
-      width: num(x1 - x0),
-      height: num(height),
-      fill: paint,
-      'fill-opacity': opacity < 1 ? num(opacity) : undefined,
-    });
-  if (run.props.underline !== 'none') {
-    const ty = y - m.underlinePosition * size;
-    out.push(bar(ty, underline));
-    if (run.props.underline === 'dbl') out.push(bar(ty + thickness * 2, underline));
-  }
-  if (run.props.strike !== 'noStrike') {
-    const strike = strikeoutBars(m, size, run.props.strike === 'dblStrike');
-    for (const top of strike.tops) out.push(bar(y + top, text, strike.thickness));
-  }
+  // A strikethrough takes the run's fill and its alpha, as the glyphs do.
+  const strike = strikeoutBars(run.face.metrics, size, run.props.strike === 'dblStrike');
+  for (const top of strike.tops)
+    out.push(
+      svg(doc, 'rect', {
+        x: num(x0),
+        y: num(y + top),
+        width: num(x1 - x0),
+        height: num(strike.thickness),
+        fill: text.paint,
+        'fill-opacity': text.opacity < 1 ? num(text.opacity) : undefined,
+      })
+    );
   return out;
+}
+
+/** The path data of closed rings in EMU, in points. */
+function ringPathData(rings: readonly UnderlineRing[]): string {
+  const pt = (emu: number): string => num(emu / EMU_PER_PT);
+  return rings
+    .map((ring) => ring.map(([x, y], i) => `${i ? 'L' : 'M'}${pt(x)} ${pt(y)}`).join('') + 'Z')
+    .join('');
 }
 
 /**
@@ -439,6 +458,7 @@ export function paintText(
   }
   for (const line of layout.lines) {
     if (shows && !shows(lineCorners(layout, line))) continue;
+    const unders = lineUnderlines(line.runs, line.baseline);
     for (const run of line.runs) {
       if (run.picture) {
         const image = bulletPicture(doc, run, line.baseline, ctx);
@@ -570,7 +590,9 @@ export function paintText(
         const under = run.props.underlineFill
           ? textFill(run.props.underlineFill, bounds, ctx)
           : fill;
-        for (const d of decorationRects(doc, run, line.baseline, fill, under)) group.appendChild(d);
+        const rings = unders.get(run);
+        for (const d of decorationRects(doc, run, line.baseline, fill, under, rings))
+          group.appendChild(d);
       }
     }
     if (line.marks) paintMarks(doc, line, group, bounds, ctx);

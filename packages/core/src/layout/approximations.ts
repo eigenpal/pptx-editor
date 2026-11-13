@@ -64,8 +64,6 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'path-start', title: 'Paths without a move', perSlide: false },
   { id: 'flipped-text', title: 'Text in flipped shapes', perSlide: true },
   { id: 'content-placeholders', title: 'Content placeholders', perSlide: true },
-  { id: 'small-caps', title: 'Small caps', perSlide: true },
-  { id: 'underline-styles', title: 'Underline styles', perSlide: true },
   { id: 'missing-glyphs', title: 'Missing glyphs', perSlide: false },
   { id: 'script-fonts', title: 'East Asian, complex-script, and symbol fonts', perSlide: true },
   { id: 'rtl', title: 'Right-to-left text', perSlide: true },
@@ -98,7 +96,6 @@ const ROTATED_TEXT = new Set([
   'wordArtVertRtl',
   'mongolianVert',
 ]);
-const DRAWN_UNDERLINES = new Set(['none', 'sng', 'dbl']);
 const RECOLOR_EFFECTS = new Set(['grayscale', 'duotone', 'biLevel']);
 
 /**
@@ -227,10 +224,8 @@ class Collector {
         const props = run.props;
         if (hasLongPaintCluster(run.text)) this.add('long-text-clusters');
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');
-        if (props.caps === 'small') this.add('small-caps');
         if (props.baseline !== 0) this.add('script-size');
         if (props.hyperlink || props.hyperlinkAction) this.add('hyperlink-text');
-        if (!DRAWN_UNDERLINES.has(props.underline)) this.add('underline-styles');
         const fill = props.fill.type === 'group' ? this.group : props.fill;
         if (fill?.type === 'linear' || fill?.type === 'path') this.add('gradient-text');
         this.fill(fill, false);

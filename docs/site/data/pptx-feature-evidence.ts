@@ -18,10 +18,7 @@ export interface FeatureEvidence {
 /** The evidence of each row, by row `id`, in matrix order. */
 export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   // --- Text & formatting -------------------------------------------------
-  'text.basic-formatting': {
-    fixtures: ['text-runs', 'font-effects'],
-    approximations: ['underline-styles'],
-  },
+  'text.basic-formatting': { fixtures: ['text-runs', 'font-effects', 'underline-styles'] },
   'text.font-family-size': {
     fixtures: ['text-runs', 'open-font-families'],
     approximations: ['line-model', 'long-text-clusters', 'glyph-advances', 'missing-glyphs'],
@@ -31,8 +28,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['gradient-text'],
   },
   'text.caps-baseline': {
-    fixtures: ['text-runs', 'font-effects'],
-    approximations: ['line-model', 'small-caps', 'script-size'],
+    fixtures: ['text-runs', 'font-effects', 'caps-scripts'],
+    approximations: ['line-model', 'script-size'],
   },
   'text.character-spacing': {
     fixtures: ['text-runs', 'font-effects'],

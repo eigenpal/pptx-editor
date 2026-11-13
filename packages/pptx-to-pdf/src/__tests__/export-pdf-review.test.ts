@@ -393,7 +393,7 @@ describe('diagnostics placement', () => {
     expect(fill).toMatchObject({ slideIndex: 2, slideNumber: 3, pageIndex: 1, pageNumber: 2 });
   });
 
-  test('single and double underline and strikethrough pass strict; other underline styles are approximate', async () => {
+  test('every underline style and strikethrough passes strict', async () => {
     const deckOf = (runs: string): Uint8Array =>
       buildPptx({
         slides: [
@@ -412,11 +412,19 @@ describe('diagnostics placement', () => {
       )
     );
     expect(exact.diagnostics.filter((d) => d.severity !== 'information')).toEqual([]);
-    const wavy = await exportPdf(deckOf(run('Wavy', 'u="wavy"')), BEST);
-    expect(wavy.diagnostics.map((d) => [d.code, d.severity])).toContainEqual([
-      'text.underline-style',
-      'approximation',
-    ]);
+    const styles = await exportPdf(
+      deckOf(
+        run('Wavy', 'u="wavy"') +
+          run('Dashed', 'u="dashHeavy"') +
+          run('Words', 'u="words"') +
+          run(
+            'Outlined',
+            'u="dotDash"',
+            '<a:uLn w="12700"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:uLn>'
+          )
+      )
+    );
+    expect(styles.diagnostics.filter((d) => d.severity !== 'information')).toEqual([]);
   });
 
   test('the font resolution lists no substitute failures when the packaged faces load', async () => {

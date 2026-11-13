@@ -278,12 +278,23 @@ describe('the PDF writer and the SVG paint agree', () => {
       ],
     });
     // The SVG bars are in points inside the frame; the PDF bars are in EMU inside the frame.
-    const svgBars = [...(await svgOf(bytes)).querySelectorAll('rect')]
-      .filter((r) => r.getAttribute('data-kind') !== 'background')
-      .map((r) => ({
-        fill: r.getAttribute('fill')!,
-        box: attrs(r, ['x', 'y', 'width', 'height']),
-      }));
+    // The underline is a path with one rectangle for each bar; the strikethrough is rects.
+    const svgBars = [
+      ...(await svgOf(bytes)).querySelectorAll('[data-pptx-text] rect, [data-pptx-text] path'),
+    ].flatMap((r) => {
+      const fill = r.getAttribute('fill')!;
+      if (r.tagName === 'rect') return [{ fill, box: attrs(r, ['x', 'y', 'width', 'height']) }];
+      return (r.getAttribute('d') ?? '')
+        .split('Z')
+        .filter(Boolean)
+        .map((ring) => {
+          const v = [...ring.matchAll(/[ML]([-\d.]+) ([-\d.]+)/g)];
+          const xs = v.map((m) => Number(m[1]));
+          const ys = v.map((m) => Number(m[2]));
+          const [x, y] = [Math.min(...xs), Math.min(...ys)];
+          return { fill, box: [x, y, Math.max(...xs) - x, Math.max(...ys) - y] };
+        });
+    });
     const pdf = await getDocument({
       data: (await exportPdf(bytes, BEST)).bytes.slice(),
       useSystemFonts: false,

@@ -13,7 +13,8 @@
  * `chart-data`, 2 copies, no prompt; `three-d-effects`, 2 copies, no prompt;
  * `diagram-editing`, 2 copies, no prompt; `equations`, 2 copies, no prompt; and
  * `three-d-turned-effects`, 2 copies and a copy with bevels set and removed on theme-styled
- * shapes, no prompt. On 8 November 2026: `equation-lines`, 2 copies, no prompt.
+ * shapes, no prompt. On 8 November 2026: `equation-lines`, 2 copies, no prompt. On 13 November
+ * 2026: `underline-styles` and `caps-scripts`, 4 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -21,6 +22,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'autofit',
   'bullets-gallery',
   'bullets-numbering',
+  'caps-scripts',
   'chart-data',
   'chart-sizes',
   'charts',
@@ -70,6 +72,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'text-warp',
   'three-d-effects',
   'three-d-turned-effects',
+  'underline-styles',
   'vertical-columns',
   'vertical-east-asian',
 ];

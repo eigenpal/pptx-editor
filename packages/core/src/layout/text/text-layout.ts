@@ -358,7 +358,8 @@ function buildSegments(
     let local = 0;
     for (const piece of bidiPieces(slotted, bidi?.levels, offset)) {
       const face = piece.face;
-      const sizePt = piece.small ? baseSize * SMALL_CAPS_SCALE : baseSize;
+      // In a superscript or subscript, small caps draw as capitals at the script size.
+      const sizePt = piece.small && scriptScale === 1 ? baseSize * SMALL_CAPS_SCALE : baseSize;
       const kerning = props.kern !== undefined && props.size >= props.kern;
       const em = measurer.advances(face, piece.text, { kerning });
       const adv = new Float64Array(piece.text.length);

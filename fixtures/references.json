@@ -46,6 +46,15 @@
         540
       ]
     },
+    "caps-scripts": {
+      "deck": "55d0886849820b043cd176beab97c203b73d483bcf42b26fa69190b95d14aa04",
+      "pdf": "f8e9da3d11311e5170cd4419d492342e01a1f7a2604e9762dbb96b5afa942caa",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "chart-data": {
       "deck": "5c1b7e7b88fdea2e8764eced47e692c33f09612232c0379063ed98d56699ebcb",
       "pdf": "d7b15e318fcabd82bef2d3d06f6078343d224b963f979a508f995e43ac8979bc",
@@ -482,6 +491,15 @@
       "deck": "f49084a9cb9b92460b862731e351318070fa34a489ef00ee562f639cdd610115",
       "pdf": "abd7b4d22750ec96cc8e05fb64ea0bba8fad028378495280b91191cb1ab94b15",
       "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "underline-styles": {
+      "deck": "68956fb6d8eec84687eefdb707af237b2e62090bbc6f118c3352bdc68e69a582",
+      "pdf": "4a9c1248da9e4a2660782de73bd5c6ef89f849fb305300e699ba0355adf5afff",
+      "pages": 3,
       "pageSizePt": [
         960,
         540

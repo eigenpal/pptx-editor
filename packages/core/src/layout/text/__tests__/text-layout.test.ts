@@ -381,3 +381,19 @@ describe('the line of an equation', () => {
     expect(spaced('<a:spcPts val="1200"/>').lines[0].height).toBe(12 * 12_700);
   });
 });
+
+describe('small caps and scripts', () => {
+  const sizes = (attrs: string): number[] =>
+    lay(
+      `<a:p><a:r><a:rPr lang="en-US" sz="1800" ${attrs}/><a:t>Hx</a:t></a:r></a:p>`
+    ).lines[0].runs.map((run) => run.sizePt);
+
+  test('small caps draw lowercase letters as capitals at 0.8 of the size', () => {
+    expect(sizes('cap="small"')).toEqual([18, 18 * 0.8]);
+  });
+
+  test('a script draws at two thirds of the size, and its small caps keep that size', () => {
+    expect(sizes('baseline="30000"')).toEqual([12]);
+    expect(sizes('baseline="-25000" cap="small"')).toEqual([12, 12]);
+  });
+});

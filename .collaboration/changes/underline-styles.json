@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The underline shapes, the underline outline that the cascade reads from a:uLn and a:uLnTx, and the small caps size in scripts affect layout, painted output, and PDF output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/text/__tests__/underline-marks.test.ts",
+    "packages/core/src/output/__tests__/paint.test.ts",
+    "packages/pptx-to-pdf/src/__tests__/painter-agreement.test.ts"
+  ]
+}

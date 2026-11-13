@@ -22,7 +22,9 @@ import {
   pushGraphicsState,
   setFillingRgbColor,
   setFontAndSize,
+  setLineJoin,
   setLineWidth,
+  LineJoinStyle,
   setStrokingRgbColor,
   stroke,
   setTextMatrix,
@@ -34,11 +36,13 @@ import {
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
 import {
   isIdeographic,
+  lineUnderlines,
   runGlyphs,
   strikeoutBars,
   type GlyphRun,
   type PathCommand,
   type TextLayout,
+  type UnderlineRing,
   type WarpedRun,
 } from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
@@ -136,6 +140,7 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
   let bounds: ReturnType<typeof textBounds> | undefined;
   const markBounds: { box?: ReturnType<typeof textBounds> } = {};
   for (const line of layout.lines) {
+    const unders = lineUnderlines(line.runs, line.baseline);
     const rtlOnly = line.runs.some((r) => r.rtl) && line.runs.every((r) => r.rtl || !r.text.trim());
     // Emit visual order across font/style boundaries too, so readers infer word spaces.
     const runs = line.runs.some((r) => r.rtl)
@@ -164,7 +169,14 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       // and on text whose font has no bytes.
       const decorate = (): void => {
         if (run.kind === 'text')
-          drawDecorations(run, line.baseline, scope, p, () => (bounds ??= textBounds(layout)));
+          drawDecorations(
+            run,
+            line.baseline,
+            scope,
+            p,
+            () => (bounds ??= textBounds(layout)),
+            unders.get(run)
+          );
       };
       if (run.props.outline)
         p.diag.add('text.outline', 'unsupported', 'Text outlines are not drawn yet.');
@@ -404,50 +416,29 @@ async function drawWarpedPicture(
   p.push(popGraphicsState());
 }
 
-/** Underline styles the bars draw exactly; the SVG paint draws every other style the same way. */
-const EXACT_UNDERLINES = new Set(['none', 'sng', 'dbl']);
-
 /**
- * Underline and strikethrough as filled bars, with the geometry of the SVG paint
- * (`core/src/output/paint-text.ts`, `decorationRects`): face metrics, trailing spaces trimmed,
- * the underline in its own fill (`a:uFill`) when the run has one, the strikethrough in the
- * run's fill. A gradient fill spans the text body's bounds, as the glyphs' does.
+ * Underline and strikethrough as filled shapes, with the geometry of the SVG paint
+ * (`core/src/output/paint-text.ts`, `decorationRects`): the underline shapes of the line
+ * (`lineUnderlines`) in their own fill (`a:uFill`) when the run has one and stroked with a solid
+ * underline outline (`a:uLn`), and the strikethrough bars in the run's fill, trailing spaces
+ * trimmed. A gradient fill spans the text body's bounds, as the glyphs' does.
  */
 function drawDecorations(
   run: GlyphRun,
   baseline: number,
   scope: FillScope,
   p: PageOps,
-  bounds: () => { x: number; y: number; w: number; h: number }
+  bounds: () => { x: number; y: number; w: number; h: number },
+  underline: readonly UnderlineRing[] | undefined
 ): void {
-  const { underline, strike } = run.props;
-  if (underline === 'none' && strike === 'noStrike') return;
-  if (!EXACT_UNDERLINES.has(underline))
-    p.diag.add(
-      'text.underline-style',
-      'approximation',
-      'Dotted, dashed, wavy, heavy, and word-only underlines are drawn as single lines.'
-    );
-  let end = run.text.length;
-  while (end > 0 && run.text[end - 1] === ' ') end -= 1;
-  const x0 = run.rtl ? run.x[run.text.length - end] : run.x[0];
-  const x1 = run.rtl ? run.x[run.x.length - 1] : (run.x[end] ?? run.x[run.x.length - 1]);
-  if (!(x1 > x0)) return;
-  const size = run.sizePt * EMU_PER_PT;
-  const m = run.face.metrics;
-  const thickness = Math.max(m.underlineThickness * size, size / 20);
-  const y = baseline - run.rise;
-  const bars = (fillValue: ResolvedFill, tops: readonly number[], height = thickness): void => {
+  const { strike } = run.props;
+  const shapes = (fillValue: ResolvedFill, rings: readonly UnderlineRing[]): void => {
     const own = ownFill(fillValue, scope).fill;
     const trace = (): void => {
-      for (const top of tops)
-        p.push(
-          moveTo(x0, top),
-          lineTo(x1, top),
-          lineTo(x1, top + height),
-          lineTo(x0, top + height),
-          closePath()
-        );
+      for (const ring of rings) {
+        ring.forEach(([x, y], i) => p.push(i ? lineTo(x, y) : moveTo(x, y)));
+        p.push(closePath());
+      }
     };
     if (own.type === 'solid') {
       p.push(pushGraphicsState());
@@ -467,22 +458,48 @@ function drawDecorations(
       flatColor(fillValue, scope, p, 'text');
     }
   };
-  if (underline !== 'none') {
-    const top = y - m.underlinePosition * size;
-    bars(
-      run.props.underlineFill ?? run.props.fill,
-      underline === 'dbl' ? [top, top + thickness * 2] : [top]
-    );
+  if (underline?.length) {
+    shapes(run.props.underlineFill ?? run.props.fill, underline);
+    const line = run.props.underlineLine;
+    if (line && line.fill.type === 'solid' && line.width > 0) {
+      p.push(pushGraphicsState());
+      p.alpha(1, line.fill.color.a);
+      p.push(setStrokingRgbColor(...rgb(line.fill.color)), setLineWidth(line.width));
+      p.push(setLineJoin(JOINS[line.join]));
+      for (const ring of underline) {
+        ring.forEach(([x, y], i) => p.push(i ? lineTo(x, y) : moveTo(x, y)));
+        p.push(closePath());
+      }
+      p.push(stroke(), popGraphicsState());
+    }
   }
-  if (strike !== 'noStrike') {
-    const bar = strikeoutBars(m, size, strike === 'dblStrike');
-    bars(
-      run.props.fill,
-      bar.tops.map((top) => y + top),
-      bar.thickness
-    );
-  }
+  if (strike === 'noStrike') return;
+  let end = run.text.length;
+  while (end > 0 && run.text[end - 1] === ' ') end -= 1;
+  const x0 = run.rtl ? run.x[run.text.length - end] : run.x[0];
+  const x1 = run.rtl ? run.x[run.x.length - 1] : (run.x[end] ?? run.x[run.x.length - 1]);
+  if (!(x1 > x0)) return;
+  const y = baseline - run.rise;
+  const bar = strikeoutBars(run.face.metrics, run.sizePt * EMU_PER_PT, strike === 'dblStrike');
+  shapes(
+    run.props.fill,
+    bar.tops.map((top): UnderlineRing => {
+      const [a, b] = [y + top, y + top + bar.thickness];
+      return [
+        [x0, a],
+        [x1, a],
+        [x1, b],
+        [x0, b],
+      ];
+    })
+  );
 }
+
+const JOINS = {
+  round: LineJoinStyle.Round,
+  bevel: LineJoinStyle.Bevel,
+  miter: LineJoinStyle.Miter,
+} as const;
 
 /**
  * The picture of a picture bullet, standing on the baseline, stretched over its box as the SVG
