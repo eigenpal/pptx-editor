@@ -122,7 +122,7 @@ describe('math layout', () => {
     expect(sizes(nested(mr('z')))).toEqual([
       ['𝑥', 18],
       ['𝑦', 13],
-      ['𝑧', 10.5],
+      ['𝑧', 11],
     ]);
     expect(sizes(nested(mr('z', true)))).toEqual([
       ['𝑥', 18],
@@ -173,9 +173,80 @@ describe('math layout', () => {
     const b = box('\\sqrt[3](x)');
     expect(b.marks).toHaveLength(2);
     expect(b.glyphs.map((g) => [g.text, g.sizePt])).toEqual([
-      ['3', 10.5],
+      ['3', 11],
       ['𝑥', 18],
     ]);
+  });
+
+  test('script glyphs advance by their script-style forms at the unrounded script size', () => {
+    // A measurer whose script-style forms are 0.6 em (level 1) and 0.7 em (level 2) wide.
+    const fixed = createFixedMeasurer();
+    const styled = {
+      ...fixed,
+      advances: (
+        face: Parameters<typeof fixed.advances>[0],
+        text: string,
+        options?: { readonly mathScript?: 1 | 2 }
+      ) => {
+        const out = fixed.advances(face, text);
+        const w = options?.mathScript === 2 ? 0.7 : options?.mathScript === 1 ? 0.6 : 0;
+        if (w) for (let i = 0; i < out.length; i += 1) if (out[i]! > 0) out[i] = w;
+        return out;
+      },
+    };
+    const zone = readMathZone(zoneOf('x^(yz^w)'), () => props)!;
+    const b = layoutMath(zone, styled, 1);
+    const at = (t: string) => b.glyphs.find((g) => g.text === t)!;
+    // Drawn at 13 pt and 11 pt (73 % and 60 % of 18 pt, to the nearest half point), placed
+    // at 13.14 pt and 10.8 pt.
+    expect(at('𝑦').sizePt).toBe(13);
+    expect(at('𝑤').sizePt).toBe(11);
+    expect(at('𝑧').x[0]! - at('𝑦').x[0]!).toBeCloseTo(0.6 * 13.14 * 12_700, 0);
+    const w = at('𝑤');
+    expect(w.x[w.x.length - 1]! - w.x[0]!).toBeCloseTo(0.7 * 10.8 * 12_700, 0);
+    // The base keeps its plain advance.
+    expect(at('𝑥').x[1]! - at('𝑥').x[0]!).toBeCloseTo(0.5 * EM, 0);
+  });
+
+  test('a script ends with the space after a script, and prescripts start with it', () => {
+    const sup = box('x^2');
+    const two = sup.glyphs[1]!;
+    expect(sup.width - two.x[two.x.length - 1]!).toBeCloseTo(0.04 * EM, 0);
+    const pre = omml(
+      `<m:sPre><m:sub>${mr('6')}</m:sub><m:sup>${mr('14')}</m:sup><m:e>${mr('C')}</m:e></m:sPre>`
+    );
+    const first = Math.min(...pre.glyphs.map((g) => g.x[0]!));
+    expect(first).toBeCloseTo(0.04 * EM, 0);
+  });
+
+  test('a radical ends with its radicand, and its degree sits on the kerns of the font', () => {
+    const plain = box('\\sqrt(x)');
+    const x = plain.glyphs[0]!;
+    // The rule and the box end where the radicand ends.
+    expect(plain.width).toBeCloseTo(x.x[1]!, 0);
+    const rule = plain.marks[1]!.commands.filter((c) => c.op !== 'Z');
+    expect(Math.max(...rule.map((c) => ('x' in c ? c.x : 0)))).toBeCloseTo(plain.width, 0);
+    // The degree starts 0.065 em into the box; the sign starts 0.335 em before its end.
+    const deg = box('\\sqrt[3](x)');
+    const three = deg.glyphs[0]!;
+    expect(three.x[0]!).toBeCloseTo(0.065 * EM, 0);
+    const sign = deg.marks[0]!.commands.filter((c) => c.op !== 'Z');
+    const left = Math.min(...sign.map((c) => ('x' in c ? c.x : Infinity)));
+    expect(left).toBeCloseTo(three.x[1]! - 0.335 * EM + 0.019 * EM, 0);
+  });
+
+  test('a radical sign reaches below its box, and its line keeps the box', () => {
+    // A subscript gives the radicand a descent; the sign reaches further down than the box.
+    const b = omml(
+      `<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg/><m:e>` +
+        `<m:sSub><m:e>${mr('a')}</m:e><m:sub>${mr('n')}</m:sub></m:sSub></m:e></m:rad>`
+    );
+    const sign = b.marks[0]!;
+    const bottom = Math.min(...sign.commands.map((c) => ('y' in c ? c.y : 0)));
+    expect(sign.claimBelow).toBeDefined();
+    expect(-bottom).toBeGreaterThan(sign.claimBelow!);
+    expect(b.descent).toBeCloseTo(sign.claimBelow!, 0);
+    expect(b.lineDescent).toBeLessThan(-bottom);
   });
 
   test('delimiters grow with a matrix', () => {

@@ -929,6 +929,7 @@ export interface TextLayout {
 export interface TextMeasurer {
     advances(face: ResolvedFace, text: string, options?: {
         readonly kerning?: boolean;
+        readonly mathScript?: 1 | 2;
     }): Float64Array;
     fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
     glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;

@@ -399,11 +399,12 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
   const advances = (
     face: ResolvedFace,
     text: string,
-    options?: { readonly kerning?: boolean }
+    options?: { readonly kerning?: boolean; readonly mathScript?: 1 | 2 }
   ): Float64Array => {
     const lf = loaded.get(face.id);
     const kerning = options?.kerning === true && (lf?.kerns === true || face.substituted);
-    const key = `${face.id}${kerning ? 'k' : ''}\u0000${text}`;
+    const ssty = options?.mathScript;
+    const key = `${face.id}${kerning ? 'k' : ''}${ssty ? `s${ssty}` : ''}\u0000${text}`;
     const hit = cache.get(key);
     if (hit) return hit;
     const out = new Float64Array(text.length);
@@ -414,10 +415,18 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     buffer ??= new module.Buffer();
     buffer.reset();
     buffer.addText(text);
+    // Script-style forms are features of the math script (`Zmth`), which no character of the
+    // text names: set it before the other properties are guessed.
+    if (ssty) buffer.setScript('Zmth');
     buffer.guessSegmentProperties();
     // Slide text takes no standard or contextual ligatures, and embedded subset fonts
     // often lack the ligature glyphs. Paint disables them too.
-    module.shape(lf.font, buffer, featuresFor(module, kerning, text));
+    const features = featuresFor(module, kerning, text);
+    module.shape(
+      lf.font,
+      buffer,
+      ssty ? [...features, new module.Feature('ssty', ssty)] : features
+    );
     // `addText` adds UTF-16, so clusters are UTF-16 offsets into `text`.
     const infos = buffer.getGlyphInfos();
     const positions = buffer.getGlyphPositions();

@@ -16,7 +16,8 @@
 // - The band has an ascent share of 0.81 whatever face draws the equation (`MATH_LINE_BAND`).
 // - A structure claims the ink of its marks (rules, radical signs, delimiters, and braces), not
 //   its box, also a fraction of a display equation. The rule of a radical also claims the math
-//   leading above it (`MathMark.claimAbove`, set in `math-layout.ts`).
+//   leading above it (`MathMark.claimAbove`, set in `math-layout.ts`), and its sign claims the
+//   depth of the radical's box, not the depth of its outline (`MathMark.claimBelow`).
 // These are not measured, because no fixture holds them (the reference draws n-ary operators
 // with a math font that is not open), so they keep the ink rule:
 // - The operator of an inline n-ary structure claims its ink, not its whole box, and an inline
@@ -99,7 +100,7 @@ export function mathLineExtent(
     for (const c of m.commands)
       if (c.op !== 'Z') {
         ascent = Math.max(ascent, c.y + (m.claimAbove ?? 0));
-        descent = Math.max(descent, -c.y);
+        descent = Math.max(descent, m.claimBelow ?? -c.y);
       }
   return { ascent, descent };
 }
