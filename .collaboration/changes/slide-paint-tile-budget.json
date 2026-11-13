@@ -3,7 +3,7 @@
   "fields": [],
   "before": "pptx-collaboration:1.8.1.1",
   "after": "pptx-collaboration:1.8.1.1",
-  "reason": "The slide painter gives each paint of a slide the whole tile image budget and spends it in paint order on the background and every item on screen, and paints a kept item with tiles again when the images left for it change, so the slide draws the tiles of a fresh paint and earlier paints and edits no longer switch tiled fills to the pattern. This changes painted output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "reason": "The slide painter gives each paint of a slide whole budgets of tile images and shape gradient bands and spends them in paint order on the background and every item on screen, and paints a kept item that read a budget again when what was left for it changes, so the slide draws the tiles and bands of a fresh paint and earlier paints and edits no longer switch tiled fills to the pattern or shape gradients to the rectangle construction. This changes painted output only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
   "tests": [
     "packages/core/src/output/__tests__/slide-painter.test.ts",
     "packages/core/src/output/__tests__/fill-fidelity.test.ts"

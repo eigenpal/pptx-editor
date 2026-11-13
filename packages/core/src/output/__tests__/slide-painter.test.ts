@@ -307,3 +307,58 @@ test('a tiled shape added in front leaves the kept shapes as a fresh paint draws
   painter.paint(layout);
   expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, TILE_OPTS)));
 });
+
+const SHAPE_GRADIENT =
+  '<a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>' +
+  '<a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst>' +
+  '<a:path path="shape"><a:fillToRect l="50000" t="50000" r="50000" b="50000"/></a:path>' +
+  '</a:gradFill>';
+
+test('each paint of a slide has the whole band budget: a shape gradient keeps its bands', () => {
+  const layout = tiledLayout(
+    shape({ id: 2, x: IN, y: IN, cx: 2 * IN, cy: 2 * IN, prst: 'star5', fill: SHAPE_GRADIENT })
+  );
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  let svg = painter.paint(layout);
+  // Each new key paints the shape again: 400 paints spend the band budget of each paint, not
+  // of the painter.
+  for (let i = 0; i < 400; i += 1) {
+    painter.invalidate(i);
+    svg = painter.paint(layout);
+  }
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, TILE_OPTS)));
+});
+
+/**
+ * The painted slide as `normalized` text with its ids left out: the rectangle construction of a
+ * shape gradient refers to its gradients from its definitions, whose order an incremental paint
+ * changes.
+ */
+const unnumbered = (svg: Element): string =>
+  normalized(svg).replace(/id\d+/g, 'id').split('\n').sort().join('\n');
+
+test('a banded shape added in front leaves the kept shapes as a fresh paint draws them', () => {
+  // Each 1,500-command outline costs 96,000 of the 512,000 band work: five fit, the sixth not.
+  const points = Array.from({ length: 1_499 }, (_, i) => {
+    const t = (i / 1_499) * 2 * Math.PI;
+    const x = Math.round(50_000 + 50_000 * Math.cos(t));
+    return `<a:lnTo><a:pt x="${x}" y="${Math.round(50_000 + 50_000 * Math.sin(t))}"/></a:lnTo>`;
+  }).join('');
+  const custom =
+    '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/>' +
+    '<a:pathLst><a:path w="100000" h="100000"><a:moveTo><a:pt x="100000" y="50000"/></a:moveTo>' +
+    `${points}</a:path></a:pathLst></a:custGeom>`;
+  const banded = (id: number): string =>
+    shape({ id, x: id * 300_000, y: 0, cx: IN, cy: IN, fill: SHAPE_GRADIENT }).replace(
+      /<a:prstGeom[\s\S]*?<\/a:prstGeom>/,
+      custom
+    );
+  const layout = tiledLayout([2, 3, 4, 5, 6].map(banded).join(''));
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  painter.paint(layout);
+  const added = { ...layout, items: [tiledLayout(banded(7)).items[0]!, ...layout.items] };
+  const svg = painter.paint(added);
+  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, added, TILE_OPTS)));
+  painter.paint(layout);
+  expect(unnumbered(svg)).toBe(unnumbered(paintSlide(doc, layout, TILE_OPTS)));
+});

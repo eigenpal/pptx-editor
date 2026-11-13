@@ -24,6 +24,9 @@ import { ALIGN_POINTS, blipColorSteps } from './effect-transforms.ts';
 import { circleGradient, linearGradient, rectGradient, shapeGradient } from './paint-gradient.ts';
 import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
 import { Defs, matrixParts, num, svg } from './svg.ts';
+import { paintBudgets } from './paint-budgets.ts';
+
+export { MAX_SLIDE_TILE_IMAGES } from './paint-budgets.ts';
 
 /** Resolves a picture fill's relationship id to a displayable URL (never a remote fetch). */
 export type ImageUrlPort = (sourcePart: string, rId: string) => string | undefined;
@@ -501,63 +504,6 @@ function tilePaint(
   return { paint: defs.add(pattern), opacity: pictureAlpha(fill) };
 }
 
-/**
- * The most tile images that one paint of a slide draws (`TileBudget`). A slide with more tiles
- * fills the rest with the pattern of `tilePaint`, so a file cannot make the paint write millions
- * of elements, with many shapes or many filled paths.
- */
-export const MAX_SLIDE_TILE_IMAGES = 4096;
-
-/** The tile images left in one paint of a slide. */
-export class TileBudget {
-  #spent = 0;
-  #asks = 0;
-  /** How many tiled fills read the budget: a paint that reads none draws the same whatever is left. */
-  get asks(): number {
-    return this.#asks;
-  }
-  /** The images left, for a tiled fill that fits its tiles to them. */
-  ask(): number {
-    this.#asks += 1;
-    return this.left;
-  }
-  /** The images still allowed, never below zero. */
-  get left(): number {
-    return Math.max(0, MAX_SLIDE_TILE_IMAGES - this.#spent);
-  }
-  /** The images spent so far, past the budget too. */
-  get spent(): number {
-    return this.#spent;
-  }
-  spend(n: number): void {
-    this.#spent += n;
-  }
-}
-
-/** The tile image budget of the slide paint in progress, by the painter's `Defs`. */
-const tileWork = new WeakMap<Defs, TileBudget>();
-
-/**
- * The tile budget of the paint in progress with `defs`: a fresh `paintSlide` makes new `Defs`,
- * so its first tiled fill makes the budget.
- */
-export function tileBudget(defs: Defs): TileBudget {
-  let budget = tileWork.get(defs);
-  if (!budget) tileWork.set(defs, (budget = new TileBudget()));
-  return budget;
-}
-
-/**
- * Start a new slide paint with `defs`, with the whole tile budget. A painter that keeps its
- * `Defs` across paints (`SlidePainter`) calls this when each paint starts, so each paint of a
- * slide spends the same budget and draws the same tiles.
- */
-export function startTileBudget(defs: Defs): TileBudget {
-  const budget = new TileBudget();
-  tileWork.set(defs, budget);
-  return budget;
-}
-
 /** A rectangle in a fill box's space, by its edges. */
 export interface TileArea {
   readonly x0: number;
@@ -664,7 +610,7 @@ function tileImages(
   const { defs } = ctx;
   const doc = defs.doc;
   const g = tileGeometry(fill.tile!, ctx.imageSize?.(ctx.sourcePart, fill.rId), w, h);
-  const budget = tileBudget(defs);
+  const budget = paintBudgets(defs).tiles;
   const tiles = tilePlacements(g, area, budget.ask());
   if (!tiles) return undefined;
   budget.spend(tiles.length);
