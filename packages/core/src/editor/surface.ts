@@ -521,7 +521,7 @@ export class SlideSurface {
   #onPointerDown = (e: PointerEvent): void => {
     // The slide shows composed text the model does not hold yet: it goes in first, so the
     // press, and the right-click menu after it, land on the text the user sees.
-    if (this.#composition.view()) this.#inputBinding.endComposition();
+    if (e.button !== 1 && this.#composition.view()) this.#inputBinding.endComposition();
     // On a Mac, Ctrl+click is a right-click: the context menu handles it, not a press.
     if (e.button !== 0 || (e.ctrlKey && /Mac|iP(hone|ad)/.test(navigator.platform))) return;
     const layout = this.editor.layout();

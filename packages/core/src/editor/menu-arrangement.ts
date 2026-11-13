@@ -52,7 +52,7 @@ export function placeInViewport(
 
 /**
  * Where a canvas context menu opens: the pointer, or for a keyboard open (`at` null) just below
- * the caret for the text menu (`caret`: the focused input sits on the caret), else the middle
+ * the caret while text is edited (`caret`: the focused input sits on it), else the middle
  * of the selection outline, else of the canvas. @internal
  */
 export function canvasMenuPoint(
