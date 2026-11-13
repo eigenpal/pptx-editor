@@ -28,6 +28,12 @@ interface PaintedItem {
   readonly defs: SVGElement[];
   /** The tile images it draws (`MAX_SLIDE_TILE_IMAGES`): a later paint that keeps it spends them. */
   tiles: number;
+  /**
+   * The tile images left when it began to paint, and whether a tiled fill in it read them. Its
+   * paint depends on nothing else of the budget, so a later paint keeps it only with as many left.
+   */
+  tileLeft: number;
+  tiled: boolean;
   /** A group painted in part (`paint`'s budget): the index of its first child left out. */
   rest?: number;
 }
@@ -173,15 +179,38 @@ export class SlidePainter {
       sourcePart: layout.slide.backgroundPart,
     };
     // Each paint has the whole tile budget, spent in paint order: the background, then each item
-    // on screen, kept or new. So the edits before a paint do not use up its budget, and the
-    // tiles on screen stay within one budget.
+    // on screen, kept or new. So the edits before a paint do not use up its budget, the tiles on
+    // screen stay within one budget, and a kept item with tiles paints again when the images left
+    // for it changed (`retiles`): the slide draws the tiles of a fresh paint.
     const tileBudget = startTileBudget(this.#defs);
-    /** Run `paint` and count the tile images it spent. */
-    const counted = <T>(paint: () => T): { value: T; defs: SVGElement[]; tiles: number } => {
-      const from = tileBudget.spent;
+    /** Run `paint` and count the tile images it spent, and whether it read the budget. */
+    const counted = <T>(paint: () => T) => {
+      const [from, asks, tileLeft] = [tileBudget.spent, tileBudget.asks, tileBudget.left];
       const fresh = this.#defs.capture(paint);
-      return { value: fresh.value, defs: [...fresh.defs], tiles: tileBudget.spent - from };
+      const tiles = tileBudget.spent - from;
+      return {
+        value: fresh.value,
+        defs: [...fresh.defs],
+        tiles,
+        tileLeft,
+        tiled: tileBudget.asks > asks,
+      };
     };
+    /** The painted item of a counted paint. */
+    const paintedOf = (fresh: ReturnType<typeof counted<SVGElement | null>>): PaintedItem => ({
+      node: fresh.value,
+      defs: fresh.defs,
+      tiles: fresh.tiles,
+      tileLeft: fresh.tileLeft,
+      tiled: fresh.tiled,
+    });
+    /**
+     * Whether a kept item paints otherwise now: a tiled fill in it read a budget with other
+     * images left. An item before it in paint order changed its tiles, so it paints again, as a
+     * fresh paint draws it. A group painted in part goes on with its children instead.
+     */
+    const retiles = (painted: PaintedItem | undefined): boolean =>
+      !!painted?.tiled && painted.rest === undefined && painted.tileLeft !== tileBudget.left;
     // The background is one rectangle: it paints each time.
     const drop = dropPainted;
     if (this.#background) drop(this.#background);
@@ -189,7 +218,7 @@ export class SlidePainter {
     const background = counted(() =>
       paintBackground(doc, layout.slide.background, width, height, ctx)
     );
-    this.#background = { node: background.value, defs: background.defs, tiles: background.tiles };
+    this.#background = paintedOf(background);
     root.insertBefore(background.value, content);
     const next = new Map<LayoutItem, PaintedItem>();
     const nodes: SVGElement[] = [];
@@ -202,12 +231,11 @@ export class SlidePainter {
         const g = groupNode(doc, item, opts);
         const fresh = counted(() => paintChildren(doc, item, g, ctx, opts, 0, room));
         const { next: rest, spent } = fresh.value;
-        const painted: PaintedItem = { node: g, defs: fresh.defs, tiles: fresh.tiles };
+        const painted = paintedOf({ ...fresh, value: g });
         if (rest < item.children.length) painted.rest = rest;
         return [painted, spent + 1];
       }
-      const fresh = counted(() => paintItem(doc, item, ctx, opts, 1));
-      return [{ node: fresh.value, defs: fresh.defs, tiles: fresh.tiles }, paintWeight(item)];
+      return [paintedOf(counted(() => paintItem(doc, item, ctx, opts, 1))), paintWeight(item)];
     };
     /**
      * Go on with a group painted in part, in `room`, after its earlier children spend their
@@ -221,6 +249,7 @@ export class SlidePainter {
       const more = counted(() => paintChildren(doc, item, node, ctx, opts, from, room));
       painted.defs.push(...more.defs);
       painted.tiles += more.tiles;
+      painted.tiled ||= more.tiled;
       if (more.value.next < item.children.length) painted.rest = more.value.next;
       else delete painted.rest;
       return more.value.spent;
@@ -234,7 +263,8 @@ export class SlidePainter {
     let current: Set<LayoutItem> | null = null;
     for (const item of layout.items) {
       let painted: PaintedItem;
-      const stale = this.#stale?.has(item) === true;
+      const stale =
+        this.#stale?.has(item) === true || (!next.has(item) && retiles(this.#items.get(item)));
       const kept = next.has(item) || stale ? undefined : this.#items.get(item);
       if (kept) {
         // A group painted in part goes on with its children.
@@ -289,7 +319,7 @@ export class SlidePainter {
         next.set(item, painted);
         if (stale) {
           // Painted again: its earlier node and definitions go.
-          this.#stale!.delete(item);
+          this.#stale?.delete(item);
           if (old) drop(old);
         }
       }

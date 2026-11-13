@@ -289,3 +289,21 @@ test('shapes painted over several frames share one tile budget, as a fresh paint
   expect(svg.querySelectorAll('image').length).toBe(2 * 1_600 + 1);
   expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, TILE_OPTS)));
 });
+
+test('a tiled shape added in front leaves the kept shapes as a fresh paint draws them', () => {
+  const box = (id: number): string =>
+    shape({ id, x: id * 400_000, y: 0, cx: 9_525 * 40, cy: 9_525 * 40, fill: TILE(781, 1041) });
+  const layout = tiledLayout(box(2) + box(3) + box(4));
+  const painter = new SlidePainter(doc, TILE_OPTS);
+  painter.paint(layout);
+  // The kept boxes paint after the new one: the second of them no longer fits the budget.
+  const added = { ...layout, items: [tiledLayout(box(5)).items[0]!, ...layout.items] };
+  const svg = painter.paint(added);
+  const fresh = paintSlide(doc, added, TILE_OPTS);
+  expect(fresh.querySelectorAll('image').length).toBe(2 * 1_600 + 2);
+  expect(svg.querySelectorAll('image').length).toBe(2 * 1_600 + 2);
+  expect(normalized(svg)).toBe(normalized(fresh));
+  // Taking the new shape out gives the kept boxes their tiles back.
+  painter.paint(layout);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, TILE_OPTS)));
+});

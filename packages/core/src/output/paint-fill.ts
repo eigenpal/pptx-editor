@@ -511,6 +511,16 @@ export const MAX_SLIDE_TILE_IMAGES = 4096;
 /** The tile images left in one paint of a slide. */
 export class TileBudget {
   #spent = 0;
+  #asks = 0;
+  /** How many tiled fills read the budget: a paint that reads none draws the same whatever is left. */
+  get asks(): number {
+    return this.#asks;
+  }
+  /** The images left, for a tiled fill that fits its tiles to them. */
+  ask(): number {
+    this.#asks += 1;
+    return this.left;
+  }
   /** The images still allowed, never below zero. */
   get left(): number {
     return Math.max(0, MAX_SLIDE_TILE_IMAGES - this.#spent);
@@ -655,7 +665,7 @@ function tileImages(
   const doc = defs.doc;
   const g = tileGeometry(fill.tile!, ctx.imageSize?.(ctx.sourcePart, fill.rId), w, h);
   const budget = tileBudget(defs);
-  const tiles = tilePlacements(g, area, budget.left);
+  const tiles = tilePlacements(g, area, budget.ask());
   if (!tiles) return undefined;
   budget.spend(tiles.length);
   const images = tiles.map((t) =>
