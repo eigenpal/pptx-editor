@@ -37,6 +37,8 @@ import {
 import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import { around, clip, fillEvenOdd, type PageOps } from './page-ops.ts';
 import { fontEmbeddingDecision } from './pdf-font-embedding.ts';
+import { drawSvgPicture, svgDrawingFor } from './paint-svg-picture.ts';
+import type { SvgPictureDrawing } from '@pptx-editor.dev/core/editor';
 
 /**
  * The largest picture this writer decodes. `pdf-lib` decodes every PNG pixel, so a small file
@@ -301,8 +303,45 @@ export async function canDrawPicture(
   fill: PictureFill,
   p: PageOps
 ): Promise<boolean> {
+  if (fill.svgRId && svgDrawing(sourcePart, fill, p)) return true;
   const target = relTarget(p.res.pkg, sourcePart, fill.rId);
   return target ? (await imageFor(target, p)) !== null : false;
+}
+
+/** The vector drawing of a picture fill's SVG picture, or null when the editor draws its PNG. */
+function svgDrawing(sourcePart: string, fill: PictureFill, p: PageOps): SvgPictureDrawing | null {
+  const target = fill.svgRId ? relTarget(p.res.pkg, sourcePart, fill.svgRId) : undefined;
+  return target ? svgDrawingFor(target, p) : null;
+}
+
+/**
+ * Where the whole picture sits in a `w` × `h` box: `fillRect` places the picture's visible part,
+ * and `srcRect` crops it, so the whole picture extends past that place by the crop.
+ */
+function pictureBox(
+  fill: PictureFill,
+  w: number,
+  h: number
+): { x: number; y: number; w: number; h: number } {
+  const fr = fill.fillRect;
+  const bx = fr.l * w;
+  const by = fr.t * h;
+  const bw = w * (1 - fr.l - fr.r);
+  const bh = h * (1 - fr.t - fr.b);
+  // A crop that leaves nothing visible on an axis (two concurrent crops merged edge by edge)
+  // draws uncropped on that axis, as the SVG paint and the crop commands read it.
+  const raw = fill.srcRect;
+  const okW = 1 - raw.l - raw.r >= 0.001;
+  const okH = 1 - raw.t - raw.b >= 0.001;
+  const sr = {
+    l: okW ? raw.l : 0,
+    r: okW ? raw.r : 0,
+    t: okH ? raw.t : 0,
+    b: okH ? raw.b : 0,
+  };
+  const iw = bw / (1 - sr.l - sr.r);
+  const ih = bh / (1 - sr.t - sr.b);
+  return { x: bx - sr.l * iw, y: by - sr.t * ih, w: iw, h: ih };
 }
 
 /**
@@ -317,18 +356,6 @@ export async function drawPicture(
   h: number,
   p: PageOps
 ): Promise<void> {
-  const target = relTarget(p.res.pkg, sourcePart, fill.rId);
-  if (!target) {
-    p.diag.add('picture.missing', 'unsupported', 'A picture part is missing or external.');
-    return;
-  }
-  // The fallback is the deck's own raster picture of the SVG, so it is reported, not refused.
-  if (fill.svgRId)
-    p.diag.add(
-      'picture.svg-fallback',
-      'information',
-      'SVG pictures are drawn from their PNG fallback.'
-    );
   // The SVG paint draws no other effect either, so the export reports them as the editor shows.
   const unsupported = fill.effects.find((e) => e.kind === 'unsupported');
   if (unsupported)
@@ -337,10 +364,33 @@ export async function drawPicture(
       'approximation',
       `The picture color effect ${clip(unsupported.name)} is not drawn.`
     );
+  const alpha = fill.effects.reduce((a, e) => (e.kind === 'alphaModFix' ? a * e.amount : a), 1);
+  // An SVG picture that the editor draws as vector art draws as PDF paths, without color
+  // effects or tiles. Any other one draws the deck's own raster picture of the SVG, so it is
+  // reported, not refused.
+  if (fill.svgRId) {
+    const drawing = svgDrawing(sourcePart, fill, p);
+    if (drawing && fill.mode !== 'tile' && blipColorSteps(fill.effects).length === 0) {
+      const r = pictureBox(fill, w, h);
+      drawSvgPicture(drawing, r.x, r.y, r.w, r.h, alpha, p);
+      return;
+    }
+    p.diag.add(
+      'picture.svg-fallback',
+      'information',
+      drawing
+        ? 'SVG pictures with color effects or tiles are drawn from their PNG fallback.'
+        : 'SVG pictures outside the vector subset are drawn from their PNG fallback.'
+    );
+  }
+  const target = relTarget(p.res.pkg, sourcePart, fill.rId);
+  if (!target) {
+    p.diag.add('picture.missing', 'unsupported', 'A picture part is missing or external.');
+    return;
+  }
   const image = await imageFor(target, p);
   if (!image) return;
   const ref = recolored(image, blipColorSteps(fill.effects), p);
-  const alpha = fill.effects.reduce((a, e) => (e.kind === 'alphaModFix' ? a * e.amount : a), 1);
   if (fill.mode === 'tile' && fill.tile) {
     // The tiles sit on the box, so a pattern in the space of a form drawn at the box's matrix.
     const g = tileGeometry(fill.tile, p.res.imageSize?.(sourcePart, fill.rId), w, h);
@@ -360,28 +410,11 @@ export async function drawPicture(
     p.push(drawObject(p.name('XObject', form)), popGraphicsState());
     return;
   }
-  const fr = fill.fillRect;
-  const bx = fr.l * w;
-  const by = fr.t * h;
-  const bw = w * (1 - fr.l - fr.r);
-  const bh = h * (1 - fr.t - fr.b);
-  // A crop that leaves nothing visible on an axis (two concurrent crops merged edge by edge)
-  // draws uncropped on that axis, as the SVG paint and the crop commands read it.
-  const raw = fill.srcRect;
-  const okW = 1 - raw.l - raw.r >= 0.001;
-  const okH = 1 - raw.t - raw.b >= 0.001;
-  const sr = {
-    l: okW ? raw.l : 0,
-    r: okW ? raw.r : 0,
-    t: okH ? raw.t : 0,
-    b: okH ? raw.b : 0,
-  };
-  const iw = bw / (1 - sr.l - sr.r);
-  const ih = bh / (1 - sr.t - sr.b);
+  const r = pictureBox(fill, w, h);
   const name = p.name('XObject', ref);
   p.push(pushGraphicsState());
   p.alpha(alpha, 1);
   // The image space is the unit square with y up; the picture is iw × ih EMU with y down.
-  p.push(concatTransformationMatrix(iw, 0, 0, -ih, bx - sr.l * iw, by - sr.t * ih + ih));
+  p.push(concatTransformationMatrix(r.w, 0, 0, -r.h, r.x, r.y + r.h));
   p.push(drawObject(name), popGraphicsState());
 }

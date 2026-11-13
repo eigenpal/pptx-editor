@@ -7,6 +7,7 @@ export { textClipboardParagraphs } from './clipboard-rich.ts';
 export { drawingClipboardPayload, DRAWING_CLIPBOARD_TYPES } from './clipboard-drawing.ts';
 export type { ClipboardDrawingReader } from './clipboard-host.ts';
 export { createBrowserAutomationHost } from './automation-host.ts';
+export * from './svg-picture-drawing.ts';
 export type {
   FontMeasurementState,
   PptxEditorInstance,
