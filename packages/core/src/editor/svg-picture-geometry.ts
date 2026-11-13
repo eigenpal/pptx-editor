@@ -1,5 +1,6 @@
 // Geometry of the SVG icon subset, for `svg-picture-drawing.ts`: numbers, transform lists,
-// view box fits, path data, and basic shapes, as absolute path commands with cubic curves.
+// view box fits, the `d` attribute, and basic shapes, as absolute path commands with cubic
+// curves.
 // The input is untrusted: numbers are finite, and a path past `MAX_DRAWING_COMMANDS` throws
 // `SvgUnsupported`.
 
