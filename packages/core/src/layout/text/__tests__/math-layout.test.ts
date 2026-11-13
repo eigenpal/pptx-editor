@@ -5,6 +5,7 @@ import { parseXmlPart, type Element } from '../../../store/index.ts';
 import { isSupportedMath, readMathZone } from '../../../cascade/math.ts';
 import type { RunProps } from '../../../cascade/index.ts';
 import { layoutMath } from '../math-layout.ts';
+import { NORMAL_TEXT_LEADING } from '../math-line-extent.ts';
 import { mathAlphanumeric, plainLetter } from '../math-glyphs.ts';
 import { createFixedMeasurer } from '../measurer.ts';
 import { oMathParaOf, parseLinear } from '../../../automation/commands/equation-linear.ts';
@@ -57,7 +58,7 @@ describe('math layout', () => {
     expect(sup!.x[0]).toBeCloseTo(base!.x[1]!, 0);
   });
 
-  test('normal text keeps its size in a script, and only ink makes the line taller', () => {
+  test('normal text keeps its size in a script, and its ink and leading make the line taller', () => {
     const M = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
     const run = (t: string, nor: boolean) =>
       `<m:r>${nor ? '<m:rPr><m:nor/></m:rPr>' : ''}<a:rPr/><m:t>${t}</m:t></m:r>`;
@@ -78,9 +79,8 @@ describe('math layout', () => {
     ]);
     const sup = b.glyphs[1]!;
     expect(sup.y).toBeGreaterThan(0.3 * EM);
-    // The line holds the ink of the raised digit, not its face's ascent.
-    expect(b.lineAscent).toBeCloseTo(b.ascent, 0);
-    expect(b.lineAscent).toBeLessThan(sup.y + sup.face.metrics.ascent * EM);
+    // The line holds the ink of the raised digit and the leading of normal text above it.
+    expect(b.lineAscent).toBeCloseTo(b.ascent + NORMAL_TEXT_LEADING * EM, 0);
   });
 
   /** The layout of `m:oMath` content `inner`, in OMML. */

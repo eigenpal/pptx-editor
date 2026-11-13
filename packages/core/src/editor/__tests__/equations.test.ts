@@ -98,34 +98,24 @@ describe('lines that hold equations', () => {
     });
   }
 
-  test('each line holds the ink of its equation, so stacked lines do not overlap', async () => {
+  test('a line holds its equation and the math leading, less the line spacing', async () => {
     const e = await open(buildPptx({ slides: equationFixtures['equation-lines']! }));
-    // Baselines round to whole points: the ink may pass its line by up to half a point.
-    const half = 6_350;
-    const gaps = (name: string) => {
-      const lines = inkLines(e, name);
-      for (const l of lines) {
-        expect(l.inkTop).toBeGreaterThanOrEqual(l.top - half);
-        expect(l.inkBottom).toBeLessThanOrEqual(l.bottom + half);
-      }
-      return lines.slice(1).map((l, i) => (l.inkTop - lines[i]!.inkBottom) / 12_700);
+    const pitch = (name: string) => {
+      const item = e
+        .session!.layout(0)!
+        .items.find((i) => i.kind === 'shape' && i.element.name === name);
+      if (!item || item.kind !== 'shape' || !item.text) throw new Error(name);
+      const [first, second] = item.text.lines;
+      return (second!.baseline - first!.baseline) / 12_700;
     };
-    // Two display fractions: the line of the second starts where the ink of the first ends,
-    // with no face descent between them (0.7 pt with the fixed measurer, 7.7 pt with the face's
-    // descent).
-    const [fractions] = gaps('Stack 3');
-    expect(fractions).toBeGreaterThanOrEqual(-0.5);
-    expect(fractions).toBeLessThan(1);
-    // Text, a fraction, and text: the text below starts at the fraction's ink, plus the room
-    // that the text line keeps above its own ink (1.4 pt with the fixed measurer).
-    const [, below] = gaps('Stack 4');
-    expect(below).toBeGreaterThanOrEqual(-0.5);
-    expect(below).toBeLessThan(2);
-    // At 150 % spacing, the line of an equation keeps its extent and the spacing adds half a
-    // single line on top (10 pt with the fixed measurer), not only the room the ink leaves.
-    const [spaced] = gaps('Stack 6');
-    expect(spaced! - fractions!).toBeGreaterThan(9);
-    expect(spaced! - fractions!).toBeLessThan(11);
+    // Two display fractions at the default 90 % spacing: the line is 90 % of the ink and the
+    // leading above it.
+    const [line] = inkLines(e, 'Stack 3');
+    const claimed = (line!.inkBottom - line!.inkTop) / 12_700 + 0.16 * 18;
+    // Baselines round to whole points.
+    expect(Math.abs(pitch('Stack 3') - 0.9 * claimed)).toBeLessThanOrEqual(1);
+    // At 150 % spacing, the same line is 150 % of that height.
+    expect(Math.abs(pitch('Stack 6') - 1.5 * claimed)).toBeLessThanOrEqual(1);
   });
 });
 
@@ -155,16 +145,9 @@ describe('equation lines at exact spacing', () => {
     for (const h of await spaced(6000)) expect(h).toBeCloseTo(60, 1);
   });
 
-  test('a line shorter than the equation grows by what the equation needs past it', async () => {
-    const [first, eq1, eq2, last] = await spaced(4000);
-    expect(first).toBeCloseTo(40, 1);
-    expect(last).toBeCloseTo(40, 1);
-    // The equation fills the line's own 40 pt first: the line grows by 2 pt, not by the
-    // single-line box plus the exact height.
-    for (const h of [eq1!, eq2!]) {
-      expect(h).toBeGreaterThan(40);
-      expect(h).toBeLessThan(45);
-    }
+  test('a line shorter than the equation keeps its exact height', async () => {
+    // Exact spacing stacks the fractions closer than their ink, as text.
+    for (const h of await spaced(2000)) expect(h).toBeCloseTo(20, 1);
   });
 });
 

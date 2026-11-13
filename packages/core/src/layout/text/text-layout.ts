@@ -766,36 +766,35 @@ export function layoutTextOn(
       const heightPt = lineHeightInPt(single, p.lineSpacing, reduction);
       let height = heightPt * EMU_PER_PT;
       let baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
-      // An equation that needs more room than the line has makes the line taller. Above single
-      // percent spacing (`a:spcPct`), the equation grows the single line, and the spacing then
-      // adds its share of the text band on top, as DOCX Editor's `equationSpacingBand` does for
-      // its `auto` rule: the line keeps the equation's own extent. The extra goes above and
-      // below the baseline as on a text line. At 150 % (`equation-lines`, slide 1), the first
-      // line of stacked display fractions comes 8.2 pt above the reference and the line pitch
-      // 3 pt over it, against 14.2 pt and 5 pt when the equation fills the extra space. At
-      // single spacing and below, and at exact spacing (`a:spcPts`), the equation fills the
-      // line's own space first (the reference PDFs of `equations` and `preserved-content`).
-      const raised = 'pct' in p.lineSpacing && heightPt > single + 1e-9;
+      // An equation that claims more room than the band of a single line (`MathBox.lineAscent`
+      // and `lineDescent`) makes a new single line: the band and the claims together. Line
+      // spacing then applies to that line as to text: percent spacing scales it, exact spacing
+      // replaces it, and the baseline takes the place that the line model gives a face with the
+      // same ascent share. So 90 % spacing makes an equation line 10 % shorter than its claims.
+      // Measured on reference PDFs of stacked display fractions at 18 pt: at 80 % to 200 %
+      // spacing, the line pitch is the percentage of one value (37.2 pt), and each baseline is
+      // within the 1 pt baseline rounding. A text line below a fraction then starts above the
+      // denominator's baseline, as in `equation-lines`, slide 1. Exact spacing of 30 pt stacks
+      // the same fractions 30 pt apart, closer than their ink.
       const singleBase = baselineInLinePt(single, single, lineMetrics) * EMU_PER_PT;
-      let growAbove = 0;
-      let growBelow = 0;
+      let above = singleBase;
+      let below = single * EMU_PER_PT - singleBase;
+      let grows = false;
       for (let i = range.start, last = -1; i < range.end; i += 1) {
         if (units[i].seg === last) continue;
         last = units[i].seg;
         const box = segments[last].math;
         if (!box) continue;
-        if (raised) {
-          growAbove = Math.max(growAbove, box.lineAscent - singleBase);
-          growBelow = Math.max(growBelow, box.lineDescent - (single * EMU_PER_PT - singleBase));
-          continue;
-        }
-        const above = Math.max(0, box.lineAscent - baseline);
-        const below = Math.max(0, box.lineDescent - (height - baseline));
-        height += above + below;
-        baseline += above;
+        if (box.lineAscent > above) [above, grows] = [box.lineAscent, true];
+        if (box.lineDescent > below) [below, grows] = [box.lineDescent, true];
       }
-      height += growAbove + growBelow;
-      baseline += growAbove;
+      if (grows) {
+        const mathSingle = (above + below) / EMU_PER_PT;
+        const mathHeight = lineHeightInPt(mathSingle, p.lineSpacing, reduction);
+        const share = { ...lineMetrics, ascent: above, descent: below };
+        height = mathHeight * EMU_PER_PT;
+        baseline = baselineInLinePt(mathSingle, mathHeight, share) * EMU_PER_PT;
+      }
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.

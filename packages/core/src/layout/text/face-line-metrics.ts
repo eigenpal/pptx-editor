@@ -27,6 +27,7 @@
 
 import { isComplexScriptChar, isEastAsianChar } from './font-slots.ts';
 import type { LineBasis } from './line-metrics.ts';
+import { MATH_LINE_BAND } from './math-line-extent.ts';
 import type { FaceMetrics } from './measurer.ts';
 
 interface FaceLineMetrics {
@@ -127,7 +128,7 @@ export function lineFaceMetrics(
  * place the line (`lineFaceMetrics`). The faces of every run at that size merge on a line with
  * East Asian or complex-script text (units `start` to `end`), where the reference PDFs measure
  * it; on other lines only the faces of that segment's run merge, by their extents. An equation
- * keeps its own face.
+ * keeps its own face, and its line takes the ascent share of `MATH_LINE_BAND`.
  * @internal
  */
 export function largestFace<F extends { readonly metrics: FaceMetrics }>(
@@ -145,7 +146,10 @@ export function largestFace<F extends { readonly metrics: FaceMetrics }>(
   let top: (typeof segments)[number] | undefined;
   for (const s of segments) if (!top || s.sizePt >= top.sizePt) top = s;
   if (!top) return { sizePt: 0, face: null };
-  if (top.math) return { sizePt: top.sizePt, face: top.face, metrics: top.face.metrics };
+  if (top.math) {
+    const metrics = { ...top.face.metrics, ...MATH_LINE_BAND };
+    return { sizePt: top.sizePt, face: top.face, metrics };
+  }
   let script = false;
   for (let i = start; i < end && !script; i += 1)
     script = isEastAsianChar(units[i].code) || isComplexScriptChar(units[i].code);
