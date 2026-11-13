@@ -101,7 +101,7 @@ import { coversWholeBody } from './text-drag.ts';
 import { commandWordAt } from '../automation/commands/command-word.ts';
 import { clearCells, compileTable, isTableSelection, setTableAnchor } from './table-commands.ts';
 import { MAX_MULTIPLE, setLineSpacingMultiple } from '../automation/commands/paragraph-format.ts';
-import { isLatinTypeface } from '../automation/commands/font-format.ts';
+import { isLatinTypeface, setRunTypeface } from '../automation/commands/font-format.ts';
 import {
   addSlide,
   deleteSlide,
@@ -460,11 +460,10 @@ export function compile(
       const part = slidePart(ctx);
       const family = command.family.trim();
       // The same bound as the font catalog: a family name can reach a CSS declaration. A Latin
-      // theme font reference (`+mj-lt`, `+mn-lt`) is written as is, so the text follows the theme.
+      // theme font reference (`+mj-lt`, `+mn-lt`) is written as a theme reference, so the text
+      // follows the theme. The family goes to every script's face, so CJK text changes too.
       if (!isLatinTypeface(family)) throw new CommandRefusal('errors.unsupported', 'family');
-      forRuns(batch, part, ctx, (run) =>
-        setRunChild(batch, part, run, ['latin'], aSpec('latin', { typeface: family }))
-      );
+      forRuns(batch, part, ctx, (run) => setRunTypeface(batch, part, run, family));
       return { batch, effect: { label: 'fontFamily' } };
     }
     case 'setTextColor':

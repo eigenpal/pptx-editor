@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, para, run, shape, solid } from '../../../../../scripts/fixtures/builder.ts';
-import { readPptx } from '../../store/index.ts';
+import { attr, child, find, readPptx, xmlPartOf } from '../../store/index.ts';
 import {
   createServerAutomationHost,
   type AutomationBatchResponse,
@@ -596,6 +596,20 @@ describe('automation host: text', () => {
     expect(ok(host, [{ op: 'readFont', shape: box }])[0]).toMatchObject({
       font: { superscript: true, subscript: false, strikethrough: true },
     });
+  });
+
+  test('a font name applies to the Latin, East Asian, and complex script faces', () => {
+    const host = open();
+    const box = firstShape(host);
+    ok(host, [{ op: 'setFont', shape: box, font: { name: 'Noto Sans TC' } }]);
+    const saved = host.save();
+    if (!saved.ok) throw new Error(saved.error.code);
+    const pkg = readPptx(saved.bytes);
+    if (!pkg.ok) throw new Error('unreadable');
+    const slide = xmlPartOf(pkg.pkg, '/ppt/slides/slide1.xml')!.root;
+    const rPr = child(find(slide, 'a:r')!, 'a:rPr');
+    for (const face of ['a:latin', 'a:ea', 'a:cs'])
+      expect(attr(child(rPr, face), 'typeface')).toBe('Noto Sans TC');
   });
 
   test('reads and writes alignment, bullets, and the list level', () => {

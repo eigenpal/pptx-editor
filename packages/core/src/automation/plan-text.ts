@@ -15,6 +15,7 @@ import { toHex } from '../cascade/index.ts';
 import { attr, child, elements, intAttr, type Element } from '../store/index.ts';
 import type { TextMeasurer } from '../layout/index.ts';
 import { refit } from './commands/autofit.ts';
+import { setRunTypeface } from './commands/font-format.ts';
 import { OpBatch } from './commands/op-batch.ts';
 import { refitTable } from './commands/table-fit.ts';
 import { cellBodyAsSaved, joinCellBodies, readTable, tblOf } from './commands/table-model.ts';
@@ -730,13 +731,7 @@ export function setFont(
       if (font.name !== undefined) {
         if (typeof font.name !== 'string' || !/^[\p{L}\p{N}\p{M} \-.+_]{1,64}$/u.test(font.name))
           badArgument('name');
-        setRunChild(
-          ctx.batch,
-          part,
-          run,
-          ['latin'],
-          aSpec('latin', { typeface: font.name.trim() })
-        );
+        setRunTypeface(ctx.batch, part, run, font.name.trim());
       }
       if (font.size !== undefined)
         set('sz', String(Math.round(numberIn(font.size, 'size', 1, 4000) * 100)));

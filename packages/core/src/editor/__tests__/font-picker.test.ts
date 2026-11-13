@@ -227,6 +227,60 @@ describe('theme font rows', () => {
   });
 });
 
+describe('script faces', () => {
+  // Runs with a Latin and an East Asian face, as CJK decks carry them.
+  function cjkDeck(): Uint8Array {
+    return buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 4 * IN,
+            cy: IN,
+            text: para(run('曾經', '', '<a:latin typeface="Calibri"/><a:ea typeface="SimSun"/>')),
+          }),
+        },
+      ],
+    });
+  }
+
+  function facesOf(editor: PptxEditorInstance): Record<string, string | undefined> {
+    const root = xmlPartOf(
+      editor.session!.store.package,
+      editor.session!.info.slides[0].partName
+    )!.root;
+    const rPr = child(find(root, 'a:r')!, 'a:rPr');
+    return Object.fromEntries(
+      ['latin', 'ea', 'cs'].map((s) => [s, attr(child(rPr, `a:${s}`), 'typeface')])
+    );
+  }
+
+  test('a family applies to the Latin, East Asian, and complex script faces', async () => {
+    const editor = await reopen(cjkDeck());
+    selectAll(editor);
+    expect(editor.exec({ type: 'setFontFamily', family: 'Noto Sans TC' }).ok).toBe(true);
+    const again = await reopen(editor.save()!);
+    expect(facesOf(again)).toEqual({
+      latin: 'Noto Sans TC',
+      ea: 'Noto Sans TC',
+      cs: 'Noto Sans TC',
+    });
+    selectAll(again);
+    expect(again.snapshot().format?.fontFamily).toBe('Noto Sans TC');
+  });
+
+  test('a theme font maps to the theme reference of each face', async () => {
+    const editor = await reopen(cjkDeck());
+    selectAll(editor);
+    expect(editor.exec({ type: 'setFontFamily', family: '+mn-lt' }).ok).toBe(true);
+    const again = await reopen(editor.save()!);
+    expect(facesOf(again)).toEqual({ latin: '+mn-lt', ea: '+mn-ea', cs: '+mn-cs' });
+  });
+});
+
 describe('fontPickerRow', () => {
   afterEach(() => resetDevWarnings());
 

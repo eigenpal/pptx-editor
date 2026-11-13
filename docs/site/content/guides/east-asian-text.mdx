@@ -19,6 +19,8 @@ Each character uses the font of its slot in the run (ECMA-376 `a:rPr`):
 
 Quotes, dashes, the ellipsis, and arrows use `a:ea` when the run's `lang` or `altLang` is Chinese, Japanese, or Korean. A space uses `a:latin`, except a space between two complex-script characters, which uses `a:cs`.
 
+The toolbar font picker and the automation `setFont` operation write the family to `a:latin`, `a:ea`, and `a:cs`, so text in every script takes it. A theme font maps to the theme reference of each slot, such as `+mn-lt` to `+mn-ea` and `+mn-cs`. The **Latin text font** field of the Font dialog writes only `a:latin`.
+
 When the slot's font has no glyph for a character, such as `①` in Arial, the character uses another loaded face that has it. East Asian faces come first.
 
 When a run names no East Asian font and the theme's `a:ea` is empty, the theme's script font (`a:font script="Jpan"`, `Hans`, `Hant`, or `Hang`) for the run's language applies. `lang` comes first, then `altLang`.

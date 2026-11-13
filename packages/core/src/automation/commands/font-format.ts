@@ -112,6 +112,21 @@ export function isLatinTypeface(typeface: string): boolean {
   return FONT_NAME.test(typeface);
 }
 
+/**
+ * Write one family to the Latin, East Asian, and complex script faces of a run
+ * (ECMA-376 Part 1, 21.1.2.3.7 `ea`, 21.1.2.3.1 `cs`), so text in every script takes the
+ * family. A Latin theme font reference maps to the reference of the same slot
+ * (`+mj-lt` to `+mj-ea` and `+mj-cs`). @internal
+ */
+export function setRunTypeface(batch: OpBatch, part: string, run: Element, typeface: string): void {
+  for (const slot of ['latin', 'ea', 'cs'] as const) {
+    const face = typeface.startsWith('+')
+      ? typeface.replace(/-lt$/, `-${slot === 'latin' ? 'lt' : slot}`)
+      : typeface;
+    setRunChild(batch, part, run, [slot], aSpec(slot, { typeface: face }));
+  }
+}
+
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** Check a character spacing in points, or refuse it. */
