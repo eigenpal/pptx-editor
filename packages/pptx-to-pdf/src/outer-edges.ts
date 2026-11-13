@@ -24,6 +24,11 @@ const PIECE_LENGTH = 12_700;
 const MAX_PIECES = 20_000;
 /** The most flattened segments for one shape. Past it, every path keeps its own commands. */
 const MAX_SEGMENTS = 8_000;
+/**
+ * The most filled paths whose union is searched. Past it, every path keeps its own commands, so
+ * the pair test of the bounds and the side tests stay bounded.
+ */
+const MAX_PATHS = 256;
 
 type Pt = { x: number; y: number };
 type Segment = { a: Pt; b: Pt };
@@ -132,7 +137,11 @@ function segmentsOf(rings: readonly Pt[][]): Segment[][] {
  * edge that lie on the outer edge (empty when none does).
  */
 export function outerEdges(filled: readonly PathCommand[][]): PathCommand[][] {
-  if (filled.length < 2) return filled.map((path) => [...path]);
+  if (filled.length < 2 || filled.length > MAX_PATHS) return filled.map((path) => [...path]);
+  // Each drawing command flattens into at least one segment: past the cap, skip the flattening.
+  let commands = 0;
+  for (const path of filled) for (const c of path) if (c.op !== 'M' && c.op !== 'Z') commands += 1;
+  if (commands > MAX_SEGMENTS) return filled.map((path) => [...path]);
   const rings = filled.map(flatten);
   const boxes = rings.map(boundsOf);
   const pad = 2 * SIDE_OFFSET;
