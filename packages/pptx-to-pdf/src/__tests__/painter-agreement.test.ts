@@ -235,13 +235,13 @@ describe('the PDF writer and the SVG paint agree', () => {
         ],
         media: [{ name: 'img.png', bytes: PNG.sync.write(png), contentType: 'image/png' }],
       });
+      // The SVG paint draws each tile as an image: an unmirrored one sits at a cell's corner.
       const svg = await svgOf(bytes, true);
-      const [x, y, width, height] = attrs(svg.querySelector('pattern[id*="tile"]'), [
-        'x',
-        'y',
-        'width',
-        'height',
-      ]);
+      const mirrored = /flip="(x|y|xy)"/.exec(tile)?.[1] ?? '';
+      const first = [...svg.querySelectorAll('image')].find((i) => !i.hasAttribute('transform'));
+      const [x, y, width, height] = attrs(first ?? null, ['x', 'y', 'width', 'height']);
+      const cw = mirrored.includes('x') ? 2 * width! : width!;
+      const ch = mirrored.includes('y') ? 2 * height! : height!;
       const doc = await PDFDocument.load((await exportPdf(bytes, BEST)).bytes);
       const patterns = [...doc.context.enumerateIndirectObjects()].flatMap(([, obj]) =>
         obj instanceof PDFRawStream && obj.dict.get(PDFName.of('PatternType'))?.toString() === '1'
@@ -252,10 +252,12 @@ describe('the PDF writer and the SVG paint agree', () => {
       const dict = patterns[0]!;
       const num = (key: string): number => Number(dict.get(PDFName.of(key))!.toString());
       const matrix = dict.lookup(PDFName.of('Matrix'), PDFArray).asArray().map(Number);
-      expect(num('XStep')).toBeCloseTo(width!, 0);
-      expect(num('YStep')).toBeCloseTo(height!, 0);
-      expect(matrix[4]!).toBeCloseTo(x!, 0);
-      expect(matrix[5]!).toBeCloseTo(y!, 0);
+      expect(num('XStep')).toBeCloseTo(cw, 0);
+      expect(num('YStep')).toBeCloseTo(ch, 0);
+      // The pattern's origin is a corner of the same grid.
+      const cells = (d: number, size: number): number => Math.abs(d / size - Math.round(d / size));
+      expect(cells(x! - matrix[4]!, cw)).toBeLessThan(1e-6);
+      expect(cells(y! - matrix[5]!, ch)).toBeLessThan(1e-6);
     });
 
   test('on the bars of underline, double underline, and strikethrough', async () => {

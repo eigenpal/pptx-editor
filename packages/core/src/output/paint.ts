@@ -41,6 +41,7 @@ import {
   pictureUrl,
   slideSpaceFill,
   strokeAttrs,
+  tiledPictureContent,
   type ImageSizePort,
   type FillContext,
   type ImageUrlPort,
@@ -298,6 +299,52 @@ function geometryMask(
 }
 
 /**
+ * Picture content kept inside one filled path: the box of a rectangle as a nested viewport, which
+ * a printed page clips with a path, and any other path with a mask (`geometryMask`).
+ */
+function keepInside(
+  doc: Document,
+  ctx: PaintContext,
+  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
+  path: GeometryPath,
+  d: string,
+  content: SVGElement
+): SVGElement {
+  const { geometry, xfrm } = item.element;
+  const box =
+    geometry.kind === 'preset' && geometry.preset === 'rect' && item.geometry.paths.length === 1;
+  return box
+    ? svg(doc, 'svg', { width: num(xfrm.cx), height: num(xfrm.cy), overflow: 'hidden' }, [content])
+    : svg(doc, 'g', { mask: geometryMask(ctx.defs, [path], d, xfrm.cx, xfrm.cy) }, [content]);
+}
+
+/**
+ * The slide background: one rectangle, or the images of a tiled picture (`tiledPictureContent`)
+ * in the slide's viewport. Both carry `data-kind="background"`.
+ */
+export function paintBackground(
+  doc: Document,
+  fill: ResolvedFill,
+  width: number,
+  height: number,
+  ctx: PaintContext
+): SVGElement {
+  const content = tiledPictureContent(fill, width, height, ctx);
+  if (content)
+    return svg(doc, 'svg', { width, height, overflow: 'hidden', 'data-kind': 'background' }, [
+      content,
+    ]);
+  const bg = fillPaint(fill, width, height, ctx);
+  return svg(doc, 'rect', {
+    width,
+    height,
+    fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
+    'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
+    'data-kind': 'background',
+  });
+}
+
+/**
  * A picture's outline. It lies outside the picture, not centered on its edge,
  * as reference PDFs show. So the stroke is twice as wide, and a mask hides the half inside the
  * geometry. Its dashes come from `outsideDashArray`, as in the PDF export: the dash period of a
@@ -453,8 +500,16 @@ function paintGeometry(
     const strokeD =
       plan && plan.commands !== path.commands ? pathData({ ...path, commands: plan.commands }) : d;
     const extras = plan ? strokeExtras(doc, plan, stroke) : [];
+    // A tiled picture draws as images inside the path (`tiledPictureContent`); the stroke follows.
+    const content =
+      path.fill === 'none' || lostPicture ? undefined : tiledPictureContent(el.fill, w, h, ctx);
+    if (content) {
+      const kept = keepInside(doc, ctx, item, path, d, content);
+      const over = overlayPath(doc, d, effects, paintFor);
+      out.push(over ? isolated(doc, [kept, over]) : kept);
+    }
     const fill =
-      path.fill === 'none'
+      path.fill === 'none' || content
         ? { paint: 'none', opacity: 1 }
         : lostPicture
           ? { paint: PICTURE_PLACEHOLDER, opacity: 1 }
@@ -915,16 +970,7 @@ export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOption
     ...(opts.imageSize ? { imageSize: opts.imageSize } : {}),
     sourcePart: layout.slide.backgroundPart,
   };
-  const bg = fillPaint(layout.slide.background, width, height, ctx);
-  root.appendChild(
-    svg(doc, 'rect', {
-      width,
-      height,
-      fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
-      'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
-      'data-kind': 'background',
-    })
-  );
+  root.appendChild(paintBackground(doc, layout.slide.background, width, height, ctx));
   const content = svg(doc, 'g', { 'data-kind': 'content' });
   for (const item of layout.items) {
     const painted = paintItem(doc, item, ctx, opts, 1);
