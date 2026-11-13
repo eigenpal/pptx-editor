@@ -10,7 +10,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import { describe, expect, test } from 'bun:test';
 import { keyMetrics, rowKeyInset, rowPlotGap, type LegendEntry } from '../chart-legend.ts';
+import { bestFitInside } from '../chart-pie.ts';
 import { labelRoom } from '../chart-radar.ts';
+import { autoValueScale } from '../chart-scale.ts';
 import type { ChartComponent, Point } from '../chart-scene.ts';
 import type { ChartLabel } from '../chart-text.ts';
 import { fixtureCharts, renderFixture } from './chart-support.ts';
@@ -301,5 +303,78 @@ describe('the chart-sizes charts follow the rules', () => {
       const plotRight = 2 * cx - MARGIN;
       expect(lineKey(scene.components).l - plotRight).toBeCloseTo(15.66, 6);
     }
+  });
+});
+
+describe('value axes and pie labels follow the reference PDFs', () => {
+  test('an automatic major unit keeps one label line between ticks, not 1.6 sizes', () => {
+    // [slide index, text size]: the 20 pt column chart and the 14 pt and 20 pt radars show
+    // 0, 10, ..., 60 in the reference, with 29.4 pt, 21.9 pt, and 29.3 pt between ticks.
+    for (const [index, size] of [
+      [2, 20],
+      [10, 14],
+      [11, 20],
+    ] as const) {
+      const texts = render(index).labels.map((l) => l.paragraphs[0]?.[0]?.text);
+      for (const tick of ['0', '10', '20', '30', '40', '50', '60'])
+        expect([index, size, tick, texts.includes(tick)]).toEqual([index, size, tick, true]);
+    }
+    // The 176.6 pt axis of the 20 pt column chart has room for six intervals of one line, but
+    // not for six of 1.6 sizes.
+    const scale = autoValueScale({
+      dataMin: 0,
+      dataMax: 55,
+      lengthPt: 176.6,
+      minIntervalPt: CARLITO_LINE * 20,
+      fixedMin: null,
+      fixedMax: null,
+      fixedMajor: null,
+    });
+    expect(scale.major).toBe(10);
+    expect(176.6 / 6).toBeLessThan(1.6 * 20);
+  });
+
+  test('the top value label lowers the plot by half a line and the lift, less 6.5 pt and 0.05 sizes', () => {
+    // The 20 pt column chart has no title: the plot starts at the 11 pt chart margin plus the
+    // overhang, 6.31 pt for a Carlito line of 1.2207 sizes.
+    const { scene, labels } = render(2);
+    const line = label(labels, '60').height;
+    expect(gridBox(scene.components).t).toBeCloseTo(
+      MARGIN + line / 2 + (0.08 - 0.05) * 20 - 6.5,
+      6
+    );
+  });
+
+  test('a best-fit label sits between its slice edges, 4 pt inside the circle', () => {
+    const width = 24.2;
+    const height = CARLITO_LINE * 14;
+    // A wide label in a quarter slice turns towards the level line, and keeps equal room to
+    // both edges.
+    const placed = bestFitInside(width, height, { cx: 0, cy: 0, outer: 80, from: 0, sweep: 90 });
+    const x = placed.x;
+    const up = -placed.y;
+    expect(x - width / 2).toBeCloseTo(up - height / 2, 6);
+    expect(Math.hypot(x + width / 2, up + height / 2)).toBeCloseTo(76, 6);
+    expect((Math.atan2(x, up) * 180) / Math.PI).toBeGreaterThan(46);
+    // A slice of half the pie keeps its middle angle.
+    const half = bestFitInside(width, height, { cx: 0, cy: 0, outer: 80, from: 270, sweep: 180 });
+    expect(half.x).toBeCloseTo(0, 6);
+    // The labels of the 14 pt pie (`chart-sizes` slide 7): centres measured on the reference
+    // PDF, from the pie centre, in points with y down. The baselines match within the 0.5 pt
+    // line tolerance. The position across the slice is a known gap of the slide, which the
+    // fidelity harness checks against the reference.
+    const measured = [
+      [46.61, -39.44],
+      [42.86, 43.6],
+      [-51.64, 34.0],
+      [-33.64, -53.12],
+    ] as const;
+    let from = 0;
+    [42, 35, 51, 28].forEach((value, i) => {
+      const sweep = (value / 156) * 360;
+      const label = bestFitInside(width, height, { cx: 0, cy: 0, outer: 80.1, from, sweep });
+      expect([i, Math.abs(label.y - measured[i]![1]) <= 0.5]).toEqual([i, true]);
+      from += sweep;
+    });
   });
 });

@@ -14,55 +14,60 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import {
   closePath,
   concatTransformationMatrix,
+  drawObject,
   fill,
   lineTo,
   moveTo,
   popGraphicsState,
   pushGraphicsState,
   setDashPattern,
+  setFillingGrayscaleColor,
   setFillingRgbColor,
   setLineCap,
   setLineJoin,
   setLineWidth,
+  setStrokingGrayscaleColor,
   stroke,
   LineJoinStyle,
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
 } from 'pdf-lib';
-import type { ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
+import type { BlendMode, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
 import {
   ARROW_MITER_LIMIT,
   dashArray,
   hasCharacters,
   planStroke,
+  strokeCap,
   strokeWidth,
   type LayoutItem,
   type PathCommand,
   type SlideLayout,
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
-import { compoundBandLines, type CompoundBandLine } from '@pptx-editor.dev/core/output';
+import {
+  compoundPlan,
+  MAX_OVERLAY_PATHS,
+  type CompoundBand,
+  type CompoundBandLine,
+  type CompoundPlan,
+} from '@pptx-editor.dev/core/output';
 import {
   drawGlow,
   drawShadows,
   drawInnerShadow,
   drawReflection,
+  drawSoftEdge,
   effectDiagnostics,
 } from './paint-effects.ts';
-import {
-  canDrawPicture,
-  drawPicture,
-  lineCapStyle,
-  ownFill,
-  paintFill,
-  strokeStyle,
-  type FillScope,
-} from './paint-fill.ts';
+import { canDrawPicture, drawPicture } from './paint-picture.ts';
+import { lineCapStyle, ownFill, paintFill, strokeStyle, type FillScope } from './paint-fill.ts';
 import { drawTable } from './paint-table.ts';
 import { faceMatrix, fillFacets, threeDOf, turnsFace } from './paint-three-d.ts';
 import { drawText } from './paint-text.ts';
 import {
+  around,
   clip,
   clipEvenOdd,
   clipNonZero,
@@ -172,6 +177,57 @@ function outsideOf(
   p.push(clipEvenOdd(), endPath(), setLineWidth(2 * width));
 }
 
+/** The PDF blend mode of each `ST_BlendMode`, as the SVG paint's `mix-blend-mode`. */
+const PDF_BLEND: Readonly<Record<BlendMode, string>> = {
+  over: 'Normal',
+  mult: 'Multiply',
+  screen: 'Screen',
+  darken: 'Darken',
+  lighten: 'Lighten',
+};
+
+/**
+ * Paint a fill and its `a:fillOverlay`, as the SVG paint does: `base` paints the fill, then the
+ * overlay fill blends over the path that `trace` draws. Both paint into an isolated transparency
+ * group, so the blend sees only this fill, not the slide behind it. Returns false, with nothing
+ * painted, when the item has no overlay to draw; the caller then paints `base` itself. A shape
+ * with more than `MAX_OVERLAY_PATHS` paths draws no overlay, as in the SVG paint.
+ */
+async function withOverlay(
+  item: Drawable,
+  w: number,
+  h: number,
+  trace: () => void,
+  p: PageOps,
+  scope: FillScope,
+  base: () => Promise<boolean>
+): Promise<boolean> {
+  const overlay = item.element.effects?.fillOverlay;
+  if (!overlay) return false;
+  if (item.geometry.paths.length > MAX_OVERLAY_PATHS) {
+    p.diag.add(
+      'effect.fill-overlay',
+      'unsupported',
+      `A fill overlay on a shape with more than ${MAX_OVERLAY_PATHS} paths is not drawn.`
+    );
+    return false;
+  }
+  const ops = await p.capture(async () => {
+    if (!(await base())) return;
+    p.push(pushGraphicsState());
+    p.state(`blend:${overlay.blend}`, () =>
+      p.res.doc.context.obj({ Type: 'ExtGState', BM: PDF_BLEND[overlay.blend] })
+    );
+    // A `path="shape"` overlay draws as bands of the outline, as the SVG paint draws it.
+    const banded = bandsShapeGradient(item, overlay.fill, p);
+    await paintFill(overlay.fill, w, h, trace, p, scope, 'fill overlays', 'norm', banded);
+    p.push(popGraphicsState());
+  });
+  const group = p.form(ops, around(w, h), { S: 'Transparency', I: true });
+  p.push(drawObject(p.name('XObject', group)));
+  return true;
+}
+
 /** A shape's or picture's geometry: fills, the picture clipped to the geometry, outlines. */
 async function drawGeometry(
   item: Drawable,
@@ -190,7 +246,16 @@ async function drawGeometry(
       if (paths.length) for (const path of paths) tracePath(path.commands, p);
       else traceRect(0, 0, w, h, p);
       p.push(clipNonZero(), endPath());
-      await drawPicture(own.sourcePart, own.fill, w, h, p);
+      const pictureFill = own.fill;
+      const picture = async (): Promise<boolean> => {
+        await drawPicture(own.sourcePart, pictureFill, w, h, p);
+        return true;
+      };
+      const traceAll = (): void => {
+        if (paths.length) for (const path of paths) tracePath(path.commands, p);
+        else traceRect(0, 0, w, h, p);
+      };
+      if (!(await withOverlay(item, w, h, traceAll, p, scope, picture))) await picture();
       p.push(popGraphicsState());
     }
   }
@@ -209,6 +274,7 @@ async function drawGeometry(
       'approximation',
       'The border of a picture cropped to a shape with several paths is drawn path by path.'
     );
+  const banded = item.kind === 'shape' && bandsShapeGradient(item, ownFill(el.fill, scope).fill, p);
   // Path by path, fill then outline, in the SVG paint's order.
   for (const path of paths) {
     if (boxOnly && path.fill !== 'none' && pastBox(path.commands, w, h))
@@ -217,17 +283,12 @@ async function drawGeometry(
         'approximation',
         "Picture fills and rectangular path gradients paint only the shape's box."
       );
-    if (item.kind === 'shape' && path.fill !== 'none')
-      await paintFill(
-        el.fill,
-        w,
-        h,
-        () => tracePath(path.commands, p),
-        p,
-        scope,
-        'shapes',
-        path.fill
-      );
+    if (item.kind === 'shape' && path.fill !== 'none') {
+      const trace = (): void => tracePath(path.commands, p);
+      const own = (): Promise<boolean> =>
+        paintFill(el.fill, w, h, trace, p, scope, 'shapes', path.fill, banded);
+      if (!(await withOverlay(item, w, h, trace, p, scope, own))) await own();
+    }
     // A picture's outline follows all of its geometry, as in the SVG paint.
     if (!line || (!path.stroke && item.kind !== 'picture')) continue;
     p.push(pushGraphicsState());
@@ -237,13 +298,15 @@ async function drawGeometry(
     // in the SVG paint (`core/layout`, `planStroke`).
     const plan = picture ? undefined : planStroke(path.commands, line, groupScale);
     const commands = plan ? plan.commands : path.commands;
-    const bands = picture ? null : solidBands(line, width, commands);
+    const bands = picture ? null : compoundOf(line, width, commands);
     const color = strokeStyle(line, p, scope, groupScale, picture, !!bands);
     if (color) {
       p.alpha(1, color.a);
       // A picture's border lies outside the picture.
       if (picture) outsideOf(path.commands, width, w, h, p);
-      if (bands) drawBands(bands, line.join === 'miter' ? line.miterLimit : 4, p);
+      if (bands?.kind === 'offset')
+        drawBands(bands.bands, line.join === 'miter' ? line.miterLimit : 4, p);
+      else if (bands) drawMaskedBands(bands, line, width, commands, w, h, p);
       else {
         tracePath(commands, p);
         p.push(stroke());
@@ -255,18 +318,117 @@ async function drawGeometry(
 }
 
 /**
- * The bands of a solid compound line, as the SVG paint draws them (`core/output`,
- * `compoundBandLines`), or null for a single line. A dashed compound line draws as one line: the
- * SVG paint cuts its bands with a mask.
+ * Whether a shape draws its `path="shape"` gradient as bands of its paths, as the SVG paint
+ * decides (`shapeBandBudget`): only shapes with such a fill spend the page's band work, once each.
  */
-function solidBands(
+function bandsShapeGradient(item: Drawable, fill: ResolvedFill, p: PageOps): boolean {
+  if (fill.type !== 'path' || fill.path !== 'shape') return false;
+  let banded = p.bandedShapes.get(item);
+  if (banded === undefined) {
+    const paths = item.geometry.paths;
+    const commands = paths.reduce((n, path) => n + path.commands.length, 0);
+    banded = p.shapeBands.allow(paths.length, commands);
+    p.bandedShapes.set(item, banded);
+  }
+  return banded;
+}
+
+/**
+ * How a compound line draws, as in the SVG paint (`core/output`, `compoundPlan`): offset bands,
+ * or bands cut from the line's own stroke by a mask. Null for a single line.
+ */
+function compoundOf(
   line: ResolvedLine,
   width: number,
   commands: readonly PathCommand[]
-): CompoundBandLine[] | null {
-  if (line.compound === 'sng' || dashArray(line, width)) return null;
+): CompoundPlan | null {
+  if (line.compound === 'sng') return null;
   const join = line.join === 'miter' ? 'miter' : line.join === 'bevel' ? 'bevel' : 'round';
-  return compoundBandLines(commands, line.compound, width, join, Math.max(1, line.miterLimit));
+  const closed = commands[commands.length - 1]?.op === 'Z';
+  const dashed = !!dashArray(line, width);
+  return compoundPlan(line.compound, width, closed, dashed, join, miterLimitOf(line), commands);
+}
+
+/** The miter limit of a line as the SVG paint writes it: 4 when the join is not a miter. */
+const miterLimitOf = (line: ResolvedLine): number =>
+  line.join === 'miter' ? Math.max(1, line.miterLimit) : 4;
+
+/**
+ * Draw the masked bands of a compound line, as the SVG paint's `compoundStroke`: the line's own
+ * stroke (color, width, caps, joins, and dashes already set) under a luminosity soft mask of a
+ * white stroke `2b` wide and a black stroke `2a` wide for each band. On a closed path, the outer
+ * bands lose the inside of the path, and the inner bands keep only the inside.
+ */
+function drawMaskedBands(
+  plan: Extract<CompoundPlan, { kind: 'masked' }>,
+  line: ResolvedLine,
+  width: number,
+  given: readonly PathCommand[],
+  w: number,
+  h: number,
+  p: PageOps
+): void {
+  const commands = plan.commands ?? given;
+  const grow = width + Math.max(w, h);
+  const bbox = [-grow, -grow, w + 2 * grow, h + 2 * grow];
+  const dashes = dashArray(line, width);
+  const join =
+    line.join === 'miter'
+      ? LineJoinStyle.Miter
+      : line.join === 'bevel'
+        ? LineJoinStyle.Bevel
+        : LineJoinStyle.Round;
+  /** Paint the line through a mask of `bands`; `cutInside` removes the inside of the path. */
+  const painted = (bands: readonly CompoundBand[], cutInside: boolean): void => {
+    const ops = p.captureNow(() => {
+      // A soft mask starts from the default graphics state: set the line's own stroke.
+      p.push(
+        setLineCap(lineCapStyle(strokeCap(line))),
+        setLineJoin(join),
+        PDFOperator.of(PDFOperatorNames.SetLineMiterLimit, [PDFNumber.of(miterLimitOf(line))])
+      );
+      if (dashes) p.push(setDashPattern(dashes, 0));
+      // Widest first, so each black stroke cuts only its own band.
+      for (const band of [...bands].sort((x, y) => y.b - x.b)) {
+        p.push(setStrokingGrayscaleColor(1), setLineWidth(2 * band.b));
+        tracePath(commands, p);
+        p.push(stroke());
+        if (band.a > 0) {
+          p.push(setStrokingGrayscaleColor(0), setLineWidth(2 * band.a));
+          tracePath(commands, p);
+          p.push(stroke());
+        }
+      }
+      if (cutInside) {
+        p.push(setFillingGrayscaleColor(0));
+        tracePath(commands, p);
+        p.push(fill());
+      }
+    });
+    const form = p.form(ops, bbox, { S: 'Transparency', CS: 'DeviceGray' });
+    p.push(pushGraphicsState());
+    p.state(`smask:${form.toString()}`, () =>
+      p.res.doc.context.obj({
+        Type: 'ExtGState',
+        SMask: { Type: 'Mask', S: 'Luminosity', G: form },
+      })
+    );
+    tracePath(commands, p);
+    p.push(stroke(), popGraphicsState());
+  };
+  if (!plan.closed) {
+    painted(plan.outer, false);
+    return;
+  }
+  if (plan.outer.length) painted(plan.outer, true);
+  if (plan.inner.length) {
+    // The inside of the path, nonzero, as the SVG paint's mask of the filled path.
+    p.push(pushGraphicsState());
+    tracePath(commands, p);
+    p.push(clipNonZero(), endPath());
+    painted(plan.inner, false);
+    p.push(popGraphicsState());
+  }
 }
 
 /** Stroke the bands of a compound line in the current stroke color, caps, and dashes. */
@@ -351,14 +513,18 @@ async function drawItem(
   const turned = turnsFace(threeD);
   const drawContent = async (): Promise<void> => {
     if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
-    p.push(pushGraphicsState());
-    p.matrix(item.matrix);
-    if (threeD) fillFacets(threeD.under, p);
-    await drawGeometry(item, p, local, groupScale);
-    if (threeD) fillFacets(threeD.over, p);
-    p.push(popGraphicsState());
-    // Over the geometry and under the text, in slide space.
-    if (shown) await drawInnerShadow(item, p, local);
+    // The soft edge fades the body (the geometry, its bevel, and the inner shadow), not the text,
+    // as in the SVG paint.
+    await drawSoftEdge(item, p, local, groupScale, async () => {
+      p.push(pushGraphicsState());
+      p.matrix(item.matrix);
+      if (threeD) fillFacets(threeD.under, p);
+      await drawGeometry(item, p, local, groupScale);
+      if (threeD) fillFacets(threeD.over, p);
+      p.push(popGraphicsState());
+      // Over the geometry and under the text, in slide space.
+      if (shown) await drawInnerShadow(item, p, local);
+    });
     // An empty body's caret line draws nothing: no operators for it.
     if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
       p.push(pushGraphicsState());
