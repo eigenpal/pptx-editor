@@ -9,8 +9,36 @@ import type { Matrix } from '../layout/index.ts';
 /** The most path commands one drawing holds, with each `<use>` expanded and each arc as curves. */
 export const MAX_DRAWING_COMMANDS = 200_000;
 
+/** The most style rules (one per selector) a picture may hold; one with more draws its PNG. */
+export const MAX_STYLE_RULES = 1_000;
+
 /** Thrown for a feature the drawing reader does not draw; the reader then gives `undefined`. */
 export class SvgUnsupported extends Error {}
+
+/**
+ * The largest magnitude of any number in a drawing: coordinates, matrix entries, and line
+ * widths. Every number of a drawing reaches a PDF operator, which takes plain decimals.
+ */
+export const MAX_SVG_NUMBER = 1e9;
+/** Numbers closer to zero than this are written as zero, so no decimal runs long. */
+const NEAR_ZERO = 1e-9;
+
+/** A number of a drawing, finite and within `MAX_SVG_NUMBER`; throws `SvgUnsupported` otherwise. */
+export function drawingNumber(v: number): number {
+  if (!Number.isFinite(v) || Math.abs(v) > MAX_SVG_NUMBER) throw new SvgUnsupported('number');
+  return Math.abs(v) < NEAR_ZERO ? 0 : v;
+}
+
+/** A path with every number checked by `drawingNumber`. */
+export const drawingPath = (path: readonly PathCommand[]): PathCommand[] =>
+  path.map((c) => {
+    if (c.op === 'Z') return c;
+    const n = drawingNumber;
+    if (c.op === 'C')
+      return { op: 'C', x1: n(c.x1), y1: n(c.y1), x2: n(c.x2), y2: n(c.y2), x: n(c.x), y: n(c.y) };
+    if (c.op === 'Q') return { op: 'Q', x1: n(c.x1), y1: n(c.y1), x: n(c.x), y: n(c.y) };
+    return { op: c.op, x: n(c.x), y: n(c.y) };
+  });
 
 export const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
@@ -124,14 +152,21 @@ function arcCurves(
   const dy = (y1 - y2) / 2;
   const xp = cos * dx + sin * dy;
   const yp = -sin * dx + cos * dy;
-  const lambda = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
+  // Shares of the radii, so that a huge radius cannot overflow a square (SVG 1.1, F.6.6).
+  const lambda = (xp / rx) ** 2 + (yp / ry) ** 2;
+  // Radii so large that the arc's bulge is far below a point draw as the straight chord, as the
+  // arc of an infinite radius does.
+  if (!(lambda > 1e-12)) {
+    out.push({ op: 'L', x: x2, y: y2 });
+    return;
+  }
   if (lambda > 1) {
+    // Out-of-range radii scale up until the ellipse just reaches both ends.
     rx *= Math.sqrt(lambda);
     ry *= Math.sqrt(lambda);
   }
-  const num2 = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp;
-  const den = rx * rx * yp * yp + ry * ry * xp * xp;
-  let k = Math.sqrt(Math.max(0, num2 / den));
+  // (rx²ry² − rx²yp² − ry²xp²) / (rx²yp² + ry²xp²), divided through by rx²ry².
+  let k = Math.sqrt(Math.max(0, (1 - Math.min(1, lambda)) / Math.min(1, lambda)));
   if (large === sweep) k = -k;
   const cxp = (k * rx * yp) / ry;
   const cyp = (-k * ry * xp) / rx;
@@ -141,6 +176,10 @@ function arcCurves(
     const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
     return a;
   };
+  if (![cx, cy, rx, ry].every(Number.isFinite)) {
+    out.push({ op: 'L', x: x2, y: y2 });
+    return;
+  }
   const t1 = ang(1, 0, (xp - cxp) / rx, (yp - cyp) / ry);
   let dt = ang((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
   if (!sweep && dt > 0) dt -= 2 * Math.PI;

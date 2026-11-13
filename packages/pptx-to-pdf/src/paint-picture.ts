@@ -370,15 +370,15 @@ export async function drawPicture(
   // reported, not refused.
   if (fill.svgRId) {
     const drawing = svgDrawing(sourcePart, fill, p);
-    if (drawing && fill.mode !== 'tile' && blipColorSteps(fill.effects).length === 0) {
+    const plain = fill.mode !== 'tile' && blipColorSteps(fill.effects).length === 0;
+    if (drawing && plain) {
       const r = pictureBox(fill, w, h);
-      drawSvgPicture(drawing, r.x, r.y, r.w, r.h, alpha, p);
-      return;
+      if (drawSvgPicture(drawing, r.x, r.y, r.w, r.h, alpha, p)) return;
     }
     p.diag.add(
       'picture.svg-fallback',
       'information',
-      drawing
+      drawing && !plain
         ? 'SVG pictures with color effects or tiles are drawn from their PNG fallback.'
         : 'SVG pictures outside the vector subset are drawn from their PNG fallback.'
     );

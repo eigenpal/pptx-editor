@@ -107,9 +107,17 @@ function drawItems(items: readonly SvgPictureItem[], bbox: number[], p: PageOps)
 }
 
 /**
+ * The largest magnitude of a number that the view box's matrix writes. The drawing's own
+ * numbers are bounded by `svgPictureDrawing`; a tiny view box over a large frame could still
+ * scale past what a PDF real holds as a plain decimal.
+ */
+const MAX_MATRIX_NUMBER = 1e12;
+
+/**
  * Draw an SVG picture's drawing over the box `x`, `y`, `w` × `h` (slide EMU, y down): its view
  * box stretches over the box, as the editor's image draws with `preserveAspectRatio="none"`,
- * and the view box clips. `alpha` is the picture's transparency.
+ * and the view box clips. `alpha` is the picture's transparency. Draws nothing and returns
+ * false when the view box's matrix holds a number out of range.
  */
 export function drawSvgPicture(
   drawing: SvgPictureDrawing,
@@ -119,13 +127,25 @@ export function drawSvgPicture(
   h: number,
   alpha: number,
   p: PageOps
-): void {
+): boolean {
   const [vx, vy, vw, vh] = drawing.viewBox;
   const sx = w / vw;
   const sy = h / vh;
+  const raw = [sx, 0, 0, sy, x - vx * sx, y - vy * sy];
+  if (!raw.every((v) => Number.isFinite(v) && Math.abs(v) <= MAX_MATRIX_NUMBER)) return false;
+  // Rounding noise near zero is written as zero, so no decimal runs long.
+  const [a, b, c, d, e, f] = raw.map((v) => (Math.abs(v) < 1e-9 ? 0 : v)) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  const matrix = [a, b, c, d, e, f] as const;
   const bbox = [vx, vy, vx + vw, vy + vh];
   p.push(pushGraphicsState());
-  p.matrix([sx, 0, 0, sy, x - vx * sx, y - vy * sy]);
+  p.matrix(matrix);
   tracePath(
     [
       { op: 'M', x: vx, y: vy },
@@ -144,4 +164,5 @@ export function drawSvgPicture(
     p.push(drawObject(p.name('XObject', form)));
   } else drawItems(drawing.items, bbox, p);
   p.push(popGraphicsState());
+  return true;
 }
