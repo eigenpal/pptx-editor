@@ -7,7 +7,18 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // (`@pptx-editor.dev/pro/drawing`), the same ones the SVG paint fills. The editor's renderer
 // gives them, so the two outputs agree. Without the renderer, a 3-D shape draws flat.
 
-import { fill, popGraphicsState, pushGraphicsState, setFillingRgbColor } from 'pdf-lib';
+import {
+  fill,
+  popGraphicsState,
+  pushGraphicsState,
+  setFillingRgbColor,
+  setLineJoin,
+  setLineWidth,
+  setStrokingRgbColor,
+  LineJoinStyle,
+  PDFOperator,
+  PDFOperatorNames,
+} from 'pdf-lib';
 import {
   drawingRenderers,
   type LayoutItem,
@@ -46,17 +57,29 @@ export function faceMatrix(paint: ThreeDPaint | null): Matrix {
   return paint?.front ?? [1, 0, 0, 1, 0, 0];
 }
 
+/** The width of the outline of an opaque facet, half a pixel in EMU, as in the SVG paint. */
+const SEAM = 9_525 / 2;
+
 /**
- * Fill facets in the current space, each in its color and alpha, as one nonzero path. A facet
- * with a value that is not finite is skipped, as the SVG paint skips it.
+ * Fill facets in the current space, each in its color and alpha, as one nonzero path. An opaque
+ * facet also has a thin outline of its own color, as in the SVG paint, so neighbors leave no
+ * antialiased seam that shows the face below. A facet with a value that is not finite is
+ * skipped, as the SVG paint skips it.
  */
 export function fillFacets(facets: readonly ThreeDFacet[], p: PageOps): void {
   for (const f of facets) {
     const polygons = f.polygons.filter((poly) => poly.length >= 3);
     if (polygons.length === 0 || f.color.a <= 0 || !finiteFacet(f)) continue;
+    const opaque = f.color.a >= 1;
     p.push(pushGraphicsState());
     p.alpha(f.color.a, 1);
     p.push(setFillingRgbColor(...rgb(f.color)));
+    if (opaque)
+      p.push(
+        setStrokingRgbColor(...rgb(f.color)),
+        setLineWidth(SEAM),
+        setLineJoin(LineJoinStyle.Round)
+      );
     tracePath(
       polygons.flatMap((poly) => [
         ...poly.map((q, i) => ({ op: i ? ('L' as const) : ('M' as const), x: q.x, y: q.y })),
@@ -64,6 +87,9 @@ export function fillFacets(facets: readonly ThreeDFacet[], p: PageOps): void {
       ]),
       p
     );
-    p.push(fill(), popGraphicsState());
+    p.push(
+      opaque ? PDFOperator.of(PDFOperatorNames.FillNonZeroAndStroke) : fill(),
+      popGraphicsState()
+    );
   }
 }
