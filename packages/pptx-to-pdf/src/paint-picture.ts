@@ -35,7 +35,7 @@ import {
   type TileGeometry,
 } from '@pptx-editor.dev/core/output';
 import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
-import { around, clip, fillEvenOdd, type PageOps } from './page-ops.ts';
+import { around, clip, EMU_PER_PT, fillEvenOdd, type PageOps } from './page-ops.ts';
 import { fontEmbeddingDecision } from './pdf-font-embedding.ts';
 import { drawSvgPicture, svgDrawingFor } from './paint-svg-picture.ts';
 import type { SvgPictureDrawing } from '@pptx-editor.dev/core/editor';
@@ -393,14 +393,19 @@ export async function drawPicture(
   const ref = recolored(image, blipColorSteps(fill.effects), p);
   if (fill.mode === 'tile' && fill.tile) {
     // The tiles sit on the box, so a pattern in the space of a form drawn at the box's matrix.
+    // A tiling pattern fill inverts the current transform, and slide EMU (1/12,700 pt per unit)
+    // is too close to singular for that. The form fills its box in points: the pattern maps to
+    // the form's space, whatever the current transform.
     const g = tileGeometry(fill.tile, p.res.imageSize?.(sourcePart, fill.rId), w, h);
     const pattern = p.name('Pattern', tilePattern(ref, g, p));
     const bbox = around(w, h);
+    const [l, t, r, b] = bbox.map((v) => v / EMU_PER_PT) as [number, number, number, number];
     const form = p.form(
       [
         PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
         PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [pattern]),
-        ...rectOps(bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]),
+        concatTransformationMatrix(EMU_PER_PT, 0, 0, EMU_PER_PT, 0, 0),
+        ...rectOps(l, t, r - l, b - t),
         fillEvenOdd(),
       ],
       bbox
