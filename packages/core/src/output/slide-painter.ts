@@ -185,6 +185,7 @@ export class SlidePainter {
     /** Paint `item` from nothing, a group in part when it weighs more than `room`. */
     const paintFresh = (item: LayoutItem, room: number): [PaintedItem, number] => {
       // A group with effects paints whole: its shadow and filters cover all of its children.
+      // The cascade bounds its weight (`MAX_GROUP_EFFECT_ELEMENTS`) and nesting, so it fits a frame.
       if (item.kind === 'group' && paintWeight(item) > room && !groupPaintsEffects(item)) {
         const g = groupNode(doc, item, opts);
         const fresh = this.#defs.capture(() => paintChildren(doc, item, g, ctx, opts, 0, room));

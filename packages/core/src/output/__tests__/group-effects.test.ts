@@ -189,4 +189,32 @@ describe('group effects', () => {
       2
     );
   });
+
+  test('only the two outermost of nested shadowed groups draw their shadows', async () => {
+    // Each shadow copies the content that holds the shadows inside it: copies would double per
+    // level. A stack of 16 paints at most two shadows.
+    let shapes = shape({ id: 300, x: 0, y: 0, cx: IN, cy: IN, fill: solid('C00000') });
+    for (let level = 15; level >= 0; level -= 1)
+      shapes = group(
+        { id: 200 + level, x: 0, y: 0, cx: 2 * IN, cy: 2 * IN, effects: shadow() },
+        shapes
+      );
+    const started = performance.now();
+    const layout = await layoutOf(shapes);
+    const svg = paintSlide(doc, layout, OPTS);
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(svg.querySelectorAll('[data-effect="shadow"]').length).toBe(2);
+    expect(layout.diagnostics).toContain('effect not rendered: nested group effects');
+  });
+
+  test('the effects of a group of more than 1,000 elements do not draw', async () => {
+    const many = Array.from({ length: 1_001 }, (_, i) =>
+      shape({ id: 1_000 + i, x: 0, y: 0, cx: IN, cy: IN, fill: solid('C00000') })
+    ).join('');
+    const layout = await layoutOf(
+      group({ id: 10, x: 0, y: 0, cx: IN, cy: IN, effects: shadow() }, many)
+    );
+    expect(paintSlide(doc, layout, OPTS).querySelector('[data-effect="shadow"]')).toBeNull();
+    expect(layout.diagnostics).toContain('effect not rendered: group effects of a large group');
+  });
 });

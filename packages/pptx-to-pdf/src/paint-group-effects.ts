@@ -113,6 +113,22 @@ export function groupEffectDiagnostics(
       'approximation',
       'The soft edge of a group fades the lightest of the soft edges of its shapes, and its text paints over it unfaded.'
     );
+  // The mask covers the shapes' areas: their own shadows, glows, and reflections outside them do
+  // not show, where the editor's filter fades them with the group.
+  if (
+    pro &&
+    fx.softEdge &&
+    fx.softEdge.radius > 0 &&
+    leaves.some(({ item }) => {
+      const own = item.element.effects;
+      return !!(own?.outerShadow || own?.secondShadow || own?.glow || own?.reflection);
+    })
+  )
+    p.diag.add(
+      'effect.group-soft-edge-effects',
+      'approximation',
+      'Under the soft edge of a group, the shadows, glows, and reflections of its shapes show only over the shapes.'
+    );
   if (pro && fx.blur)
     p.diag.add(
       'effect.group-body',

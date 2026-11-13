@@ -109,20 +109,16 @@ describe('group effects and the Pro drawing tier', () => {
     // shapes.
     const shown = root.querySelector('[data-kind="group"]')!.lastElementChild!;
     expect(shown.getAttribute('filter')).toMatch(/^url\(#/);
-    const body = shown.querySelector('[id] > [filter]')!;
-    expect(body.querySelectorAll('[data-kind="shape"]').length).toBe(2);
+    const copy = shown.querySelector('[filter] > use')!;
+    const target = root.querySelector(`[id="${copy.getAttribute('href')!.slice(1)}"]`)!;
+    expect(target.querySelectorAll('[data-kind="shape"]').length).toBe(2);
   });
 
-  test('the text of a soft-edged group paints again over the filtered picture', () => {
+  test('a soft-edged group paints each text once, in its shape, over the faded copy', () => {
+    const half =
+      '<a:solidFill><a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr></a:solidFill>';
     const labelled = group(
-      {
-        id: 20,
-        x: IN,
-        y: IN,
-        cx: 3 * IN,
-        cy: IN,
-        effects: '<a:effectLst><a:softEdge rad="63500"/></a:effectLst>',
-      },
+      { id: 20, x: IN, y: IN, cx: 3 * IN, cy: IN, effects: SOFT },
       shape({
         id: 21,
         x: IN,
@@ -130,7 +126,7 @@ describe('group effects and the Pro drawing tier', () => {
         cx: 1.5 * IN,
         cy: IN,
         fill: solid('4472C4'),
-        text: para(run('One')),
+        text: para(run('One', '', half)),
       }) +
         shape({
           id: 22,
@@ -142,19 +138,63 @@ describe('group effects and the Pro drawing tier', () => {
           text: para(run('Two')),
         })
     );
-    const root = paint(labelled);
+    const { root } = paintFull(labelled);
     const node = root.querySelector('[data-kind="group"]')!;
-    const overlay = node.querySelector(':scope > [data-effect="text"]')!;
-    // The copies lie over the filtered picture, outside any filter, and hold no ids.
-    expect(node.lastElementChild).toBe(overlay);
-    const copies = [...overlay.querySelectorAll('[data-pptx-text]')];
-    expect(copies.map((c) => c.textContent)).toEqual(['One', 'Two']);
-    expect(overlay.querySelectorAll('[id]').length).toBe(0);
-    expect(overlay.closest('[filter]')).toBeNull();
-    // Each copy keeps the placement of its original.
-    const originals = [...node.querySelectorAll('[filter] [data-pptx-text]')];
-    expect(copies.map((c) => c.getAttribute('transform'))).toEqual(
-      originals.map((o) => o.getAttribute('transform'))
-    );
+    // One text body per run in the whole slide, so assistive technology and find read it once.
+    const bodies = [...root.querySelectorAll('[data-pptx-text]')];
+    expect(bodies.map((b) => b.textContent)).toEqual(['One', 'Two']);
+    for (const body of bodies) {
+      // In its shape's node: the drag preview hides the node, and with it the text.
+      const owner = body.closest('[data-node-id]')!;
+      expect(owner.getAttribute('data-kind')).toBe('shape');
+      // Under no filter, so it paints once at its own alpha; the bodies around it are hidden,
+      // and the text shows (`visibility` from the custom property, unset outside the copy).
+      expect(body.closest('[filter]')).toBeNull();
+      expect(body.closest('[visibility="hidden"]')).not.toBeNull();
+      expect(body.getAttribute('style')).toContain('visibility:var(--pptx-group-text,visible)');
+    }
+    // The 50 % run keeps its alpha: it paints once, with no copy over it.
+    expect(root.querySelector('[data-pptx-text] [fill-opacity="0.5"]')).not.toBeNull();
+    // The filter takes a copy of the children with their text hidden.
+    const copy = node.querySelector('[filter] > use')!;
+    expect(copy.getAttribute('style')).toBe('--pptx-group-text:hidden');
+    expect(copy.getAttribute('href')).toBe(`#${bodies[0]!.closest('[id]')!.getAttribute('id')}`);
+  });
+
+  test('a stack of 16 soft-edged groups paints in bounded time, each text once', () => {
+    let shapes = '';
+    for (let level = 15; level >= 0; level -= 1) {
+      const label = shape({
+        id: 100 + level,
+        x: IN,
+        y: IN,
+        cx: IN,
+        cy: IN,
+        fill: solid('4472C4'),
+        text: para(run(`Level ${level}`)),
+      });
+      shapes = group(
+        { id: 200 + level, x: IN, y: IN, cx: 2 * IN, cy: 2 * IN, effects: SOFT },
+        label + shapes
+      );
+    }
+    const started = performance.now();
+    const { root, layout } = paintFull(shapes);
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(root.querySelectorAll('[data-pptx-text]').length).toBe(16);
+    // The two outermost soft edges draw; deeper group effects are reported, not drawn.
+    expect(root.querySelectorAll('[filter] > use').length).toBe(2);
+    expect(layout.diagnostics).toContain('effect not rendered: nested group effects');
   });
 });
+
+const SOFT = '<a:effectLst><a:softEdge rad="63500"/></a:effectLst>';
+
+/** The paint of a slide with its hit targets, and its layout. */
+function paintFull(shapes: string) {
+  const r = readPptx(buildPptx({ slides: [{ shapes, layout: 'blank' }] }));
+  if (!r.ok) throw new Error('open failed');
+  const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+  const root = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'f' });
+  return { root, layout };
+}
