@@ -193,7 +193,7 @@ A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidel
 ### Add a fixture
 
 1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/` (Noto Sans Arabic, Noto Sans Symbols 2, STIX Two Math). Name a font for every script in the deck, also in the theme, so the presentation app uses no fallback font.
-2. Install those fonts where the presentation app runs, open the deck, and export `fixtures/<name>.pdf`. Any machine can export a reference. For a deck with equations, export it several times and keep an export that most exports agree with: the presentation app can lay out the equations of a text box in a more compact form on some exports, also on the first export after it starts.
+2. Install those fonts where the presentation app runs, open the deck, and export `fixtures/<name>.pdf`. Any machine can export a reference. When two exports of the same deck differ, export it at least five times and commit the export that most exports agree with.
 3. Run `bun run fidelity:record-reference <name>`. It records the deck and PDF hashes, the page count, and the page size in `fixtures/references.json`. A missing or stale reference is a gap, never a pass.
 4. Run `bun run fidelity <name> --update-gaps --accept-worse`, and commit the deck, the PDF, `references.json`, and `thresholds.ts`.
 

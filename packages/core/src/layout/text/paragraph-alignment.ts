@@ -6,6 +6,9 @@
 // inset. Only that rule differs.
 
 import type { ResolvedParagraph } from '../../cascade/index.ts';
+import { WHOLE_POINT_BASELINES } from './line-metrics.ts';
+
+const EMU_PER_PT = 12_700;
 
 /** Horizontal alignment of a paragraph on the page. */
 export type Alignment = 'left' | 'center' | 'right' | 'both';
@@ -39,8 +42,6 @@ export function leadingOffset(alignment: Alignment, rtl: boolean, room: number):
   return alignment === (rtl ? 'left' : 'right') ? room : 0;
 }
 
-const EMU_PER_PT = 12_700;
-
 /**
  * The leading edge of a right-to-left paragraph, measured from the left edge of its column, for
  * a column `width` wide (EMU): the column width in whole points, rounded down. This is the line
@@ -52,5 +53,6 @@ const EMU_PER_PT = 12_700;
  * moves left by the cut.
  */
 export function rtlLeadingEdge(width: number): number {
+  if (!WHOLE_POINT_BASELINES) return width;
   return Math.max(0, Math.floor(width / EMU_PER_PT + 1e-6)) * EMU_PER_PT;
 }
