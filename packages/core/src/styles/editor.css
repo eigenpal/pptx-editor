@@ -5150,6 +5150,30 @@ legend.pptx-dialog__label {
   flex-shrink: 0;
   max-width: 65%;
 }
+/* Fill Transparency: a slider beside the percent field, on the field's input row. */
+.pptx-editor .pptx-format-transparency {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: end;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.pptx-editor .pptx-format-transparency__slider {
+  grid-row: 1;
+  grid-column: 1;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  margin: 0;
+  accent-color: var(--doc-primary);
+}
+.pptx-editor .pptx-format-transparency > .pptx-field {
+  grid-row: 1;
+  grid-column: 2;
+}
+.pptx-editor .pptx-format-transparency > [role='alert'] {
+  grid-column: 1 / -1;
+}
 .pptx-editor .pptx-format-details:not(:empty) {
   margin-top: 16px;
   padding-top: 12px;

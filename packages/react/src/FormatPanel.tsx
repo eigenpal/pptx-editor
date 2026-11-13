@@ -16,6 +16,7 @@ import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { useEditorDialog } from './popups.tsx';
 import { ToolbarSlot } from './Toolbar.tsx';
 import { FormatLineWidth } from './FormatLineWidth.tsx';
+import { FormatFillTransparency } from './FormatFillTransparency.tsx';
 import { FormatDetails } from './FormatDetails.tsx';
 import { FormatGeometry } from './FormatGeometry.tsx';
 import { ChartDataPane } from './ChartDataPane.tsx';
@@ -75,7 +76,7 @@ export function FormatSection({ section }: FormatSectionProps) {
           <div className="pptx-format-controls">
             {section.slots
               .filter((slot) => slot !== 'slide.background' || background.isAvailable)
-              .map((slot) => (
+              .flatMap((slot) => [
                 <div className="pptx-format-control" data-format-slot={slot} key={slot}>
                   {slot !== 'shape.lineWidth' ? (
                     <span className="pptx-format-control__label">
@@ -86,8 +87,9 @@ export function FormatSection({ section }: FormatSectionProps) {
                     <span className="pptx-format-mixed">{t('inspector.mixed')}</span>
                   ) : null}
                   {slot === 'shape.lineWidth' ? <FormatLineWidth /> : <ToolbarSlot slotId={slot} />}
-                </div>
-              ))}
+                </div>,
+                slot === 'shape.fill' ? <FormatFillTransparency key="fill.transparency" /> : null,
+              ])}
           </div>
         )}
       </div>

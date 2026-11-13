@@ -1840,6 +1840,7 @@
     "blur": "흐림",
     "distance": "거리",
     "opacity": "불투명도",
+    "transparency": "투명도",
     "startOpacity": "시작 불투명도",
     "endOpacity": "끝 불투명도",
     "startPosition": "시작 위치",

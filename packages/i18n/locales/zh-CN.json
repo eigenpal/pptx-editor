@@ -1840,6 +1840,7 @@
     "blur": "模糊",
     "distance": "距离",
     "opacity": "不透明度",
+    "transparency": "透明度",
     "startOpacity": "起始不透明度",
     "endOpacity": "结束不透明度",
     "startPosition": "起始位置",

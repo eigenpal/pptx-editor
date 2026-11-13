@@ -1840,6 +1840,7 @@
     "blur": "Blur",
     "distance": "Distance",
     "opacity": "Opacity",
+    "transparency": "Transparency",
     "startOpacity": "Start opacity",
     "endOpacity": "End opacity",
     "startPosition": "Start position",

@@ -12,6 +12,7 @@ import {
   specOf,
   xmlPartOf,
   type Element,
+  type NodeSpec,
   type PptxPackage,
 } from '../../store/index.ts';
 import type {
@@ -113,7 +114,7 @@ function replaceIn(
   parentId: string,
   names: ReadonlySet<string>,
   after: ReadonlySet<string>,
-  xml: string
+  xml: string | NodeSpec
 ): string {
   for (const c of batch.element(part, parentId).children)
     if (isA(c, names)) batch.push({ op: 'removeNode', part, node: c.id });
@@ -122,10 +123,35 @@ function replaceIn(
   parent.children.forEach((c, i) => {
     if (isA(c, after)) index = i + 1;
   });
-  return batch.insert({ op: 'insertNode', part, parent: parentId, index, spec: specFromXml(xml) });
+  const spec = typeof xml === 'string' ? specFromXml(xml) : xml;
+  return batch.insert({ op: 'insertNode', part, parent: parentId, index, spec });
 }
 
-/** Set the fill of shapes (`p:sp` only; pictures, connectors, and groups have none). */
+const SOLID = new Set(['solidFill']);
+const COLORS = new Set(['srgbClr', 'schemeClr', 'prstClr', 'scrgbClr', 'sysClr', 'hslClr']);
+const ALPHA = new Set(['alpha', 'alphaMod', 'alphaOff']);
+
+/** The alpha transforms of the color of a shape's own solid fill. */
+function solidFillAlpha(spPr: Element): NodeSpec[] {
+  const fill = spPr.children.find((c): c is Element => isA(c, SOLID));
+  const color = fill?.children.find((c): c is Element => isA(c, COLORS));
+  return color?.children.filter((c): c is Element => isA(c, ALPHA)).map(specOf) ?? [];
+}
+
+/** A copy of a solid fill spec whose color also carries `alpha`. */
+function withAlpha(fill: NodeSpec, alpha: readonly NodeSpec[]): NodeSpec {
+  const [color, ...rest] = fill.children ?? [];
+  if (!color || !('local' in color)) return fill;
+  return {
+    ...fill,
+    children: [{ ...color, children: [...(color.children ?? []), ...alpha] }, ...rest],
+  };
+}
+
+/**
+ * Set the fill of shapes (`p:sp` only; pictures, connectors, and groups have none). A new color
+ * keeps the transparency of the shape's own solid fill.
+ */
 export function setShapeFill(
   batch: OpBatch,
   part: string,
@@ -135,7 +161,12 @@ export function setShapeFill(
   const shapes = ids.filter((id) => batch.element(part, id).kind === 'sp');
   if (shapes.length === 0) throw new CommandRefusal('disabled.noShapeFill');
   const xml = fillXml(color);
-  for (const id of shapes) replaceIn(batch, part, spPrOf(batch, part, id).id, FILLS, GEOMETRY, xml);
+  for (const id of shapes) {
+    const spPr = spPrOf(batch, part, id);
+    const alpha = color === null ? [] : solidFillAlpha(spPr);
+    const fill = alpha.length ? withAlpha(specFromXml(xml), alpha) : xml;
+    replaceIn(batch, part, spPr.id, FILLS, GEOMETRY, fill);
+  }
 }
 
 /** `a:gradFill` for a gradient, after validating it. */

@@ -128,3 +128,52 @@ test('a deleted gradient stop refuses a stale patch without creating another sto
     docB.destroy();
   }
 });
+
+test('concurrent fill transparency and fill color edits converge and undo independently', async () => {
+  const docA = new Y.Doc(),
+    docB = new Y.Doc();
+  const sync = link(docA, docB);
+  const bytes = buildPptx({
+    slides: [
+      {
+        layout: 'blank',
+        shapes: shape({
+          id: 2,
+          x: 0,
+          y: 0,
+          cx: 914400,
+          cy: 914400,
+          fill: '<a:solidFill><a:schemeClr val="accent1"><a:alpha val="50000"/></a:schemeClr></a:solidFill>',
+        }),
+      },
+    ],
+  });
+  const a = await replica(docA, 'a', bytes),
+    b = await replica(docB, 'b', bytes);
+  try {
+    a.setSelection({ kind: 'shapes', nodeIds: [read(a).target.nodeId] });
+    b.setSelection({ kind: 'shapes', nodeIds: [read(b).target.nodeId] });
+    sync.pause();
+    expect(patch(a, { kind: 'solid', opacity: 0.3 }).ok).toBe(true);
+    expect(patch(b, { kind: 'solid', opacity: 0.8 }).ok).toBe(true);
+    sync.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    expect(read(a).solid).toEqual(read(b).solid);
+    sync.pause();
+    expect(patch(a, { kind: 'solid', opacity: 0.6 }).ok).toBe(true);
+    expect(b.exec({ type: 'setShapeFill', color: { theme: 'accent2' } }).ok).toBe(true);
+    sync.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    expect(read(a).solid).toEqual(read(b).solid);
+    expect(read(b).solid?.color).toEqual({ theme: 'accent2' });
+    expect(b.exec({ type: 'undo' }).ok).toBe(true);
+    sync.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    expect(read(a).solid?.color).toEqual({ theme: 'accent1' });
+  } finally {
+    a.destroy();
+    b.destroy();
+    docA.destroy();
+    docB.destroy();
+  }
+});
