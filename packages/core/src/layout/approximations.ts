@@ -17,6 +17,7 @@ import { AutonumberCounters, isExactScheme, isSymbolFont } from './text/autonumb
 import { hasCharacters } from './text/text-layout.ts';
 import { isIdeographic } from './text/line-break.ts';
 import { hasLongPaintCluster } from './text/paint-clusters.ts';
+import { unmeasuredDashStart } from './line-strokes.ts';
 
 /** One known approximation. */
 export interface Approximation {
@@ -60,6 +61,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'inset-lines', title: 'Inset lines', perSlide: false },
   { id: 'hyperlink-text', title: 'Hyperlink text', perSlide: true },
   { id: 'dash-complexity', title: 'Dash complexity', perSlide: true },
+  { id: 'closed-curve-dashes', title: 'Dashes on closed curves', perSlide: true },
   { id: 'compound-lines', title: 'Compound lines', perSlide: true },
   { id: 'path-start', title: 'Paths without a move', perSlide: false },
   { id: 'flipped-text', title: 'Text in flipped shapes', perSlide: true },
@@ -287,8 +289,18 @@ class Collector {
         const { geometry } = item.element;
         const rect = geometry.kind === 'preset' && geometry.preset === 'rect';
         this.line(item.element.line, item.kind === 'picture' && !rect);
-        for (const p of item.geometry.paths)
+        for (const p of item.geometry.paths) {
           if (p.fill !== 'norm' && p.fill !== 'none') this.add('path-fill-modes');
+          const outline = item.element.line;
+          if (
+            item.kind === 'shape' &&
+            p.stroke &&
+            outline &&
+            outline.fill.type !== 'none' &&
+            unmeasuredDashStart(p.commands, outline)
+          )
+            this.add('closed-curve-dashes');
+        }
         if (item.kind === 'shape' && item.text && hasCharacters(item.text)) {
           this.text(item.element.text);
           if (item.textMatrix && flipped(item.matrix)) this.add('flipped-text');

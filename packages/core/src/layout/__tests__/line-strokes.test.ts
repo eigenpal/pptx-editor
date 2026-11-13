@@ -12,6 +12,7 @@ import {
   dashArray,
   lineEndReach,
   pictureBorder,
+  unmeasuredDashStart,
   planStroke,
   strokeCap,
   type PathCommand,
@@ -100,6 +101,48 @@ describe('dashes', () => {
     const sq = planStroke(SQUARE, line({ dash: 'lgDashDot', cap: 'sq' }));
     expect(points(sq.commands)[0]).toEqual([0, 10]);
     expect(sq.dashPhase).toBeUndefined();
+  });
+
+  test('a closed path that ends at its first point starts at the last chord', () => {
+    // A closing segment shorter than one EMU is no segment: the last line is the last chord.
+    const loop: PathCommand[] = [...SQUARE.slice(0, 4), { op: 'L', x: 0.4, y: 0.2 }, { op: 'Z' }];
+    const rnd = line({ dash: 'sysDot', cap: 'rnd' });
+    const plan = planStroke(loop, rnd);
+    expect(points(plan.commands).slice(0, 3)).toEqual([
+      [0, 10],
+      [0, 0],
+      [20, 0],
+    ]);
+    expect(plan.dashPhase).toBeCloseTo(PT, 1);
+    expect(unmeasuredDashStart(loop, rnd)).toBe(true);
+    expect(unmeasuredDashStart(loop, line({ dash: 'sysDot' }))).toBe(false);
+    expect(unmeasuredDashStart(SQUARE, rnd)).toBe(false);
+  });
+
+  test('a closed curve starts one chord before its end: 16 or 32 steps a quarter circle', () => {
+    // A circle of four cubic quarter arcs, from the left point, clockwise (y down).
+    const circle = (r: number): PathCommand[] => {
+      const k = 0.5522847498 * r;
+      return [
+        { op: 'M', x: -r, y: 0 },
+        { op: 'C', x1: -r, y1: -k, x2: -k, y2: -r, x: 0, y: -r },
+        { op: 'C', x1: k, y1: -r, x2: r, y2: -k, x: r, y: 0 },
+        { op: 'C', x1: r, y1: k, x2: k, y2: r, x: 0, y: r },
+        { op: 'C', x1: -k, y1: r, x2: -r, y2: k, x: -r, y: 0 },
+        { op: 'Z' },
+      ];
+    };
+    const sq = line({ dash: 'dash', cap: 'sq' });
+    // The angle before the left point where the dashes start, in degrees.
+    const before = (r: number): number => {
+      const start = planStroke(circle(r), sq).commands[0]!;
+      if (start.op !== 'M') throw new Error('no move');
+      return (Math.atan2(start.y, -start.x) * 180) / Math.PI;
+    };
+    // Reference PDFs: about 6° on a 0.8 in circle, about 2.8° on 1.7 in and 3 in circles.
+    expect(before(0.4 * 914_400)).toBeCloseTo(90 / 16, 0);
+    expect(before(0.85 * 914_400)).toBeCloseTo(90 / 32, 0);
+    expect(before(1.5 * 914_400)).toBeCloseTo(90 / 32, 0);
   });
 
   test('a closed path with flat caps, a solid line, or a custom dash keeps its start', () => {

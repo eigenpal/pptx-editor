@@ -82,6 +82,15 @@
         540
       ]
     },
+    "closed-dashes": {
+      "deck": "8677e53d3ff9b7956289392ae3bcb4aab33a25aa3215c1a4999b658b330b2b29",
+      "pdf": "3476986a7750af815e06c7f76f19f8083f8af90014407fd4a16922f9b3c2321f",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "colors": {
       "deck": "886f7de968b4a0967a79dd050f03a45813c27530b67697506e2fdddf8f00ef66",
       "pdf": "4f88ffcc359a8cb1387314afe78960f69386eb71dbc21f901b02a2935c1ee69b",

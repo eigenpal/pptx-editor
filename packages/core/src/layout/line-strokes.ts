@@ -21,8 +21,14 @@
 //   end when it falls in a dash. A custom dash with square caps gets a cap on every dash.
 // - On a closed path, a preset dash with round or square caps starts at the closing segment
 //   (from the last point back to the first), and a round-capped pattern starts one width into
-//   its last gap. A flat-capped pattern starts at the first point. Measured on rectangles in
-//   the `picture-adjustments` fixture, as shapes and as picture borders.
+//   its last gap. A flat-capped pattern starts at the first point. Measured at 3 pt and 9 pt on
+//   rectangles (`picture-adjustments`, as shapes and as picture borders) and on rounded
+//   rectangles, stars, triangles, hexagons, and a custom path of lines and a curve
+//   (`closed-dashes`). A path that ends at its first point, such as an ellipse, has no closing
+//   segment: its pattern starts at the start of the last chord of its last segment, where a
+//   curve is cut into a power of two of equal parameter steps (`CHORD_STEPS_PER_POINT`). The
+//   chord count is fitted to circles of 0.8, 1.7, and 3 in and a 3 × 1.2 in ellipse
+//   (`closed-dashes`), so it is an estimate (approximation `closed-curve-dashes`).
 // - A picture's border lies outside the picture: it is the outline of the geometry grown by
 //   the line width, half a width on each side, with the dashes, caps, and joins of a shape's
 //   outline. Measured on rectangles (`picture-adjustments`).
@@ -564,7 +570,7 @@ function closedDashStart(
   line: ResolvedLine,
   scale: number
 ): StrokePlan | undefined {
-  if (line.dash === 'custom' || (line.cap !== 'rnd' && line.cap !== 'sq')) return undefined;
+  if (!startsAtClosingSegment(line)) return undefined;
   const width = strokeWidth(line, scale);
   const pattern = dashArray(line, width);
   if (!pattern) return undefined;
@@ -577,19 +583,30 @@ function closedDashStart(
   for (const part of subpathCommands(commands)) {
     const first = part[0];
     const last = part[part.length - 2];
-    if (
+    const closed =
       part[part.length - 1]?.op === 'Z' &&
       first?.op === 'M' &&
       last &&
       last.op !== 'M' &&
-      last.op !== 'Z' &&
-      (last.x !== first.x || last.y !== first.y)
-    ) {
+      last.op !== 'Z';
+    if (closed && !samePoint(last, first)) {
       // Start at the last point, draw the closing segment, then the path as it was.
       out.push({ op: 'M', x: last.x, y: last.y }, { op: 'L', x: first.x, y: first.y });
       for (let i = 1; i < part.length; i += 1) out.push(part[i]!);
       changed = true;
-    } else for (const c of part) out.push(c);
+      continue;
+    }
+    const before = part[part.length - 3];
+    if (closed && before && before.op !== 'Z' && part.length > 3) {
+      // Start at the last chord of the last segment: its tail, the path, then its head.
+      const [head, tail] = splitLast({ x: before.x, y: before.y }, last, scale);
+      out.push({ op: 'M', x: tail.from.x, y: tail.from.y }, tail.command);
+      for (let i = 1; i < part.length - 2; i += 1) out.push(part[i]!);
+      out.push(head, { op: 'Z' });
+      changed = true;
+      continue;
+    }
+    for (const c of part) out.push(c);
   }
   if (!changed && phase === 0) return undefined;
   return {
@@ -598,6 +615,93 @@ function closedDashStart(
     caps: [],
     ...(phase > 0 ? { dashPhase: phase } : {}),
   };
+}
+
+/**
+ * How finely the chords of a curve fall, for where dashes start: a curve is cut into n equal
+ * parameter steps, n the smallest power of two with n² ≥ this × M, where M is the largest
+ * second difference of its control points in points. Fitted to the circles and the ellipse of
+ * the `closed-dashes` fixture, whose quarter arcs take 16 or 32 steps.
+ */
+const CHORD_STEPS_PER_POINT = 14;
+
+/** The most steps a curve is cut into. */
+const MAX_CHORD_STEPS = 1024;
+
+/**
+ * Cut the last segment of a closed path, from `from`, before its last chord: the head (a
+ * command from `from`) and the tail (its start and command). A line is all one chord.
+ */
+function splitLast(
+  from: Pt,
+  last: PathCommand,
+  scale: number
+): [PathCommand, { from: Pt; command: PathCommand }] {
+  if (last.op !== 'C' && last.op !== 'Q')
+    return [
+      { op: 'L', x: from.x, y: from.y },
+      { from, command: last },
+    ];
+  const to = { x: last.x, y: last.y };
+  const pts: Pt[] =
+    last.op === 'Q'
+      ? [from, { x: last.x1, y: last.y1 }, to]
+      : [from, { x: last.x1, y: last.y1 }, { x: last.x2, y: last.y2 }, to];
+  let m = 0;
+  for (let i = 0; i + 2 < pts.length; i += 1)
+    m = Math.max(m, len(sub(sub(pts[i]!, pts[i + 1]!), sub(pts[i + 1]!, pts[i + 2]!))));
+  const need = (CHORD_STEPS_PER_POINT * m * (scale || 1)) / 12_700;
+  let n = 1;
+  while (n * n < need && n < MAX_CHORD_STEPS) n *= 2;
+  const t = 1 - 1 / n;
+  // de Casteljau at t: the head keeps the first points of each level, the tail the last.
+  const levels: Pt[][] = [pts];
+  while (levels[levels.length - 1]!.length > 1) {
+    const prev = levels[levels.length - 1]!;
+    levels.push(prev.slice(1).map((q, i) => lerp(prev[i]!, q, t)));
+  }
+  const head = levels.map((l) => l[0]!);
+  const tail = levels.map((l) => l[l.length - 1]!).reverse();
+  const cmd = (q: Pt[]): PathCommand =>
+    q.length === 3
+      ? { op: 'Q', x1: q[1]!.x, y1: q[1]!.y, x: q[2]!.x, y: q[2]!.y }
+      : { op: 'C', x1: q[1]!.x, y1: q[1]!.y, x2: q[2]!.x, y2: q[2]!.y, x: q[3]!.x, y: q[3]!.y };
+  return [cmd(head), { from: tail[0]!, command: cmd(tail) }];
+}
+
+/** Whether two path points are the same within one EMU, past the rounding of evaluated arcs. */
+function samePoint(a: Pt, b: Pt): boolean {
+  return Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
+}
+
+/** Whether the dashes of an outline start at a closed path's closing segment (`planStroke`). */
+function startsAtClosingSegment(line: ResolvedLine): boolean {
+  return (
+    line.dash !== 'custom' && (line.cap === 'rnd' || line.cap === 'sq') && !!dashMultiples(line)
+  );
+}
+
+/**
+ * Whether an outline of `line` on `commands` has dashes whose start is estimated: a preset dash
+ * with round or square caps on a closed subpath that ends at its first point, such as an
+ * ellipse, starts at a chord whose length `CHORD_STEPS_PER_POINT` estimates (approximation
+ * `closed-curve-dashes`).
+ * @internal
+ */
+export function unmeasuredDashStart(commands: readonly PathCommand[], line: ResolvedLine): boolean {
+  if (!startsAtClosingSegment(line)) return false;
+  return subpathCommands(commands).some((part) => {
+    const first = part[0];
+    const last = part[part.length - 2];
+    return (
+      part[part.length - 1]?.op === 'Z' &&
+      first?.op === 'M' &&
+      !!last &&
+      last.op !== 'M' &&
+      last.op !== 'Z' &&
+      samePoint(last, first)
+    );
+  });
 }
 
 /** The commands of each subpath, from its move up to and including its close. */

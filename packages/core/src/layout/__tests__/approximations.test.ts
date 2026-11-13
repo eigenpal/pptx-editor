@@ -280,6 +280,32 @@ describe('approximations a slide uses', () => {
     );
   });
 
+  test('capped dashes on a closed curve are flagged; on measured shapes they are not', () => {
+    const dashed = (prst: string, dash = 'sysDot', cap = 'rnd'): string =>
+      shape({
+        id: 2,
+        x: 0,
+        y: 0,
+        cx: IN,
+        cy: IN,
+        prst,
+        fill: '<a:noFill/>',
+        line:
+          `<a:ln w="38100" cap="${cap}"><a:solidFill><a:srgbClr val="000000"/></a:solidFill>` +
+          `<a:prstDash val="${dash}"/></a:ln>`,
+      });
+    expect(approximationsOf(dashed('ellipse'))).toContain('closed-curve-dashes');
+    expect(approximationsOf(dashed('ellipse', 'dash', 'sq'))).toContain('closed-curve-dashes');
+    // Flat caps start at the first point, as reference PDFs show; so does a solid line.
+    expect(approximationsOf(dashed('ellipse', 'dash', 'flat'))).not.toContain(
+      'closed-curve-dashes'
+    );
+    expect(approximationsOf(dashed('ellipse', 'solid'))).not.toContain('closed-curve-dashes');
+    // The `closed-dashes` fixture measures these with a closing segment.
+    for (const prst of ['rect', 'roundRect', 'star5', 'triangle', 'hexagon'])
+      expect(approximationsOf(dashed(prst))).not.toContain('closed-curve-dashes');
+  });
+
   test('pattern tiles of a turned or flipped shape are measured; a pattern line is not', () => {
     const patt =
       '<a:pattFill prst="horz"><a:fgClr><a:srgbClr val="000000"/></a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr></a:pattFill>';
