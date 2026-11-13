@@ -135,6 +135,31 @@ describe('3-D polygons', () => {
     expect(face(effects({ ...bevel, lightRig: 'harsh' })).g).toBeLessThan(front.g - 20);
   });
 
+  test('a material changes the highlights, not the diffuse light', () => {
+    const bevel = { bevelTop: { w: 76_200, h: 76_200, preset: 'circle' as const } };
+    // The strips of one side, outer to inner: the side of each strip is its index modulo 4.
+    const side = (material: string, k: number) =>
+      polygons(threeDPaint(input(effects({ ...bevel, material })))!.over).filter(
+        (_, i) => i % 4 === k
+      );
+    const top = (material: string) => side(material, 0).map((q) => q.color);
+    const right = (material: string) => side(material, 1).map((q) => q.color);
+    // Matte takes no highlight. The right side, away from the light, shows the same diffuse
+    // light in every material.
+    const matte = top('matte');
+    const warm = top('warmMatte');
+    const metal = top('metal');
+    expect(Math.max(...warm.map((c) => c.r))).toBeGreaterThan(Math.max(...matte.map((c) => c.r)));
+    // Metal: a strong highlight (white in the reference), and a rim at the grazing outer strip
+    // on every side, also the dark one (the reference shows 95989E there).
+    expect(Math.max(...metal.map((c) => c.r))).toBeGreaterThan(240);
+    expect(right('metal')[0]!.r).toBeGreaterThan(right('warmMatte')[0]!.r + 60);
+    expect(right('metal')[11]!.g).toBeCloseTo(right('warmMatte')[11]!.g, -1);
+    // Plastic has stronger highlights than warm matte.
+    const peak = (cs: readonly { r: number }[]) => Math.max(...cs.map((c) => c.r));
+    expect(peak(top('plastic'))).toBeGreaterThan(peak(warm) + 10);
+  });
+
   test('the sides take the light of their normals in the shape axes', () => {
     const paint = threeDPaint(
       input(effects({ camera: 'isometricOffAxis2Left', extrusionH: 228_600 }))

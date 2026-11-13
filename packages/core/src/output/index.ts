@@ -53,5 +53,7 @@ export {
   type RegisterFontFacesOptions,
 } from './font-faces.ts';
 export { SVG_NS } from './svg.ts';
+// Internal: the transform format that `pro/drawing` writes, to the same precision.
+export { matrixAttr } from './svg.ts';
 // Internal: the DOM-free document that a host without a DOM paints into.
 export { createSvgDocument, elementsWithAttribute, serializeSvgElement } from './svg-document.ts';

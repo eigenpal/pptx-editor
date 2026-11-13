@@ -212,6 +212,32 @@ describe('effect filter regions', () => {
 });
 
 describe('glow paint', () => {
+  test('a skewed reflection keeps its linear coefficients to 1e-6', () => {
+    const root = paint(
+      shape({
+        id: 2,
+        x: 1_000_000,
+        y: 1_000_000,
+        cx: 2_000_000,
+        cy: 1_000_000,
+        fill: '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>',
+        effects:
+          '<a:effectLst><a:reflection stA="50000" endPos="55000" dir="5400000" sy="-100000"' +
+          ' kx="-1200000" algn="bl" rotWithShape="0"/></a:effectLst>',
+      })
+    );
+    const transform = root
+      .querySelector('[data-effect="reflection"] use')
+      ?.getAttribute('transform');
+    const linear = /matrix\(([^)]*)\)/
+      .exec(transform ?? '')![1]!
+      .split(' ')
+      .slice(0, 4)
+      .map(Number);
+    // The skew of 20 degrees writes tan 20 degrees, not its value to two decimals.
+    expect(linear.some((v) => Math.abs(Math.abs(v) - Math.tan(Math.PI / 9)) < 1e-5)).toBe(true);
+  });
+
   test('the glow is a copy under the content, and the text paints with no filter', () => {
     const root = paint(
       shape({
