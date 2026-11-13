@@ -167,6 +167,13 @@ interface Lobe extends Light {
   readonly power: number;
 }
 
+/** A light rig: an ambient term, lights, and highlights. */
+interface Rig {
+  readonly ambient: number;
+  readonly lights: readonly Light[];
+  readonly highlights: readonly Lobe[];
+}
+
 /**
  * The three-point rig from the top, in the shape's own axes: a camera turn moves the view, not
  * the light. An ambient term, three lights (from above, from below, and from behind), and
@@ -177,17 +184,44 @@ interface Lobe extends Light {
  * light from below and behind, is fitted to the outer strips of the bevels of slide 1, which
  * catch light at the bottom edge.
  */
-const AMBIENT = 0.1253;
-const LIGHTS: readonly Light[] = [
-  { dir: [-0.194, -0.722, 0.664], k: 0.857 },
-  { dir: [-0.027, 0.669, 0.743], k: 0.486 },
-  { dir: [-0.286, 0.571, -0.769], k: 0.929 },
-];
-const HIGHLIGHTS: readonly Lobe[] = [
-  { dir: [-0.355, -0.749, 0.559], k: 0.484, power: 28.5 },
-  { dir: [-0.457, 0.459, -0.762], k: 1.125, power: 82.4 },
-  { dir: [0, 0.485, -0.875], k: 0.13, power: 24 },
-];
+const THREE_POINT: Rig = {
+  ambient: 0.1253,
+  lights: [
+    { dir: [-0.194, -0.722, 0.664], k: 0.857 },
+    { dir: [-0.027, 0.669, 0.743], k: 0.486 },
+    { dir: [-0.286, 0.571, -0.769], k: 0.929 },
+  ],
+  highlights: [
+    { dir: [-0.355, -0.749, 0.559], k: 0.484, power: 28.5 },
+    { dir: [-0.457, 0.459, -0.762], k: 1.125, power: 82.4 },
+    { dir: [0, 0.485, -0.875], k: 0.13, power: 24 },
+  ],
+};
+
+/**
+ * The rigs that the fixture shows, each fitted to its circle bevel and face under the front
+ * camera (slide 2), within 8 levels of 255 on average. Their highlights are fitted for that view
+ * only. The other rigs take the three-point rig.
+ */
+const RIGS: Readonly<Record<string, Rig>> = {
+  threePt: THREE_POINT,
+  balanced: {
+    ambient: 0.201,
+    lights: [
+      { dir: [-0.305, 0.466, 0.831], k: 0.992 },
+      { dir: [0.534, -0.794, -0.291], k: 1.324 },
+    ],
+    highlights: [{ dir: [-0.346, -0.919, 0.186], k: 0.278, power: 15.1 }],
+  },
+  harsh: {
+    ambient: 0.2826,
+    lights: [
+      { dir: [-0.733, 0.597, 0.325], k: 0.941 },
+      { dir: [-0.585, -0.741, 0.329], k: 0.698 },
+    ],
+    highlights: [{ dir: [-0.718, -0.645, -0.262], k: 3.764, power: 23.9 }],
+  },
+};
 
 /**
  * How far the rig turns the light about the view axis, by `dir`, in degrees. The top-left
@@ -203,15 +237,6 @@ const DIR_TURN: Readonly<Record<string, number>> = {
   br: 135,
   r: 90,
   tr: 45,
-};
-
-/**
- * The strength of a rig against the three-point rig, measured on the faces of slide 2 of the
- * fixture. The rigs that the fixture does not show keep the strength of the three-point rig.
- */
-const RIG_STRENGTH: Readonly<Record<string, number>> = {
-  balanced: 0.93,
-  harsh: 0.77,
 };
 
 /** The highlight strength of each material: none for matte ones, more for metal. */
@@ -272,18 +297,17 @@ export function lightingOf(t: ResolvedThreeD, view: Vec3 = [0, 0, 1]): Lighting 
   )
     return { shade: () => ({ level: 1, white: 0 }) };
   const turnBy = DIR_TURN[t.lightDir] ?? 0;
-  const strength = RIG_STRENGTH[t.lightRig] ?? 1;
-  const lights = LIGHTS.map((l) => ({ dir: spin(normalize(l.dir), turnBy), k: strength * l.k }));
-  const ambient = strength * AMBIENT;
-  const gloss = strength * highlightOf(t.material);
+  const rig = RIGS[t.lightRig] ?? THREE_POINT;
+  const lights = rig.lights.map((l) => ({ dir: spin(normalize(l.dir), turnBy), k: l.k }));
+  const gloss = highlightOf(t.material);
   // The half vector of each highlight is fixed for one view.
-  const halves = HIGHLIGHTS.map((h) => {
+  const halves = rig.highlights.map((h) => {
     const l = spin(normalize(h.dir), turnBy);
     return { half: normalize([l[0] + view[0], l[1] + view[1], l[2] + view[2]]), lobe: h };
   });
   return {
     shade: (n) => ({
-      level: lights.reduce((sum, l) => sum + l.k * Math.max(0, dot(n, l.dir)), ambient),
+      level: lights.reduce((sum, l) => sum + l.k * Math.max(0, dot(n, l.dir)), rig.ambient),
       white: halves.reduce(
         (sum, { half, lobe }) => sum + gloss * lobe.k * Math.max(0, dot(n, half)) ** lobe.power,
         0

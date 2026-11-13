@@ -316,7 +316,9 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
     const cColor = t.contourColor ? { ...t.contourColor } : color;
     for (const p of polys) {
       const normals = edgeNormals(p);
-      const ring = offset(p, normals, -t.contourW);
+      // The contour lies across the edge: half of it shows outside the outline, and the face
+      // covers the rest (measured on the fixture, slide 2).
+      const ring = offset(p, normals, -t.contourW / 2);
       for (let i = 0; i < p.length; i += 1) {
         const j = (i + 1) % p.length;
         under.push({ points: [ring[i]!, ring[j]!, p[j]!, p[i]!], color: cColor });

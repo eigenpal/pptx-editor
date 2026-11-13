@@ -107,7 +107,9 @@ describe('3-D polygons', () => {
     // One color: the four sides of the ring are one facet.
     expect(contour.under).toHaveLength(1);
     expect(polygons(contour.under)).toHaveLength(4);
-    expect(contour.under[0]!.polygons[0]!.some((p) => p.y < IN)).toBe(true);
+    // Half of the contour shows outside the outline (the top edge lies at y = 0).
+    const top = Math.min(...contour.under[0]!.polygons.flat().map((p) => p.y));
+    expect(top).toBeCloseTo(-38_100 / 2, 3);
     const flat = threeDPaint(
       input(effects({ material: 'flat', bevelTop: { w: 76_200, h: 76_200, preset: 'angle' } }))
     )!;

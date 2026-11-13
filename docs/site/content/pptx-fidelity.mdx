@@ -200,7 +200,7 @@ Edits recalculate the slide layout and apply text autofit rules. The following o
 - **Opaque silhouettes.** Fill transparency does not lighten a shadow, and a picture's shadow takes the shape of its frame.
 - **Inner shadows.** The outer half of an outline is not shaded, and an unfilled shape gets no inner shadow.
 - **Soft edges.** The fade follows the distance to the painted edge of the fill and outline, so corners are rounder than a blur.
-- **Blur.** `a:blur` is not drawn.
+- **Blur.** `a:blur` fades the shape to half its opacity at the painted edge and, when the blur grows the shape, adds rings in the color of that edge outside it. Text and detail inside the shape stay sharp.
 - **Reflection blur.** A reflection is drawn with its fade, without its blur.
 - **Gradient lines.** Drawn in one color.
 - **Gradient stops.** At most 64 stops are drawn.
