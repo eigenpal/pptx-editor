@@ -98,6 +98,16 @@ export interface CompoundPolyline {
 export function createSvgDocument(): Document;
 
 // @internal
+export function effectBoxCorners(item: Extract<LayoutItem, {
+    kind: 'shape';
+} | {
+    kind: 'picture';
+}>): {
+    x: number;
+    y: number;
+}[];
+
+// @internal
 export function effectMatrix(e: EffectPlacement, shape: Matrix, w: number, h: number): Matrix;
 
 // @internal

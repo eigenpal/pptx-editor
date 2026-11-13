@@ -21,6 +21,7 @@ export {
   blipColorSteps,
   blurSigma,
   circleGradientGeometry,
+  effectBoxCorners,
   effectMatrix,
   finiteFacet,
   gradientPaintStops,

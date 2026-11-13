@@ -4,7 +4,7 @@
 // a public API.
 
 import type { EffectPlacement, GradientStop, ResolvedFill, Rgba } from '../cascade/index.ts';
-import type { GeometryPath, Matrix, ThreeDFacet } from '../layout/index.ts';
+import type { GeometryPath, LayoutItem, Matrix, ThreeDFacet } from '../layout/index.ts';
 import {
   applyBlipColorSteps,
   blipColorSteps,
@@ -14,6 +14,7 @@ import {
   lumTransfer,
   type BlipColorStep,
 } from './effect-transforms.ts';
+import { boxCorners } from './item-corners.ts';
 import { adjustForPathMode as adjusted, tileGeometry, type TileGeometry } from './paint-fill.ts';
 import {
   circleGeometry,
@@ -149,4 +150,15 @@ export function rectGradientGeometry(
   h: number
 ): { l: number; t: number; r: number; b: number; x0: number; y0: number; x1: number; y1: number } {
   return rectGeometry(fill, w, h);
+}
+
+/**
+ * The slide-space corners of an item's box, geometry, and outline: the bounds that the SVG
+ * paint's body effects (soft edge, inner shadow) read.
+ * @internal
+ */
+export function effectBoxCorners(
+  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>
+): { x: number; y: number }[] {
+  return boxCorners(item);
 }

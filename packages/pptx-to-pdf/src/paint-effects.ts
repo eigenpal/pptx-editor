@@ -51,16 +51,18 @@ import {
   invert,
   multiply,
   planStroke,
+  strokeWidth,
   type GeometryPath,
   type LayoutItem,
   type Matrix,
   type PathCommand,
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
-import { blurSigma, effectMatrix } from '@pptx-editor.dev/core/output';
+import { blurSigma, effectBoxCorners, effectMatrix } from '@pptx-editor.dev/core/output';
 import {
   glowSpread,
   innerShadowShift,
+  MAX_MORPH_SPREAD,
   reflectionBlurSigma,
   reflectionFade,
   softEdgeSpread,
@@ -150,14 +152,11 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
       'approximation',
       'Inner shadows start at the fill: outlines and overlapping paths are shaded differently.'
     );
-  // `drawSoftEdge` fades the filled paths; an outline alone draws hard.
   if (pro && softEdge && softEdge.radius > 0)
     p.diag.add(
       'effect.soft-edge',
       'approximation',
-      filled.length > 0
-        ? 'Soft edges fade by the distance to the outline: corners round.'
-        : 'Soft edges of a shape with no fill are drawn hard.'
+      'Soft edges fade by the distance to the painted edge: corners round.'
     );
   if (pro && effects.blur && effects.blur.radius > 0)
     p.diag.add('effect.blur', 'approximation', 'Blur is not drawn.');
@@ -629,11 +628,6 @@ export async function drawReflection(
   p.push(drawObject(p.name('XObject', group)), popGraphicsState());
 }
 
-/**
- * The most a soft edge shrinks the outline, in EMU (100 pt), as the SVG renderer caps it: a
- * larger soft edge shrinks the outline by 100 pt and keeps its blur.
- */
-const MAX_SOFT_EDGE_INSET = 1_270_000;
 /** At most this many bands across a soft edge: each is one stroke of the mask. */
 const MAX_SOFT_EDGE_BANDS = 48;
 /** The narrowest band of a soft edge, half a point: a narrower one is under one output pixel. */
@@ -658,56 +652,146 @@ export function softEdgeBands(inset: number, sigma: number): { reach: number[]; 
   return { reach, alpha };
 }
 
-/** The filled paths of an item that a soft edge fades: none for a shape with no fill. */
-function softEdgePaths(item: Drawable, scope: FillScope): readonly GeometryPath[] {
-  const fills = item.kind === 'picture' || ownFill(item.element.fill, scope).fill.type !== 'none';
-  return fills ? item.geometry.paths.filter((path) => path.fill !== 'none') : [];
+/**
+ * What a soft edge fades, as the SVG renderer's body filter reads it (`SourceAlpha`): the filled
+ * paths, and the outline at `width` in slide space (a picture's border lies outside the picture:
+ * twice its width, clipped outside). `rimmed` are the filled paths whose outline lies over their
+ * edge, so their own edge is `width / 2` inside the painted edge.
+ */
+interface SoftEdgeSilhouette {
+  readonly filled: readonly PathCommand[][];
+  readonly rimmed: readonly boolean[];
+  readonly outlines: readonly PathCommand[][];
+  readonly width: number;
+}
+
+function softEdgeSilhouette(
+  item: Drawable,
+  scope: FillScope,
+  groupScale: number
+): SoftEdgeSilhouette {
+  const el = item.element;
+  const m = item.matrix;
+  const picture = item.kind === 'picture';
+  const fills = picture || ownFill(el.fill, scope).fill.type !== 'none';
+  const line = item.paintLine ?? el.line;
+  const lineFill = line ? ownFill(line.fill, scope).fill.type : 'none';
+  const drawn = !!line && (lineFill === 'solid' || lineFill === 'linear' || lineFill === 'path');
+  const { cx: w, cy: h } = el.xfrm;
+  // A picture with no geometry shows in its box, as `drawGeometry` draws it.
+  const box: GeometryPath = {
+    commands: [
+      { op: 'M', x: 0, y: 0 },
+      { op: 'L', x: w, y: 0 },
+      { op: 'L', x: w, y: h },
+      { op: 'L', x: 0, y: h },
+      { op: 'Z' },
+    ],
+    fill: 'norm',
+    stroke: true,
+  } as GeometryPath;
+  const paths = picture && item.geometry.paths.length === 0 ? [box] : item.geometry.paths;
+  const filledPaths = fills ? paths.filter((path) => path.fill !== 'none') : [];
+  const stroked = drawn ? paths.filter((path) => picture || path.stroke) : [];
+  const width = drawn ? strokeWidth(line, groupScale) * matrixScale(m) * (picture ? 2 : 1) : 0;
+  return {
+    filled: filledPaths.map((path) => pathUnder(path.commands, m)),
+    rimmed: filledPaths.map((path) => stroked.includes(path)),
+    outlines: stroked.map((path) => pathUnder(path.commands, m)),
+    width,
+  };
 }
 
 /**
  * Paint `drawBody` (the geometry, its bevel, and the inner shadow, in slide space) through the
  * item's soft edge, as the SVG renderer's body filter: as one transparency group under a
- * luminosity soft mask whose alpha follows the outline shrunk by 0.84 times the radius and
- * blurred by the radius (`softEdgeSpread`). The mask is the filled paths in white, then strokes
- * of the paths from the widest band in, each in its band's gray: a band follows the distance to
- * the outline, so at a corner it rounds where the blur takes the product of the two edges.
- * Without a soft edge, `drawBody` paints as it is.
+ * luminosity soft mask whose alpha follows everything the body paints (the fill and the outline)
+ * shrunk by 0.84 times the radius and blurred by the radius (`softEdgeSpread`). The mask holds
+ * the alpha by the distance to the painted edge, in bands: inside a filled path, strokes of the
+ * path from the widest band in; on the outline, outside the filled paths, strokes of the outline
+ * from the full width in. At a corner a band rounds where the blur takes the product of the two
+ * edges. Without a soft edge, `drawBody` paints as it is.
  */
 export async function drawSoftEdge(
   item: Drawable,
   p: PageOps,
   scope: FillScope,
+  groupScale: number,
   drawBody: () => Promise<void>
 ): Promise<void> {
   const soft = item.element.effects?.softEdge;
-  const paths = soft && soft.radius > 0 && proEffects() ? softEdgePaths(item, scope) : [];
   const m = item.matrix;
-  if (!soft || paths.length === 0 || Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9) return drawBody();
+  if (!soft || soft.radius <= 0 || !proEffects() || Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9)
+    return drawBody();
+  const shape = softEdgeSilhouette(item, scope, groupScale);
+  if (shape.filled.length === 0 && shape.outlines.length === 0) return drawBody();
   const { spread, sigma } = softEdgeSpread(soft.radius);
-  const inset = Math.min(-spread, MAX_SOFT_EDGE_INSET);
-  // A shrink by more than half the narrower side of the box leaves nothing, as in the SVG
-  // renderer: the shape paints nothing.
-  const { cx: w, cy: h } = item.element.xfrm;
-  const corners = [apply(m, 0, 0), apply(m, w, 0), apply(m, w, h), apply(m, 0, h)];
+  // A shrink by more than half the narrower side of the bounds leaves nothing, as in the SVG
+  // renderer, which compares the spread before its cap: the shape paints nothing.
+  const corners = effectBoxCorners(item);
   const xs = corners.map((c) => c.x);
   const ys = corners.map((c) => c.y);
   const narrow = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  if (inset > narrow / 2) return;
+  if (Math.abs(spread) > narrow / 2) return;
+  const inset = Math.min(Math.abs(spread), MAX_MORPH_SPREAD);
   const body = p.form(await p.capture(drawBody), formBox(p), { S: 'Transparency' });
   const { reach, alpha } = softEdgeBands(inset, sigma);
-  const trace = (): void => {
-    for (const path of paths) tracePath(pathUnder(path.commands, m), p);
+  const extent = reach[reach.length - 1] ?? 0;
+  const trace = (paths: readonly PathCommand[][]): void => {
+    for (const path of paths) tracePath(path, p);
   };
+  const W = shape.width;
   const ops = await p.capture(async () => {
     p.push(setLineJoin(LineJoinStyle.Round), setLineCap(LineCapStyle.Round));
-    p.push(setFillingGrayscaleColor(1));
-    trace();
-    p.push(fillEvenOdd());
-    // Widest first: a point keeps the gray of the narrowest band that reaches it.
-    for (let k = reach.length - 1; k >= 0; k -= 1) {
-      p.push(setStrokingGrayscaleColor(alpha[k]), setLineWidth(2 * reach[k]));
-      trace();
-      p.push(stroke());
+    // Inside a filled path: its own edge lies `off` inside the painted edge. Widest band first,
+    // so a point keeps the gray of the narrowest band that reaches it.
+    for (const rim of [false, true]) {
+      const paths = shape.filled.filter((_, i) => shape.rimmed[i] === rim);
+      if (paths.length === 0) continue;
+      const off = rim ? W / 2 : 0;
+      p.push(setFillingGrayscaleColor(1));
+      trace(paths);
+      p.push(fillEvenOdd());
+      for (let k = reach.length - 1; k >= 0; k -= 1) {
+        if (reach[k] <= off) break;
+        p.push(setStrokingGrayscaleColor(alpha[k]), setLineWidth(2 * (reach[k] - off)));
+        trace(paths);
+        p.push(stroke());
+      }
+    }
+    // On the outline, outside the filled paths: the painted edge is the outline's outer edge.
+    // From the full width in, each stroke covers the points at least its band inside that edge.
+    if (shape.outlines.length && W > 0) {
+      p.push(pushGraphicsState());
+      if (shape.filled.length) {
+        const r =
+          4 * Math.max(narrow, W, extent) + Math.max(...xs.map(Math.abs), ...ys.map(Math.abs));
+        tracePath(
+          [
+            { op: 'M', x: -r, y: -r },
+            { op: 'L', x: r, y: -r },
+            { op: 'L', x: r, y: r },
+            { op: 'L', x: -r, y: r },
+            { op: 'Z' },
+          ],
+          p
+        );
+        trace([...shape.filled]);
+        p.push(clipEvenOdd(), endPath());
+      }
+      for (let j = 0; j < reach.length; j += 1) {
+        const from = j ? reach[j - 1] : 0;
+        if (from >= W / 2) break;
+        p.push(setStrokingGrayscaleColor(alpha[j]), setLineWidth(W - 2 * from));
+        trace([...shape.outlines]);
+        p.push(stroke());
+      }
+      if (extent < W / 2) {
+        p.push(setStrokingGrayscaleColor(1), setLineWidth(W - 2 * extent));
+        trace([...shape.outlines]);
+        p.push(stroke());
+      }
+      p.push(popGraphicsState());
     }
   });
   const mask = p.form(ops, formBox(p), { S: 'Transparency', CS: 'DeviceGray' });

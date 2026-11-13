@@ -513,7 +513,7 @@ async function drawItem(
     if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
     // The soft edge fades the body (the geometry, its bevel, and the inner shadow), not the text,
     // as in the SVG paint.
-    await drawSoftEdge(item, p, local, async () => {
+    await drawSoftEdge(item, p, local, groupScale, async () => {
       p.push(pushGraphicsState());
       p.matrix(item.matrix);
       if (threeD) fillFacets(threeD.under, p);
