@@ -28,3 +28,28 @@ test('post-release capture has a manual retry and App-authenticated pull request
   expect(capture.concurrency['cancel-in-progress']).toBe(false);
   expect(capture.jobs.capture.steps[0].uses).toContain('actions/create-github-app-token@');
 });
+
+test('baseline merge receives workflow approval permissions through the reusable call', () => {
+  const caller = workflow('post-release.yml').jobs['collaboration-baseline'];
+  const baseline = workflow('collaboration-baseline.yml');
+  const capture = baseline.jobs.capture;
+  const merge = baseline.jobs.merge;
+  expect(capture.outputs.pr).toBe('${{ steps.capture.outputs.pr }}');
+  expect(capture.steps.find((step: any) => step.id === 'capture').run).toContain(
+    'node scripts/collaboration/post-release.mjs'
+  );
+  expect(merge.needs).toBe('capture');
+  expect(merge.if).toBe("needs.capture.outputs.pr != ''");
+  expect(merge.env.PR_NUMBER).toBe('${{ needs.capture.outputs.pr }}');
+  expect(merge.env.RELEASE_VERSION).toBe('${{ inputs.version }}');
+  for (const permissions of [caller.permissions, merge.permissions]) {
+    expect(permissions['pull-requests']).toBe('write');
+    for (const scope of ['contents', 'actions', 'checks', 'statuses'])
+      expect(permissions[scope]).toBe('read');
+  }
+  const final = merge.steps.at(-1);
+  expect(final.env.GH_TOKEN).toBe('${{ github.token }}');
+  expect(final.env.MERGE_TOKEN).toBe('${{ steps.token.outputs.token }}');
+  expect(final.run).toContain('-f event=APPROVE -f commit_id="$EXPECTED_HEAD"');
+  expect(final.run).toContain('GH_TOKEN="$MERGE_TOKEN" gh pr merge');
+});
