@@ -75,6 +75,23 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+/* The preview banner sits over the demo, so the demo takes the rest of the window height. The
+   banner uses a system font, not Geist: it paints before the web font arrives, and a font swap
+   would move its centered text and change its height. */
+.demo-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 18px;
+  -webkit-font-smoothing: antialiased;
+}
+.demo-frame > .demo-root {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
 .demo-root.dark {
   --demo-bg: #141413;
   --demo-surface: #1c1c1b;
