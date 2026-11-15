@@ -1916,7 +1916,7 @@ export function drawingClipboardPayload(bytes: Uint8Array): ClipboardPayload | n
 export function dropSlideDrag(editor: PptxEditorInstance | null, drag: SlideDrag | null, grouped: readonly SlideSection[] | null): void;
 
 // @internal
-export const EAGER_FONTS_WAIT_MS = 2000;
+export const EAGER_FONTS_WAIT_MS = 3000;
 
 // @internal
 export function editBulletGlyph(d: BulletsDialogFields, field: 'char' | 'font', value: string, seed?: BulletsDialogFields): BulletsDialogFields;

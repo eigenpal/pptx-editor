@@ -45,7 +45,7 @@ export interface UsePptxSourceReturn {
 /**
  * Load a presentation, and optionally its fonts, for `PptxEditor`, the twin of React's
  * `usePptxSource` and of DOCX Editor's `useDocxSource`. Eager fonts hold the deck back until
- * they settle, for at most 2 seconds; an on-demand resolver does not. A font failure never
+ * they settle, for at most 3 seconds; an on-demand resolver does not. A font failure never
  * fails the deck, and a URL that sends no bytes for 10 seconds fails with an error. @public
  */
 export function usePptxSource(

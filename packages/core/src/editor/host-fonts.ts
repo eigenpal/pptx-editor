@@ -210,11 +210,13 @@ export function withFontOrigin(
 const isAbort = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
 /**
- * The longest a deck that opens waits for the host's fonts, as DOCX Editor's
- * `PREPARED_WORK_WAIT_MS`. After it, the deck paints with the embedded and built-in faces, and
- * the host's faces install when they arrive. A stalled download never holds the loading screen.
+ * The longest a deck that opens waits for its fonts: the text engine, the opening slide's
+ * substitutes, and the host's fonts. The loading sheet shows meanwhile, so on most networks
+ * the first slide paints once, in its own faces. After it, the deck paints with the browser's
+ * faces as stand-ins, and the deck's faces install when they arrive. A stalled download never
+ * holds the loading screen.
  */
-export const FONT_WAIT_MS = 2000;
+export const FONT_WAIT_MS = 3000;
 
 /** The answer `within` gives when the host's fonts did not arrive in time. */
 const LATE = Symbol('late');

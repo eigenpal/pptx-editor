@@ -50,7 +50,7 @@ export interface UsePptxSourceResult {
  * ```
  *
  * Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back until they
- * settle, so the slides lay out once. They hold it for at most 2 seconds: fonts that settle
+ * settle, so the slides lay out once. They hold it for at most 3 seconds: fonts that settle
  * later apply, and the slides lay out again. An on-demand resolver (`packagedFonts()`,
  * `googleFonts()`) needs the parsed deck, so the bytes go through at once and the slides lay
  * out again when the faces arrive. A font failure never fails the deck.

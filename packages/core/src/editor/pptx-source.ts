@@ -52,7 +52,7 @@ export type PptxSource = string | URL | Uint8Array | ArrayBuffer;
 
 /** Options for `usePptxSource`. @public */
 export interface UsePptxSourceOptions {
-  /** The fonts. Eager origins hold the deck back until they settle, for at most 2 seconds. */
+  /** The fonts. Eager origins hold the deck back until they settle, for at most 3 seconds. */
   readonly fonts?: PptxFontsSource;
   /** Passed to `fetch` for a URL source: credentials and headers. */
   readonly fetchOptions?: RequestInit;

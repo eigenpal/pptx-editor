@@ -118,7 +118,7 @@ export interface PptxEditorInstance extends Editor {
   readonly fonts: PptxEditorOptions['fonts'];
   /**
    * Which measurer the deck's layout runs on, and whether the host's fonts are still on the
-   * way. A deck that opens waits at most 2 seconds for its fonts, then shows with stand-in
+   * way. A deck that opens waits at most 3 seconds for its fonts, then shows with stand-in
    * faces; the host's faces install when they arrive.
    */
   fontMeasurement(): FontMeasurementState;
