@@ -4,11 +4,15 @@ import './styles.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
+import { PreviewBanner } from '../../shared/PreviewBanner.tsx';
 
 const container = document.getElementById('app');
 if (container)
   createRoot(container).render(
     <StrictMode>
-      <App />
+      <div className="demo-frame">
+        <PreviewBanner />
+        <App />
+      </div>
     </StrictMode>
   );
