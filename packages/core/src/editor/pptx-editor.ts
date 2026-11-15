@@ -604,10 +604,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   /** The session's faces changed: register them for paint (in a browser) and publish. */
   const refreshFaces = async (owner: DocumentSession): Promise<void> => {
     if (typeof document !== 'undefined') {
-      // The faces on screen stay until the new ones load and paint: no frame falls back.
-      const faces = replaceFontFaces(document, fonts, owner.faces);
-      fonts = faces;
-      await faces.ready;
+      // The faces on screen stay until the new ones paint and the thumbnails repaint.
+      const retire = () => thumbnails.repainted();
+      await (fonts = replaceFontFaces(document, fonts, owner.faces, { retire })).ready;
       // A load or destroy in the meantime owns the faces now.
       if (destroyed || session !== owner) return;
     }

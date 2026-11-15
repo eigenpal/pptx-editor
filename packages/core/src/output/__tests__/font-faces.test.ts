@@ -242,4 +242,31 @@ describe('replaceFontFaces', () => {
     await new Promise((r) => setTimeout(r, 5));
     expect(fonts.size).toBe(0);
   });
+
+  test('keeps the previous faces until `retire` resolves', async () => {
+    class FastFontFace {
+      constructor(readonly family: string) {}
+      load(): Promise<this> {
+        return Promise.resolve(this);
+      }
+    }
+    const fonts = new Set<unknown>();
+    const doc = {
+      defaultView: { FontFace: FastFontFace },
+      fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+    } as unknown as Document;
+    const first = registerFontFaces(doc, [face]);
+    await first.ready;
+    let retired!: () => void;
+    const retire = () => new Promise<void>((resolve) => (retired = resolve));
+    const second = replaceFontFaces(doc, first, [face], { retire });
+    await second.ready;
+    await new Promise((r) => setTimeout(r, 20));
+    // The thumbnails still draw with the previous faces: they stay.
+    expect(fonts.size).toBe(2);
+    retired();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(fonts.size).toBe(1);
+    second.dispose();
+  });
 });

@@ -122,6 +122,8 @@ export class ThumbnailPainter {
   /** When the oldest waiting repaint was asked for (0: none waits). */
   #since = 0;
   #count = 0;
+  /** Callers of `repainted` that wait for the changed thumbnails to repaint. */
+  #repaintWaits: (() => void)[] = [];
   /**
    * The painter of each container. It keeps the nodes of the items it painted, so a slide that
    * changed in place repaints the items that changed, not the whole slide.
@@ -261,6 +263,24 @@ export class ThumbnailPainter {
     this.#shown.delete(container);
     this.#pending.delete(container);
     this.#queue.drop(container);
+    this.#settle();
+  }
+
+  /**
+   * Resolves once no changed thumbnail waits for its repaint. Font faces that the thumbnails on
+   * screen draw with stay registered until then (`replaceFontFaces`), so a thumbnail that
+   * repaints late never draws with a fallback face.
+   */
+  repainted(): Promise<void> {
+    if (this.#pending.size === 0) return Promise.resolve();
+    return new Promise((resolve) => this.#repaintWaits.push(resolve));
+  }
+
+  #settle(): void {
+    if (this.#pending.size > 0 || this.#repaintWaits.length === 0) return;
+    const waits = this.#repaintWaits;
+    this.#repaintWaits = [];
+    for (const resolve of waits) resolve();
   }
 
   /** Whether any first paint waits, or any observer or timer is left (for tests). @internal */
@@ -275,6 +295,7 @@ export class ThumbnailPainter {
     this.#layoutBoxes.clear();
     this.#shown.clear();
     this.#queue.clear();
+    this.#settle();
   }
 
   /**
@@ -437,6 +458,7 @@ export class ThumbnailPainter {
     }
     if (this.#pending.size > 0) this.#whenIdle();
     else this.#since = 0;
+    this.#settle();
   }
 
   #cancel(): void {

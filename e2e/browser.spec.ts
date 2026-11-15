@@ -828,7 +828,8 @@ test('fonts: the first slide paints with its own fonts while the other slides fo
   const held = new Promise<void>((resolve) => (release = resolve));
   for (const file of ['**/LiberationSerif-*', '**/LiberationMono-*', '**/Caladea-*'])
     await page.route(file, async (route) => (await held, route.continue()));
-  // Every frame, the slide text must name a face that has loaded: a fallback face is a flash.
+  // Every frame, the text of the slide and of the thumbnails must name a face that has loaded:
+  // a fallback face is a flash.
   await page.addInitScript(() => {
     const store = window as unknown as { __unloaded: string[] };
     store.__unloaded = [];
@@ -837,7 +838,8 @@ test('fonts: the first slide paints with its own fonts while the other slides fo
         (f) => f.family.replace(/["']/g, '') === family && f.status === 'loaded'
       );
     const check = (): void => {
-      for (const el of document.querySelectorAll('.pptx-surface__stage text')) {
+      const text = '.pptx-surface__stage text, .pptx-rail__thumb text';
+      for (const el of document.querySelectorAll(text)) {
         const family = el.getAttribute('font-family')?.split(',')[0]?.trim().replace(/["']/g, '');
         if (family?.startsWith('pptx-f') && !loaded(family)) store.__unloaded.push(family);
       }

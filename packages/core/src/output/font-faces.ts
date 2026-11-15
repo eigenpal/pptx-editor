@@ -87,11 +87,36 @@ export function replaceFontFaces(
   doc: Document,
   previous: FontFaceHandle | null,
   faces: readonly RegisteredFace[],
-  options: RegisterFontFacesOptions = {}
+  options: RegisterFontFacesOptions & {
+    /**
+     * Resolves once nothing on the page draws with `previous`, such as thumbnails that repaint
+     * when idle. The previous faces go at the latest `RETIRE_WAIT_MS` after the paint.
+     */
+    readonly retire?: () => Promise<void>;
+  } = {}
 ): FontFaceHandle {
   const next = registerFontFaces(doc, faces, options);
-  if (previous) void next.ready.then(() => afterNextPaint(doc)).then(() => previous.dispose());
+  const retire = options.retire;
+  if (previous)
+    void next.ready
+      .then(() => afterNextPaint(doc))
+      .then(() => (retire ? within(retire(), RETIRE_WAIT_MS) : undefined))
+      .then(() => previous.dispose());
   return next;
+}
+
+/** The longest the previous faces wait for `retire`: a page that keeps changing never settles. */
+const RETIRE_WAIT_MS = 5000;
+
+/** `promise`, or nothing after `ms`, whichever is first. Never rejects. */
+function within(promise: Promise<void>, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    void promise.then(
+      () => (clearTimeout(timer), resolve()),
+      () => (clearTimeout(timer), resolve())
+    );
+  });
 }
 
 /** The longest `afterNextPaint` waits for a frame: a hidden page runs none. */
