@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://pptx-editor.dev/">
+  <a href="https://www.pptx-editor.dev/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/readme-logo-dark.svg" />
       <source media="(prefers-color-scheme: light)" srcset="./.github/assets/readme-logo-light.svg" />
@@ -12,12 +12,14 @@
   <a href="https://www.npmjs.com/package/@pptx-editor.dev/core"><img src="https://img.shields.io/npm/v/@pptx-editor.dev/core.svg?style=flat-square&color=C43E1C" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/@pptx-editor.dev/core"><img src="https://img.shields.io/npm/dm/@pptx-editor.dev/core.svg?style=flat-square&color=C43E1C" alt="npm downloads" /></a>
   <a href="https://github.com/eigenpal/pptx-editor/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0_%2B_Pro-blue.svg?style=flat-square&color=C43E1C" alt="license" /></a>
-  <a href="https://latest.pptx-editor.dev/"><img src="https://img.shields.io/badge/Live_Demo-C43E1C?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
+  <a href="https://preview.pptx-editor.dev/"><img src="https://img.shields.io/badge/Live_Demo-C43E1C?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
 </p>
 
 **PPTX Editor** is a WYSIWYG editor and headless rendering engine for `.pptx` presentations. Use it to edit, render, automate, and export slides on the client or the server. It uses the ECMA-376 (Office Open XML) format. Licensed packages add real-time collaboration, comments, and PDF export. It is part of the EigenPal editor family, with [DOCX Editor](https://docx-editor.dev).
 
-[Live demo](https://latest.pptx-editor.dev/) | [Documentation](docs/site/content/index.mdx) | [Editor API](docs/site/content/editor-api/index.mdx) | [PPTX fidelity](docs/site/content/pptx-fidelity.mdx)
+<p align="center">
+  <a href="https://preview.pptx-editor.dev/">Live demo</a> | <a href="docs/site/content/index.mdx">Documentation</a> | <a href="docs/site/content/editor-api/index.mdx">Editor API</a> | <a href="docs/site/content/pptx-fidelity.mdx">PPTX fidelity</a> | <a href="https://www.docx-editor.dev/"><img src="./.github/assets/docx-editor-icon.svg" alt="" width="14" height="20" align="middle" /></a> <a href="https://www.docx-editor.dev/">DOCX Editor</a> | <a href="https://www.pptx-editor.dev/"><img src="./.github/assets/pptx-editor-icon.svg" alt="" width="24" height="20" align="middle" /></a> <a href="https://www.pptx-editor.dev/">PPTX Editor</a>
+</p>
 
 ## Quick start
 
@@ -31,7 +33,7 @@ npm install @pptx-editor.dev/vue @pptx-editor.dev/core     # Vue
 See the [React](#react) or [Vue](#vue) quick start.
 
 <p align="center">
-  <a href="https://latest.pptx-editor.dev/"><img src="./.github/assets/editor.png" alt="PPTX Editor with the sample presentation open" width="100%" /></a>
+  <a href="https://preview.pptx-editor.dev/"><img src="./.github/assets/editor.png" alt="PPTX Editor with the sample presentation open" width="100%" /></a>
 </p>
 
 ## Features
@@ -136,3 +138,11 @@ The repository uses [Apache 2.0](LICENSE), except for the files that the license
 ## Security and feedback
 
 Report vulnerabilities through the [security policy](SECURITY.md). For other bugs, open a [GitHub issue](https://github.com/eigenpal/pptx-editor/issues) with the steps to reproduce and a synthetic or sanitized deck. Never attach confidential decks.
+
+---
+
+<p align="center">
+  <a href="https://www.docx-editor.dev/"><img src="./.github/assets/docx-editor-icon.svg" alt="" width="21" height="30" align="middle" /></a> <a href="https://www.docx-editor.dev/"><b>DOCX Editor</b></a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://www.pptx-editor.dev/"><img src="./.github/assets/pptx-editor-icon.svg" alt="" width="36" height="30" align="middle" /></a> <a href="https://www.pptx-editor.dev/"><b>PPTX Editor</b></a>
+</p>
