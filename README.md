@@ -12,13 +12,13 @@
   <a href="https://www.npmjs.com/package/@pptx-editor.dev/core"><img src="https://img.shields.io/npm/v/@pptx-editor.dev/core.svg?style=flat-square&color=C43E1C" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/@pptx-editor.dev/core"><img src="https://img.shields.io/npm/dm/@pptx-editor.dev/core.svg?style=flat-square&color=C43E1C" alt="npm downloads" /></a>
   <a href="https://github.com/eigenpal/pptx-editor/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0_%2B_Pro-blue.svg?style=flat-square&color=C43E1C" alt="license" /></a>
-  <a href="https://latest.pptx-editor.dev/"><img src="https://img.shields.io/badge/Live_Demo-C43E1C?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
+  <a href="https://preview.pptx-editor.dev/"><img src="https://img.shields.io/badge/Live_Demo-C43E1C?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
 </p>
 
 **PPTX Editor** is a WYSIWYG editor and headless rendering engine for `.pptx` presentations. Use it to edit, render, automate, and export slides on the client or the server. It uses the ECMA-376 (Office Open XML) format. Licensed packages add real-time collaboration, comments, and PDF export. It is part of the EigenPal editor family, with [DOCX Editor](https://docx-editor.dev).
 
 <p align="center">
-  <a href="https://latest.pptx-editor.dev/">Live demo</a> | <a href="docs/site/content/index.mdx">Documentation</a> | <a href="docs/site/content/editor-api/index.mdx">Editor API</a> | <a href="docs/site/content/pptx-fidelity.mdx">PPTX fidelity</a>
+  <a href="https://preview.pptx-editor.dev/">Live demo</a> | <a href="docs/site/content/index.mdx">Documentation</a> | <a href="docs/site/content/editor-api/index.mdx">Editor API</a> | <a href="docs/site/content/pptx-fidelity.mdx">PPTX fidelity</a>
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@ npm install @pptx-editor.dev/vue @pptx-editor.dev/core     # Vue
 See the [React](#react) or [Vue](#vue) quick start.
 
 <p align="center">
-  <a href="https://latest.pptx-editor.dev/"><img src="./.github/assets/editor.png" alt="PPTX Editor with the sample presentation open" width="100%" /></a>
+  <a href="https://preview.pptx-editor.dev/"><img src="./.github/assets/editor.png" alt="PPTX Editor with the sample presentation open" width="100%" /></a>
 </p>
 
 ## Features
