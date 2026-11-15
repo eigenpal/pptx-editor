@@ -235,7 +235,9 @@ A lower rank still serves a style that a higher rank lacks. `snapshot().substitu
 
 A deck that opens waits at most 2 seconds for its fonts: the text engine, the packaged substitutes, and the faces of your `fonts` origins. Faces that arrive later install when they land, and the slides lay out again. A slow or blocked font download never holds the loading screen.
 
-Browser font registration has a separate 2-second limit. If registration stalls, the editor opens with available browser faces. Late faces remain registered and display when the browser finishes loading them.
+The editor waits only for the packaged substitutes of the slide it opens on: the families of that slide, its layout, its master, and its theme. The substitutes for the other slides load after the deck opens, and `resolving` stays `true` until they install. A deck that uses many families therefore shows its first slide sooner. A PDF export or a server session loads every substitute before it opens.
+
+Browser font registration has a separate 2-second limit. If registration stalls, the editor opens with available browser faces. Late faces remain registered and display when the browser finishes loading them. When late faces install, the faces on screen stay registered until the new faces load and the slide repaints, so text never draws with a fallback face in between.
 
 A deferred font chain stops after 256 arrivals and reports a font error. Faces already received remain available. This limit prevents cyclic or endless resolver answers from blocking browser input.
 

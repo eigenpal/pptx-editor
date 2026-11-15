@@ -43,6 +43,7 @@ import { withHalos } from './surface-halo.ts';
 import { hitItem, inMultiple, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
 import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
+import { DEFAULT_SLIDE } from './loading.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { canvasName, selectionAnnouncement, type CanvasNameHost } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
@@ -264,10 +265,11 @@ export class SlideSurface {
   }
 
   #reportFit(): void {
-    const layout = this.editor.layout();
-    if (!layout) return;
-    this.#fitSlide = `${layout.slide.width}x${layout.slide.height}`;
-    this.editor.fitChanged(fitZoom(this.host, this.root, layout.slide));
+    // Before a deck opens, the default slide fits: the loading sheet and the zoom show the
+    // size that a 16:9 deck opens at, so neither jumps when the slide paints.
+    const slide = this.editor.layout()?.slide ?? DEFAULT_SLIDE;
+    this.#fitSlide = `${slide.width}x${slide.height}`;
+    this.editor.fitChanged(fitZoom(this.host, this.root, slide));
   }
 
   /** Zoom by a factor, keeping the slide point under (`clientX`, `clientY`) in place. */

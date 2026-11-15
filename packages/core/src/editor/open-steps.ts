@@ -48,7 +48,9 @@ export async function prepareDeck(
   step('parse');
   // The parse does not wait for the text engine: it and the host's fonts wait side by side.
   const parseAt = performance.now();
-  const r = await openPresentation(bytes, { ...options, shapingWaitMs: 0 });
+  // The open waits only for the fonts of the slide it shows; the others install after it.
+  const firstSlideFonts = options.progressive?.startSlide ?? 0;
+  const r = await openPresentation(bytes, { ...options, shapingWaitMs: 0, firstSlideFonts });
   const parseMs = performance.now() - parseAt;
   if (!r.ok) return stale() ? { kind: 'stale' } : { kind: 'refused', error: r.error };
   const session = r.session;

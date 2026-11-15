@@ -7,7 +7,7 @@ import { pickImageInto } from './chrome-actions.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
 import { slideRefAt, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
-import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
+import { replaceFontFaces, type FontFaceHandle } from '../output/font-faces.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
   CanResult,
@@ -604,8 +604,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   /** The session's faces changed: register them for paint (in a browser) and publish. */
   const refreshFaces = async (owner: DocumentSession): Promise<void> => {
     if (typeof document !== 'undefined') {
-      fonts?.dispose();
-      const faces = registerFontFaces(document, owner.faces);
+      // The faces on screen stay until the new ones load and paint: no frame falls back.
+      const faces = replaceFontFaces(document, fonts, owner.faces);
       fonts = faces;
       await faces.ready;
       // A load or destroy in the meantime owns the faces now.

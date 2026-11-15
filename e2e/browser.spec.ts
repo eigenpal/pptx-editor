@@ -782,3 +782,87 @@ test('IME: the slide shows the composing text in place, and the model takes it o
   expect(await revision()).toBe(before + 1);
   expect(await page.evaluate(() => window.__pptxEditor.find.matches('日本').length)).toBe(1);
 });
+
+test('loading: the sheet sits where the slide paints, at the zoom the deck opens at', async ({
+  page,
+}) => {
+  // Hold the deck, so the loading screen stays until the test measures it.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/showcase.pptx', async (route) => (await held, route.continue()));
+  await page.goto('/');
+  const sheet = page.locator('.pptx-loading__sheet');
+  await expect(sheet).toBeVisible();
+  const zoom = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as { __pptxEditor: { snapshot(): { zoom: number } } }
+        ).__pptxEditor.snapshot().zoom
+    );
+  const loadingBox = await sheet.boundingBox();
+  const loadingZoom = await zoom();
+  // The zoom and the view switch stay in view over the loading screen.
+  const pillOnTop = await page.evaluate(() => {
+    const pill = document.querySelector('.demo-status .pptx-zoom')!;
+    const r = pill.getBoundingClientRect();
+    return [r.top + 1, r.top + r.height / 2, r.bottom - 1].every((y) =>
+      pill.contains(document.elementFromPoint(r.left + r.width / 2, y))
+    );
+  });
+  expect(pillOnTop).toBe(true);
+  release();
+  const slide = page.locator('.pptx-surface__slide');
+  await expect(slide).toBeVisible();
+  const slideBox = await slide.boundingBox();
+  for (const key of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(slideBox![key] - loadingBox![key])).toBeLessThanOrEqual(1);
+  expect(await zoom()).toBeCloseTo(loadingZoom, 3);
+});
+
+test('fonts: the first slide paints with its own fonts while the other slides fonts load', async ({
+  page,
+}) => {
+  // The showcase deck names serif and mono families on later slides only: hold their files.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  for (const file of ['**/LiberationSerif-*', '**/LiberationMono-*', '**/Caladea-*'])
+    await page.route(file, async (route) => (await held, route.continue()));
+  // Every frame, the slide text must name a face that has loaded: a fallback face is a flash.
+  await page.addInitScript(() => {
+    const store = window as unknown as { __unloaded: string[] };
+    store.__unloaded = [];
+    const loaded = (family: string): boolean =>
+      [...document.fonts].some(
+        (f) => f.family.replace(/["']/g, '') === family && f.status === 'loaded'
+      );
+    const check = (): void => {
+      for (const el of document.querySelectorAll('.pptx-surface__stage text')) {
+        const family = el.getAttribute('font-family')?.split(',')[0]?.trim().replace(/["']/g, '');
+        if (family?.startsWith('pptx-f') && !loaded(family)) store.__unloaded.push(family);
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+  type Ed = {
+    fontMeasurement(): { measurer: string; resolving: boolean };
+    snapshot(): { status: string };
+  };
+  const fonts = () =>
+    page.evaluate(() => {
+      const ed = (window as unknown as { __pptxEditor?: Ed }).__pptxEditor;
+      return ed ? { status: ed.snapshot().status, ...ed.fontMeasurement() } : null;
+    });
+  await page.goto('/');
+  await page.waitForSelector('.pptx-surface__slide');
+  // The opening slide's fonts arrived: shaped text, while the held families are on the way.
+  await expect.poll(fonts).toEqual({ status: 'ready', measurer: 'shaped', resolving: true });
+  release();
+  await expect.poll(async () => (await fonts())?.resolving, { timeout: 20_000 }).toBe(false);
+  // The late faces replaced the faces on screen with no frame that drew a fallback face.
+  await page.waitForTimeout(200);
+  expect(
+    await page.evaluate(() => (window as unknown as { __unloaded: string[] }).__unloaded)
+  ).toEqual([]);
+});

@@ -77,3 +77,34 @@ export function registerFontFaces(
     },
   };
 }
+
+/**
+ * Register `faces` in place of `previous`. The previous faces stay in the font set until the new
+ * ones load and the next frame paints, so text that the page still draws with them never shows
+ * a fallback face between the two sets. @internal
+ */
+export function replaceFontFaces(
+  doc: Document,
+  previous: FontFaceHandle | null,
+  faces: readonly RegisteredFace[],
+  options: RegisterFontFacesOptions = {}
+): FontFaceHandle {
+  const next = registerFontFaces(doc, faces, options);
+  if (previous) void next.ready.then(() => afterNextPaint(doc)).then(() => previous.dispose());
+  return next;
+}
+
+/** The longest `afterNextPaint` waits for a frame: a hidden page runs none. */
+const PAINT_WAIT_MS = 100;
+
+/** Resolves after the next frame of `doc`'s window paints, or after `PAINT_WAIT_MS`. */
+function afterNextPaint(doc: Document): Promise<void> {
+  const view = doc.defaultView;
+  if (!view || typeof view.requestAnimationFrame !== 'function') return Promise.resolve();
+  return new Promise((resolve) => {
+    // `requestAnimationFrame` runs before the paint; the task after it runs after the paint.
+    const done = (): void => void view.setTimeout(resolve, 0);
+    const timer = view.setTimeout(done, PAINT_WAIT_MS);
+    view.requestAnimationFrame(() => (view.clearTimeout(timer), done()));
+  });
+}

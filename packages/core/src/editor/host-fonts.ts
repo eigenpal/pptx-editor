@@ -249,8 +249,9 @@ export interface HostFonts {
   /** Whether faces the deck asked for are still on the way, for at most {@link LATE_FONT_WAIT_MS}. */
   resolving(): boolean;
   /**
-   * Shaped measurement that arrives after `session` opened: count it in `resolving`. Then,
-   * while the editor shows `session`, register the new faces, or report why it did not load.
+   * Shaped measurement and packaged substitutes that arrive after `session` opened: count them
+   * in `resolving`. Then, while the editor shows `session`, register the new faces, or report
+   * why shaped measurement did not load.
    */
   awaitShaping(session: DocumentSession): void;
   dispose(): void;
@@ -369,13 +370,14 @@ export function createHostFonts(
   };
 
   /**
-   * The faces the engine loads itself: the packaged substitutes of the session's families.
-   * An origin that serves the same files (`packagedFonts()`) skips them, so no file loads twice.
+   * The faces the engine loads itself: the packaged substitutes of the session's families,
+   * with those it loads after the open (`DocumentSession.restSubstitutes`). An origin that
+   * serves the same files (`packagedFonts()`) skips them, so no file loads twice.
    * The faces carry the substitute's own family (Carlito, not Calibri): an origin that serves
    * the requested family itself, such as `customFonts()` with the real Calibri, still loads it.
    */
   const engineFaces = (session: DocumentSession): { resolvedFaces?: FontFaceRequest[] } => {
-    const families = session.substituteFamilies;
+    const families = session.plannedSubstituteFamilies;
     if (!families || families.length === 0) return {};
     return {
       resolvedFaces: families.flatMap((family) =>
@@ -564,6 +566,18 @@ export function createHostFonts(
     resolving: () => waiting.size > 0,
 
     awaitShaping(session) {
+      // The substitutes that a split open left for later count in `resolving`, so the
+      // substitution notice waits for them, and they install when they arrive.
+      const rest = session.restSubstitutes;
+      if (rest) {
+        const token = track(rest, (added, own) => {
+          if (!added || destroyed || host.session() !== session) return false;
+          settle(own, true);
+          void host.installed(session);
+          return true;
+        });
+        shapingWaits.add(token);
+      }
       const work = session.shaping;
       if (!work) return;
       shapingWaits.add(track(work, () => false));

@@ -1870,7 +1870,11 @@ export class DocumentSession {
     picturesReady(index?: number, options?: PicturesWait): Promise<boolean>;
     pictureStatus(index?: number): PictureStatus[];
     // @internal
+    get plannedSubstituteFamilies(): readonly DefaultFamily[] | null;
+    // @internal
     probeBatch(base?: PptxPackage): OpBatch;
+    // @internal
+    restSubstitutes: Promise<boolean> | null;
     // @internal
     setHostFaces(next: HostFaces): void;
     // @internal
@@ -4559,6 +4563,8 @@ export function openHyperlinkPopup(controller: HyperlinkPopupController, editor:
 
 // @public
 export interface OpenOptions {
+    // @internal
+    readonly firstSlideFonts?: number;
     readonly fixedMeasurer?: boolean;
     readonly fonts?: readonly FontSource_2[];
     // @internal
