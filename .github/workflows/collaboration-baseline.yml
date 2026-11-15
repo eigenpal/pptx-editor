@@ -31,6 +31,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      pr: ${{ steps.capture.outputs.pr }}
     steps:
       - name: Mint release-pal App token
         id: token
@@ -49,6 +51,7 @@ jobs:
         with:
           node-version: '24'
       - name: Capture published packages and open baseline PR
+        id: capture
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ steps.token.outputs.token }}
@@ -57,3 +60,61 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           node scripts/collaboration/post-release.mjs
+
+  merge:
+    name: Merge verified baseline
+    needs: capture
+    if: needs.capture.outputs.pr != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      # Write, to approve the generated PR. main requires one approving review, and
+      # release-pal cannot approve the PR it opened.
+      pull-requests: write
+      actions: read
+      checks: read
+      statuses: read
+    env:
+      PR_NUMBER: ${{ needs.capture.outputs.pr }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Wait for the complete CI run and all PR checks
+        if: env.PR_NUMBER != ''
+        id: checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/collaboration/catalog-merge.mjs wait
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        if: steps.checks.outputs.head != ''
+        id: token
+        with:
+          app-id: ${{ secrets.RELEASE_PAL_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PAL_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: pptx-editor
+      - name: Recheck and merge the tested commit
+        if: steps.checks.outputs.head != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_TOKEN: ${{ steps.token.outputs.token }}
+          EXPECTED_HEAD: ${{ steps.checks.outputs.head }}
+        run: |
+          node scripts/collaboration/catalog-merge.mjs check
+          if [ "$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json state --jq .state)" = MERGED ]; then
+            echo "Catalog PR #$PR_NUMBER is already merged."
+            exit 0
+          fi
+          # The check above proved this head holds only the generated baseline files and
+          # passed every check, so approve exactly that commit.
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
+            -f event=APPROVE -f commit_id="$EXPECTED_HEAD" \
+            -f body="Generated catalog for $RELEASE_VERSION. Only baseline files changed, and all checks passed." >/dev/null
+          GH_TOKEN="$MERGE_TOKEN" gh pr merge "$PR_NUMBER" --squash --match-head-commit "$EXPECTED_HEAD" --repo "$GITHUB_REPOSITORY"

@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Eigenpal, Inc. Licensed under Apache-2.0.
 // Capture through an App-authenticated PR, following DOCX Editor post-release.mjs.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { capture, verifyCatalog } from './catalog.mjs';
@@ -30,15 +30,18 @@ if (run('git', ['diff', '--cached', '--name-only'])) {
 const prs = JSON.parse(
   run('gh', ['pr', 'list', '--head', branch, '--state', 'all', '--json', 'number,state'])
 );
-if (prs.some((pr) => pr.state === 'OPEN' || pr.state === 'MERGED')) {
-  console.log('Baseline pull request already exists');
+const existing = prs.find((pr) => pr.state === 'OPEN' || pr.state === 'MERGED');
+if (existing) {
+  console.log(`Baseline pull request is ${existing.state}`);
+} else if (prs.length) {
+  throw new Error('Baseline pull request is closed; reopen it before retrying');
 } else {
   const temp = mkdtempSync(resolve(tmpdir(), 'pptx-baseline-pr-'));
   try {
     const file = resolve(temp, 'body.md');
     writeFileSync(
       file,
-      `Capture the published ${version} packages and saved collaboration room.\n\nRegistry integrity, source commit, installation lock, and fixture hashes passed verification.\nReview and merge after CI passes. The packages are already published; do not republish.\n`
+      `Capture the published ${version} packages and saved collaboration room.\n\nRegistry integrity, source commit, installation lock, and fixture hashes passed verification.\nThe workflow approves and merges this PR after all checks pass. The packages are already published; do not republish.\n`
     );
     run('gh', [
       'pr',
@@ -56,3 +59,14 @@ if (prs.some((pr) => pr.state === 'OPEN' || pr.state === 'MERGED')) {
     rmSync(temp, { recursive: true, force: true });
   }
 }
+const open =
+  existing?.state === 'OPEN'
+    ? existing
+    : !existing
+      ? JSON.parse(
+          run('gh', ['pr', 'list', '--head', branch, '--state', 'open', '--json', 'number'])
+        )[0]
+      : undefined;
+if (!existing && !open) throw new Error('Baseline pull request was not found after creation');
+if (open && process.env.GITHUB_OUTPUT)
+  appendFileSync(process.env.GITHUB_OUTPUT, `pr=${open.number}\n`);

@@ -22,7 +22,9 @@ The stable release job runs this matrix against its downloaded publish artifacts
 
 ## Capture a published release
 
-After publication, the post-release workflow calls the baseline capture workflow. It creates a pull request with the release-pal App token so normal CI runs. Review and merge that pull request before the next stable release. The workflow does not republish packages or automatically merge evidence.
+After publication, the post-release workflow calls the baseline capture workflow. It creates a pull request with the release-pal App token so normal CI runs. The merge job waits for complete CI and all PR checks at the same commit. It verifies the author, branch, repository, and generated file list.
+
+It then approves with the workflow token and merges the tested commit with the App token. Failed checks leave the PR open. The workflow does not republish packages.
 
 For local capture, run `bun run collaboration:catalog --capture X.Y.Z`. Capture releases in chronological order from actual npm packages. The command checks package `gitHead` against tag `vX.Y.Z`. It records registry integrity, source lock hash, exact installation lock, and a synthetic saved room. The synthetic fixture contains reversible editing history. The baseline worker never imports workspace packages. The initial release predates format inspection exports, so its worker reads its legacy schema metadata.
 

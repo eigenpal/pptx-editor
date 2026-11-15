@@ -278,6 +278,9 @@ Rooms SHALL record protocol, shared schema, repair, and canonical model versions
 
 - **WHEN** a stable package release is published
 - **THEN** the post-release workflow captures immutable package integrity, installation locks, and a saved room fixture
+- **AND** the workflow approves and merges the generated baseline PR only after complete CI and all checks pass
+- **AND** approval and merge use the tested commit
+- **AND** failed checks or unexpected files leave the PR open
 - **AND** missing baseline evidence blocks the next stable publication
 
 ### Requirement: Concurrent case changes and selection continuity
