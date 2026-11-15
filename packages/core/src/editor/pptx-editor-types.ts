@@ -83,8 +83,10 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
  */
 export interface FontMeasurementState {
   /**
-   * `fixed` estimates advance widths; `shaped` measures real font bytes with HarfBuzz. It is
-   * `fixed` while no deck is open, and until the text engine and its faces arrive.
+   * `shaped` measures real font bytes with HarfBuzz. `fixed` is any other measurement: in a
+   * browser, the canvas measures the faces the browser already has, and elsewhere a fixed
+   * measurer estimates the widths. It is `fixed` while no deck is open, and until the text
+   * engine and its faces arrive.
    */
   readonly measurer: 'fixed' | 'shaped';
   /**

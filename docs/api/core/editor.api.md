@@ -4573,6 +4573,8 @@ export interface OpenOptions {
     };
     // @internal
     readonly shapingWaitMs?: number;
+    // @internal
+    readonly standIn?: () => TextMeasurer | null;
     readonly substitutes?: boolean;
 }
 

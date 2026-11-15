@@ -105,6 +105,12 @@ export interface OpenOptions {
    * does not wait for the fonts of every slide. Requires `shapingWaitMs`. @internal
    */
   readonly firstSlideFonts?: number;
+  /**
+   * The measurer of an open that has stopped waiting for its fonts (`shapingWaitMs`), until
+   * shaping starts: the browser canvas (`canvas-measurer.ts`), so the text draws where it was
+   * measured. Null or omitted, the fixed measurer stands in. @internal
+   */
+  readonly standIn?: () => TextMeasurer | null;
 }
 
 /** A family the deck names that measures with another face. @public */
@@ -315,10 +321,12 @@ interface FontSet {
   /** The substitute families loaded, or null when the open loads none. */
   readonly substituteFamilies: readonly DefaultFamily[] | null;
   readonly fixed: boolean;
+  /** Measures while `fixed`, instead of the fixed measurer (`OpenOptions.standIn`). */
+  readonly standIn?: TextMeasurer | null;
 }
 
 function buildMeasurer(set: FontSet): { measurer: TextMeasurer; faces: readonly RegisteredFace[] } {
-  if (set.fixed) return { measurer: createFixedMeasurer(), faces: [] };
+  if (set.fixed) return { measurer: set.standIn ?? createFixedMeasurer(), faces: [] };
   const measurer = createHarfBuzzMeasurer([
     ...set.host,
     ...set.embedded,
@@ -825,7 +833,8 @@ export async function openPresentation(
     if (split) session.restSubstitutes = session.addMissingSubstitutes().catch(() => false);
     return { ok: true, session };
   }
-  const session = make({ ...base, substituteFamilies: families, fixed: true });
+  const standIn = options.standIn?.() ?? null;
+  const session = make({ ...base, substituteFamilies: families, fixed: true, standIn });
   session.parsedAt = parsedAt;
   session.shapingError = inTime?.error ?? null;
   // The shapes that edits fit with the fixed measurer fit again when shaping starts, unless

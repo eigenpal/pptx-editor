@@ -866,3 +866,41 @@ test('fonts: the first slide paints with its own fonts while the other slides fo
     await page.evaluate(() => (window as unknown as { __unloaded: string[] }).__unloaded)
   ).toEqual([]);
 });
+
+test('fonts: before any font arrives, the slide text draws where layout measured it', async ({
+  page,
+}) => {
+  // Hold every packaged face: the deck opens on the stand-in measurer after the font wait.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/*.ttf', async (route) => (await held, route.continue()));
+  type Ed = { fontMeasurement(): { measurer: string; resolving: boolean } };
+  const measurement = () =>
+    page.evaluate(() =>
+      (window as unknown as { __pptxEditor?: Ed }).__pptxEditor?.fontMeasurement()
+    );
+  await page.goto('/');
+  await page.waitForSelector('.pptx-surface__slide text');
+  expect(await measurement()).toEqual({ measurer: 'fixed', resolving: true });
+  // Each character starts where the previous one ends: no overlap, and no gap in the title.
+  const fit = await page.evaluate(() => {
+    let overlap = 0;
+    let titleGap = 0;
+    for (const el of document.querySelectorAll<SVGTextElement>('.pptx-surface__slide text')) {
+      const n = el.getNumberOfChars();
+      if (n < 2 || (el.getAttribute('x') ?? '').trim().split(/\s+/).length < n) continue;
+      for (let i = 0; i + 1 < n; i += 1) {
+        const gap = el.getStartPositionOfChar(i + 1).x - el.getEndPositionOfChar(i).x;
+        overlap = Math.max(overlap, -gap);
+        if (el.textContent === 'PPTX Editor') titleGap = Math.max(titleGap, Math.abs(gap));
+      }
+    }
+    return { overlap, titleGap };
+  });
+  expect(fit.overlap).toBeLessThan(0.5);
+  expect(fit.titleGap).toBeLessThan(0.5);
+  release();
+  await expect
+    .poll(async () => (await measurement())?.measurer, { timeout: 20_000 })
+    .toBe('shaped');
+});

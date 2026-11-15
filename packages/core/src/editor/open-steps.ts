@@ -4,6 +4,7 @@
 // and the mount (the first paint) of a slide of 24,000 shapes each take a task of their own,
 // so the page answers between them.
 
+import { createCanvasMeasurer } from './canvas-measurer.ts';
 import { resolveSlide } from '../cascade/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import {
@@ -50,7 +51,14 @@ export async function prepareDeck(
   const parseAt = performance.now();
   // The open waits only for the fonts of the slide it shows; the others install after it.
   const firstSlideFonts = options.progressive?.startSlide ?? 0;
-  const r = await openPresentation(bytes, { ...options, shapingWaitMs: 0, firstSlideFonts });
+  // Until shaping starts, the browser canvas measures, so the text draws where it was measured.
+  const standIn = options.standIn ?? (() => createCanvasMeasurer());
+  const r = await openPresentation(bytes, {
+    ...options,
+    shapingWaitMs: 0,
+    firstSlideFonts,
+    standIn,
+  });
   const parseMs = performance.now() - parseAt;
   if (!r.ok) return stale() ? { kind: 'stale' } : { kind: 'refused', error: r.error };
   const session = r.session;
