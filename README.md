@@ -17,7 +17,13 @@
 
 **PPTX Editor** is a WYSIWYG editor and headless rendering engine for `.pptx` presentations. Use it to edit, render, automate, and export slides on the client or the server. It uses the ECMA-376 (Office Open XML) format. Licensed packages add real-time collaboration, comments, and PDF export. It is part of the EigenPal editor family, with [DOCX Editor](https://docx-editor.dev).
 
-[Live demo](https://latest.pptx-editor.dev/) | [Documentation](docs/site/content/index.mdx) | [Editor API](docs/site/content/editor-api/index.mdx) | [PPTX fidelity](docs/site/content/pptx-fidelity.mdx)
+<p align="center">
+  <a href="https://latest.pptx-editor.dev/">Live demo</a> | <a href="docs/site/content/index.mdx">Documentation</a> | <a href="docs/site/content/editor-api/index.mdx">Editor API</a> | <a href="docs/site/content/pptx-fidelity.mdx">PPTX fidelity</a>
+</p>
+
+<p align="center">
+  See also: <a href="https://www.docx-editor.dev/"><img src="./.github/assets/docx-editor-icon.svg" alt="" width="17" height="24" /> DOCX Editor</a>
+</p>
 
 ## Quick start
 
