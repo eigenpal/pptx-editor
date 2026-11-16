@@ -77,9 +77,31 @@ export function createOpeningLane(editor: OpeningEditor) {
       failed: (rejection) => refuseNow(owner, rejection),
     });
   };
+  /** The slide size of the deck being opened, once its parse finished, until it mounts. */
+  let incoming: { readonly width: number; readonly height: number } | null = null;
   return {
+    /** The slide size of the deck being opened, or null (`parsed`). */
+    incoming: () => incoming,
+    /**
+     * The steps of one open: `phase` names the step it reached, for the log of a failed open,
+     * and `at` is the step callback of `prepareDeck`. Once the deck parsed, the loading sheet
+     * and the zoom take its slide size.
+     */
+    steps() {
+      const steps = {
+        phase: 'paint',
+        at: (step: string, slide?: { readonly width: number; readonly height: number }) => {
+          steps.phase = step;
+          if (!slide) return;
+          incoming = { width: slide.width, height: slide.height };
+          editor.emit();
+        },
+      };
+      return steps;
+    },
     /** Parse the rest of `owner`'s deck in background tasks, if any is left. */
     start(owner: DocumentSession): void {
+      incoming = null;
       // A slide that does not parse, wherever it is read, refuses the deck at once.
       owner.onDamage = (rejection) => refuse(owner, rejection);
       // An EMF or WMF picture that finished converting paints in place of its placeholder.
@@ -107,10 +129,12 @@ export function createOpeningLane(editor: OpeningEditor) {
     },
     /** Hold the background parse while another file loads: the load's task gets the thread. */
     pause(owner: DocumentSession | null): void {
+      incoming = null;
       if (owner?.opening) paused.add(owner);
     },
     /** The load did not replace `owner`: its background parse goes on. */
     resume(owner: DocumentSession | null): void {
+      incoming = null;
       if (!owner || !paused.has(owner)) return;
       paused.delete(owner);
       if (owner.opening && !owner.opening.settled) run(owner, owner.opening);

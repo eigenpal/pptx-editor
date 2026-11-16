@@ -327,13 +327,18 @@ interface FontSet {
 
 function buildMeasurer(set: FontSet): { measurer: TextMeasurer; faces: readonly RegisteredFace[] } {
   if (set.fixed) return { measurer: set.standIn ?? createFixedMeasurer(), faces: [] };
-  const measurer = createHarfBuzzMeasurer([
+  const sources = [
     ...set.host,
     ...set.embedded,
     ...set.configured.faces,
     ...set.configured.substitutions.map((s) => s.face),
     ...set.substitutes,
-  ]);
+  ];
+  // Every font failed to load (a blocked network, a strict proxy): with no face, shaping would
+  // give each character half an em, and the letters spread or overlap. The browser's faces
+  // measure and paint the text instead, until a face arrives.
+  if (sources.length === 0 && set.standIn) return { measurer: set.standIn, faces: [] };
+  const measurer = createHarfBuzzMeasurer(sources);
   return { measurer, faces: measurer.faces };
 }
 

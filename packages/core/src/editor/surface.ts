@@ -66,6 +66,8 @@ export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost, Compositi
   /** Unique to the editor instance: SVG ids of two editors on one page never collide. */
   readonly idPrefix: string;
   readonly layout: () => SlideLayout | undefined;
+  /** The slide size of a deck that is opening, which the zoom fits until it mounts. */
+  readonly openingSlide?: () => { readonly width: number; readonly height: number } | null;
   /** The layout to paint, when it differs from `layout` (placeholder prompts). */
   readonly paintLayout?: (layout: SlideLayout) => SlideLayout;
   readonly selection: () => EditorSelection;
@@ -267,11 +269,15 @@ export class SlideSurface {
   #reportFit(): void {
     // Before a deck opens, the default slide fits: the loading sheet and the zoom show the
     // size that a 16:9 deck opens at, so neither jumps when the slide paints.
-    const slide = this.editor.layout()?.slide ?? DEFAULT_SLIDE;
+    const slide = this.#fitTarget();
     this.#fitSlide = `${slide.width}x${slide.height}`;
     this.editor.fitChanged(fitZoom(this.host, this.root, slide));
   }
 
+  /** The slide the zoom fits: an opening deck's, the shown deck's, or the default. */
+  #fitTarget(): { readonly width: number; readonly height: number } {
+    return this.editor.openingSlide?.() ?? this.editor.layout()?.slide ?? DEFAULT_SLIDE;
+  }
   /** Zoom by a factor, keeping the slide point under (`clientX`, `clientY`) in place. */
   zoomBy(factor: number, clientX?: number, clientY?: number): void {
     const r = this.host.getBoundingClientRect();
@@ -290,6 +296,8 @@ export class SlideSurface {
     // A dragged shape that changed under the drag (a peer's edit) ends the drag.
     this.#drag.check(layout);
     this.#syncRotating();
+    const fit = this.#fitTarget();
+    if (this.#fitSlide !== `${fit.width}x${fit.height}`) this.#reportFit();
     if (!layout) {
       this.#stage.querySelector('.pptx-surface__slide')?.remove();
       this.#paintKey = null;
@@ -365,7 +373,6 @@ export class SlideSurface {
     paint.sizeAll([this.#stage.querySelector('.pptx-surface__slide'), this.#overlay], w, h);
     setAttr(this.#overlay, 'viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
     this.#renderOverlay(this.#drag.overlayLayout(shown), zoom);
-    if (this.#fitSlide !== `${layout.slide.width}x${layout.slide.height}`) this.#reportFit();
   }
 
   #renderOverlay(layout: SlideLayout, zoom: number): void {

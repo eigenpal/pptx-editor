@@ -13,6 +13,12 @@ const copy = { ...realFonts };
 /** The families the substitute loads asked for, in order. */
 export const requested: string[] = [];
 const held = new Map<string, { promise: Promise<void>; resolve: () => void }>();
+const failing = new Set<string>();
+
+/** Make every load of `family` fail, as a blocked font download does. */
+export function fail(family: string): void {
+  failing.add(family);
+}
 
 /** Hold the loads of `family` until `release(family)`. */
 export function hold(family: string): void {
@@ -30,6 +36,7 @@ export function release(family: string): void {
 export function resetGate(): void {
   for (const family of held.keys()) release(family);
   held.clear();
+  failing.clear();
   requested.length = 0;
 }
 
@@ -39,6 +46,12 @@ mock.module('@docx-editor.dev/fonts', () => ({
     const families = [...(o.families ?? [])];
     requested.push(...families);
     const gates = families.map((f) => held.get(f)?.promise ?? Promise.resolve());
+    if (families.some((f) => failing.has(f)))
+      return Promise.all(gates).then(() => ({
+        sources: [],
+        substitutions: [],
+        failures: families.map((family) => ({ family, file: '', diagnostic: 'HTTP 404' })),
+      }));
     return Promise.all(gates).then(() => original(o));
   },
 }));

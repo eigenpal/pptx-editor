@@ -228,6 +228,14 @@ const LATE = Symbol('late');
  */
 export const LATE_FONT_WAIT_MS = 10_000;
 
+/**
+ * How long the packaged substitutes for the other slides may hold `resolving`. They are a few
+ * files from the editor's own assets, but they download after the opening slide's faces, so on
+ * a slow network they need longer than {@link LATE_FONT_WAIT_MS}. Until then the substitution
+ * notice does not name families whose faces are still on the way.
+ */
+export const REST_SUBSTITUTE_WAIT_MS = 30_000;
+
 /** The host's fonts for one editor. */
 export interface HostFonts {
   /**
@@ -267,6 +275,8 @@ export function createHostFonts(
     readonly waitMs?: number;
     /** Overrides {@link LATE_FONT_WAIT_MS}; for tests. */
     readonly lateWaitMs?: number;
+    /** Overrides {@link REST_SUBSTITUTE_WAIT_MS}; for tests. */
+    readonly restWaitMs?: number;
     /** `resolving()` changed with nothing installed: publish. */
     readonly changed: () => void;
     readonly session: () => DocumentSession | null;
@@ -312,11 +322,15 @@ export function createHostFonts(
     }
   };
   /** Wait for `late`; `arrived` installs it and answers whether it installed anything. */
-  const track = <T>(late: Promise<T>, arrived: (value: T, token: object) => boolean): object => {
+  const track = <T>(
+    late: Promise<T>,
+    arrived: (value: T, token: object) => boolean,
+    waitMs = host.lateWaitMs ?? LATE_FONT_WAIT_MS
+  ): object => {
     const token = {};
     waiting.set(
       token,
-      setTimeout(() => settle(token), host.lateWaitMs ?? LATE_FONT_WAIT_MS)
+      setTimeout(() => settle(token), waitMs)
     );
     late.then(
       (value) => {
@@ -572,12 +586,16 @@ export function createHostFonts(
       // substitution notice waits for them, and they install when they arrive.
       const rest = session.restSubstitutes;
       if (rest) {
-        const token = track(rest, (added, own) => {
-          if (!added || destroyed || host.session() !== session) return false;
-          settle(own, true);
-          void host.installed(session);
-          return true;
-        });
+        const token = track(
+          rest,
+          (added, own) => {
+            if (!added || destroyed || host.session() !== session) return false;
+            settle(own, true);
+            void host.installed(session);
+            return true;
+          },
+          host.restWaitMs ?? REST_SUBSTITUTE_WAIT_MS
+        );
         shapingWaits.add(token);
       }
       const work = session.shaping;

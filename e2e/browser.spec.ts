@@ -3,7 +3,7 @@
 // `packages/vue/test/demo-shell.test.ts`), which has no layout engine and no canvas. These
 // keep only what those cannot prove: pixels drawn on a canvas, and boxes from CSS layout.
 import { readFileSync } from 'node:fs';
-import { unzipSync } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { textDeck } from '../scripts/bench/text-deck.ts';
 
@@ -818,6 +818,38 @@ test('loading: the sheet sits where the slide paints, at the zoom the deck opens
   for (const key of ['x', 'y', 'width', 'height'] as const)
     expect(Math.abs(slideBox![key] - loadingBox![key])).toBeLessThanOrEqual(1);
   expect(await zoom()).toBeCloseTo(loadingZoom, 3);
+});
+
+test('loading: a 4:3 deck shows a 4:3 sheet while its fonts load, and paints in its box', async ({
+  page,
+}) => {
+  const parts = unzipSync(new Uint8Array(readFileSync('examples/vite/public/showcase.pptx')));
+  const presentation = strFromU8(parts['ppt/presentation.xml']!);
+  parts['ppt/presentation.xml'] = strToU8(
+    presentation.replace(/<p:sldSz[^>]*\/>/, '<p:sldSz cx="9144000" cy="6858000"/>')
+  );
+  const deck = zipSync(parts);
+  await page.route('**/showcase.pptx', (route) => route.fulfill({ body: Buffer.from(deck) }));
+  // Hold every font, so the deck waits for them behind the loading sheet.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\.(ttf|otf|woff2?)(\?|$)/, async (route) => (await held, route.continue()));
+  await page.goto('/');
+  const sheet = page.locator('.pptx-loading__sheet');
+  // Once the deck parsed, the sheet takes its slide size: 4:3, not the default 16:9.
+  await expect
+    .poll(async () => {
+      const box = await sheet.boundingBox();
+      return box ? Math.round((box.width / box.height) * 100) / 100 : 0;
+    })
+    .toBeCloseTo(4 / 3, 1);
+  const loadingBox = await sheet.boundingBox();
+  release();
+  const slide = page.locator('.pptx-surface__slide');
+  await expect(slide).toBeVisible();
+  const slideBox = await slide.boundingBox();
+  for (const key of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(slideBox![key] - loadingBox![key])).toBeLessThanOrEqual(1);
 });
 
 test('fonts: the first slide paints with its own fonts while the other slides fonts load', async ({
