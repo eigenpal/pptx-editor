@@ -11,6 +11,8 @@ const ENGLISH: Readonly<Record<string, string>> = {
   'added.shape': 'Added a shape to slide {slide}',
   'removed.slide': 'Removed slide {slide}',
   'removed.shape': 'Removed a shape from slide {slide}',
+  'removed.notes': 'Removed the notes of slide {slide}',
+  truncated: 'Other changes are not listed',
   'moved.slide': 'Moved slide {slide}',
   'changed.slide': 'Changed slide {slide}',
   'changed.shape': 'Changed a shape on slide {slide}',
@@ -43,8 +45,14 @@ export function describeRefreshChange(
   const c = change.computed;
   if (!c) return '';
   const scoped = c.scope === 'slide' || c.scope === 'shape';
-  const action = scoped && (c.action !== 'moved' || c.scope === 'slide') ? c.action : 'changed';
-  const key = `${action}.${c.scope}`;
+  const removedNotes = c.scope === 'notes' && c.action === 'removed';
+  const action =
+    removedNotes || (scoped && (c.action !== 'moved' || c.scope === 'slide'))
+      ? c.action
+      : 'changed';
+  // The review module ends a list that hit its limit with a `package` change named `truncated`.
+  const key =
+    change.id === 'truncated' && c.scope === 'package' ? 'truncated' : `${action}.${c.scope}`;
   const index = change.location?.slideIndex ?? c.previousSlideIndex;
   const params = {
     slide: index === undefined ? '' : index + 1,

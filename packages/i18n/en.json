@@ -1871,7 +1871,8 @@
       },
       "removed": {
         "slide": "Removed slide {slide}",
-        "shape": "Removed a shape from slide {slide}"
+        "shape": "Removed a shape from slide {slide}",
+        "notes": "Removed the notes of slide {slide}"
       },
       "moved": {
         "slide": "Moved slide {slide}"
@@ -1885,7 +1886,8 @@
         "master": "Changed a slide master. Slides that use it: {count}",
         "theme": "Changed the theme. Slides that use it: {count}",
         "package": "Changed the presentation settings"
-      }
+      },
+      "truncated": "Other changes are not listed"
     }
   }
 }

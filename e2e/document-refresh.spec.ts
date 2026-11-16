@@ -10,6 +10,11 @@
 //   text, a thumbnail that comes into view or mounts during the hold, reduced motion,
 //   `clearHighlights()`, and saved files without the flash.
 //
+// - Input that runs when a result arrives: notes typed after capture, an IME composition, and
+//   a shape drag make the result wait or refuse with `local-edits`; the typing stays. After a
+//   reload, a caret in a kept text box stays and takes keys; a removed one moves the focus to
+//   the slide.
+//
 // Screenshots during the flash go to `test-results/` (`REFRESH_SHOTS` sets another folder).
 
 import { mkdirSync } from 'node:fs';
@@ -24,6 +29,7 @@ import {
   refreshDeck,
   type RefreshEdits,
 } from '../scripts/bench/refresh-deck.ts';
+import { buildPptx, para, run, shape } from '../scripts/fixtures/builder.ts';
 
 declare global {
   interface Window {
@@ -289,6 +295,119 @@ function shotPath(name: string): string {
 /** The thumbnail of the rail item at `index`. */
 const railThumb = (page: Page, index: number) =>
   page.locator(`.pptx-rail [data-index="${index}"] .pptx-rail__thumb`);
+
+/** Start `applyUpdate()` with `bytes` in the page; `window.__pending` holds its result. */
+async function startApply(page: Page, bytes: Uint8Array): Promise<void> {
+  await page.evaluate((data) => {
+    const w = window as unknown as { __submission: unknown; __pending: unknown; __done: boolean };
+    w.__done = false;
+    w.__pending = window.__refresh
+      .applyUpdate({
+        submission: w.__submission as never,
+        sequence: 1,
+        bytes: new Uint8Array(data),
+      })
+      .then((r) => ((w.__done = true), r));
+  }, Array.from(bytes));
+}
+
+/** Capture in the page, and keep the submission for `startApply`. */
+async function capture(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    (window as unknown as { __submission: unknown }).__submission =
+      await window.__refresh.capture();
+  });
+}
+
+const applied = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __done: boolean }).__done);
+const resultCode = (page: Page) =>
+  page.evaluate(async () => {
+    const r = await (window as unknown as { __pending: Promise<{ ok: boolean; code?: string }> })
+      .__pending;
+    return r.ok ? 'ok' : r.code;
+  });
+
+/** The client point of slide point (`x`, `y`) in EMU. */
+async function clientPoint(page: Page, x: number, y: number) {
+  const box = (await page.locator('.pptx-surface__slide').boundingBox())!;
+  const scale = box.width / SLIDE_SIZE.width;
+  return { x: box.x + x * scale, y: box.y + y * scale };
+}
+
+/** Two text boxes and a filled box on one slide; `second: false` leaves the second out. */
+const twoBoxes = (first: string, second: string | false) =>
+  buildPptx({
+    width: SLIDE_SIZE.width,
+    height: SLIDE_SIZE.height,
+    slides: [
+      {
+        shapes:
+          shape({
+            id: 2,
+            name: 'One',
+            x: 914_400,
+            y: 914_400,
+            cx: 6_000_000,
+            cy: 900_000,
+            text: para(run(first, 'sz="3200"')),
+          }) +
+          (second === false
+            ? ''
+            : shape({
+                id: 3,
+                name: 'Two',
+                x: 914_400,
+                y: 3_000_000,
+                cx: 6_000_000,
+                cy: 900_000,
+                text: para(run(second, 'sz="3200"')),
+              })) +
+          shape({
+            id: 4,
+            name: 'Box',
+            x: 8_000_000,
+            y: 3_000_000,
+            cx: 2_000_000,
+            cy: 1_500_000,
+            fill: '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>',
+          }),
+      },
+      {
+        shapes: shape({
+          id: 2,
+          name: 'Other',
+          x: 914_400,
+          y: 914_400,
+          cx: 6_000_000,
+          cy: 900_000,
+          text: para(run('Other')),
+        }),
+      },
+    ],
+  });
+
+/** Put a caret in the shape named `name` of the slide on screen, at `offset`, with the focus. */
+async function caretIn(page: Page, name: string, offset: number): Promise<void> {
+  await page.evaluate(
+    ({ name, offset }) => {
+      const ed = window.__pptxEditor;
+      const node = ed.snapshot().shapes?.find((s) => s.name === name)?.nodeId;
+      if (!node) throw new Error(`no shape ${name}`);
+      const at = { paragraph: 0, offset };
+      ed.setSelection({ kind: 'text', nodeId: node, anchor: at, focus: at });
+      ed.focus();
+    },
+    { name, offset }
+  );
+  await expect(page.locator('.pptx-surface__input')).toBeFocused();
+}
+
+/** The XML of the first slide in the file that `save()` writes now. */
+const savedSlide = async (page: Page): Promise<string> => {
+  const bytes = await page.evaluate(() => Array.from(window.__pptxEditor.save()!));
+  return strFromU8(unzipSync(new Uint8Array(bytes))['ppt/slides/slide1.xml']!);
+};
 
 for (const adapter of [{ name: 'react' }, { name: 'vue' }] as const) {
   test.describe(`${adapter.name}: document refresh`, () => {
@@ -599,6 +718,106 @@ for (const adapter of [{ name: 'react' }, { name: 'vue' }] as const) {
         expect(text).not.toMatch(/refresh/i);
         expect(text, name).toBe(strFromU8(a[name]!));
       }
+    });
+
+    test('input: notes typed after capture refuse the result, and the typing stays', async ({
+      page,
+    }) => {
+      await page.addInitScript(() => localStorage.setItem('pptx-editor-demo-notes', 'open'));
+      await openDeck(page, base(), refreshDeck(4));
+      const notes = page.locator('.pptx-notes__text');
+      await notes.click();
+      await capture(page);
+      await page.keyboard.type('typing across the update', { delay: 10 });
+      await startApply(page, refreshDeck(4, { text: [0] }));
+      expect(await resultCode(page)).toBe('local-edits');
+      // A press elsewhere commits nothing more: the typing is the deck's notes already.
+      await page.locator('.pptx-rail [data-index="1"]').click();
+      await page.locator('.pptx-rail [data-index="0"]').click();
+      expect(await page.evaluate(() => window.__pptxEditor.snapshot().notes)).toContain(
+        'typing across the update'
+      );
+      expect(await page.evaluate(() => window.__pptxEditor.snapshot().shapes?.length)).toBe(2);
+    });
+
+    test('input: a result waits for an IME composition, then refuses with local-edits', async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(browserName !== 'chromium', 'IME composition through the DevTools protocol');
+      await openDeck(page, base(), twoBoxes('Hello', 'World'));
+      await caretIn(page, 'One', 5);
+      await capture(page);
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Input.imeSetComposition', { text: 'ka', selectionStart: 2, selectionEnd: 2 });
+      await startApply(page, twoBoxes('Server', 'World'));
+      await page.waitForTimeout(400);
+      expect(await applied(page)).toBe(false);
+      await cdp.send('Input.insertText', { text: 'か' });
+      expect(await resultCode(page)).toBe('local-edits');
+      const xml = await page.evaluate(() => {
+        const ed = window.__pptxEditor;
+        return ed
+          .snapshot()
+          .shapes?.map((s) => s.name)
+          .join(',');
+      });
+      expect(xml).toContain('One');
+      const slide = await savedSlide(page);
+      expect(slide).toContain('Helloか');
+      expect(slide).not.toContain('Server');
+    });
+
+    test('input: a result waits for a shape drag, and the drag refuses it', async ({ page }) => {
+      await openDeck(page, base(), twoBoxes('Hello', 'World'));
+      const start = await clientPoint(page, 9_000_000, 3_750_000);
+      await page.mouse.click(start.x, start.y);
+      await expect
+        .poll(() => page.evaluate(() => window.__pptxEditor.snapshot().selection.kind))
+        .toBe('shapes');
+      await capture(page);
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(start.x + 40, start.y + 30, { steps: 5 });
+      await startApply(page, twoBoxes('Server', 'World'));
+      await page.mouse.move(start.x + 80, start.y + 60, { steps: 5 });
+      await page.waitForTimeout(300);
+      expect(await applied(page)).toBe(false);
+      expect(await page.evaluate(() => window.__pptxEditor.snapshot().selection.kind)).toBe(
+        'shapes'
+      );
+      await page.mouse.up();
+      expect(await resultCode(page)).toBe('local-edits');
+      const slide = await savedSlide(page);
+      expect(slide).not.toContain('Server');
+      expect(slide).not.toContain('<a:off x="8000000" y="3000000"/>');
+    });
+
+    test('focus: a caret in a kept text box stays after a reload and takes keys', async ({
+      page,
+    }) => {
+      await openDeck(page, base(), twoBoxes('Hello', 'World'));
+      await caretIn(page, 'Two', 5);
+      await capture(page);
+      await startApply(page, twoBoxes('Changed', 'World'));
+      expect(await resultCode(page)).toBe('ok');
+      const sel = await page.evaluate(() => window.__pptxEditor.snapshot().selection);
+      expect(sel.kind).toBe('text');
+      await expect(page.locator('.pptx-surface__input')).toBeFocused();
+      await page.keyboard.type('!');
+      const slide = await savedSlide(page);
+      expect(slide).toContain('World!');
+    });
+
+    test('focus: a caret in a removed text box moves the focus to the slide', async ({ page }) => {
+      await openDeck(page, base(), twoBoxes('Hello', 'World'));
+      await caretIn(page, 'Two', 3);
+      await capture(page);
+      await startApply(page, twoBoxes('Hello', false));
+      expect(await resultCode(page)).toBe('ok');
+      expect(await page.evaluate(() => window.__pptxEditor.snapshot().selection.kind)).toBe('none');
+      await expect(page.locator('.pptx-surface__input')).not.toBeFocused();
+      await expect(page.locator('.pptx-surface')).toBeFocused();
     });
   });
 }

@@ -12,6 +12,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // collaboration fixture", gives the steps.
 
 import { expect } from 'bun:test';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type {
   EditorCommandType,
   EditorSelection,
@@ -146,6 +147,21 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       run(e, { type: 'undo' });
     },
     command: () => ({ type: 'redo' }),
+  },
+  // Whole-document replacement: the returned file changes text on slide 1 and the title of
+  // slide 2. Peer B receives the diff as ordinary edits.
+  replaceDocument: {
+    command: (a) => {
+      const files = unzipSync(a.save()!);
+      const edit = (name: string, from: string, to: string) => {
+        const xml = strFromU8(files[name]!);
+        if (!xml.includes(from)) throw new Error(`${name} has no ${from}`);
+        files[name] = strToU8(xml.replace(from, to));
+      };
+      edit('ppt/slides/slide1.xml', 'Hello world', 'Hello there');
+      edit('ppt/slides/slide2.xml', 'Slide two', 'Second slide');
+      return { type: 'replaceDocument', pptx: zipSync(files) };
+    },
   },
 
   // Character and paragraph formatting.

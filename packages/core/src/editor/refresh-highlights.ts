@@ -67,6 +67,14 @@ const text = (name: string, v: unknown): string => {
   if (typeof v !== 'string') throw new TypeError(`${name} must be a string.`);
   return v;
 };
+/** A color for a CSS custom property: never one that makes the page fetch a URL. */
+const color = (name: string, v: unknown): string => {
+  const value = text(name, v);
+  // CSS escapes can spell a function name, so a backslash is refused as well.
+  if (/url\s*\(|image-set\s*\(|image\s*\(|\\/i.test(value))
+    throw new TypeError(`${name} cannot load a URL.`);
+  return value;
+};
 
 /** The settings of `options`, or a thrown TypeError or RangeError. Each call starts from defaults. */
 export function refreshSettings(options: RefreshHighlightOptions | undefined): Settings {
@@ -85,7 +93,7 @@ export function refreshSettings(options: RefreshHighlightOptions | undefined): S
       throw new TypeError("surfaces must hold 'thumbnails', 'canvas', or 'notes'.");
     surfaces = new Set(o.surfaces);
   }
-  const color = o.color === undefined ? DEFAULT_COLOR : text('color', o.color);
+  const fill = o.color === undefined ? DEFAULT_COLOR : color('color', o.color);
   const style = o.borderStyle ?? 'solid';
   if (style !== 'solid' && style !== 'dashed' && style !== 'dotted')
     throw new TypeError("borderStyle must be 'solid', 'dashed', or 'dotted'.");
@@ -107,8 +115,8 @@ export function refreshSettings(options: RefreshHighlightOptions | undefined): S
   if (anim !== false && anim.easing !== undefined && /var\s*\(/i.test(easing))
     throw new TypeError('animation.easing cannot use CSS variables.');
   return {
-    color,
-    borderColor: o.borderColor === undefined ? color : text('borderColor', o.borderColor),
+    color: fill,
+    borderColor: o.borderColor === undefined ? fill : color('borderColor', o.borderColor),
     borderStyle: style,
     borderWidth: o.borderWidth === undefined ? null : finite('borderWidth', o.borderWidth, 0),
     borderRadius: finite('borderRadius', o.borderRadius ?? 6, 0),
@@ -163,6 +171,9 @@ export class RefreshHighlights {
   #marked = new Set<Element>();
   #observer: MutationObserver | null = null;
   #unsubscribe: (() => void) | null = null;
+  /** The `aria-description` each marked item had before the flash: null for none. */
+  #descriptions = new Map<Element, string | null>();
+  #disposed = false;
 
   constructor(
     private readonly editor: PptxEditorInstance,
@@ -175,6 +186,7 @@ export class RefreshHighlights {
 
   /** Flash `targets`. An empty list fades the current flash out. */
   show(targets: readonly RefreshTarget[], settings: Settings): void {
+    if (this.#disposed) return;
     if (targets.length === 0) return this.hide();
     const root = surfaceRootOf(this.editor);
     const win = root?.ownerDocument.defaultView;
@@ -232,6 +244,12 @@ export class RefreshHighlights {
     this.#observer = null;
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+  }
+
+  /** Remove the flash and show none again: the editor is destroyed. */
+  dispose(): void {
+    this.clear();
+    this.#disposed = true;
   }
 
   get visible(): boolean {
@@ -299,7 +317,13 @@ export class RefreshHighlights {
 
   #unmark(el: Element): void {
     el.removeAttribute(MARK);
-    el.removeAttribute('aria-description');
+    // The adapter's own description comes back.
+    if (this.#descriptions.has(el)) {
+      const before = this.#descriptions.get(el);
+      this.#descriptions.delete(el);
+      if (before === null || before === undefined) el.removeAttribute('aria-description');
+      else el.setAttribute('aria-description', before);
+    }
     el.removeAttribute('data-refresh-border');
     for (const name of (this.#settings?.className ?? '').split(/\s+/).filter(Boolean))
       el.classList.remove(name);
@@ -335,6 +359,8 @@ export class RefreshHighlights {
           item.classList.add('pptx-refresh-item');
         }
         item.setAttribute(MARK, this.#phase);
+        if (!this.#descriptions.has(item))
+          this.#descriptions.set(item, item.getAttribute('aria-description'));
         item.setAttribute('aria-description', label);
       }
     // A slide that moved since, or a surface turned off: its old marks go.
@@ -359,7 +385,14 @@ export class RefreshHighlights {
     const targets = s.surfaces.has('canvas')
       ? this.#targets.filter((t) => !t.notes && t.slideIndex === snap.currentSlide)
       : [];
-    if (!stage || !layout || targets.length === 0 || snap.presentationView === 'slideSorter') {
+    // The master view shows a layout, not the slide the targets name.
+    if (
+      !stage ||
+      !layout ||
+      targets.length === 0 ||
+      snap.presentationView === 'slideSorter' ||
+      snap.presentationView === 'slideMaster'
+    ) {
       this.#layer?.replaceChildren();
       return;
     }

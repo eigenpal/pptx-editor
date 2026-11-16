@@ -9,14 +9,19 @@
 // screen paints again for them, and nothing flashes.
 //
 // A document refresh that reloads applies the same difference in place, with no history entry,
-// and then clears the history and the selection, as a load does (`reloadInPlace`). It gives the
-// document a new load id. A file whose difference touches embedded fonts reloads through
-// `load()` instead, because a session registers its embedded faces when it opens.
+// and then clears the history, as a load does (`reloadInPlace`). It gives the document a new
+// load id. The selection stays when the nodes it names stay, as after an edit. A file whose
+// difference touches embedded fonts, or that the part checks refuse as an edit, reloads through
+// `load()` instead: a session registers its embedded faces when it opens, and a load accepts
+// what an edit does not.
+//
+// Both paths read the returned file as an open does: `readPptx`, then the sanitizers of
+// `openStore` (`withoutEditorMarks`). So a replacement and a reload give the same package.
 //
 // A document refresh runs the steps in separate tasks, so no task holds the main thread for
 // all of them: `preparseReturned` reads the file, `prediffReturned` takes the difference, and
-// the commit then reuses both. A difference is reused only while the open package is the one
-// it was taken from.
+// the commit then reuses both. The commit reuses a difference only while the open package is
+// the package that the difference compares.
 
 import type {
   DocumentHandle,
@@ -32,11 +37,13 @@ import {
   type PptxOp,
   type PptxPackage,
 } from '../store/index.ts';
+import { withoutEditorMarks } from '../automation/commands/table-edit-marks.ts';
 import { markOf } from './history-marks.ts';
 import { isCollaborating } from './modules.ts';
 import type { DocumentSession } from './document-session.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
-import { withChangeSource } from './change-source.ts';
+import { adoptLoadId, withChangeSource } from './change-source.ts';
+import { focusSurfaceOf, surfaceInputOf } from './surface-registry.ts';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 const translations = new WeakMap<object, Translate>();
@@ -50,6 +57,18 @@ const loadIds = new WeakMap<DocumentSession, string>();
 let nextLoad = 0;
 /** Editors with a refresh or a preview that blocks replacement (`busy`). */
 const busyEditors = new WeakSet<object>();
+/** What runs when an editor is destroyed: a refresh controller's teardown. */
+const teardowns = new WeakMap<object, Set<() => void>>();
+
+/** Run `teardown` once when `editor` is destroyed. Returns the function that cancels it. @internal */
+export function onEditorDestroy(editor: object, teardown: () => void): () => void {
+  let set = teardowns.get(editor);
+  if (!set) teardowns.set(editor, (set = new Set()));
+  set.add(teardown);
+  return () => {
+    set.delete(teardown);
+  };
+}
 
 /** The load id of a session: one per open, and a new one after a refresh that reloads. */
 function loadIdOf(session: DocumentSession): string {
@@ -98,7 +117,7 @@ const steps = new WeakMap<Uint8Array, Steps>();
 export function preparseReturned(bytes: Uint8Array): boolean {
   if (steps.has(bytes)) return true;
   const read = readPptx(bytes);
-  if (read.ok) steps.set(bytes, { pkg: read.pkg });
+  if (read.ok) steps.set(bytes, { pkg: withoutEditorMarks(read.pkg) });
   return read.ok;
 }
 
@@ -126,7 +145,21 @@ function readReturned(bytes: unknown): PptxPackage | ReplaceDocumentRefusal {
   const known = bytes instanceof Uint8Array ? steps.get(bytes) : undefined;
   if (known) return known.pkg;
   const read = readPptx(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
-  return read.ok ? read.pkg : refusal('invalidDocument', 'The bytes are not a valid PPTX file.');
+  // The sanitizers of an open: a structure mark in a file is forged (`openStore`).
+  return read.ok
+    ? withoutEditorMarks(read.pkg)
+    : refusal('invalidDocument', 'The bytes are not a valid PPTX file.');
+}
+
+/**
+ * Keep the keys reaching the editor after a replacement. The hidden text input has the focus
+ * only for a text selection: when the replacement removed the text, the slide takes the focus,
+ * so a key does not go to an input that writes nothing. @internal
+ */
+export function keepKeyboardFocus(editor: PptxEditorInstance): void {
+  const input = surfaceInputOf(editor);
+  if (!input || input.ownerDocument.activeElement !== input) return;
+  if (editor.snapshot().selection.kind !== 'text') focusSurfaceOf(editor);
 }
 
 /** Whether the ops change embedded fonts, which a session registers only when it opens. */
@@ -213,14 +246,19 @@ export function replaceDocument(
 ): ReplaceDocumentOutcome {
   const prepared = prepare(editor, command);
   if ('ok' in prepared) return prepared;
-  return withChangeSource(editor, 'refresh', () => commit(editor, prepared, true));
+  const outcome = withChangeSource(editor, 'refresh', () => commit(editor, prepared, true));
+  if (outcome.ok) keepKeyboardFocus(editor);
+  return outcome;
 }
 
 /**
- * Show a returned file as a reload does: the content is the file's, and the history and the
- * selection are reset. The difference applies in place, so unchanged slides and thumbnails do
- * not paint again and no loading screen shows. Returns `'load'` when the editor must open the
- * file with `load()` instead (embedded fonts changed, or the difference is no edit).
+ * Show a returned file as a reload does: the content is the file's, and the history is reset.
+ * The difference applies in place, so unchanged slides and thumbnails do not paint again and no
+ * loading screen shows. The selection stays when the nodes it names stay, with a text selection
+ * clamped into its text, as after an edit; else it is none, and the slide takes the keyboard
+ * focus from the hidden text input. Returns `'load'` when the editor must open the file with
+ * `load()` instead: embedded fonts changed, the difference is no edit, or the part checks refuse
+ * it as an edit.
  *
  * @internal
  */
@@ -233,26 +271,38 @@ export function reloadInPlace(
   if ('ok' in prepared)
     return prepared.code === 'invalidDocument' || prepared.code === 'busy' ? prepared : 'load';
   if (touchesFonts(prepared.ops)) return 'load';
-  return withChangeSource(editor, source, () => {
+  const outcome = withChangeSource(editor, source, (): ReplaceDocumentOutcome | 'load' => {
     const { session } = prepared;
     const index = editor.snapshot().currentSlide;
-    editor.setSelection({ kind: 'none' });
-    const outcome = commit(editor, prepared, false);
-    if (!outcome.ok) return outcome;
+    // A reload is a new document. The new load id applies before the commit, so the change
+    // event of the commit names it, and the next edit is no load (`adoptLoadId`).
+    const before = loadIdOf(session);
+    const next = `load-${++nextLoad}`;
+    loadIds.set(session, next);
+    const result = commit(editor, prepared, false);
+    if (!result.ok) {
+      loadIds.set(session, before);
+      // The part checks refuse the difference as an edit: a load opens the file whole. A
+      // collaboration room never gets here: a reload refuses before it.
+      return isCollaborating(editor) ? result : 'load';
+    }
+    adoptLoadId(editor, next);
     // A reload keeps the slide index, clamped, as a load with `startSlide` does.
     if (editor.snapshot().currentSlide !== index) editor.goToSlide(index);
-    // A reload is a new document with no history: handles taken before it name another load.
+    // Handles taken before the reload name another load: no undo step reaches them.
     session.store.clearHistory();
     session.store.closeHistoryGroup();
-    loadIds.set(session, `load-${++nextLoad}`);
     // Publish the empty history and the new load id.
     editor.setMode(editor.snapshot().mode);
-    return outcome;
+    return result;
   });
+  if (outcome !== 'load' && outcome.ok) keepKeyboardFocus(editor);
+  return outcome;
 }
 
 /**
- * Add `getDocumentHandle()` and the `replaceDocument` command to an editor. The facade calls it
+ * Add `getDocumentHandle()` and the `replaceDocument` command to an editor, and the teardowns
+ * of `onEditorDestroy` to its `destroy()`. The facade calls it
  * once, on the instance it returns.
  *
  * @internal
@@ -262,6 +312,19 @@ export function withDocumentReplace(
   translate?: Translate
 ): PptxEditorInstance {
   if (translate) translations.set(editor, translate);
+  const destroy = editor.destroy;
+  editor.destroy = () => {
+    const set = teardowns.get(editor);
+    teardowns.delete(editor);
+    for (const teardown of set ?? []) {
+      try {
+        teardown();
+      } catch {
+        /* A teardown cannot stop the destroy. */
+      }
+    }
+    destroy.call(editor);
+  };
   const exec = editor.exec;
   editor.exec = (command, options) => {
     if (command.type !== 'replaceDocument') return exec(command, options);

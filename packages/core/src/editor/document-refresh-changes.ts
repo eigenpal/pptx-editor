@@ -13,7 +13,12 @@ import type {
   RefreshChangeInput,
   RefreshLocation,
 } from './document-refresh-types.ts';
-import type { ComputedRefreshChange, RefreshDiagnosticCode } from './document-refresh-types.ts';
+import type {
+  ComputedRefreshChange,
+  RefreshChangeAspect,
+  RefreshComputedChange,
+  RefreshDiagnosticCode,
+} from './document-refresh-types.ts';
 import { paragraphsOf, paragraphText } from '../automation/commands/text-model.ts';
 import {
   elements,
@@ -114,7 +119,7 @@ function check(pkg: PptxPackage, location: RefreshLocation, rendered: Rendered):
   if (paragraphIndex === undefined) return { ok: true, target: base };
   const texts = shapeParagraphTexts(shape);
   const paragraph = texts[paragraphIndex];
-  if (paragraph === undefined) return { ok: false, code: 'invalid-offsets' };
+  if (paragraph === undefined) return { ok: false, code: 'paragraph-not-found' };
   if (!offsets) {
     const whole = { paragraph: paragraphIndex, start: 0, end: paragraph.length };
     return { ok: true, target: { ...base, text: whole } };
@@ -128,13 +133,20 @@ function check(pkg: PptxPackage, location: RefreshLocation, rendered: Rendered):
 /** Whether shape `nodeId` of slide `index` has a layout position. */
 export type Rendered = (index: number, nodeId: string) => boolean;
 
-const fingerprintOf = (input: RefreshChangeInput): string =>
-  JSON.stringify([
+/**
+ * What makes a change new, as in DOCX Editor: its text and its description, here with what a
+ * computed change changed. Positions are not part of it: a slide inserted before a change
+ * moves its slide index, and the change is not new.
+ */
+const fingerprintOf = (input: RefreshChangeInput): string => {
+  const computed = (input as Partial<ComputedRefreshChange>).computed;
+  return JSON.stringify([
     input.description ?? null,
-    input.location ?? null,
+    input.location?.text ?? null,
     input.unavailableReason ?? null,
-    (input as Partial<ComputedRefreshChange>).computed ?? null,
+    computed ? [computed.scope, computed.action, computed.aspects ?? null] : null,
   ]);
+};
 
 /**
  * The located changes of one result. `seen` holds the fingerprints of the previous results of
@@ -216,6 +228,81 @@ export function isLocationShape(value: unknown): value is RefreshLocation {
     (v.text === undefined || typeof v.text === 'string') &&
     (v.notes === undefined || typeof v.notes === 'boolean')
   );
+}
+
+const SCOPES: ReadonlySet<string> = new Set<RefreshComputedChange['scope']>([
+  'slide',
+  'shape',
+  'text',
+  'notes',
+  'layout',
+  'master',
+  'theme',
+  'package',
+]);
+const ACTIONS: ReadonlySet<string> = new Set<RefreshComputedChange['action']>([
+  'added',
+  'removed',
+  'moved',
+  'changed',
+]);
+/**
+ * The aspects a computed change may name: `RefreshChangeAspect`, and the aspects a newer review
+ * module may add. A string outside the list makes the update malformed.
+ */
+const ASPECTS: ReadonlySet<string> = new Set([
+  'position',
+  'size',
+  'rotation',
+  'geometry',
+  'fill',
+  'line',
+  'effects',
+  'text',
+  'textFormat',
+  'picture',
+  'table',
+  'chart',
+  'diagram',
+  'transition',
+  'animation',
+  'background',
+  'layout',
+  'visibility',
+  'other',
+]);
+/** The most aspects and affected slides one computed change may name. */
+const MAX_COMPUTED_ITEMS = 10000;
+
+/** Whether `value` is a well-typed `computed` field of a change. */
+export function isComputedShape(value: unknown): value is RefreshComputedChange {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  const list = (k: string, ok: (x: unknown) => boolean) =>
+    v[k] === undefined ||
+    (Array.isArray(v[k]) &&
+      (v[k] as unknown[]).length <= MAX_COMPUTED_ITEMS &&
+      (v[k] as unknown[]).every(ok));
+  return (
+    typeof v.scope === 'string' &&
+    SCOPES.has(v.scope) &&
+    typeof v.action === 'string' &&
+    ACTIONS.has(v.action) &&
+    list('aspects', (x) => typeof x === 'string' && ASPECTS.has(x)) &&
+    list('affectedSlides', isIndex) &&
+    (v.previousSlideIndex === undefined || isIndex(v.previousSlideIndex))
+  );
+}
+
+/** A frozen copy of a `computed` field with only its documented fields. */
+export function ownComputed(c: RefreshComputedChange): RefreshComputedChange {
+  return Object.freeze({
+    scope: c.scope,
+    action: c.action,
+    ...(c.aspects ? { aspects: Object.freeze(c.aspects.slice() as RefreshChangeAspect[]) } : {}),
+    ...(c.affectedSlides ? { affectedSlides: Object.freeze(c.affectedSlides.slice()) } : {}),
+    ...(c.previousSlideIndex !== undefined ? { previousSlideIndex: c.previousSlideIndex } : {}),
+  });
 }
 
 /** A copy of a location with only its documented fields. */

@@ -4,18 +4,23 @@
 //
 // PPTX Editor shows an accepted result without a reset of the view. With `mode: 'edit'` it runs
 // `replaceDocument`, one undoable transaction. A reload applies the same difference in place,
-// with no history, and then clears the history and the selection, as a load does
-// (`reloadInPlace`). In both modes parts the result did not change keep their identity, so the
+// with no history, and then clears the history, as a load does (`reloadInPlace`). In both
+// modes the selection stays when the nodes it names stay. In both modes parts the result did not change keep their identity, so the
 // slide on screen and the thumbnails paint again only where the result changed them, the old
 // paint stays until the new one replaces it, and the loading screen never shows. A result that
-// changes embedded fonts reloads with a quiet `load()`, which keeps the open deck on screen
-// until the new one is ready.
+// changes embedded fonts, or that the part checks refuse as an edit, reloads with a quiet
+// `load()`, which keeps the open deck on screen until the new one is ready.
+//
+// A result waits for input that runs when it arrives: a pointer gesture on the slide and an IME
+// composition (`refresh-input.ts`). It then commits a notes draft. Input that changed the
+// document makes the result refuse with `local-edits`, so a result never overwrites typing.
 //
 // An update runs in steps, each in a task of its own, so the main thread can paint between
 // them: read the file, take the difference, commit and paint, then compute the changes. Each
 // step after a yield checks again that the document is the captured one and that no
 // cancellation came. The recovery bytes are the last bytes known to equal the document (the
-// captured file, then each accepted file), so no save runs during an update.
+// captured file, then each accepted file), so no save runs during an update. They stay only
+// while no document shows: a load from outside drops them.
 //
 // Without `changes`, a registered `reviewModule()` computes the changes from the captured
 // presentation to the returned one; without the module, the result reports
@@ -23,6 +28,7 @@
 
 import { DocumentRefreshError } from './document-refresh-types.ts';
 import type {
+  ComputedRefreshChange,
   DocumentRefresh,
   DocumentRefreshState,
   RefreshFailureCode,
@@ -38,6 +44,8 @@ import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { isCollaborating, moduleRegistryOf } from './modules.ts';
 import {
   forgetReturned,
+  keepKeyboardFocus,
+  onEditorDestroy,
   preparseReturned,
   prediffReturned,
   reloadInPlace,
@@ -45,14 +53,22 @@ import {
 } from './document-replace.ts';
 import { expectLoad } from './change-source.ts';
 import {
+  isComputedShape,
   isLocationShape,
+  ownComputed,
   ownLocation,
   resolveRefreshChanges,
   type LocatedChange,
 } from './document-refresh-changes.ts';
 import { RefreshHighlights } from './refresh-highlights.ts';
-import { surfaceRootOf } from './surface-registry.ts';
-import { COMPOSING_CLASS } from './surface-input.ts';
+import {
+  REFRESH_INPUT_LIMITS,
+  commitPendingInput,
+  composing,
+  gestureActive,
+  trackRefreshInput,
+  waitUntil,
+} from './refresh-input.ts';
 import { revealRailItem } from './refresh-navigation.ts';
 
 export { DocumentRefreshError } from './document-refresh-types.ts';
@@ -111,7 +127,9 @@ function wellFormed(update: RefreshUpdate): boolean {
             (c.location === undefined || isLocationShape(c.location)) &&
             (c.unavailableReason === undefined ||
               c.unavailableReason === 'deleted' ||
-              c.unavailableReason === 'unavailable')
+              c.unavailableReason === 'unavailable') &&
+            ((c as Partial<ComputedRefreshChange>).computed === undefined ||
+              isComputedShape((c as Partial<ComputedRefreshChange>).computed))
         )))
   );
 }
@@ -124,22 +142,21 @@ function owned(update: RefreshUpdate): RefreshUpdate {
     bytes: bytes.slice(),
     ...(update.changes
       ? {
-          changes: update.changes.map((c) => ({
-            id: c.id,
-            ...(c.description !== undefined ? { description: c.description } : {}),
-            ...(c.unavailableReason ? { unavailableReason: c.unavailableReason } : {}),
-            ...(c.location ? { location: ownLocation(c.location) } : {}),
-          })),
+          changes: update.changes.map((c) => {
+            // A change from `comparePresentations()` keeps what it computed.
+            const computed = (c as Partial<ComputedRefreshChange>).computed;
+            return {
+              id: c.id,
+              ...(c.description !== undefined ? { description: c.description } : {}),
+              ...(c.unavailableReason ? { unavailableReason: c.unavailableReason } : {}),
+              ...(c.location ? { location: ownLocation(c.location) } : {}),
+              ...(computed ? { computed: ownComputed(computed) } : {}),
+            };
+          }),
         }
       : {}),
     ...(update.failures ? { failures: update.failures.slice() } : {}),
   };
-}
-
-/** The editor's text input while an IME composition runs in it, or null. */
-function composingInput(editor: PptxEditorInstance): HTMLElement | null {
-  const input = surfaceRootOf(editor)?.querySelector<HTMLElement>('.pptx-surface__input');
-  return input?.classList.contains(COMPOSING_CLASS) ? input : null;
 }
 
 /**
@@ -282,6 +299,11 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
   };
   // Locations name one accepted document. Never paint stale places after another change.
   editor.subscribe(() => {
+    // A load from outside shows another document: the recovery bytes restore nothing now.
+    if (!busy && recovery && editor.session && handle().loadId !== recovery.loadId) {
+      recovery = null;
+      notify({ recoveryAvailable: false });
+    }
     if (busy || acceptedHandle === null || same(acceptedHandle, handle())) return;
     located = [];
     acceptedHandle = null;
@@ -293,15 +315,19 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     const layout = editor.session?.layout(index);
     return !!layout && !!findItem(layout.items, nodeId);
   };
-  /** Wait for a running composition, then serialize with no await before the handle read. */
+  /**
+   * Wait for a running composition, at most `REFRESH_INPUT_LIMITS.compositionMs`, commit a notes
+   * draft, then serialize with no await before the handle read.
+   */
   const settle = async (current: number) => {
-    const input = composingInput(editor);
-    if (input)
-      await new Promise<void>((resolve) => {
-        const done = () => (input.removeEventListener('compositionend', done), resolve());
-        input.addEventListener('compositionend', done);
-      });
+    const ended = await waitUntil(
+      editor,
+      () => composing(editor),
+      REFRESH_INPUT_LIMITS.compositionMs
+    );
     if (current !== generation) throw new Error('superseded');
+    if (!ended) throw new Error('composition');
+    commitPendingInput(editor);
     const bytes = editor.save();
     if (!bytes) throw new Error('save');
     return { bytes, handle: handle() };
@@ -358,7 +384,48 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     expectLoad(editor, source);
     const startSlide = editor.snapshot().currentSlide;
     const loaded = await editor.load(bytes, { startSlide, quiet: true });
+    if (loaded.ok) keepKeyboardFocus(editor);
     return loaded.ok ? 'ok' : 'failed';
+  };
+  /**
+   * Let input that runs when a result arrives end, and commit a notes draft, so the revision
+   * check sees it. A pointer gesture on the slide ends at its release; a lost release ends the
+   * wait at its limit. False when a composition still runs at its limit.
+   */
+  const settleInput = async (): Promise<boolean> => {
+    await waitUntil(editor, () => gestureActive(editor), REFRESH_INPUT_LIMITS.gestureMs);
+    const ended = await waitUntil(
+      editor,
+      () => composing(editor),
+      REFRESH_INPUT_LIMITS.compositionMs
+    );
+    if (ended) commitPendingInput(editor);
+    return ended;
+  };
+  /**
+   * The result of a reload whose load failed. A quiet load that fails keeps the open deck on
+   * screen: it is restored already. A load from outside that replaced it shows another
+   * document. With no document on screen, the recovery bytes open again.
+   */
+  const failedLoad = async (resultId: string, before: DocumentHandle): Promise<RefreshResult> => {
+    active = null;
+    const outside = () => !!editor.session && handle().loadId !== before.loadId;
+    if (outside()) {
+      recovery = null;
+      return failure(resultId, 'document-changed');
+    }
+    let restored = !!editor.session;
+    if (!restored && recovery) {
+      const saved = recovery;
+      notify({ phase: 'recovering' });
+      restored = (await whileReplacing(editor, () => reload(saved.bytes, 'recovery'))) === 'ok';
+      if (!restored && outside()) {
+        recovery = null;
+        return failure(resultId, 'document-changed');
+      }
+    }
+    if (restored) recovery = null;
+    return failure(resultId, restored ? 'load-failed' : 'recovery-failed', restored);
   };
   const controller: DocumentRefresh = {
     async capture() {
@@ -412,6 +479,9 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
         return Promise.resolve(publish(failure(resultId, 'invalid-result')));
       }
       const apply = async (): Promise<RefreshResult> => {
+        // Input that runs now ends first: the checks below then see what it changed.
+        if (active && active.token === mine.submission && !(await settleInput()))
+          return publish(failure(resultId, 'local-edits'), 'failed');
         const request = active;
         const code = refusal(mine.mode);
         if (code) return publish(failure(resultId, code));
@@ -472,16 +542,9 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
               recovery = null;
               return publish(failure(resultId, 'invalid-document'), 'failed');
             }
-            if (outcome === 'failed') {
-              // A quiet load that fails keeps the open deck on screen: it is restored already.
-              const restored = handle().loadId === now.loadId;
-              if (restored) recovery = null;
-              active = null;
-              return publish(
-                failure(resultId, restored ? 'load-failed' : 'recovery-failed', restored),
-                'failed'
-              );
-            }
+            if (outcome === 'failed') return publish(await failedLoad(resultId, now), 'failed');
+            // The result shows: nothing is left to recover, also if a cancel comes next.
+            recovery = null;
             done = { pkg: editor.session!.store.package, at: handle() };
           }
           // Step 4: the changes, after the new paint had a frame.
@@ -510,7 +573,8 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
       return result;
     },
     cancel() {
-      const keepRecovery = state.phase === 'recovering' || recovery !== null;
+      // As in DOCX Editor: the recovery bytes stay only while no document shows.
+      const keepRecovery = state.phase === 'recovering' || (!editor.session && recovery !== null);
       generation++;
       active = null;
       if (!keepRecovery) recovery = null;
@@ -591,21 +655,31 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     },
     recoveryBytes: () => (recovery ? (recovery.bytes.slice().buffer as ArrayBuffer) : null),
     async recover() {
-      if (!recovery || recovery.loadId !== handle().loadId || busy) return false;
+      // The bytes restore the document they were taken from, or open where no document shows.
+      if (!recovery || busy || (editor.session && recovery.loadId !== handle().loadId))
+        return false;
       busy = true;
       const saved = recovery;
       notify({ phase: 'recovering' });
       try {
         const outcome = await whileReplacing(editor, () => reload(saved.bytes, 'recovery'));
         const ok = outcome === 'ok';
-        if (ok) recovery = null;
-        notify({ phase: ok ? 'idle' : 'failed', recoveryAvailable: !ok });
+        if (ok || (editor.session && handle().loadId !== saved.loadId)) recovery = null;
+        notify({ phase: ok ? 'idle' : 'failed', recoveryAvailable: recovery !== null });
         return ok;
       } finally {
         busy = false;
       }
     },
   };
+  trackRefreshInput(editor);
+  // A destroyed editor keeps no observer, subscription, or timer of the change flash.
+  onEditorDestroy(editor, () => {
+    reset();
+    highlights.dispose();
+    recovery = null;
+    controllers.delete(editor);
+  });
   controllers.set(editor, controller);
   return controller;
 }

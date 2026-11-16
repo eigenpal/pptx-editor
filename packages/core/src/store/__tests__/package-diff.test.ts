@@ -138,4 +138,58 @@ describe('diffPackages', () => {
     const { diff } = applyAndCheck(open, next);
     expect(diff.ok && diff.ops.some((op) => op.op === 'addPart')).toBe(true);
   });
+
+  test('a namespace declaration that changes below the root replaces the part whole', () => {
+    const MC = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
+    const choice = (prefix: string, uri: string) =>
+      `<mc:AlternateContent xmlns:mc="${MC}"><mc:Choice xmlns:${prefix}="${uri}" ` +
+      `Requires="${prefix}"><p:sp><p:nvSpPr><p:cNvPr id="9" name="X"/><p:cNvSpPr/><p:nvPr/>` +
+      `</p:nvSpPr><p:spPr/></p:sp></mc:Choice><mc:Fallback/></mc:AlternateContent>`;
+    const P14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
+    const A14 = 'http://schemas.microsoft.com/office/drawing/2010/main';
+    const open = deck([{ shapes: box(2, 'A') + choice('p14', P14) }]);
+    const next = deck([{ shapes: box(2, 'A') + choice('a14', A14) }]);
+    const { store } = applyAndCheck(open, next);
+    const written = read(writePptx(store.package)).parts.get('/ppt/slides/slide1.xml');
+    if (written?.kind !== 'xml') throw new Error('no slide');
+    type El = typeof written.xml.root;
+    const all = (el: El): El[] => [
+      el,
+      ...el.children.flatMap((c) => (c.type === 'element' ? all(c) : [])),
+    ];
+    const ac = all(written.xml.root).find((el) => el.local === 'Choice');
+    expect(ac?.nsDecls.map((d) => `${d.prefix}=${d.uri}`)).toEqual([`a14=${A14}`]);
+  });
+
+  test('30000 changed paragraphs take linear time and replace the part whole', () => {
+    const paragraphs = (tag: string) =>
+      shape({
+        id: 2,
+        x: 1,
+        y: 1,
+        cx: 10,
+        cy: 10,
+        text: Array.from({ length: 30_000 }, (_, i) => para(run(`${tag}${i}`))).join(''),
+      });
+    const open = deck([{ shapes: paragraphs('a') }]);
+    const next = deck([{ shapes: paragraphs('b') }]);
+    const start = performance.now();
+    const diff = diffPackages(open, next);
+    const ms = performance.now() - start;
+    if (!diff.ok) throw new Error(diff.reason);
+    expect(diff.ops.some((op) => op.op === 'addPart')).toBe(true);
+    // A quadratic name match took about 1.8 s here.
+    expect(ms).toBeLessThan(600);
+  });
+
+  test('children of one name pair in order by name when their content differs', () => {
+    const texts = (tag: string) => ['x', 'y', 'z'].map((t) => para(run(`${tag}${t}`))).join('');
+    const body = (tag: string) => shape({ id: 2, x: 1, y: 1, cx: 10, cy: 10, text: texts(tag) });
+    const open = deck([{ shapes: body('a') }]);
+    const next = deck([{ shapes: body('b') }]);
+    const { diff } = applyAndCheck(open, next);
+    if (!diff.ok) throw new Error('no difference');
+    expect(diff.ops.every((op) => op.op === 'setText')).toBe(true);
+    expect(diff.ops.length).toBe(3);
+  });
 });

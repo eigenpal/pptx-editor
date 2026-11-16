@@ -1871,7 +1871,8 @@
       },
       "removed": {
         "slide": "已删除幻灯片 {slide}",
-        "shape": "已从幻灯片 {slide} 中删除形状"
+        "shape": "已从幻灯片 {slide} 中删除形状",
+        "notes": "删除了幻灯片 {slide} 的备注"
       },
       "moved": {
         "slide": "已移动幻灯片 {slide}"
@@ -1885,7 +1886,8 @@
         "master": "已更改幻灯片母版。使用该母版的幻灯片：{count}",
         "theme": "已更改主题。使用该主题的幻灯片：{count}",
         "package": "已更改演示文稿设置"
-      }
+      },
+      "truncated": "未列出其他更改"
     }
   }
 }

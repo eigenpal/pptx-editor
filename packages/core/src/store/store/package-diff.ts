@@ -10,8 +10,11 @@
 // identity (a shape's `p:cNvPr/@id`, a relationship's `Id`, a slide id, an extension URI),
 // then by equal content in order, then by name in order. Matched children that moved get
 // `moveNode`; unmatched ones are removed or inserted whole. A part whose node edit would be
-// larger than its budget, whose root changed name, or whose root declares a namespace the open
-// root does not (an `mc:Ignorable` list names prefixes) is replaced whole. Before it returns,
+// larger than its budget, whose child list is longer than `MAX_CHILDREN`, whose root changed
+// name, or whose root declares a namespace the open root does not (an `mc:Ignorable` list names
+// prefixes) is replaced whole. So is a part where a matched element below the root declares
+// other namespaces than in the open part: an `mc:Choice/@Requires` names prefixes that its own
+// element may declare, and no op changes a declaration. Before it returns,
 // the difference is applied to a copy and each changed part is compared with the file by its
 // canonical form; a part that does not match is replaced whole. Store node ids of the two
 // packages are unrelated: both come from document order. DOM-free.
@@ -36,6 +39,8 @@ export type PackageDiff =
 const PART_OP_BUDGET = 4000;
 /** The largest `length(A) * length(B)` of a child list that gets an in-order content match. */
 const LCS_CELLS = 250_000;
+/** The longest child list that gets node ops. A longer one replaces its part whole. */
+const MAX_CHILDREN = 20_000;
 const CHUNK = 0x8000;
 
 class ReplacePart extends Error {}
@@ -54,7 +59,17 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-/** A content hash of each subtree: names, attributes (sorted), children; no ids or prefixes. */
+/** The namespace declarations of an element, sorted, as one string. */
+const declsOf = (el: Element): string =>
+  el.nsDecls
+    .map((d) => `${d.prefix}=${d.uri}`)
+    .sort()
+    .join('\u0001');
+
+/**
+ * A content hash of each subtree: names, attributes (sorted), namespace declarations (sorted),
+ * children; no ids or element prefixes.
+ */
 class Hashes {
   readonly #memo = new WeakMap<Node, string>();
 
@@ -65,7 +80,7 @@ class Hashes {
     if (node.type === 'text') text = `"${node.value}`;
     else {
       const attrs = node.attrs.map((a) => `${a.ns}}${a.local}=${a.value}`).sort();
-      text = `<${node.ns}}${node.local} ${attrs.join('\u0001')}>`;
+      text = `<${node.ns}}${node.local} ${attrs.join('\u0001')}\u0002${declsOf(node)}>`;
       for (const child of node.children) text += this.of(child);
     }
     const hash = digest(text);
@@ -180,21 +195,30 @@ function matchChildren(
       else y += 1;
     }
   }
-  // 3. The same name, in order: an edited child of the same kind.
+  // 3. The same name, in order: an edited child of the same kind. The open children wait in one
+  // queue per name, so each child of `b` takes the first one of its name in constant time. An
+  // identified child pairs only with the same identity, done above.
+  const queues = new Map<string, number[]>();
+  for (let i = 0; i < a.length; i += 1) {
+    const na = a[i];
+    if (usedA.has(i) || na.type !== 'element' || identityOf(na) !== undefined) continue;
+    const name = `${na.ns}}${na.local}`;
+    const queue = queues.get(name);
+    if (queue) queue.push(i);
+    else queues.set(name, [i]);
+  }
+  const heads = new Map<string, number>();
   for (let j = 0; j < b.length; j += 1) {
     if (pairs.has(j)) continue;
     const nb = b[j];
-    if (nb.type !== 'element') continue;
-    for (let i = 0; i < a.length; i += 1) {
-      const na = a[i];
-      if (usedA.has(i) || na.type !== 'element') continue;
-      if (na.ns !== nb.ns || na.local !== nb.local) continue;
-      // An identified child pairs only with the same identity, done above.
-      if (identityOf(na) !== undefined || identityOf(nb) !== undefined) continue;
-      pairs.set(j, i);
-      usedA.add(i);
-      break;
-    }
+    if (nb.type !== 'element' || identityOf(nb) !== undefined) continue;
+    const name = `${nb.ns}}${nb.local}`;
+    const queue = queues.get(name);
+    const head = heads.get(name) ?? 0;
+    if (!queue || head >= queue.length) continue;
+    heads.set(name, head + 1);
+    pairs.set(j, queue[head]);
+    usedA.add(queue[head]);
   }
   return pairs;
 }
@@ -213,9 +237,11 @@ class PartDiff {
     if (this.ops.length > PART_OP_BUDGET) throw new ReplacePart();
   }
 
-  element(a: Element, b: Element): void {
+  /** The ops of matched elements `a` and `b`. The root's declarations are checked before. */
+  element(a: Element, b: Element, root = false): void {
     if (a.ns !== b.ns || a.local !== b.local) throw new ReplacePart();
     if (this.hashes.of(a) === this.hashes.of(b)) return;
+    if (!root && declsOf(a) !== declsOf(b)) throw new ReplacePart();
     this.#attributes(a, b);
     const textA = a.children.every((c) => c.type === 'text');
     const textB = b.children.every((c) => c.type === 'text');
@@ -265,6 +291,7 @@ class PartDiff {
   }
 
   #children(parent: Element, a: readonly Node[], b: readonly Node[]): void {
+    if (a.length > MAX_CHILDREN || b.length > MAX_CHILDREN) throw new ReplacePart();
     const pairs = matchChildren(a, b, this.hashes);
     const matchedA = new Set(pairs.values());
     // The children as the ops leave them, by open node id; `null` marks an inserted child.
@@ -327,7 +354,7 @@ function xmlPartOps(name: string, open: Element, next: Element, hashes: Hashes):
   if (open.ns !== next.ns || open.local !== next.local || newRootPrefixes(open, next)) return null;
   const diff = new PartDiff(name, hashes);
   try {
-    diff.element(open, next);
+    diff.element(open, next, true);
   } catch (e) {
     if (e instanceof ReplacePart) return null;
     throw e;

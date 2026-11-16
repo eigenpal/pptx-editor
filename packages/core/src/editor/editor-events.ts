@@ -11,7 +11,7 @@ import type {
   EditorRejection,
   EditorSnapshot,
 } from '../contracts/index.ts';
-import { changeSourceTracker } from './change-source.ts';
+import { changeSourceTracker, loadIdOf } from './change-source.ts';
 
 /** The events `useEditorEvent` subscribes to, and what each handler receives. @public */
 export interface PptxEditorEvents {
@@ -21,7 +21,9 @@ export interface PptxEditorEvents {
    * long deck that finishes opening in the background (`selectionChange` reports those): a
    * host that saves on `change` does not save, and parse the whole deck, while it opens. It
    * also fires once when the deck turns read-only (`EditorSnapshot.readOnlyReason`), so a host
-   * that saves on `change` sees `save()` return `null` and can say why.
+   * that saves on `change` sees `save()` return `null` and can say why. A document refresh
+   * that reloads fires it once, also when the returned file equals the open one: the document
+   * has a new load id and no history.
    *
    * `change.source` names a load, a document refresh, or a refresh recovery; it is absent for
    * edits, undo, and redo. Do not start external processing for a change with a `source`.
@@ -92,11 +94,16 @@ export function onEditorEvent<E extends keyof PptxEditorEvents>(
 ): () => void {
   let prev = editor.snapshot();
   const sourceOf = event === 'change' ? changeSourceTracker(editor) : null;
+  // A reload gives a new load id, also when it keeps the revision: that is a change too.
+  let loadId = sourceOf ? loadIdOf(editor) : undefined;
   return editor.subscribe(() => {
     const next = editor.snapshot();
     const before = prev;
     prev = next;
-    if (next === before || !happened(event, before, next)) return;
+    const loadBefore = loadId;
+    if (sourceOf) loadId = loadIdOf(editor);
+    const reloaded = !!sourceOf && loadId !== loadBefore && next.status !== 'loading';
+    if (!reloaded && (next === before || !happened(event, before, next))) return;
     const change = sourceOf?.(next.revision);
     const call = handler as (...args: unknown[]) => void;
     if (event === 'rejection') call(next.lastRejection, next);

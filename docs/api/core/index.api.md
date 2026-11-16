@@ -1272,13 +1272,15 @@ export class CommandRefusal extends Error {
 // @public
 export type CommandResult = {
     readonly ok: true;
-    readonly replaceDocument?: ReplaceDocumentOutcome;
+    readonly replaceDocument?: Extract<ReplaceDocumentOutcome, {
+        readonly ok: true;
+    }>;
 } | {
     readonly ok: false;
     readonly reason: string;
     readonly detail?: string;
     readonly noop?: boolean;
-    readonly replaceDocument?: ReplaceDocumentOutcome;
+    readonly replaceDocument?: ReplaceDocumentRefusal;
 };
 
 // @internal
@@ -5341,7 +5343,9 @@ export interface RefreshChange {
 }
 
 // @public
-export type RefreshChangeAspect = 'position' | 'size' | 'rotation' | 'geometry' | 'fill' | 'line' | 'effects' | 'text' | 'textFormat' | 'picture' | 'table' | 'chart' | 'diagram' | 'transition' | 'animation' | 'background' | 'layout' | 'other';
+export type RefreshChangeAspect = 'position' | 'size' | 'rotation' | 'geometry' | 'fill' | 'line' | 'effects' | 'text' | 'textFormat' | 'picture' | 'table' | 'chart' | 'diagram' | 'transition' | 'animation' | 'background' | 'layout'
+/** The slide became hidden or shown in a slide show (`p:sld/@show`). */
+| 'visibility' | 'other';
 
 // @public
 export interface RefreshChangeInput {
@@ -5506,6 +5510,9 @@ export type ReplaceDocumentCommand = {
 } & ReplaceDocumentRequest;
 
 // @public
+export type ReplaceDocumentErrorCode = 'invalidRequest' | 'invalidDocument' | 'staleDocument' | 'unavailable' | 'busy' | 'editNotPermitted' | 'editUnsupported';
+
+// @public
 export type ReplaceDocumentOutcome = {
     readonly ok: true;
     readonly changed: boolean;
@@ -5531,6 +5538,9 @@ export type ReplaceDocumentRefusal = {
     readonly code: 'invalidRequest' | 'invalidDocument' | 'busy';
     readonly reason?: undefined;
 });
+
+// @public
+export type ReplaceDocumentRefusalReason = 'viewing' | 'suggesting' | 'protected' | 'collaborationUnavailable' | 'differentMainPart' | 'unsupportedDifference' | 'collaborationRefused' | 'otherDocument' | 'edited';
 
 // @public
 export interface ReplaceDocumentRequest {
