@@ -1,0 +1,13 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Font loading, the stand-in text measurer before shaping starts, the opening font wait, and the thumbnail repaint are local to each client. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged. The refit of edited text when shaping starts uses the existing edit path, as it did after the fixed measurer.",
+  "tests": [
+    "packages/core/src/editor/__tests__/stand-in-measurer.test.ts",
+    "packages/core/src/editor/__tests__/canvas-measurer.test.ts",
+    "packages/core/src/editor/__tests__/stalled-fonts.test.ts",
+    "packages/core/src/editor/__tests__/thumbnail-repainted.test.ts"
+  ]
+}
