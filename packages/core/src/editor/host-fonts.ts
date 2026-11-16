@@ -582,10 +582,15 @@ export function createHostFonts(
     resolving: () => waiting.size > 0,
 
     awaitShaping(session) {
-      // The substitutes that a split open left for later count in `resolving`, so the
-      // substitution notice waits for them, and they install when they arrive.
+      // The substitutes that a split open left for later install when they arrive. Those of other
+      // families count in `resolving`, so the substitution notice waits for them. The other
+      // faces of families the deck has do not: those families already report their substitute.
       const rest = session.restSubstitutes;
-      if (rest) {
+      if (rest && !session.restAddsFamilies)
+        void rest.then((added) => {
+          if (added && !destroyed && host.session() === session) void host.installed(session);
+        });
+      else if (rest) {
         const token = track(
           rest,
           (added, own) => {

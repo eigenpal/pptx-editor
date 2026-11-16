@@ -89,6 +89,20 @@ export interface FontResolutionRequest {
   /** Cancels document-scoped resolution; network-backed resolvers should pass it to fetch. */
   readonly signal?: AbortSignal;
   /**
+   * The faces to load: each family with the weights and styles that the text of the slides
+   * that name it asks for. A family in `families` that no slide names, such as a script or
+   * fallback font, gets the faces of the whole deck. Every family in `families` has a face
+   * here, and every family has its regular face, so a resolver can load only these faces.
+   *
+   * The editor reads the faces from the text properties and asks once for each deck. It does
+   * not ask again when an edit makes text use another face, such as bold. A resolver that loads
+   * only these faces then leaves that face to the faces it has; one that loads the other faces
+   * of each family in the background covers it.
+   *
+   * Absent when the editor asks for picked families. Load every face of each family then.
+   */
+  readonly faces?: readonly FontFaceRequest[];
+  /**
    * Faces an EARLIER origin in the same composition can already PAINT — either because it
    * supplied the bytes, or because it mapped that face onto one it did supply.
    *

@@ -3235,6 +3235,7 @@ export interface FontReport {
 // @public
 export interface FontResolutionRequest {
     readonly defaultFamily: string;
+    readonly faces?: readonly FontFaceRequest[];
     readonly families: readonly string[];
     readonly resolvedFaces?: readonly FontFaceRequest[];
     readonly signal?: AbortSignal;
@@ -4062,7 +4063,7 @@ export interface LoadOptions {
 }
 
 // @internal
-export function loadSubstitute(family: DefaultFamily, fetcher?: typeof fetch | undefined): Promise<SubstituteLoad>;
+export function loadSubstitute(family: DefaultFamily, fetcher?: typeof fetch | undefined, faces?: readonly FaceStyle[]): Promise<SubstituteLoad>;
 
 // @internal
 export function localeContentKey(locale: unknown): string;

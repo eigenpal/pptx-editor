@@ -1,8 +1,8 @@
 // Holds the packaged substitute loads of chosen families until a test releases them, and
 // records the families each load asked for. Import it before the editor: it mocks
 // `@docx-editor.dev/fonts`, so each test file that uses it needs its own process, as
-// `bun run test` gives it. The session caches each family for the page, so a family that one
-// test loaded is not held in a later test of the same file.
+// `bun run test` gives it. The session caches each face for the page, so a face that one test
+// loaded is not held in a later test of the same file.
 
 import { mock } from 'bun:test';
 import * as realFonts from '@docx-editor.dev/fonts';
@@ -12,6 +12,8 @@ const copy = { ...realFonts };
 
 /** The families the substitute loads asked for, in order. */
 export const requested: string[] = [];
+/** The faces the substitute loads asked for, in order, as `Calibri 700 italic`. */
+export const requestedFaces: string[] = [];
 const held = new Map<string, { promise: Promise<void>; resolve: () => void }>();
 const failing = new Set<string>();
 
@@ -20,7 +22,7 @@ export function fail(family: string): void {
   failing.add(family);
 }
 
-/** Hold the loads of `family` until `release(family)`. */
+/** Hold the loads of `family`, or of one face such as `Calibri 700 normal`, until `release`. */
 export function hold(family: string): void {
   let resolve!: () => void;
   const promise = new Promise<void>((r) => (resolve = r));
@@ -38,6 +40,7 @@ export function resetGate(): void {
   held.clear();
   failing.clear();
   requested.length = 0;
+  requestedFaces.length = 0;
 }
 
 mock.module('@docx-editor.dev/fonts', () => ({
@@ -45,7 +48,18 @@ mock.module('@docx-editor.dev/fonts', () => ({
   loadDefaultFonts: (o: Parameters<typeof realFonts.loadDefaultFonts>[0] = {}) => {
     const families = [...(o.families ?? [])];
     requested.push(...families);
-    const gates = families.map((f) => held.get(f)?.promise ?? Promise.resolve());
+    const styles = o.faces ?? [
+      { weight: 400, style: 'normal' },
+      { weight: 700, style: 'normal' },
+      { weight: 400, style: 'italic' },
+      { weight: 700, style: 'italic' },
+    ];
+    for (const f of families)
+      for (const s of styles) requestedFaces.push(`${f} ${s.weight} ${s.style}`);
+    const gates = families.flatMap((f) => [
+      held.get(f)?.promise ?? Promise.resolve(),
+      ...styles.map((s) => held.get(`${f} ${s.weight} ${s.style}`)?.promise ?? Promise.resolve()),
+    ]);
     if (families.some((f) => failing.has(f)))
       return Promise.all(gates).then(() => ({
         sources: [],

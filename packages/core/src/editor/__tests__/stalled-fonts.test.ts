@@ -83,6 +83,7 @@ test('substitutes for the other slides hold the notice longer than other late fo
   const session = opened.session;
   // A slow network: the other slides' substitutes are still downloading.
   session.restSubstitutes = new Promise<boolean>(() => {});
+  session.restAddsFamilies = true;
   const fonts = createHostFonts(
     {},
     {

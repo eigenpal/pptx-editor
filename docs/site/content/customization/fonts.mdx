@@ -47,6 +47,20 @@ const fonts = useFonts(packagedFonts(), googleFonts({ cjk: true }));
 </Framework>
 </FrameworkTabs>
 
+### Choose how font faces load
+
+`packagedFonts()` and `googleFonts()` take a `loading` option:
+
+| `loading` | Behavior |
+| --- | --- |
+| `'progressive'` (default) | The text switches to its own fonts when the faces it uses arrive, and the other faces load in the background. |
+| `'eager'` | The text switches to its own fonts when every face of its families arrives. |
+| `'lazy'` | Only the faces the text uses load. A face that an edit uses later, such as bold, does not load. |
+
+```ts
+const fonts = useFonts(packagedFonts({ loading: 'eager' }), googleFonts());
+```
+
 Google Fonts makes network requests when the deck needs a catalog family. Arabic text requests Amiri. CJK text requests a regional Noto Sans fallback. Large CJK faces load in the background and can change line breaks when they arrive. Use `googleFonts({ allow: ['Amiri', 'Lato'] })` to limit the catalog families you permit.
 
 Without `fonts`, the editor uses permitted embedded fonts and packaged substitutes without network requests. For server-side output, configure [PDF fonts](/docs/export/pdf/fonts) separately.
@@ -191,9 +205,9 @@ Earlier sources win for the same family, weight, and style. A supplied face wins
 | `maxFontBytes` | Per-face admission limit. |
 | `defaultFont`, `language`, `epoch` | Accepted for DOCX Editor compatibility. A slide's text size comes from the deck's text styles, so these do not change layout. |
 
-A `FontResolver` receives `families`, `defaultFamily`, and optional `signal` and `resolvedFaces`. It returns a configuration, a fragment, or `undefined`. Map family names to URLs through your own lookup, and pass `signal` to your fetch calls so cancellation stops network work.
+A `FontResolver` receives `families`, `defaultFamily`, and optional `signal`, `faces`, and `resolvedFaces`. It returns a configuration, a fragment, or `undefined`. Map family names to URLs through your own lookup, and pass `signal` to your fetch calls so cancellation stops network work.
 
-`families` contains up to 64 requested names, including theme fonts, explicit typefaces, and script fallbacks. `defaultFamily` is the theme's minor Latin font.
+`families` contains up to 64 requested names, including theme fonts, explicit typefaces, and script fallbacks. `defaultFamily` is the theme's minor Latin font. `faces` lists the weight and style of each family that the deck's text asks for, so a resolver can load those faces first. Every family in `families` has its regular face in `faces`.
 
 ### Render Chinese, Japanese, and Korean text
 
@@ -235,7 +249,7 @@ A lower rank still serves a style that a higher rank lacks. `snapshot().substitu
 
 A deck that opens waits at most 3 seconds for its fonts: the text engine, the packaged substitutes, and the faces of your `fonts` origins. The loading sheet shows meanwhile, so on most networks the first slide paints once, in its own faces. Faces that arrive later install when they land, and the slides lay out again. A slow or blocked font download never holds the loading screen.
 
-The editor waits only for the packaged substitutes of the slide it opens on: the families of that slide, its layout, its master, and its theme. The substitutes for the other slides load after the deck opens, and `resolving` stays `true` until they install. A deck that uses many families therefore shows its first slide sooner. A PDF export or a server session loads every substitute before it opens.
+The editor waits only for the packaged substitute faces that the slide it opens on uses: the families of that slide, its layout, its master, and its theme, in the regular face and in bold or italic when the text sets them. The other faces and the substitutes for the other slides load after the deck opens and install when they arrive. `resolving` stays `true` until the substitutes for the other slides install. A deck therefore shows its first slide sooner. A PDF export or a server session loads every substitute face before it opens.
 
 Browser font registration has a separate 2-second limit. If registration stalls, the editor opens with available browser faces. Late faces remain registered and display when the browser finishes loading them. When late faces install, the faces on screen stay registered until the new faces load and the slide and its thumbnails repaint, so text never draws with a fallback face in between.
 
