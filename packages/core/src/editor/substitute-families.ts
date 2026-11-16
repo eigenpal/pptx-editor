@@ -16,6 +16,7 @@ import {
   type PresentationInfo,
   type XmlPart,
 } from '../store/index.ts';
+import { faceStylesOf, partStyles, type FaceStyle } from './face-styles.ts';
 
 /** Elements whose `typeface` names a family layout measures with. */
 const TYPEFACE_ELEMENTS = new Set(['latin', 'sym', 'buFont']);
@@ -181,8 +182,42 @@ export function slideSubstituteFamilies(pkg: PptxPackage, index: number): Defaul
   const families = new Set<DefaultFamily>();
   const ref = presentationInfo(pkg).slides[index];
   const themes = new Set([ref?.themePart]);
-  for (const name of ref ? [ref.partName, ref.layoutPart, ref.masterPart, ref.themePart] : [])
+  for (const name of slideParts(ref))
     for (const family of countedFamilies(name ? pkg.parts.get(name) : undefined, themes))
       families.add(substituteFamilyFor(family));
   return families.size > 0 ? [...families] : ['Arial'];
+}
+
+/** The parts that slide `ref` draws text from: its slide, layout, master, and theme. */
+function slideParts(ref: PresentationInfo['slides'][number] | undefined): (string | undefined)[] {
+  return ref ? [ref.partName, ref.layoutPart, ref.masterPart, ref.themePart] : [];
+}
+
+/** The part that holds the deck's table styles (ECMA-376 Part 1, 20.1.4.2.27 `tblStyleLst`). */
+const TABLE_STYLES = '/ppt/tableStyles.xml';
+
+/**
+ * The faces that the text of slide `index` asks for (`face-styles.ts`), the same for each part
+ * of its slide, layout, master, and theme, and for the deck's table styles.
+ */
+export function slideFaceStyles(pkg: PptxPackage, index: number): FaceStyle[] {
+  const names = [...slideParts(presentationInfo(pkg).slides[index]), TABLE_STYLES];
+  return faceStylesOf(
+    names.flatMap((name) => {
+      const part = name ? pkg.parts.get(name) : undefined;
+      return part?.kind === 'xml' && !isDeferredPending(part) ? [partStyles(part.xml)] : [];
+    })
+  );
+}
+
+/** A packaged substitute family and the faces of it to load. */
+export interface SubstituteFaces {
+  readonly family: DefaultFamily;
+  readonly faces: readonly FaceStyle[];
+}
+
+/** The substitute families that slide `index` needs, each with the faces its text asks for. */
+export function slideSubstituteFaces(pkg: PptxPackage, index: number): SubstituteFaces[] {
+  const faces = slideFaceStyles(pkg, index);
+  return slideSubstituteFamilies(pkg, index).map((family) => ({ family, faces }));
 }

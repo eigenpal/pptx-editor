@@ -46,7 +46,7 @@ import { OpBatch } from '../automation/commands/op-batch.ts';
 import { createPackagedFileFetch } from './packaged-file-fetch.ts';
 import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
-import { carryFits } from '../automation/commands/table-fit.ts';
+import { carryFits, fittedWith } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
 import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
 import type { PicturesWait, PictureStatus } from './metafile-pictures.ts';
@@ -61,10 +61,12 @@ import {
 } from './progressive-open.ts';
 import {
   namedFamilies,
-  slideSubstituteFamilies,
+  slideSubstituteFaces,
   substituteFamiliesFor,
   type DefaultFamily,
+  type SubstituteFaces,
 } from './substitute-families.ts';
+import { ALL_FACE_STYLES, faceKey, type FaceStyle } from './face-styles.ts';
 
 export { namedFamilies, substituteFamiliesFor } from './substitute-families.ts';
 
@@ -100,9 +102,10 @@ export interface OpenOptions {
    */
   readonly progressive?: { readonly startSlide?: number };
   /**
-   * Load only the packaged substitutes that slide `firstSlideFonts` needs before the session
-   * opens. The others load after it (`DocumentSession.restSubstitutes`), so the first slide
-   * does not wait for the fonts of every slide. Requires `shapingWaitMs`. @internal
+   * Load only the packaged substitute faces that the text of slide `firstSlideFonts` asks for
+   * before the session opens. The other families and faces load after it
+   * (`DocumentSession.restSubstitutes`), so the first slide does not wait for the fonts of
+   * every slide. Requires `shapingWaitMs`. @internal
    */
   readonly firstSlideFonts?: number;
   /**
@@ -174,7 +177,8 @@ export interface SubstituteLoad {
   readonly failures: readonly SubstituteFontFailure[];
 }
 
-const substituteCache = new Map<DefaultFamily, Promise<SubstituteLoad>>();
+/** The loads of packaged substitute faces, by `faceKey`. */
+const substituteCache = new Map<string, Promise<SubstituteLoad>>();
 
 /**
  * How the substitutes are fetched. Under Node the packaged faces are `file:` URLs, which
@@ -195,12 +199,20 @@ function substituteFetch(): typeof fetch | undefined {
 const MISSING_ASSET =
   'the file is not in the assets folder of @docx-editor.dev/fonts. A bundled Node app must ship that folder and set DOCX_EDITOR_FONT_ASSET_ROOT to it';
 
-/** Load one family's packaged substitutes. `fetcher` is injectable for tests. @internal */
+/**
+ * Load one family's packaged substitutes: `faces`, or all four. `fetcher` is injectable for
+ * tests. @internal
+ */
 export function loadSubstitute(
   family: DefaultFamily,
-  fetcher: typeof fetch | undefined = substituteFetch()
+  fetcher: typeof fetch | undefined = substituteFetch(),
+  faces?: readonly FaceStyle[]
 ): Promise<SubstituteLoad> {
-  return loadDefaultFonts({ families: [family], ...(fetcher ? { fetcher } : {}) }).then(
+  return loadDefaultFonts({
+    families: [family],
+    ...(faces ? { faces } : {}),
+    ...(fetcher ? { fetcher } : {}),
+  }).then(
     (fragment) => ({
       sources: fragment.sources.map((s) => ({
         family: s.request.family,
@@ -231,27 +243,57 @@ export function loadSubstitute(
   );
 }
 
+/** Each family with all four faces: what an open that loads every face asks for. */
+const everyFace = (families: readonly DefaultFamily[]): SubstituteFaces[] =>
+  families.map((family) => ({ family, faces: ALL_FACE_STYLES }));
+
 /**
- * The packaged substitutes for some families, each family loaded once per page. A family
- * with a failed face loads again at the next open, so a passing fault does not stick.
+ * One source for each face. A family whose italic is its upright file (`@docx-editor.dev/fonts`)
+ * answers an italic load with the upright face, which another load can give too.
  */
-function substituteFonts(families: readonly DefaultFamily[]): Promise<SubstituteLoad> {
+function uniqueSources(sources: readonly FontSource[]): FontSource[] {
+  const seen = new Set<string>();
+  return sources.filter((s) => {
+    const key = `${s.family.toLowerCase()}\u0000${s.bold}\u0000${s.italic}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** The keys of the faces of `wanted`. */
+const faceKeys = (wanted: readonly SubstituteFaces[]): string[] =>
+  wanted.flatMap(({ family, faces }) => faces.map((face) => faceKey(family, face)));
+
+/**
+ * The packaged substitute faces of `wanted`, each face loaded once per page. A face that failed
+ * loads again at the next open, so a passing fault does not stick.
+ */
+function substituteFonts(wanted: readonly SubstituteFaces[]): Promise<SubstituteLoad> {
   return Promise.all(
-    families.map((family) => {
-      let hit = substituteCache.get(family);
-      if (!hit) {
-        hit = loadSubstitute(family);
-        substituteCache.set(family, hit);
-        void hit.then((load) => {
-          if (load.failures.length > 0 && substituteCache.get(family) === hit)
-            substituteCache.delete(family);
-        });
-      }
-      return hit;
-    })
+    wanted.flatMap(({ family, faces }) =>
+      faces.map((face) => {
+        const key = faceKey(family, face);
+        let hit = substituteCache.get(key);
+        if (!hit) {
+          hit = loadSubstitute(family, substituteFetch(), [face]);
+          substituteCache.set(key, hit);
+          void hit.then((load) => {
+            if (load.failures.length > 0 && substituteCache.get(key) === hit)
+              substituteCache.delete(key);
+          });
+        }
+        return hit;
+      })
+    )
   ).then((loads) => ({
-    sources: loads.flatMap((l) => l.sources),
-    failures: loads.flatMap((l) => l.failures),
+    sources: uniqueSources(loads.flatMap((l) => l.sources)),
+    // Two faces that share a file report its failure once.
+    failures: [
+      ...new Map(
+        loads.flatMap((l) => l.failures).map((f) => [`${f.family}\u0000${f.file}`, f])
+      ).values(),
+    ],
   }));
 }
 
@@ -320,6 +362,8 @@ interface FontSet {
   readonly substituteFailures: readonly SubstituteFontFailure[];
   /** The substitute families loaded, or null when the open loads none. */
   readonly substituteFamilies: readonly DefaultFamily[] | null;
+  /** The `faceKey` of each substitute face loaded. */
+  readonly substituteFaces: readonly string[];
   readonly fixed: boolean;
   /** Measures while `fixed`, instead of the fixed measurer (`OpenOptions.standIn`). */
   readonly standIn?: TextMeasurer | null;
@@ -402,6 +446,12 @@ export class DocumentSession {
    * `true` when they loaded and the session measures with them. Never rejects. @internal
    */
   restSubstitutes: Promise<boolean> | null = null;
+  /**
+   * Whether `restSubstitutes` adds families, not only the other faces of families the session
+   * has. Only then does it hide the substitution notice: a family with its regular face already
+   * reports the substitute it measures with. @internal
+   */
+  restAddsFamilies = false;
   /** Why shaped measurement did not start, once `shaping` resolved `false`. @internal */
   shapingError: unknown = null;
   /**
@@ -521,7 +571,8 @@ export class DocumentSession {
   /**
    * Load the packaged substitutes that slides parsed after the open need: a progressive open
    * chose them from the parts it had parsed, and a slide parsed later can name another family.
-   * Re-measures only when a family was added. Resolves true when it was. @internal
+   * It also loads the faces that the open left for later. Re-measures only when a face was
+   * added. Resolves true when one was. @internal
    */
   addMissingSubstitutes(): Promise<boolean> {
     // One load at a time: two at once (the opening lane and late shaping) chose the same
@@ -536,16 +587,25 @@ export class DocumentSession {
   async #loadMissingSubstitutes(): Promise<boolean> {
     const loaded = this.#fonts.substituteFamilies;
     if (this.#fonts.fixed || !loaded || this.#disposed) return false;
-    const missing = substituteFamiliesFor(this.store.package).filter((f) => !loaded.includes(f));
+    // The families that slides parsed later name, and the faces that the open left for later.
+    const have = new Set(this.#fonts.substituteFaces);
+    const missing = everyFace(substituteFamiliesFor(this.store.package))
+      .map(({ family, faces }) => ({
+        family,
+        faces: faces.filter((face) => !have.has(faceKey(family, face))),
+      }))
+      .filter((f) => f.faces.length > 0);
     if (missing.length === 0) return false;
     const more = await substituteFonts(missing);
     if (this.#disposed) return false;
     const now = this.#fonts;
+    const families = missing.map((f) => f.family);
     this.#fonts = {
       ...now,
-      substitutes: [...now.substitutes, ...more.sources],
+      substitutes: uniqueSources([...now.substitutes, ...more.sources]),
       substituteFailures: [...now.substituteFailures, ...more.failures],
-      substituteFamilies: [...(now.substituteFamilies ?? []), ...missing],
+      substituteFamilies: [...new Set([...(now.substituteFamilies ?? []), ...families])],
+      substituteFaces: [...now.substituteFaces, ...faceKeys(missing)],
     };
     this.#remeasure();
     return true;
@@ -794,6 +854,7 @@ export async function openPresentation(
     substitutes: [] as readonly FontSource[],
     substituteFailures: [] as readonly SubstituteFontFailure[],
     substituteFamilies: null,
+    substituteFaces: [] as readonly string[],
   };
   const make = (fonts: FontSet): DocumentSession => {
     made = new DocumentSession(store, fonts);
@@ -802,26 +863,30 @@ export async function openPresentation(
     return made;
   };
   if (options.fixedMeasurer) return { ok: true, session: make({ ...base, fixed: true }) };
-  const all = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
-  // The opening slide's substitutes first: the others load after the open (`restSubstitutes`).
+  const all = options.substitutes === false ? null : everyFace(substituteFamiliesFor(read.pkg));
+  // The faces that the opening slide's text asks for first: the other families and faces load
+  // after the open (`restSubstitutes`).
   const first =
     all && options.firstSlideFonts !== undefined && options.shapingWaitMs !== undefined
-      ? slideSubstituteFamilies(
+      ? slideSubstituteFaces(
           read.pkg,
           clampSlide(options.firstSlideFonts, presentationInfo(read.pkg).slides.length)
-        ).filter((f) => all.includes(f))
+        ).filter((f) => all.some((a) => a.family === f.family))
       : all;
-  const families = first;
-  const split = !!all && !!first && first.length < all.length;
+  const families = first && first.map((f) => f.family);
+  const keys = first ? faceKeys(first) : [];
+  const split = !!all && !!first && keys.length < faceKeys(all).length;
+  const addsFamilies = !!all && !!first && first.length < all.length;
   const parsedAt = performance.now();
   // The substitutes download next to the text engine, not after it: the two waits do not add up.
-  const subs = families ? substituteFonts(families) : { sources: [], failures: [] };
+  const subs = first ? substituteFonts(first) : { sources: [], failures: [] };
   const shaping = Promise.all([initializeHarfBuzz(), subs]).then(([, loaded]) => loaded);
   const shaped = (loaded: SubstituteLoad): FontSet => ({
     ...base,
     substitutes: loaded.sources,
     substituteFailures: loaded.failures,
     substituteFamilies: families,
+    substituteFaces: keys,
     fixed: false,
   });
   if (options.shapingWaitMs === undefined)
@@ -836,10 +901,17 @@ export async function openPresentation(
     const session = make(shaped(inTime.loaded));
     session.parsedAt = parsedAt;
     if (split) session.restSubstitutes = session.addMissingSubstitutes().catch(() => false);
+    session.restAddsFamilies = addsFamilies;
     return { ok: true, session };
   }
   const standIn = options.standIn?.() ?? null;
-  const session = make({ ...base, substituteFamilies: families, fixed: true, standIn });
+  const session = make({
+    ...base,
+    substituteFamilies: families,
+    substituteFaces: keys,
+    fixed: true,
+    standIn,
+  });
   session.parsedAt = parsedAt;
   session.shapingError = inTime?.error ?? null;
   // The shapes that edits fit with the fixed measurer fit again when shaping starts, unless
@@ -847,6 +919,7 @@ export async function openPresentation(
   const openedPackage = session.store.package;
   let restLoaded: (added: boolean) => void = () => {};
   if (split) session.restSubstitutes = new Promise((resolve) => (restLoaded = resolve));
+  session.restAddsFamilies = addsFamilies;
   session.shaping = inTime
     ? (restLoaded(false), Promise.resolve(false))
     : settled.then((late) => {
@@ -868,8 +941,10 @@ export async function openPresentation(
           return true;
         };
         const fitted = more.then(refit, () => refit());
-        // A split open paints with the opening slide's faces now; the rest install on arrival.
-        return split ? true : fitted;
+        // The deck paints with the opening slide's faces now, and the rest install on arrival.
+        // Text that an edit fitted before shaping started waits for the other faces of its
+        // families, so the fit it saves is the one their shaped text needs.
+        return addsFamilies || fittedWith(fixed).size === 0 ? true : fitted;
       });
   return { ok: true, session };
 }

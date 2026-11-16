@@ -23,6 +23,8 @@ import {
   type FontResolutionRequest,
 } from '../layout/font-composition.ts';
 import { FONT_NAME } from '../automation/commands/font-format.ts';
+import type { FontFaceRequest } from '../contracts/index.ts';
+import { faceStylesOf, partStyles, type PartStyles } from './face-styles.ts';
 
 /**
  * Elements whose `typeface` names a family (ECMA-376 Part 1, 21.1.2.3.7 `latin`, 21.1.2.3.3
@@ -169,7 +171,60 @@ export function deckDefaultFamily(pkg: PptxPackage): string {
   return latin && FONT_NAME.test(latin) ? latin : DEFAULT_FONT.family;
 }
 
-/** The request a deck makes of the host's font origins. */
+/** The part that holds the deck's table styles (ECMA-376 Part 1, 20.1.4.2.27 `tblStyleLst`). */
+const TABLE_STYLES = '/ppt/tableStyles.xml';
+
+/**
+ * The faces each family asks for (`FontResolutionRequest.faces`): for each slide, the families
+ * that its slide, layout, master, and theme parts name, with the faces of those parts and of
+ * the table styles. A family that no slide names, and the default family, get the faces of
+ * every slide.
+ */
+export function deckFontFaces(
+  pkg: PptxPackage,
+  families: readonly string[],
+  defaultFamily: string
+): FontFaceRequest[] {
+  const tableStyles = xmlPartOf(pkg, TABLE_STYLES);
+  const join = (a: PartStyles, b: PartStyles): PartStyles => ({
+    bold: a.bold || b.bold,
+    italic: a.italic || b.italic,
+  });
+  const none: PartStyles = { bold: false, italic: false };
+  const shared = tableStyles ? partStyles(tableStyles) : none;
+  const byFamily = new Map<string, PartStyles>();
+  let every = shared;
+  for (const ref of presentationInfo(pkg).slides) {
+    const parts = [ref.partName, ref.layoutPart, ref.masterPart, ref.themePart].flatMap((name) => {
+      const part = name ? pkg.parts.get(name) : undefined;
+      return part?.kind === 'xml' && !isDeferredPending(part) ? [part.xml] : [];
+    });
+    const styles = parts.map(partStyles).reduce(join, shared);
+    every = join(every, styles);
+    for (const part of parts)
+      for (const face of partFonts(part).faces) {
+        const key = face.toLowerCase();
+        byFamily.set(key, join(byFamily.get(key) ?? none, styles));
+      }
+  }
+  const deck = faceStylesOf([every]);
+  const out: FontFaceRequest[] = [];
+  const seen = new Set<string>();
+  for (const family of [defaultFamily, ...families]) {
+    const key = family.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const named = byFamily.get(key);
+    const faces = named && key !== defaultFamily.toLowerCase() ? faceStylesOf([named]) : deck;
+    for (const face of faces) out.push({ family, weight: face.weight, style: face.style });
+  }
+  return out;
+}
+
+/**
+ * The request a deck makes of the host's font origins. It names no faces, so an origin loads
+ * every face of each family: a PDF export needs them all. The editor in a browser adds `faces`.
+ */
 export function deckFontRequest(pkg: PptxPackage, signal?: AbortSignal): FontResolutionRequest {
   return {
     families: deckFontFamilies(pkg),

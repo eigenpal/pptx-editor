@@ -1,9 +1,16 @@
-// An editor open waits only for the packaged substitutes of the slide it shows. The substitutes
-// of the other slides load after the open and install when they arrive, so a deck that names
-// many families does not hold its first slide for the fonts of every slide.
+// An editor open waits only for the packaged substitute faces that the text of the slide it
+// shows uses. The other faces and the substitutes of the other slides load after the open and
+// install when they arrive, so a deck does not hold its first slide for every font file.
 
 import { afterEach, expect, test } from 'bun:test';
-import { deckNaming, hold, release, requested, resetGate, waitFor } from './substitute-gate.ts';
+import {
+  deckNaming,
+  hold,
+  release,
+  requestedFaces,
+  resetGate,
+  waitFor,
+} from './substitute-gate.ts';
 
 const { createPptxEditor } = await import('../index.ts');
 const { openPresentation } = await import('../document-session.ts');
@@ -37,9 +44,14 @@ test('the open waits only for the substitutes of the slide it shows', async () =
   ]);
   expect(session.fontGeneration).toBeGreaterThan(generation);
   expect(editor.snapshot().substitutedFonts.map((f) => f.family)).toContain('Times New Roman');
-  // Each family loads once: the opening slide's first, then the others.
-  expect(requested.slice(0, 2).sort()).toEqual(['Arial', 'Calibri']);
-  expect(requested.slice(2).sort()).toEqual(['Courier New', 'Times New Roman']);
+  // Each face loads once: the regular faces that the opening slide's text uses first, then the
+  // other faces of those families, and the families of the other slides.
+  expect(requestedFaces.slice(0, 2).sort()).toEqual(['Arial 400 normal', 'Calibri 400 normal']);
+  const rest = requestedFaces.slice(2);
+  expect(rest).toHaveLength(14);
+  expect(new Set(rest).size).toBe(14);
+  expect(rest).toContain('Calibri 700 normal');
+  expect(rest).toContain('Courier New 700 italic');
   editor.destroy();
 });
 
@@ -74,12 +86,19 @@ test('an open that waits for its fonts loads every substitute before it opens', 
   session.dispose();
 });
 
-test('a deck whose slides use only the opening slide families does not split', async () => {
+test('a deck whose slides use only the opening slide families loads their other faces later', async () => {
   const opened = await openPresentation(await deckNaming([undefined, undefined]), {
     shapingWaitMs: 5000,
     firstSlideFonts: 0,
   });
   if (!opened.ok) throw new Error('open failed');
-  expect(opened.session.restSubstitutes).toBeNull();
-  opened.session.dispose();
+  const session = opened.session;
+  expect(await session.restSubstitutes).toBe(true);
+  // The families stay the same; only the bold and italic faces were added.
+  expect([...session.substituteFamilies!].sort()).toEqual(['Arial', 'Calibri']);
+  expect(session.measurer.resolve({ family: 'Calibri', bold: true, italic: false })).toMatchObject({
+    family: 'Carlito',
+    bold: true,
+  });
+  session.dispose();
 });

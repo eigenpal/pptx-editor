@@ -73,7 +73,9 @@ export function registerFontFaces(
     ready,
     dispose: () => {
       finish();
-      for (const face of added) doc.fonts.delete(face);
+      // A closed window (a test's DOM after teardown) has no font set left to remove from.
+      const fonts = doc.fonts as FontFaceSet | undefined;
+      if (fonts) for (const face of added) fonts.delete(face);
     },
   };
 }

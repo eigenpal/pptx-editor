@@ -155,7 +155,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '6.5.438',
   chromium: 'chromium-headless-shell 1248',
   fonts:
-    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',
+    '@docx-editor.dev/fonts 2.38.0, @docx-editor.dev/fonts-cjk 2.38.0, fixtures/fonts f68672445aef',
   deckLines: {
     'alignment-anchor': 19,
     'arrange-flip-hidden': 3,
@@ -241,7 +241,7 @@ export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
   pdfjs: '6.5.438',
   chromium: 'chromium-headless-shell 1248',
   fonts:
-    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',
+    '@docx-editor.dev/fonts 2.38.0, @docx-editor.dev/fonts-cjk 2.38.0, fixtures/fonts f68672445aef',
   deckLines: {
     'alignment-anchor': 19,
     'arrange-flip-hidden': 3,

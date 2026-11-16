@@ -97,13 +97,13 @@
     "collaboration:check": "node scripts/collaboration/check.mjs"
   },
   "dependencies": {
-    "@docx-editor.dev/fonts": "^2.34.0",
+    "@docx-editor.dev/fonts": "^2.38.0",
     "@pptx-editor.dev/pptx-to-pdf": "workspace:*"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.0",
     "@changesets/get-release-plan": "5.0.2",
-    "@docx-editor.dev/fonts-cjk": "^2.34.0",
+    "@docx-editor.dev/fonts-cjk": "^2.38.0",
     "@happy-dom/global-registrator": "21.0.4",
     "@microsoft/api-extractor": "^7.60.1",
     "@playwright/test": "^1.56.0",

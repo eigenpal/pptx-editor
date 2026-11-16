@@ -5,13 +5,13 @@
     "": {
       "name": "pptx-editor-monorepo",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@pptx-editor.dev/pptx-to-pdf": "workspace:*",
       },
       "devDependencies": {
         "@changesets/cli": "^3.0.0",
         "@changesets/get-release-plan": "5.0.2",
-        "@docx-editor.dev/fonts-cjk": "^2.34.0",
+        "@docx-editor.dev/fonts-cjk": "^2.38.0",
         "@happy-dom/global-registrator": "21.0.4",
         "@microsoft/api-extractor": "^7.60.1",
         "@playwright/test": "^1.56.0",
@@ -42,7 +42,7 @@
       "name": "@pptx-editor.dev/example-chat",
       "version": "0.0.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@fontsource-variable/geist": "^5.3.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
@@ -55,7 +55,7 @@
       "name": "@pptx-editor.dev/example-collaboration",
       "version": "0.0.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
         "@pptx-editor.dev/pro": "workspace:*",
@@ -71,7 +71,7 @@
       "name": "@pptx-editor.dev/example-collaboration-hocuspocus",
       "version": "0.0.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@hocuspocus/provider": "^4.8.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
@@ -108,7 +108,7 @@
       "name": "@pptx-editor.dev/example-vite",
       "version": "0.0.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@fontsource-variable/geist": "^5.3.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
@@ -122,7 +122,7 @@
       "name": "@pptx-editor.dev/example-vue",
       "version": "0.0.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.33.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@fontsource-variable/geist": "^5.3.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
@@ -139,7 +139,7 @@
       "name": "@pptx-editor.dev/core",
       "version": "0.5.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@pptx-editor.dev/i18n": "^0.5.0",
         "bidi-js": "1.1.0",
         "emf-converter": "4.28.0",
@@ -183,19 +183,19 @@
       "name": "@pptx-editor.dev/pptx-to-pdf",
       "version": "0.5.0",
       "dependencies": {
-        "@docx-editor.dev/fonts": "^2.34.0",
+        "@docx-editor.dev/fonts": "^2.38.0",
         "@pptx-editor.dev/pro": "~0.5.0",
         "fontkit": "2.0.4",
         "pdf-lib": "1.17.1",
       },
       "devDependencies": {
-        "@docx-editor.dev/fonts-cjk": "^2.34.0",
+        "@docx-editor.dev/fonts-cjk": "^2.38.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/pro": "workspace:*",
         "pdfjs-dist": "6.5.438",
       },
       "peerDependencies": {
-        "@docx-editor.dev/fonts-cjk": "^2.34.0",
+        "@docx-editor.dev/fonts-cjk": "^2.38.0",
         "@napi-rs/canvas": "^1.0.9",
         "@pptx-editor.dev/core": "~0.5.0",
       },
@@ -312,9 +312,9 @@
 
     "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
-    "@docx-editor.dev/fonts": ["@docx-editor.dev/fonts@2.34.0", "", {}, "sha512-O4ubqfeX0W/EHAHgHq4TTQ9ykJDYX8B87dMVbgPqLS8bhZUSnLAFJkYAD2DXCkh/pRPFnqeqhy+NEPjnsxkgtg=="],
+    "@docx-editor.dev/fonts": ["@docx-editor.dev/fonts@2.38.0", "", {}, "sha512-5GARHM72ednV8XLPsRLMAt9GTP/sZ1uMwaMYm9RxKQvfaj/uAUf1CMGLQ+Sp5xobPnZNNi2nXHejehC/sBVlhw=="],
 
-    "@docx-editor.dev/fonts-cjk": ["@docx-editor.dev/fonts-cjk@2.34.0", "", {}, "sha512-JxBD/ylC8lCr9nAPEgNfUuwwV3l5RbcjA9YGLue+vhK0sxw2uMzrx/RjX+ypoSnJDazFNhDUBY/q/O0HsnIObQ=="],
+    "@docx-editor.dev/fonts-cjk": ["@docx-editor.dev/fonts-cjk@2.38.0", "", {}, "sha512-8UB6+3LisIk1VzkiF61VgmIzCXFMO7m2ABmtlIlyi2ZPhfIimwrjqQflf0Q3RPDqydaEkCfxL2KG6w4gUfp0Tw=="],
 
     "@eigenpal/ooxml-core": ["@eigenpal/ooxml-core@workspace:packages/ooxml-core"],
 

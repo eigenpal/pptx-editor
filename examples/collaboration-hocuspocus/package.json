@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@docx-editor.dev/fonts": "^2.34.0",
+    "@docx-editor.dev/fonts": "^2.38.0",
     "@hocuspocus/provider": "^4.8.0",
     "@pptx-editor.dev/core": "workspace:*",
     "@pptx-editor.dev/i18n": "workspace:*",
