@@ -94,12 +94,13 @@ export interface FontResolutionRequest {
    * fallback font, gets the faces of the whole deck. Every family in `families` has a face
    * here, and every family has its regular face, so a resolver can load only these faces.
    *
-   * The editor reads the faces from the text properties and asks once for each deck. It does
-   * not ask again when an edit makes text use another face, such as bold. A resolver that loads
-   * only these faces then leaves that face to the faces it has; one that loads the other faces
-   * of each family in the background covers it.
+   * The editor in a browser reads the faces from the text properties and asks once for each
+   * deck. It does not ask again when an edit or a slide that opens later uses another face,
+   * such as bold. A resolver that loads only these faces then leaves that face to the faces it
+   * has; one that loads the other faces of each family in the background covers it.
    *
-   * Absent when the editor asks for picked families. Load every face of each family then.
+   * Absent for a PDF export, an editor without a page (a server or a test), picked families,
+   * and families of slides that open later. Load every face of each family then.
    */
   readonly faces?: readonly FontFaceRequest[];
   /**

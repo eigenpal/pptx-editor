@@ -8,7 +8,9 @@ const { buildPptx, para, run, shape } = await import('../../../../../scripts/fix
 const { createPptxEditor, defineFontResolver } = await import('../index.ts');
 const { openPresentation } = await import('../document-session.ts');
 const { partStyles } = await import('../face-styles.ts');
-const { parseXmlPart } = await import('../../store/index.ts');
+const { parseXmlPart, readPptx } = await import('../../store/index.ts');
+const { deckDefaultFamily, deckFontFaces, deckFontFamilies } =
+  await import('../deck-font-request.ts');
 
 afterEach(resetGate);
 
@@ -25,21 +27,42 @@ function deck(theme: string, slides: readonly string[]): Uint8Array {
   });
 }
 
+// First in the file: the session caches each face for the page, so no earlier test loads these.
+test('an editor shows a one-family deck before the faces its text does not use arrive', async () => {
+  // The editor's own open path: it stops waiting for shaping at once (`open-steps.ts`).
+  hold('Times New Roman 700 normal');
+  const editor = createPptxEditor();
+  expect((await editor.load(deck('Times New Roman', [run('Plain'), run('Plain')]))).ok).toBe(true);
+  const session = editor.session!;
+  // Shaping ends with the regular faces, while the bold face is still on the way.
+  const shaped = await Promise.race([
+    session.shaping ?? Promise.resolve(true),
+    new Promise<'late'>((r) => setTimeout(() => r('late'), 5000)),
+  ]);
+  expect(shaped).toBe(true);
+  await waitFor(() => !editor.fontMeasurement().resolving);
+  expect(editor.fontMeasurement().measurer).toBe('shaped');
+  const generation = session.fontGeneration;
+  release('Times New Roman 700 normal');
+  await waitFor(() => session.fontGeneration > generation);
+  expect(
+    session.measurer.resolve({ family: 'Times New Roman', bold: true, italic: false })
+  ).toMatchObject({ bold: true });
+  editor.destroy();
+}, 20_000);
+
 test('bold text on the opening slide loads its bold face before the open, and italic after', async () => {
   const bytes = deck('Courier New', [run('Title', 'b="1"'), run('Aside', 'i="1"')]);
   const opened = await openPresentation(bytes, { shapingWaitMs: 5000, firstSlideFonts: 0 });
   if (!opened.ok) throw new Error('open failed');
-  // The master's bullet font (`a:buFont`) names Arial, so the slide uses its faces too.
-  const opening = requestedFaces.slice(0, 4).sort();
-  expect(opening).toEqual([
-    'Arial 400 normal',
-    'Arial 700 normal',
+  // Courier New's faces load in order: those of the opening slide, then the others.
+  const courier = () => requestedFaces.filter((f) => f.startsWith('Courier New'));
+  expect(courier().slice(0, 2).sort()).toEqual([
     'Courier New 400 normal',
     'Courier New 700 normal',
   ]);
   expect(await opened.session.restSubstitutes).toBe(true);
-  expect(requestedFaces.indexOf('Courier New 400 italic')).toBeGreaterThan(3);
-  expect(requestedFaces.indexOf('Courier New 700 italic')).toBeGreaterThan(3);
+  expect(courier().slice(2).sort()).toEqual(['Courier New 400 italic', 'Courier New 700 italic']);
   opened.session.dispose();
 });
 
@@ -75,20 +98,15 @@ test('the other faces of the families a slide has install late without holding t
   session.dispose();
 });
 
-test('a host origin hears the faces that the slides naming each family ask for', async () => {
+test('the faces of each family are those of the slides that name it', async () => {
   const bytes = deck('Cambria', [
     run('Bold', 'b="1"', '<a:latin typeface="Roboto"/>'),
     run('Plain', '', '<a:latin typeface="Lato"/>'),
   ]);
-  const heard: { family: string; weight: number; style: string }[][] = [];
-  const editor = createPptxEditor({
-    fonts: defineFontResolver((request) => {
-      heard.push([...(request.faces ?? [])]);
-      return undefined;
-    }),
-  });
-  expect((await editor.load(bytes)).ok).toBe(true);
-  const faces = heard[0]!;
+  const read = readPptx(bytes);
+  if (!read.ok) throw new Error('read failed');
+  const families = deckFontFamilies(read.pkg);
+  const faces = deckFontFaces(read.pkg, families, deckDefaultFamily(read.pkg));
   const of = (family: string) =>
     faces
       .filter((f) => f.family === family)
@@ -98,6 +116,20 @@ test('a host origin hears the faces that the slides naming each family ask for',
   expect(of('Lato')).toEqual(['400 normal']);
   // The theme font is the default family: it gets the faces of the whole deck.
   expect(of('Cambria')).toEqual(['400 normal', '700 normal']);
+  // Every requested family has its regular face, so an origin that loads only these skips none.
+  for (const family of families) expect(of(family)).toContain('400 normal');
+});
+
+test('without a page, a host origin hears no faces and loads every face', async () => {
+  const heard: unknown[] = [];
+  const editor = createPptxEditor({
+    fonts: defineFontResolver((request) => {
+      heard.push(request.faces);
+      return undefined;
+    }),
+  });
+  expect((await editor.load(deck('Cambria', [run('Bold', 'b="1"')]))).ok).toBe(true);
+  expect(heard).toEqual([undefined]);
   editor.destroy();
 });
 

@@ -46,7 +46,7 @@ import { OpBatch } from '../automation/commands/op-batch.ts';
 import { createPackagedFileFetch } from './packaged-file-fetch.ts';
 import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
-import { carryFits } from '../automation/commands/table-fit.ts';
+import { carryFits, fittedWith } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
 import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
 import type { PicturesWait, PictureStatus } from './metafile-pictures.ts';
@@ -571,7 +571,8 @@ export class DocumentSession {
   /**
    * Load the packaged substitutes that slides parsed after the open need: a progressive open
    * chose them from the parts it had parsed, and a slide parsed later can name another family.
-   * Re-measures only when a family was added. Resolves true when it was. @internal
+   * It also loads the faces that the open left for later. Re-measures only when a face was
+   * added. Resolves true when one was. @internal
    */
   addMissingSubstitutes(): Promise<boolean> {
     // One load at a time: two at once (the opening lane and late shaping) chose the same
@@ -940,10 +941,10 @@ export async function openPresentation(
           return true;
         };
         const fitted = more.then(refit, () => refit());
-        // An open that left families for later paints with the opening slide's faces now; the
-        // rest install on arrival. Otherwise the fit waits for the other faces of its families,
-        // so the saved fit is the one their shaped text needs.
-        return addsFamilies ? true : fitted;
+        // The deck paints with the opening slide's faces now, and the rest install on arrival.
+        // Text that an edit fitted before shaping started waits for the other faces of its
+        // families, so the fit it saves is the one their shaped text needs.
+        return addsFamilies || fittedWith(fixed).size === 0 ? true : fitted;
       });
   return { ok: true, session };
 }

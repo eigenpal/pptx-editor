@@ -27,7 +27,7 @@ import {
   type FontOrigin,
 } from '../layout/font-resolver.ts';
 import type { FontSource as MeasuredFace } from '../layout/index.ts';
-import { deckDefaultFamily, deckFontRequest } from './deck-font-request.ts';
+import { deckDefaultFamily, deckFontFaces, deckFontRequest } from './deck-font-request.ts';
 import {
   HOST_SUBSTITUTE_ORIGIN,
   type DocumentSession,
@@ -404,6 +404,17 @@ export function createHostFonts(
     };
   };
 
+  /**
+   * The deck's request, with the faces its text uses when a page shows it. There the shipped
+   * resolvers load those faces first and the others when the page is idle. Without a page they
+   * load only the faces asked for, and the editor does not ask again, so it names none.
+   */
+  const deckRequest = (pkg: DocumentSession['store']['package'], signal: AbortSignal) => {
+    const request = deckFontRequest(pkg, signal);
+    if (typeof document === 'undefined') return request;
+    return { ...request, faces: deckFontFaces(pkg, request.families, request.defaultFamily) };
+  };
+
   /** Compose the origins for the session; undefined when the resolution was cancelled. */
   const compose = async (
     session: DocumentSession,
@@ -414,7 +425,7 @@ export function createHostFonts(
     try {
       const answer = await composeFontOrigins(
         list,
-        { ...deckFontRequest(session.store.package, signal), ...engineFaces(session) },
+        { ...deckRequest(session.store.package, signal), ...engineFaces(session) },
         {
           onOriginFailure: (failure) => {
             if (!isAbort(signal)) report(failure.cause);
@@ -586,9 +597,13 @@ export function createHostFonts(
       // families count in `resolving`, so the substitution notice waits for them. The other
       // faces of families the deck has do not: those families already report their substitute.
       const rest = session.restSubstitutes;
+      const work = session.shaping;
+      let shaped = !work;
+      // When shaping ends after these faces arrive, its own installation registers them.
       if (rest && !session.restAddsFamilies)
         void rest.then((added) => {
-          if (added && !destroyed && host.session() === session) void host.installed(session);
+          if (added && shaped && !destroyed && host.session() === session)
+            void host.installed(session);
         });
       else if (rest) {
         const token = track(
@@ -603,10 +618,10 @@ export function createHostFonts(
         );
         shapingWaits.add(token);
       }
-      const work = session.shaping;
       if (!work) return;
       shapingWaits.add(track(work, () => false));
       void work.then((ok) => {
+        shaped = true;
         if (destroyed || host.session() !== session) return;
         if (ok) void host.installed(session);
         else report(session.shapingError);

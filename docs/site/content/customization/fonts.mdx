@@ -55,7 +55,7 @@ const fonts = useFonts(packagedFonts(), googleFonts({ cjk: true }));
 | --- | --- |
 | `'progressive'` (default) | The text switches to its own fonts when the faces it uses arrive, and the other faces load in the background. |
 | `'eager'` | The text switches to its own fonts when every face of its families arrives. |
-| `'lazy'` | Only the faces the text uses load. A face that an edit uses later, such as bold, does not load. |
+| `'lazy'` | Only the faces the text uses when the deck opens load. A face that text uses later, such as bold from an edit, does not load. |
 
 ```ts
 const fonts = useFonts(packagedFonts({ loading: 'eager' }), googleFonts());
@@ -207,7 +207,7 @@ Earlier sources win for the same family, weight, and style. A supplied face wins
 
 A `FontResolver` receives `families`, `defaultFamily`, and optional `signal`, `faces`, and `resolvedFaces`. It returns a configuration, a fragment, or `undefined`. Map family names to URLs through your own lookup, and pass `signal` to your fetch calls so cancellation stops network work.
 
-`families` contains up to 64 requested names, including theme fonts, explicit typefaces, and script fallbacks. `defaultFamily` is the theme's minor Latin font. `faces` lists the weight and style of each family that the deck's text asks for, so a resolver can load those faces first. Every family in `families` has its regular face in `faces`.
+`families` contains up to 64 requested names, including theme fonts, explicit typefaces, and script fallbacks. `defaultFamily` is the theme's minor Latin font. In a browser, `faces` lists the weight and style of each family that the deck's text asks for, so a resolver can load those faces first. Every family in `families` has its regular face in `faces`. A PDF export and an editor without a page send no `faces`, so a resolver loads every face.
 
 ### Render Chinese, Japanese, and Korean text
 

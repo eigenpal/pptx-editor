@@ -221,14 +221,14 @@ export function deckFontFaces(
   return out;
 }
 
-/** The request a deck makes of the host's font origins. */
+/**
+ * The request a deck makes of the host's font origins. It names no faces, so an origin loads
+ * every face of each family: a PDF export needs them all. The editor in a browser adds `faces`.
+ */
 export function deckFontRequest(pkg: PptxPackage, signal?: AbortSignal): FontResolutionRequest {
-  const families = deckFontFamilies(pkg);
-  const defaultFamily = deckDefaultFamily(pkg);
   return {
-    families,
-    defaultFamily,
-    faces: deckFontFaces(pkg, families, defaultFamily),
+    families: deckFontFamilies(pkg),
+    defaultFamily: deckDefaultFamily(pkg),
     ...(signal ? { signal } : {}),
   };
 }
