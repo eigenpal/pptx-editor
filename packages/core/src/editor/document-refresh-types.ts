@@ -11,7 +11,10 @@ export interface AnchorHighlightAnimation {
   readonly durationMs?: number;
   /** Exit fade, in milliseconds: 0 through 10000. Default: `durationMs`. */
   readonly exitDurationMs?: number;
-  /** A CSS easing function. CSS variables are refused. Default: `--doc-motion-ease-out`. */
+  /**
+   * A CSS easing function for the entrance and the exit. CSS variables are refused. Default:
+   * `--doc-motion-ease-out` for the entrance and `--doc-motion-ease-in-out` for the exit.
+   */
   readonly easing?: string;
 }
 

@@ -50,6 +50,7 @@ import {
   preparseReturned,
   prediffReturned,
   reloadInPlace,
+  replacedWholeParts,
   whileReplacing,
 } from './document-replace.ts';
 import { expectLoad, forgetLoad } from './change-source.ts';
@@ -385,6 +386,8 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     const inPlace = reloadInPlace(editor, bytes, source);
     if (inPlace !== 'load')
       return inPlace.ok ? 'ok' : inPlace.code === 'invalidDocument' ? 'invalid' : 'failed';
+    // A load parses every part again: no node id of a held flash is sure to name its shape.
+    highlights.forgetNodes(null);
     expectLoad(editor, source);
     const startSlide = followedSlide(editor, bytes);
     const loaded = await editor.load(bytes, { startSlide, quiet: true });
@@ -544,6 +547,10 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
             await nextTask();
             if ((stop = unchanged())) return stop;
           }
+          // A part replaced whole gets new node ids, which can name other shapes: when the
+          // commit changes the document, its canvas targets go until the result names the new
+          // places.
+          highlights.forgetNodes(replacedWholeParts(editor, bytes));
           // Step 3: commit and paint.
           let done: { pkg: PptxPackage; at: DocumentHandle };
           if (mine.mode === 'edit') {

@@ -136,6 +136,26 @@ export function prediffReturned(editor: PptxEditorInstance, bytes: Uint8Array): 
   known.diff = { base, result: diffPackages(base, known.pkg) };
 }
 
+/**
+ * The parts that the commit of `bytes` replaces whole (taken with `prediffReturned`): their new
+ * node ids can name other nodes. Null when no difference from the open package is known.
+ * @internal
+ */
+export function replacedWholeParts(
+  editor: PptxEditorInstance,
+  bytes: Uint8Array
+): ReadonlySet<string> | null {
+  const diff = steps.get(bytes)?.diff;
+  if (!diff || diff.base !== editor.session?.store.package || !diff.result.ok) return null;
+  const removed = new Set<string>();
+  const out = new Set<string>();
+  for (const op of diff.result.ops) {
+    if (op.op === 'removePart') removed.add(op.part);
+    else if (op.op === 'addPart' && removed.has(op.part)) out.add(op.part);
+  }
+  return out;
+}
+
 /** Forget the steps of `bytes`. @internal */
 export function forgetReturned(bytes: Uint8Array): void {
   steps.delete(bytes);

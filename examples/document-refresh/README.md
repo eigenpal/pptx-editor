@@ -33,10 +33,10 @@ Open `http://localhost:5279/agent.html`. A scripted agent edits the presentation
 
 1. Select **Next step** to run one step, or **Play all** to run every step with a pause between them.
 2. Watch the flash. The changed thumbnails flash, and the editor goes to each change.
-3. Select **Undo step** to take back the last step. This works in **Undoable edit** mode.
+3. Select **Undo step** to take back the last step. This works only for a step applied in **Undoable edit** mode, with no edits of yours after it.
 4. Select **Restart** to return to the first file through the same refresh, with no loading screen.
 
-Each step returns the complete PPTX file. The page passes no `changes`, so `reviewModule()` compares the files and lists what changed. The steps are in `agent-script.ts`.
+Each step returns the complete PPTX file. The page passes no `changes`, so `reviewModule()` compares the files and lists what changed. The steps are in `agent-script.ts`, and the controls are in `src/agent-panel.tsx`.
 
 ## How it works
 

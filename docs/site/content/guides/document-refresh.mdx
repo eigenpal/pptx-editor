@@ -513,14 +513,14 @@ This simulation shows highlights, navigation, and refusals with a sample present
 A highlight flashes each change on these surfaces:
 
 - **Thumbnails**: the slide rail and slide sorter thumbnails of every slide with a change.
-- **Canvas**: on the current slide, a ring around a changed shape or slide, and a band behind a changed text range.
+- **Canvas**: on the current slide, a ring around a changed shape or slide, and a band over a changed text range. The band is drawn at reduced opacity, so the text stays readable.
 - **Notes**: a ring around the notes pane when the current slide's notes changed.
 
 Other notes about change presentation:
 
 - `isNew` marks new IDs, changed text, and changed descriptions within one submission.
 - Locations stay valid until the next accepted result or local edit.
-- Highlights that show when the next result arrives stay on screen. During the replacement, they follow their slides and shapes to the new positions. A highlight request after the result starts the places that show already without the entrance. Only new places run the entrance.
+- Highlights that show when the next result arrives stay on screen. During the replacement, they follow their slides and shapes to the new positions. A highlight request after the result starts the places that show already without the entrance. Only new places run the entrance. This also applies while highlights fade out: a place that fades out returns to full opacity from its opacity on screen.
 - Highlights change presentation only. They add no saved bytes and no undo entries.
 - Changed thumbnails get the accessible description **Changed**. Keep a text change list beside the presentation, because color alone does not explain a change.
 
@@ -542,14 +542,14 @@ Other notes about change presentation:
 | `opacity` | `0.14` | Fill opacity between 0 and 1. |
 | `className` | Omitted | CSS classes for shadows, outlines, or patterns. |
 | `timeoutMs` | `3000` | Milliseconds before dismissal, or `null` to keep the highlight until you clear it. |
-| `animation` | `true` | `false` changes at once. An object sets `durationMs` (default 180), `exitDurationMs` (default `durationMs`), and `easing`. |
+| `animation` | `true` | `false` changes at once. An object sets `durationMs` (default 180), `exitDurationMs` (default `durationMs`), and `easing` (default `--doc-motion-ease-out` for the entrance and `--doc-motion-ease-in-out` for the exit). |
 
 Each call starts from the defaults, so reuse one options object. Repeated calls reset the timeout without replaying the entrance. To replay it, call `clearHighlights({ animation: false })` first.
 
 - `highlightChanges()` validates options even when change locations are stale or unavailable. Invalid values throw `RangeError` or `TypeError`.
 - Expiration removes the styling. Change metadata and navigation stay available.
 - Without overrides, `clearHighlights()` uses the last requested exit duration and easing. `snapshot().highlightsVisible` becomes `false` when dismissal starts, before the exit animation ends.
-- To restyle highlights for your theme, set `--doc-refresh-highlight-color`. See [Appearance](/docs/customization/appearance).
+- To restyle highlights for your theme, set `--doc-refresh-highlight-color`. To change the default curves, set `--doc-motion-ease-out` and `--doc-motion-ease-in-out`. See [Appearance](/docs/customization/appearance).
 
 ### Control change navigation
 

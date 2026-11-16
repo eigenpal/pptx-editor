@@ -267,14 +267,14 @@ An accepted update never blinks, flashes, or stalls the page. This applies to bo
 3. **Fonts before the swap.** When the returned file names fonts that the current slide needs, the editor waits for those faces before the swap, within the font loading budget. Text does not appear in a fallback font and then change.
 4. **Unchanged thumbnails stay.** A thumbnail whose slide, layout, master, theme, and media parts have equal bytes keeps its paint. A changed thumbnail paints off the page, then replaces the old paint. A refresh never empties a painted thumbnail container. `thumbnail-queue.ts` empties a container that showed another slide; matched slides are the same slide for this rule.
 5. **Stable rail items.** Rail and sorter items take their keys from the slide match (`p14:creationId`, then `p:sldId/@id`), so React and Vue do not mount matched items again. Added slides insert, and removed slides leave, without a layout animation. The rail keeps its scroll position. If the current slide's item moves, the rail scrolls only as far as needed to keep it in view.
-6. **View state stays.** The zoom, the canvas scroll, the current slide, the notes pane scroll, and open panes stay. In edit mode, the selection stays where it maps.
+6. **View state stays.** The zoom, the canvas scroll, the current slide, the notes pane scroll, and open panes stay. The current slide follows its slide part, also to a new index. In both modes, the selection stays when the nodes it names stay; else it clears.
 7. **No long tasks.** Parsing, comparison, layout, and paint run in steps that yield to the page. No step of a refresh takes more than 50 milliseconds, the long task threshold, on the benchmark decks. Input stays responsive during a refresh.
 8. **Current slide first.** Before `applyUpdate()` resolves, the editor paints the current slide and the thumbnails in view. Other thumbnails paint in view or when the page is idle, as `thumbnail-queue.ts` already does.
 
 ### Modes
 
 - **Edit mode** is incremental. The store commits one transaction. The cascade re-resolves only the elements whose keys changed (`resolve-keys.ts`), and only changed slides paint again. It is the recommended mode for agent workflows.
-- **Reload mode** opens the returned file into a second document session off the page. It reuses the paint of parts with equal bytes, applies rules 1 through 8, and then replaces the session in one frame. It resets selection and undo history, and keeps the current slide index (clamped) and the zoom. It refuses with `collaboration` while a collaboration session is attached.
+- **Reload mode** applies the difference to the open session in place, as one commit with no undo step, and gives the document a new load id. Parts with equal bytes keep their paint, and rules 1 through 8 apply. It resets the undo history. The current slide follows its slide part, and the selection stays when the nodes it names stay. A removed current slide leaves the index clamped. When the difference cannot apply as an edit, or embedded fonts change, the editor opens the file with a quiet load that shows no loading screen. It refuses with `collaboration` while a collaboration session is attached.
 
 ### Failure
 
@@ -304,6 +304,7 @@ A flash uses the DOCX Editor highlight timing: a 180-millisecond fade in, a hold
 - A thumbnail that scrolls into view during the hold shows the flash for the remaining time. It does not start again.
 - The user can go to another slide during the hold. The canvas then shows the flash for that slide's changes, if it has any.
 - Reduced motion caps the fades at 125 milliseconds, as in DOCX Editor. The ring and marker still show.
+- A highlight request during the fade out keeps the places that show: they return to shown from the opacity on screen, and only new places enter. The exit options of `clearHighlights()` set both the fade and the removal time.
 - The flash runs in CSS on the overlay layer and on the thumbnail container, not in the slide paint. It never paints a slide or a thumbnail again. The canvas rings and bands reuse the overlay of `comment-highlights.ts`.
 
 ### Options

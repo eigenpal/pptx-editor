@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { samplePptx, sampleUpdate } from './sample-presentation.ts';
-import { AGENT_STEPS, agentPptx } from './agent-script.ts';
+import { agentPptx, agentStepParam } from './agent-script.ts';
 
 const pkg = (p: string): string => fileURLToPath(new URL(`../../packages/${p}`, import.meta.url));
 
@@ -24,8 +24,8 @@ export default defineConfig({
           const url = new URL(req.url ?? '/', 'http://localhost');
           // The replay page: the presentation after `step` steps of the scripted agent.
           if (url.pathname === '/api/agent' && req.method === 'GET') {
-            const step = Number(url.searchParams.get('step'));
-            if (!Number.isSafeInteger(step) || step < 0 || step > AGENT_STEPS.length) {
+            const step = agentStepParam(url.searchParams.get('step'));
+            if (step === null) {
               res.statusCode = 400;
               res.end('Invalid step');
               return;

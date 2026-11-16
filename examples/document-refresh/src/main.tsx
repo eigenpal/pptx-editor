@@ -24,6 +24,7 @@ import {
 import { download } from '../../shared/demo-files.ts';
 import { receiveSampleUpdates, runRefreshJob } from './refresh-job.ts';
 import { TEXT as t } from './text.ts';
+import { useNarrow } from './narrow.ts';
 import './styles.css';
 
 // Without `changes`, the review module computes them (EigenPal Pro License). Evaluation use
@@ -152,56 +153,65 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
   const failures = state.result?.ok ? state.result.failures : [];
   return (
     <aside className="refresh-controls" aria-labelledby="refresh-title">
-      <h1 id="refresh-title">{t.title}</h1>
-      <p>{t.description}</p>
-      <p>{t.limitations}</p>
-      <fieldset disabled={busy}>
-        <legend>{t.modeLabel}</legend>
-        {(['reload', 'edit'] as const).map((value) => (
-          <label key={value}>
-            <input
-              type="radio"
-              name="refresh-mode"
-              value={value}
-              checked={mode === value}
-              onChange={() => setMode(value)}
-            />
-            {value === 'reload' ? t.modeReload : t.modeEdit}
-          </label>
-        ))}
-      </fieldset>
-      <label>
-        <input
-          type="checkbox"
-          checked={computeChanges}
-          disabled={busy}
-          onChange={(event) => setComputeChanges(event.target.checked)}
-        />
-        {t.computeChanges}
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={goToChange}
-          disabled={busy}
-          onChange={(event) => setGoToChange(event.target.checked)}
-        />
-        {t.goToChange}
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={includeLateResult}
-          disabled={busy}
-          onChange={(event) => setIncludeLateResult(event.target.checked)}
-        />
-        {t.lateResult}
-      </label>
+      <div className="refresh-intro">
+        <h1 id="refresh-title">{t.title}</h1>
+        <p>{t.description}</p>
+        <p>{t.limitations}</p>
+      </div>
+      <div className="refresh-settings">
+        <fieldset disabled={busy}>
+          <legend>{t.modeLabel}</legend>
+          {(['reload', 'edit'] as const).map((value) => (
+            <label key={value}>
+              <input
+                type="radio"
+                name="refresh-mode"
+                value={value}
+                checked={mode === value}
+                onChange={() => setMode(value)}
+              />
+              {value === 'reload' ? t.modeReload : t.modeEdit}
+            </label>
+          ))}
+        </fieldset>
+        <label>
+          <input
+            type="checkbox"
+            checked={computeChanges}
+            disabled={busy}
+            onChange={(event) => setComputeChanges(event.target.checked)}
+          />
+          {t.computeChanges}
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={goToChange}
+            disabled={busy}
+            onChange={(event) => setGoToChange(event.target.checked)}
+          />
+          {t.goToChange}
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={includeLateResult}
+            disabled={busy}
+            onChange={(event) => setIncludeLateResult(event.target.checked)}
+          />
+          {t.lateResult}
+        </label>
+      </div>
       <div className="refresh-actions">
         {/* `aria-disabled` keeps these buttons focusable, so focus does not fall to the page
             when a job starts or ends. The handlers ignore a press while they are disabled. The
             labels stay the same, so the buttons do not move; the status line shows the job. */}
-        <button type="button" aria-disabled={busy || sampleEdited} onClick={() => void update()}>
+        <button
+          type="button"
+          className="refresh-primary"
+          aria-disabled={busy || sampleEdited}
+          onClick={() => void update()}
+        >
           {t.start}
         </button>
         <button type="button" aria-disabled={!busy} onClick={cancel}>
@@ -243,7 +253,11 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
                 <span className="refresh-change-text">{describe(change)}</span>
                 <span className="refresh-badges">
                   <span className="refresh-badge">{t.changeStatus[change.status]}</span>
-                  {change.isNew && <span className="refresh-badge">{t.newChange}</span>}
+                  {change.isNew && (
+                    <span className="refresh-badge" data-new="">
+                      {t.newChange}
+                    </span>
+                  )}
                   {change.computed && <span className="refresh-badge">{t.computed}</span>}
                   {change.diagnostic && change.diagnostic.code !== change.status && (
                     <code>{change.diagnostic.code}</code>
@@ -298,6 +312,7 @@ function App() {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [error, setError] = useState('');
   const fonts = useFonts(packagedFonts());
+  const narrow = useNarrow();
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
@@ -328,14 +343,14 @@ function App() {
       <PptxEditor.Viewport className="refresh-app">
         <PptxEditor.Toolbar />
         <div className="refresh-workspace">
-          <PptxEditor.SlideRail />
+          <PptxEditor.SlideRail orientation={narrow ? 'horizontal' : 'vertical'} />
           <main className="refresh-docpane">
             <div className="refresh-canvas">
               <PptxEditor.Content />
               <PptxEditor.Loading overlay />
               <PptxEditor.FontNotice />
             </div>
-            <PptxEditor.NotesPane />
+            <PptxEditor.NotesPane defaultOpen={!narrow} />
             <PptxEditor.EditNotice />
             <PptxEditor.OpenFailure />
           </main>

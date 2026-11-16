@@ -97,3 +97,13 @@ export function agentPptx(step: number): Uint8Array {
     : [title, revenue, roadmap, ...(done(4) ? [risks] : []), team];
   return buildPptx({ slides });
 }
+
+/**
+ * The step of an `/api/agent?step=` request: digits only, 0 through the last step. Null for
+ * anything else: `Number()` also reads '', '1e0', and ' 1' as numbers.
+ */
+export function agentStepParam(raw: string | null): number | null {
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  const step = Number(raw);
+  return step <= AGENT_STEPS.length ? step : null;
+}

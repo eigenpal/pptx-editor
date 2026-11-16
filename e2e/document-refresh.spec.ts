@@ -708,6 +708,51 @@ for (const adapter of [{ name: 'react' }, { name: 'vue' }] as const) {
       expect(await page.evaluate(() => window.__refresh.snapshot().highlightsVisible)).toBe(false);
     });
 
+    test('flash: exit options time the fade; a flash during the exit never drops', async ({
+      page,
+    }) => {
+      await openDeck(page, base(), refreshDeck(8));
+      await page.evaluate(() => window.__pptxEditor.goToSlide(1));
+      expect((await recordApply(page, refreshDeck(8, { text: [1] }), 'edit', [])).ok).toBe(true);
+      await startFlash(page, { timeoutMs: 60_000 });
+      await page.waitForTimeout(300);
+      // The exit options of clearHighlights() reach the fade, not only the removal timer. A new
+      // flash during the exit turns back from the opacity on screen, with no entrance.
+      const out = await page.evaluate(async () => {
+        const refresh = window.__refresh;
+        const layer = () => document.querySelector<SVGSVGElement>('.pptx-surface__refresh');
+        const opacity = () => Number(getComputedStyle(layer()!).opacity);
+        const frame = () => new Promise((r) => requestAnimationFrame(r));
+        let t0 = performance.now();
+        refresh.clearHighlights({ animation: { exitDurationMs: 600, easing: 'linear' } });
+        const transition = getComputedStyle(layer()!).transitionDuration;
+        let mid = -1;
+        setTimeout(() => (mid = opacity()), 300);
+        while (layer()) await frame();
+        const removed = performance.now() - t0;
+        refresh.highlightChanges({ timeoutMs: 60_000 });
+        await new Promise((r) => setTimeout(r, 300));
+        refresh.clearHighlights({ animation: { exitDurationMs: 400 } });
+        await new Promise((r) => setTimeout(r, 120));
+        const before = opacity();
+        const count = refresh.highlightChanges({ timeoutMs: 60_000 });
+        const phases = new Set<string | null>();
+        let min = 1;
+        for (t0 = performance.now(); performance.now() - t0 < 500; await frame()) {
+          phases.add(layer()?.getAttribute('data-refresh-highlight') ?? null);
+          min = Math.min(min, layer() ? opacity() : 0);
+        }
+        const after = opacity();
+        return { transition, mid, removed, count, before, min, after, phases: [...phases] };
+      });
+      expect(out).toMatchObject({ transition: '0.6s', count: 1, phases: ['shown'], after: 1 });
+      expect(out.removed).toBeGreaterThanOrEqual(590);
+      expect(out.removed).toBeLessThan(900);
+      // A linear fade of 600 ms is near half at 300 ms; a 180 ms fade is gone by then.
+      expect(out.mid).toBeGreaterThan(0.3);
+      expect(out.min).toBeGreaterThanOrEqual(Math.max(0.2, out.before - 0.1));
+    });
+
     test('flash: a saved file never holds the flash', async ({ page }) => {
       await openDeck(page, base(), refreshDeck(6));
       await page.evaluate(() => window.__pptxEditor.goToSlide(2));

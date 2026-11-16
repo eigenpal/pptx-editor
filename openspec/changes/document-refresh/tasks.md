@@ -29,7 +29,7 @@
 - [x] Keep the old paint and return `load-failed` with `recovered: true` when the new file fails.
 - [x] Add a Playwright frame test for both modes and both adapters: no loading screen, no empty canvas, no emptied thumbnail, and no long task. `e2e/document-refresh.spec.ts` checks these on 20 slides, and long tasks on 100 slides, in React and Vue.
 - [x] Flash changed thumbnails in the rail and sorter, with the ring, wash, and "Changed" marker.
-- [x] Flash shape rings and text bands on the canvas, and bands in the notes pane, from one start time. Shape rings and text bands are done. The notes pane gets a ring, not a text band.
+- [x] Flash shape rings and text bands on the canvas, and the notes pane, from one start time. The notes pane gets a ring around the pane, not a text band.
 - [x] Add `RefreshHighlightOptions.surfaces` and the `pptx-refresh-*` classes. Apply reduced motion.
 - [x] Test that a thumbnail that scrolls into view during the hold shows the remaining flash only. `e2e/document-refresh.spec.ts` scrolls an offscreen rail item into view and opens the slide sorter during the hold.
 - [x] Implement `navigateToChange` with `block`, `behavior`, `offsetPx`, and `focus`.
@@ -40,7 +40,7 @@
 
 - [x] Verify whether one transaction can remove and add the same part name. Add a `replacePart` op if it cannot.
 - [x] Implement `replaceDocument` from the comparison, with part replacement as fallback.
-- [ ] Map the current slide, the shape selection, and the text caret after replacement. The current slide index stays. The selection clears; shape and caret mapping is not done.
+- [ ] Map the current slide, the shape selection, and the text caret after replacement. The current slide follows its slide part, also to a new index. The shape selection and the caret stay when their nodes stay, with the caret clamped into its text. Mapping the caret through changed text is not done: an edit before the caret does not move it.
 - [x] Connect `applyUpdate({ mode: 'edit' })` to `replaceDocument`.
 - [x] Test undo, redo, save equality with `load()`, unknown content, and refusals.
 
@@ -55,7 +55,7 @@
 
 - [x] Write `docs/site/content/guides/document-refresh.mdx` with the DOCX Editor page structure, `FrameworkTabs` samples, and a highlight simulation. Done without the highlight simulation component.
 - [x] Add `comparePresentations` to the Pro documentation.
-- [ ] Add `examples/document-refresh/`, as in DOCX Editor. Not done.
+- [x] Add `examples/document-refresh/`, as in DOCX Editor. It has the main page with both update modes and an agent replay page (`agent.html`) that applies seven scripted steps with computed changes, Undo step, and Restart.
 - [x] Add the `replaceDocument` section to `docs/site/content/guides/loading-and-saving.mdx`.
 - [x] Register the page in both `meta.json` files.
 - [x] Add a feature matrix row with evidence fixtures.

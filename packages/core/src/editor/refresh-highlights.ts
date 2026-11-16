@@ -16,14 +16,17 @@
 //
 // The flash is CSS on chrome the editor owns: it never paints a slide or a thumbnail again, and
 // it never reaches the slide paint, the thumbnails' images, the slide show, an export, or a
-// saved file. A fade is an opacity transition; reduced motion caps it at 125 milliseconds.
+// saved file. A fade is an opacity transition, and the thumbnail marker also grows into place;
+// reduced motion keeps only the fade and caps it at 125 milliseconds.
 //
 // A flash that shows when a new result arrives continues through it. The controller holds the
 // flash before the commit (`hold`): while the commit runs, the flash follows each slide by its
 // part and draws only nodes that the new layout has, so it never marks a moved or removed
 // place. After the commit, `adopt` moves it to the new places of the same shapes and slides.
 // A flash request that follows (`show`) starts the places that show already in the shown
-// state, and only new places run the entrance.
+// state, and only new places run the entrance. This applies also during the exit fade: a place
+// that fades out turns back to shown from the opacity on screen, with no drop. To replay the
+// entrance, call `clearHighlights({ animation: false })` first.
 
 import type { SlideLayout } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
@@ -43,6 +46,13 @@ import { translateOf } from './document-replace.ts';
 
 const MARK = 'data-refresh-highlight';
 const DEFAULT_COLOR = 'var(--doc-refresh-highlight-color)';
+/** The default easing: the flash shows at once, then settles. */
+const DEFAULT_EASING = 'var(--doc-motion-ease-out, ease-out)';
+/**
+ * The exit of the default easing: an ease-in-out, so the flash leaves over the whole exit.
+ * With the strong ease-out, the flash is almost gone after 50 milliseconds: it looks like a cut.
+ */
+const DEFAULT_EXIT_EASING = 'var(--doc-motion-ease-in-out, ease-in-out)';
 const SURFACES: readonly RefreshHighlightSurface[] = ['thumbnails', 'canvas', 'notes'];
 const REDUCED_MS = 125;
 const MAX_TIMEOUT = 2147483647;
@@ -61,6 +71,8 @@ interface Settings {
   readonly enterMs: number;
   readonly exitMs: number;
   readonly easing: string;
+  /** The easing of the exit: the default easing exits with an ease-in-out. */
+  readonly exitEasing: string;
   readonly timeoutMs: number | null;
   readonly surfaces: ReadonlySet<RefreshHighlightSurface>;
 }
@@ -83,6 +95,10 @@ const color = (name: string, v: unknown): string => {
     throw new TypeError(`${name} cannot load a URL.`);
   return value;
 };
+
+/** The exit easing of `easing`. */
+const exitEasingOf = (easing: string): string =>
+  easing === DEFAULT_EASING ? DEFAULT_EXIT_EASING : easing;
 
 /** The settings of `options`, or a thrown TypeError or RangeError. Each call starts from defaults. */
 export function refreshSettings(options: RefreshHighlightOptions | undefined): Settings {
@@ -118,7 +134,7 @@ export function refreshSettings(options: RefreshHighlightOptions | undefined): S
     anim === false ? 0 : finite('animation.exitDurationMs', anim.exitDurationMs ?? enter, 0, 10000);
   const easing =
     anim === false || anim.easing === undefined
-      ? 'var(--doc-motion-ease-out, ease-out)'
+      ? DEFAULT_EASING
       : text('animation.easing', anim.easing);
   if (anim !== false && anim.easing !== undefined && /var\s*\(/i.test(easing))
     throw new TypeError('animation.easing cannot use CSS variables.');
@@ -134,6 +150,7 @@ export function refreshSettings(options: RefreshHighlightOptions | undefined): S
     enterMs: enter,
     exitMs: exit,
     easing,
+    exitEasing: exitEasingOf(easing),
     timeoutMs:
       o.timeoutMs === null ? null : finite('timeoutMs', o.timeoutMs ?? 3000, 0, MAX_TIMEOUT),
     surfaces,
@@ -141,9 +158,12 @@ export function refreshSettings(options: RefreshHighlightOptions | undefined): S
 }
 
 /** Validate dismissal options. */
-function clearSettings(options: ClearRefreshHighlightsOptions | undefined, last: Settings | null) {
+function clearSettings(
+  options: ClearRefreshHighlightsOptions | undefined,
+  last: Settings | null
+): { exitMs: number; exitEasing: string } {
   const a = options?.animation;
-  if (a === false) return { exitMs: 0, easing: last?.easing ?? 'ease-out' };
+  if (a === false) return { exitMs: 0, exitEasing: last?.exitEasing ?? DEFAULT_EXIT_EASING };
   if (a !== undefined && a !== true && (typeof a !== 'object' || a === null))
     throw new TypeError('animation must be a boolean or an object.');
   const o = typeof a === 'object' ? a : {};
@@ -151,11 +171,12 @@ function clearSettings(options: ClearRefreshHighlightsOptions | undefined, last:
     o.exitDurationMs === undefined
       ? (last?.exitMs ?? 180)
       : finite('animation.exitDurationMs', o.exitDurationMs, 0, 10000);
-  const easing =
-    o.easing === undefined ? (last?.easing ?? 'ease-out') : text('animation.easing', o.easing);
-  if (o.easing !== undefined && /var\s*\(/i.test(easing))
+  if (o.easing === undefined)
+    return { exitMs, exitEasing: last?.exitEasing ?? DEFAULT_EXIT_EASING };
+  const exitEasing = text('animation.easing', o.easing);
+  if (/var\s*\(/i.test(exitEasing))
     throw new TypeError('animation.easing cannot use CSS variables.');
-  return { exitMs, easing };
+  return { exitMs, exitEasing };
 }
 
 function reducedMotion(win: Window | null | undefined): boolean {
@@ -204,6 +225,10 @@ export class RefreshHighlights {
   #holding = false;
   /** What showed before the current request, while its entrance runs. */
   #kept: Kept | null = null;
+  /** The parts whose canvas targets go at the next change of a hold (`forgetNodes`). */
+  #replaced: ReadonlySet<string> | null | undefined = undefined;
+  /** The package before that change: the targets go once the package differs. */
+  #replacedFrom: object | null = null;
 
   constructor(
     private readonly editor: PptxEditorInstance,
@@ -222,18 +247,22 @@ export class RefreshHighlights {
     const win = root?.ownerDocument.defaultView;
     const reduced = reducedMotion(win);
     const cap = (ms: number) => (reduced ? Math.min(ms, REDUCED_MS) : ms);
-    // Shown already: the timeout starts again, and the places that show do not enter again.
-    const before = this.visible ? this.#targets : null;
+    // Shown already, or fading out: the timeout starts again, and the places that show do not
+    // enter again. A place that fades out turns back to shown from the opacity on screen.
+    const before = this.#phase !== null ? this.#targets : null;
     this.#holding = false;
     this.#kept = before
       ? {
           keys: new Set(before.map(keyOf)),
           slides: new Set(before.map((t) => t.slideIndex)),
           notes: new Set(before.filter((t) => t.notes).map((t) => t.slideIndex)),
-          layer: !!this.#layer?.firstChild && this.#layer.getAttribute(MARK) !== 'exiting',
+          layer: !!this.#layer?.firstChild,
         }
       : null;
     this.#settings = { ...settings, enterMs: cap(settings.enterMs), exitMs: cap(settings.exitMs) };
+    // Marks that stay take the options of this request.
+    for (const el of this.#styled())
+      this.#style(el, this.#settings, this.#settings.borderWidth ?? 2);
     this.#targets = targets;
     this.#clearTimers();
     const kept = this.#kept;
@@ -264,11 +293,17 @@ export class RefreshHighlights {
 
   /** Fade the flash out, then remove it. */
   hide(options?: ClearRefreshHighlightsOptions): void {
-    const { exitMs, easing } = clearSettings(options, this.#settings);
+    const { exitMs: ms, exitEasing } = clearSettings(options, this.#settings);
     if (this.#phase === null) return;
     this.#clearTimers();
-    if (this.#settings) this.#settings = { ...this.#settings, exitMs, easing };
+    const root = surfaceRootOf(this.editor);
+    const exitMs = reducedMotion(root?.ownerDocument.defaultView) ? Math.min(ms, REDUCED_MS) : ms;
     if (exitMs === 0) return this.clear();
+    if (this.#settings) {
+      this.#settings = { ...this.#settings, exitMs, exitEasing };
+      // The fade reads the exit from the marked elements: it lasts as long as the removal waits.
+      for (const el of this.#styled()) this.#exitStyle(el, this.#settings);
+    }
     this.#phase = 'exiting';
     this.#applyPhase();
     this.#exitTimer = setTimeout(() => this.clear(), exitMs);
@@ -281,11 +316,25 @@ export class RefreshHighlights {
   hold(): void {
     if (!this.visible) return this.clear();
     this.#holding = true;
+    this.#replaced = undefined;
+  }
+
+  /**
+   * During a hold, drop the canvas targets of shapes in `parts`, or in every part for null, at
+   * the next document change: the commit replaces those parts whole, so their new node ids can
+   * name other shapes. The slide and notes targets stay. `adopt` takes the new places from the
+   * result. A commit that changes nothing drops nothing.
+   */
+  forgetNodes(parts: ReadonlySet<string> | null): void {
+    if (!this.#holding) return;
+    this.#replaced = parts;
+    this.#replacedFrom = this.editor.session?.store.package ?? null;
   }
 
   /** End a hold with no commit: the document did not change. */
   release(): void {
     this.#holding = false;
+    this.#replaced = undefined;
   }
 
   get holding(): boolean {
@@ -300,6 +349,7 @@ export class RefreshHighlights {
   adopt(targets: readonly RefreshTarget[]): boolean {
     if (!this.#holding) return this.visible;
     this.#holding = false;
+    this.#replaced = undefined;
     const held = new Set(this.#targets.map(placeOf));
     const next = targets.filter((t) => held.has(placeOf(t)));
     if (!this.visible || next.length === 0) {
@@ -321,7 +371,17 @@ export class RefreshHighlights {
       at.set(slide.partName, i);
       if (slide.notesPart) at.set(slide.notesPart, i);
     });
+    // Only a change of the package is the commit.
+    const replaced = pkg !== this.#replacedFrom ? this.#replaced : undefined;
+    if (replaced !== undefined) this.#replaced = undefined;
     this.#targets = this.#targets.flatMap((t) => {
+      if (
+        replaced !== undefined &&
+        t.nodeId &&
+        !t.notes &&
+        (replaced === null || replaced.has(t.part))
+      )
+        return [];
       const i = at.get(t.part);
       if (i === undefined) return [];
       return i === t.slideIndex ? [t] : [{ ...t, slideIndex: i }];
@@ -332,6 +392,7 @@ export class RefreshHighlights {
   clear(): void {
     this.#clearTimers();
     this.#holding = false;
+    this.#replaced = undefined;
     this.#kept = null;
     this.#phase = null;
     this.#targets = [];
@@ -353,6 +414,14 @@ export class RefreshHighlights {
 
   get visible(): boolean {
     return this.#phase !== null && this.#phase !== 'exiting';
+  }
+
+  /** The elements that hold the `--pptx-refresh-*` properties: marks and the canvas layer. */
+  #styled(): (Element & ElementCSSInlineStyle)[] {
+    const out = [...this.#marked].filter(
+      (el): el is HTMLElement => !el.classList.contains('pptx-refresh-item')
+    );
+    return this.#layer ? [...out, this.#layer] : out;
   }
 
   #clearTimers(): void {
@@ -401,9 +470,15 @@ export class RefreshHighlights {
     el.style.setProperty('--pptx-refresh-opacity', String(s.opacity));
     el.style.setProperty('--pptx-refresh-padding', `${s.padding}px`);
     el.style.setProperty('--pptx-refresh-enter', `${s.enterMs}ms`);
-    el.style.setProperty('--pptx-refresh-exit', `${s.exitMs}ms`);
     el.style.setProperty('--pptx-refresh-easing', s.easing);
+    this.#exitStyle(el, s);
     el.setAttribute('data-refresh-border', s.borderStyle);
+  }
+
+  /** The exit properties of `s` on `el`: `hide()` writes them again for its own options. */
+  #exitStyle(el: Element & ElementCSSInlineStyle, s: Settings): void {
+    el.style.setProperty('--pptx-refresh-exit', `${s.exitMs}ms`);
+    el.style.setProperty('--pptx-refresh-exit-easing', s.exitEasing);
   }
 
   /** The phase of a mark: one with no entrance, or one that showed already, starts shown. */
@@ -595,7 +670,12 @@ function targetMarks(
     const from = { paragraph: t.text.paragraph, offset: t.text.start };
     const to = { paragraph: t.text.paragraph, offset: t.text.end };
     const rects = selectionRects(doc, item, from, to, 'pptx-refresh-band');
-    for (const g of rects) g.setAttribute('class', 'pptx-refresh-band-group');
+    // Soft corners, as a marker pen gives: 2 CSS pixels at most, never more than borderRadius.
+    const round = String(Math.min(s.borderRadius, 2) * px);
+    for (const g of rects) {
+      g.setAttribute('class', 'pptx-refresh-band-group');
+      for (const band of g.children) band.setAttribute('rx', round);
+    }
     if (rects.length > 0) return rects;
   }
   const { cx, cy } = item.element.xfrm;

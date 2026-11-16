@@ -385,3 +385,98 @@ describe('document refresh regressions: replacement paths', () => {
     done();
   });
 });
+
+describe('document refresh regressions: the exit of a flash', () => {
+  /** An editor with one accepted result that changes shape 2 of slide 1. */
+  async function flashed(edit = deck('B')) {
+    const m = await mount(deck('A'));
+    const refresh = createDocumentRefresh(m.editor);
+    const submission = await refresh.capture();
+    const r = await refresh.applyUpdate({
+      submission,
+      sequence: 1,
+      mode: 'edit',
+      bytes: edit,
+      changes: [{ id: 'c1', location: { slideIndex: 0, shapeId: 2 } }],
+    });
+    if (!r.ok) throw new Error(r.code);
+    m.drawRail();
+    const thumb = () => m.rail.querySelector<HTMLElement>('[data-index="0"] .pptx-rail__thumb')!;
+    const layer = () => m.host.querySelector<SVGSVGElement>('.pptx-surface__refresh');
+    return { ...m, refresh, submission, thumb, layer };
+  }
+
+  test('clearHighlights() writes its exit duration and easing to every marked element', async () => {
+    const { refresh, thumb, layer, done } = await flashed();
+    expect(refresh.highlightChanges({ timeoutMs: 60_000 })).toBe(1);
+    await tick(40);
+    expect(thumb().style.getPropertyValue('--pptx-refresh-exit')).toBe('180ms');
+    expect(layer()!.style.getPropertyValue('--pptx-refresh-exit-easing')).toBe(
+      'var(--doc-motion-ease-in-out, ease-in-out)'
+    );
+    refresh.clearHighlights({ animation: { exitDurationMs: 600, easing: 'linear' } });
+    for (const el of [thumb(), layer()!]) {
+      expect(el.getAttribute(MARK)).toBe('exiting');
+      expect(el.style.getPropertyValue('--pptx-refresh-exit')).toBe('600ms');
+      expect(el.style.getPropertyValue('--pptx-refresh-exit-easing')).toBe('linear');
+    }
+    // The removal waits for the same duration.
+    await tick(300);
+    expect(thumb().getAttribute(MARK)).toBe('exiting');
+    await tick(400);
+    expect(thumb().hasAttribute(MARK)).toBe(false);
+    expect(layer()).toBeNull();
+    done();
+  });
+
+  test('a flash request during the exit turns kept places back to shown, with no entrance', async () => {
+    const { refresh, thumb, layer, done } = await flashed();
+    expect(refresh.highlightChanges({ timeoutMs: 60_000 })).toBe(1);
+    await tick(40);
+    refresh.clearHighlights({ animation: { exitDurationMs: 200 } });
+    expect(layer()!.getAttribute(MARK)).toBe('exiting');
+    expect(refresh.highlightChanges({ timeoutMs: 60_000 })).toBe(1);
+    // No mark starts from the entering state: the layer never drops to its start opacity.
+    expect(thumb().getAttribute(MARK)).toBe('shown');
+    expect(layer()!.getAttribute(MARK)).toBe('shown');
+    expect(layer()!.querySelector(`[${MARK}]`)).toBeNull();
+    expect(refresh.snapshot().highlightsVisible).toBe(true);
+    // The exit timer of the dismissal does not remove the new flash.
+    await tick(300);
+    expect(thumb().getAttribute(MARK)).toBe('shown');
+    expect(layer()?.firstChild).not.toBeNull();
+    // To replay the entrance, remove the flash at once first.
+    refresh.clearHighlights({ animation: false });
+    expect(refresh.highlightChanges({ timeoutMs: 60_000 })).toBe(1);
+    expect(thumb().getAttribute(MARK)).toBe('entering');
+    done();
+  });
+
+  test('a held canvas mark goes when the commit replaces its part whole', async () => {
+    const { editor, refresh, submission, layer, done } = await flashed();
+    expect(refresh.highlightChanges({ animation: false, timeoutMs: 60_000 })).toBe(1);
+    expect(layer()?.firstChild).not.toBeNull();
+    // A new namespace declaration on the slide root: the difference replaces the part whole,
+    // and the parse gives its nodes new ids.
+    const files = unzipSync(deck('C'));
+    const name = 'ppt/slides/slide1.xml';
+    files[name] = strToU8(
+      strFromU8(files[name]!).replace('<p:sld ', '<p:sld xmlns:x14="urn:example:x14" ')
+    );
+    const seen: boolean[] = [];
+    const off = editor.subscribe(() => seen.push(!!layer()?.firstChild));
+    const r = await refresh.applyUpdate({
+      submission,
+      sequence: 2,
+      mode: 'edit',
+      bytes: zipSync(files),
+      changes: [{ id: 'c1', location: { slideIndex: 0, shapeId: 2 } }],
+    });
+    off();
+    expect(r.ok).toBe(true);
+    // From the commit on, no frame draws a canvas mark at a node id of the replaced part.
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen).not.toContain(true);
+    done();
+  });
+});
