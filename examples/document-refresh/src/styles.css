@@ -1,0 +1,143 @@
+/* The document refresh example: the editor stylesheet, then a three-column layout with the
+   slide rail, the slide and its notes, and the refresh controls. The controls use the editor's
+   `--doc-*` tokens, so they follow its light and dark themes. */
+@import '@pptx-editor.dev/core/styles/editor.css';
+
+.refresh-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--doc-bg);
+}
+.refresh-workspace {
+  display: flex;
+  flex: 1 1 0%;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+}
+.refresh-docpane {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+.refresh-canvas {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.refresh-controls {
+  flex: 0 0 340px;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--doc-border);
+  border-radius: 12px;
+  color: var(--doc-text);
+  background: var(--doc-surface);
+  font-size: 14px;
+}
+.refresh-controls h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.refresh-controls p {
+  margin: 10px 0;
+  color: var(--doc-text-muted);
+}
+.refresh-controls fieldset {
+  margin: 12px 0 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+}
+.refresh-controls legend {
+  padding: 0 4px;
+}
+.refresh-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.refresh-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.refresh-actions p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.refresh-controls button {
+  padding: 7px 12px;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  background: var(--doc-surface);
+  font: inherit;
+  color: var(--doc-text);
+  cursor: pointer;
+}
+.refresh-controls button:hover:not(:disabled) {
+  background: var(--doc-bg-hover);
+}
+.refresh-controls button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.refresh-controls :focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 2px;
+}
+.refresh-controls code {
+  margin-inline-end: 6px;
+  font-size: 12px;
+}
+.refresh-controls .refresh-status {
+  color: var(--doc-text);
+}
+.refresh-code {
+  display: block;
+  margin-top: 4px;
+  color: var(--doc-text-muted);
+}
+.refresh-review summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.refresh-change-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.refresh-change-list li {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+}
+.refresh-change-list li button {
+  justify-self: start;
+}
+.refresh-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.refresh-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: 999px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}

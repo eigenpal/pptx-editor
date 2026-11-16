@@ -22,6 +22,9 @@ function check(extra: Record<string, string>) {
       'examples/vite/public/icon.svg': '',
       'examples/chat/src/App.tsx': '',
       'examples/chat/index.html': '',
+      'examples/document-refresh/src/main.tsx': '',
+      'examples/document-refresh/index.html': '',
+      'examples/document-refresh/README.md': '',
       '.github/ISSUE_TEMPLATE/bug.yml': '',
       '.github/pull_request_template.md': '',
       'scripts/check-public-terminology.mjs': readFileSync(
