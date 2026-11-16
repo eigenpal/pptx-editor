@@ -2,7 +2,8 @@
 // packages/core/src/editor/document-refresh-types.ts at b63cbea4a with its comments. PPTX
 // Editor differences: `RefreshLocation` names a slide, a shape, and a text range; `RefreshChange`
 // adds `computed`; `RefreshHighlightOptions` adds `surfaces`; the diagnostic codes add the slide
-// and shape codes. Every DOCX Editor member stays, so host code compiles against both.
+// and shape codes. Every DOCX Editor member stays, so code that uses the refresh controller
+// compiles against both. The `change` listener signature differs: see `editor-events.ts`.
 
 /** Opacity fade settings. Reduced motion caps fades at 125ms. @public */
 export interface AnchorHighlightAnimation {
@@ -110,6 +111,8 @@ export type RefreshChangeAspect =
   | 'animation'
   | 'background'
   | 'layout'
+  /** The slide became hidden or shown in a slide show (`p:sld/@show`). */
+  | 'visibility'
   | 'other';
 
 /**
