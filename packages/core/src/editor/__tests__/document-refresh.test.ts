@@ -267,6 +267,60 @@ describe('document refresh: reload', () => {
   });
 });
 
+describe('document refresh: steps in separate tasks', () => {
+  for (const mode of ['reload', 'edit'] as const) {
+    test(`${mode}: a local edit between two steps refuses with local-edits`, async () => {
+      const { editor, done } = await mount(deck(['A'], ['B']));
+      const refresh = createDocumentRefresh(editor);
+      const submission = await refresh.capture();
+      const pending = refresh.applyUpdate({ submission, sequence: 1, bytes: deck(['X']), mode });
+      // This task runs after the first step (the read) and before the commit.
+      setTimeout(() => void editor.exec({ type: 'duplicateSlide', index: 0 }), 0);
+      const result = await pending;
+      expect(result).toMatchObject({ ok: false, code: 'local-edits' });
+      expect(editor.find.matches('X').length).toBe(0);
+      expect(editor.snapshot().slides.length).toBe(3);
+      done();
+    });
+
+    test(`${mode}: a cancellation between two steps changes nothing`, async () => {
+      const { editor, done } = await mount(deck(['A'], ['B']));
+      const refresh = createDocumentRefresh(editor);
+      const submission = await refresh.capture();
+      const before = editor.getDocumentHandle();
+      const pending = refresh.applyUpdate({ submission, sequence: 1, bytes: deck(['X']), mode });
+      setTimeout(() => refresh.cancel(), 0);
+      expect(await pending).toMatchObject({ ok: false, code: 'cancelled' });
+      expect(editor.getDocumentHandle()).toEqual(before);
+      expect(editor.snapshot().slides.length).toBe(2);
+      done();
+    });
+  }
+
+  test('an update saves nothing: the recovery bytes are the last known file', async () => {
+    const { editor, done } = await mount(deck(['A'], ['B']));
+    const refresh = createDocumentRefresh(editor);
+    const submission = await refresh.capture();
+    const save = editor.save;
+    let saves = 0;
+    editor.save = () => (saves++, save());
+    let recovery: ArrayBuffer | null = null;
+    // The commit publishes a change while the recovery bytes are set.
+    editor.subscribe(() => void (recovery ??= refresh.recoveryBytes()));
+    const r1 = await refresh.applyUpdate({ submission, sequence: 1, bytes: deck(['X'], ['B']) });
+    expect(r1.ok).toBe(true);
+    // The recovery of the first update: the captured file.
+    expect(new Uint8Array(recovery!)).toEqual(new Uint8Array(submission.bytes));
+    const second = deck(['X'], ['Y']);
+    const r2 = await refresh.applyUpdate({ submission, sequence: 2, bytes: second });
+    expect(r2.ok).toBe(true);
+    expect(saves).toBe(0);
+    editor.save = save;
+    expect(editor.find.matches('Y').length).toBe(1);
+    done();
+  });
+});
+
 describe('document refresh: capture', () => {
   test('waits for an IME composition to end before it serializes', async () => {
     const { editor, host, done } = await mount(deck(['A']));

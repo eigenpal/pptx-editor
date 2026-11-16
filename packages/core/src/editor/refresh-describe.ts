@@ -2,9 +2,8 @@
 // change keeps its own `description`; a computed change has none, so this describes it from its
 // `computed` fields with the `refresh.change.*` strings of `@pptx-editor.dev/i18n`.
 
+import type { Translate, TranslationKey } from '@pptx-editor.dev/i18n';
 import type { RefreshChange } from './document-refresh-types.ts';
-
-type Translate = (key: string, params?: Record<string, string | number>) => string;
 
 /** English, for a host without a `translate` function. */
 const ENGLISH: Readonly<Record<string, string>> = {
@@ -36,7 +35,10 @@ const ENGLISH: Readonly<Record<string, string>> = {
  *
  * @public
  */
-export function describeRefreshChange(change: RefreshChange, translate?: Translate): string {
+export function describeRefreshChange(
+  change: RefreshChange,
+  translate?: Translate | ((key: string, params?: Record<string, string | number>) => string)
+): string {
   if (change.description !== undefined) return change.description;
   const c = change.computed;
   if (!c) return '';
@@ -48,7 +50,9 @@ export function describeRefreshChange(change: RefreshChange, translate?: Transla
     slide: index === undefined ? '' : index + 1,
     count: c.affectedSlides?.length ?? 0,
   };
-  const template = translate ? translate(`refresh.change.${key}`, params) : undefined;
+  const template = translate
+    ? translate(`refresh.change.${key}` as TranslationKey, params)
+    : undefined;
   if (template !== undefined && template !== `refresh.change.${key}`) return template;
   return (ENGLISH[key] ?? '').replace(/\{(\w+)\}/g, (_, name: string) =>
     String(params[name as keyof typeof params] ?? '')

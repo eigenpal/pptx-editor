@@ -1698,7 +1698,7 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
 
 // @public
-export function describeRefreshChange(change: RefreshChange, translate?: Translate_2): string;
+export function describeRefreshChange(change: RefreshChange, translate?: Translate | ((key: string, params?: Record<string, string | number>) => string)): string;
 
 // @public
 export type DiagramCommand = {

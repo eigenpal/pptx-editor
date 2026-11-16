@@ -11,6 +11,12 @@
 // changes embedded fonts reloads with a quiet `load()`, which keeps the open deck on screen
 // until the new one is ready.
 //
+// An update runs in steps, each in a task of its own, so the main thread can paint between
+// them: read the file, take the difference, commit and paint, then compute the changes. Each
+// step after a yield checks again that the document is the captured one and that no
+// cancellation came. The recovery bytes are the last bytes known to equal the document (the
+// captured file, then each accepted file), so no save runs during an update.
+//
 // Without `changes`, a registered `reviewModule()` computes the changes from the captured
 // presentation to the returned one; without the module, the result reports
 // `changeInformation: 'unavailable'`, as in DOCX Editor.
@@ -26,11 +32,17 @@ import type {
   RefreshUpdate,
 } from './document-refresh-types.ts';
 import type { DocumentHandle, ReplaceDocumentRefusal } from '../contracts/index.ts';
-import { readPptx, type PptxPackage } from '../store/index.ts';
+import type { PptxPackage } from '../store/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { isCollaborating, moduleRegistryOf } from './modules.ts';
-import { reloadInPlace, whileReplacing } from './document-replace.ts';
+import {
+  forgetReturned,
+  preparseReturned,
+  prediffReturned,
+  reloadInPlace,
+  whileReplacing,
+} from './document-replace.ts';
 import { expectLoad } from './change-source.ts';
 import {
   isLocationShape,
@@ -49,6 +61,9 @@ export { shapeParagraphTexts, shapesById } from './document-refresh-changes.ts';
 export { describeRefreshChange } from './refresh-describe.ts';
 
 const controllers = new WeakMap<PptxEditorInstance, DocumentRefresh>();
+
+/** Wait for the next task, so the browser can paint and handle input between steps. */
+const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** The `message` a refusal carries when nothing more specific explains it. */
 const REFRESH_FAILURE_MESSAGES: Readonly<Record<RefreshFailureCode, string>> = {
@@ -158,6 +173,8 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     handle: DocumentHandle;
     /** The captured presentation, the base of computed changes. */
     captured: PptxPackage | null;
+    /** A file equal to the document while its handle is `handle`: the recovery bytes. */
+    current: Uint8Array;
     sequence: number;
     seen: Map<string, string>;
   } | null = null;
@@ -289,18 +306,23 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     if (!bytes) throw new Error('save');
     return { bytes, handle: handle() };
   };
-  /** Record an accepted result: advance the sequence, resolve its changes, and report. */
+  /**
+   * Record an accepted result: advance the sequence, resolve its changes, and report. `pkg` and
+   * `at` are the package and the handle right after the commit.
+   */
   const accept = (
     request: NonNullable<typeof active>,
     resultId: string,
     update: RefreshUpdate,
-    mode: 'reload' | 'edit'
+    mode: 'reload' | 'edit',
+    pkg: PptxPackage,
+    at: DocumentHandle
   ): RefreshResult => {
     highlights.clear();
     recovery = null;
-    request.handle = handle();
+    request.handle = at;
+    request.current = update.bytes as Uint8Array;
     request.sequence = update.sequence;
-    const pkg = editor.session!.store.package;
     const review = moduleRegistryOf(editor).review;
     let inputs: readonly RefreshChangeInput[] | null = update.changes ?? null;
     if (!inputs && review?.refreshChanges && request.captured) {
@@ -312,7 +334,7 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     }
     located = inputs ? resolveRefreshChanges(pkg, resultId, inputs, request.seen, rendered) : [];
     for (const entry of located) request.seen.set(entry.change.id, entry.fingerprint);
-    acceptedHandle = request.handle;
+    acceptedHandle = at;
     const changes = Object.freeze(located.map((entry) => entry.change));
     const result: RefreshResult = Object.freeze({
       ok: true,
@@ -362,7 +384,14 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
           bytes: captured.bytes.slice().buffer as ArrayBuffer,
         });
         const pkg = editor.session?.store.package ?? null;
-        active = { token, handle: captured.handle, captured: pkg, sequence: -1, seen: new Map() };
+        active = {
+          token,
+          handle: captured.handle,
+          captured: pkg,
+          current: captured.bytes,
+          sequence: -1,
+          seen: new Map(),
+        };
         notify({ phase: 'processing' });
         return token;
       } catch (error) {
@@ -398,45 +427,71 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
         const bytes = mine.bytes as Uint8Array;
         busy = true;
         try {
+          // Step 1: read the file. An edit leaves a file that does not open to
+          // `replaceDocument`, which reports it after its own checks.
+          const parsed = preparseReturned(bytes);
+          if (!parsed && mine.mode !== 'edit')
+            return publish(failure(resultId, 'invalid-document'), 'failed');
+          if (parsed) await nextTask();
+          // Observers and other tasks can cancel, switch documents, or edit between steps.
+          const unchanged = (): RefreshResult | null =>
+            !valid()
+              ? publish(failure(resultId, 'cancelled'))
+              : handle().loadId !== now.loadId
+                ? publish(failure(resultId, 'document-changed'))
+                : !same(now, handle())
+                  ? publish(failure(resultId, 'local-edits'), 'failed')
+                  : null;
+          let stop = unchanged();
+          if (stop) return stop;
+          if (mine.mode !== 'edit') {
+            highlights.clear();
+            located = [];
+            acceptedHandle = null;
+            notify({ phase: 'refreshing', changes: [], highlightsVisible: false });
+            if ((stop = unchanged())) return stop;
+          }
+          // Step 2: the difference from the open package.
+          if (parsed) {
+            prediffReturned(editor, bytes);
+            await nextTask();
+            if ((stop = unchanged())) return stop;
+          }
+          // Step 3: commit and paint.
+          let done: { pkg: PptxPackage; at: DocumentHandle };
           if (mine.mode === 'edit') {
             const result = editor.exec({ type: 'replaceDocument', pptx: bytes, expected: now });
             const outcome = result.replaceDocument;
             if (!outcome) return publish(failure(resultId, 'unavailable'), 'failed');
             if (!outcome.ok) return publish(editFailure(resultId, outcome), 'failed');
-            return publish(accept(request, resultId, mine, 'edit'));
+            done = { pkg: editor.session!.store.package, at: handle() };
+          } else {
+            recovery = { bytes: request.current.slice(), loadId: now.loadId };
+            const outcome = await whileReplacing(editor, () => reload(bytes, 'refresh'));
+            if (outcome === 'invalid') {
+              recovery = null;
+              return publish(failure(resultId, 'invalid-document'), 'failed');
+            }
+            if (outcome === 'failed') {
+              // A quiet load that fails keeps the open deck on screen: it is restored already.
+              const restored = handle().loadId === now.loadId;
+              if (restored) recovery = null;
+              active = null;
+              return publish(
+                failure(resultId, restored ? 'load-failed' : 'recovery-failed', restored),
+                'failed'
+              );
+            }
+            done = { pkg: editor.session!.store.package, at: handle() };
           }
-          if (!readPptx(bytes).ok) return publish(failure(resultId, 'invalid-document'), 'failed');
-          highlights.clear();
-          located = [];
-          acceptedHandle = null;
-          notify({ phase: 'refreshing', changes: [], highlightsVisible: false });
-          // Observers can cancel, switch documents, or edit when notified.
-          if (!valid()) return publish(failure(resultId, 'cancelled'));
-          if (!same(now, handle())) return publish(failure(resultId, 'local-edits'), 'failed');
-          const previous = editor.save();
-          if (!previous) return publish(failure(resultId, 'input-failed'), 'failed');
-          recovery = { bytes: previous.slice(), loadId: now.loadId };
-          const outcome = await whileReplacing(editor, () => reload(bytes, 'refresh'));
-          if (outcome === 'invalid') {
-            recovery = null;
-            return publish(failure(resultId, 'invalid-document'), 'failed');
-          }
-          if (outcome === 'failed') {
-            // A quiet load that fails keeps the open deck on screen: it is restored already.
-            const restored = handle().loadId === now.loadId;
-            if (restored) recovery = null;
-            active = null;
-            return publish(
-              failure(resultId, restored ? 'load-failed' : 'recovery-failed', restored),
-              'failed'
-            );
-          }
+          // Step 4: the changes, after the new paint had a frame.
+          await nextTask();
           if (!valid()) {
             // Accepted content stays accepted if cancellation races with completion.
             recovery = null;
             return publish(failure(resultId, 'cancelled'));
           }
-          return publish(accept(request, resultId, mine, 'reload'));
+          return publish(accept(request, resultId, mine, mine.mode ?? 'reload', done.pkg, done.at));
         } catch {
           return publish(
             failure(resultId, valid() ? 'input-failed' : 'cancelled'),
@@ -444,6 +499,7 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
           );
         } finally {
           busy = false;
+          forgetReturned(bytes);
         }
       };
       const result = queue.then(apply);

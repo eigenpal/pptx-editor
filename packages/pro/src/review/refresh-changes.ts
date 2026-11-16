@@ -429,7 +429,7 @@ export function computeRefreshChanges(
   const slidesA = presentationInfo(captured).slides;
   const slidesB = presentationInfo(returned).slides;
   const keyOf = (pkg: PptxPackage, s: SlideRef) => creationId(pkg, s.partName) ?? `id${s.sldId}`;
-  // Slides: creation id, then slide id, then part name.
+  // Slides: creation id, then content, then slide id, then part name.
   const pairs = new Map<number, number>(); // new index -> old index
   const usedOld = new Set<number>();
   // Equal content comes before the slide id and the part name: a writer that numbers its
@@ -442,8 +442,11 @@ export function computeRefreshChanges(
     (pkg, s) => creationId(pkg, s.partName),
     content,
     (_pkg, s) => s.sldId,
-    (_pkg, s) => s.partName,
   ];
+  // The part name pairs slides only for a writer that numbers slide ids again. When the two
+  // presentations share a slide id, ids are stable, and a different id is a different slide.
+  const oldIds = new Set(slidesA.map((s) => s.sldId));
+  if (!slidesB.some((s) => oldIds.has(s.sldId))) keys.push((_pkg, s) => s.partName);
   for (const key of keys) {
     const olds = new Map<string, number | null>();
     slidesA.forEach((s, i) => {

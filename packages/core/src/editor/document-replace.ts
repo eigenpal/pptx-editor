@@ -12,6 +12,11 @@
 // and then clears the history and the selection, as a load does (`reloadInPlace`). It gives the
 // document a new load id. A file whose difference touches embedded fonts reloads through
 // `load()` instead, because a session registers its embedded faces when it opens.
+//
+// A document refresh runs the steps in separate tasks, so no task holds the main thread for
+// all of them: `preparseReturned` reads the file, `prediffReturned` takes the difference, and
+// the commit then reuses both. A difference is reused only while the open package is the one
+// it was taken from.
 
 import type {
   DocumentHandle,
@@ -23,6 +28,7 @@ import {
   diffPackages,
   readPptx,
   slideRefAt,
+  type PackageDiff,
   type PptxOp,
   type PptxPackage,
 } from '../store/index.ts';
@@ -77,10 +83,48 @@ const refusal = (
 ): ReplaceDocumentRefusal =>
   ({ ok: false, code, message, ...(reason ? { reason } : {}) }) as ReplaceDocumentRefusal;
 
+/** The steps a refresh did already for its returned bytes: the package, and a difference. */
+interface Steps {
+  readonly pkg: PptxPackage;
+  diff?: { readonly base: PptxPackage; readonly result: PackageDiff };
+}
+const steps = new WeakMap<Uint8Array, Steps>();
+
+/**
+ * Read `bytes` ahead of `reloadInPlace` or `replaceDocument` with the same array, which then
+ * reuse the package. The caller must not change `bytes` after the call. Returns false when the
+ * bytes are not a valid PPTX file. @internal
+ */
+export function preparseReturned(bytes: Uint8Array): boolean {
+  if (steps.has(bytes)) return true;
+  const read = readPptx(bytes);
+  if (read.ok) steps.set(bytes, { pkg: read.pkg });
+  return read.ok;
+}
+
+/**
+ * Take the difference from the open package to `bytes` (read with `preparseReturned`) ahead of
+ * the commit. The commit reuses it only while the open package stays the same. @internal
+ */
+export function prediffReturned(editor: PptxEditorInstance, bytes: Uint8Array): void {
+  const known = steps.get(bytes);
+  const session = editor.session;
+  if (!known || !session || editor.snapshot().isOpening || !editor.finishOpening()) return;
+  const base = session.store.package;
+  known.diff = { base, result: diffPackages(base, known.pkg) };
+}
+
+/** Forget the steps of `bytes`. @internal */
+export function forgetReturned(bytes: Uint8Array): void {
+  steps.delete(bytes);
+}
+
 /** The returned file as a package, or a refusal. */
 function readReturned(bytes: unknown): PptxPackage | ReplaceDocumentRefusal {
   if (!(bytes instanceof Uint8Array) && !(bytes instanceof ArrayBuffer))
     return refusal('invalidRequest', 'pptx must be a Uint8Array or an ArrayBuffer.');
+  const known = bytes instanceof Uint8Array ? steps.get(bytes) : undefined;
+  if (known) return known.pkg;
   const read = readPptx(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   return read.ok ? read.pkg : refusal('invalidDocument', 'The bytes are not a valid PPTX file.');
 }
@@ -122,7 +166,11 @@ function prepare(
   // A deck still opening parses the rest first: the difference reads every part.
   if (!editor.finishOpening())
     return refusal('unavailable', 'A slide of the open document did not parse.');
-  const diff = diffPackages(session.store.package, next);
+  const known = request.pptx instanceof Uint8Array ? steps.get(request.pptx)?.diff : undefined;
+  const diff =
+    known && known.base === session.store.package
+      ? known.result
+      : diffPackages(session.store.package, next);
   if (!diff.ok)
     return diff.reason === 'different-main-part'
       ? refusal('editUnsupported', 'The file names a different main part.', 'differentMainPart')

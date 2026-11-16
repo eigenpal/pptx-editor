@@ -3,6 +3,7 @@
 // `comparePresentations` on its own.
 
 import { describe, expect, test } from 'bun:test';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { createDocumentRefresh, createPptxEditor } from '@pptx-editor.dev/core';
 import { readPptx, type PptxPackage } from '@pptx-editor.dev/core/store';
 import {
@@ -79,6 +80,24 @@ describe('computed refresh changes', () => {
       unavailableReason: 'deleted',
       computed: { scope: 'slide', action: 'removed', previousSlideIndex: 1 },
     });
+  });
+
+  test('a new slide in the part of a removed slide is an addition and a removal', () => {
+    const a = [
+      { shapes: box(2, 'One') },
+      { shapes: box(2, 'Two') },
+      { shapes: box(2, 'Appendix') },
+    ];
+    const b = [a[0]!, a[1]!, { shapes: box(2, 'Summary') }];
+    // The writer keeps slide ids: the new slide has a new id in the same part name.
+    const files = unzipSync(bytesOf(b));
+    const xml = strFromU8(files['ppt/presentation.xml']!);
+    files['ppt/presentation.xml'] = strToU8(xml.replace('<p:sldId id="258"', '<p:sldId id="300"'));
+    const changes = computeRefreshChanges(pkg(bytesOf(a)), pkg(zipSync(files))).changes;
+    expect(changes.map((c) => [c.computed.scope, c.computed.action])).toEqual([
+      ['slide', 'removed'],
+      ['slide', 'added'],
+    ]);
   });
 
   test('notes changes and layout changes, with the slides that show the layout', () => {
