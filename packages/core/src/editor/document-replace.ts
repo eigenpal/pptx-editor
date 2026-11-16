@@ -32,6 +32,14 @@ import type { DocumentSession } from './document-session.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { withChangeSource } from './change-source.ts';
 
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+const translations = new WeakMap<object, Translate>();
+
+/** The editor's `translate` option, for chrome that core draws itself. @internal */
+export function translateOf(editor: object): Translate | undefined {
+  return translations.get(editor);
+}
+
 const loadIds = new WeakMap<DocumentSession, string>();
 let nextLoad = 0;
 /** Editors with a refresh or a preview that blocks replacement (`busy`). */
@@ -89,12 +97,14 @@ interface Prepared {
 /** Check the editor and the request, and compute the difference. */
 function prepare(
   editor: PptxEditorInstance,
-  request: Pick<ReplaceDocumentCommand, 'pptx' | 'expected'>
+  request: Pick<ReplaceDocumentCommand, 'pptx' | 'expected'>,
+  own = false
 ): Prepared | ReplaceDocumentRefusal {
   const session = editor.session;
   if (!session || editor.snapshot().isOpening)
     return refusal('unavailable', 'No document is mounted, or it is still opening.');
-  if (busyEditors.has(editor)) return refusal('busy', 'A document refresh blocks edits.');
+  // A refresh blocks other replacements, not its own.
+  if (busyEditors.has(editor) && !own) return refusal('busy', 'A document refresh blocks edits.');
   if (editor.snapshot().mode === 'view' || session.store.blocked !== null)
     return refusal('editNotPermitted', 'The editor is in viewing mode.', 'viewing');
   const expected = request.expected;
@@ -171,20 +181,24 @@ export function reloadInPlace(
   bytes: Uint8Array,
   source: 'refresh' | 'recovery'
 ): ReplaceDocumentOutcome | 'load' {
-  const prepared = prepare(editor, { pptx: bytes });
+  const prepared = prepare(editor, { pptx: bytes }, true);
   if ('ok' in prepared)
     return prepared.code === 'invalidDocument' || prepared.code === 'busy' ? prepared : 'load';
   if (touchesFonts(prepared.ops)) return 'load';
   return withChangeSource(editor, source, () => {
     const { session } = prepared;
-    session.store.clearHistory();
-    session.store.closeHistoryGroup();
-    // A reload is a new document: handles taken before it name another load.
-    loadIds.set(session, `load-${++nextLoad}`);
+    const index = editor.snapshot().currentSlide;
     editor.setSelection({ kind: 'none' });
     const outcome = commit(editor, prepared, false);
-    // The same file: still a reload. Publish the new load id and the empty history.
-    if (outcome.ok && !outcome.changed) editor.setMode(editor.snapshot().mode);
+    if (!outcome.ok) return outcome;
+    // A reload keeps the slide index, clamped, as a load with `startSlide` does.
+    if (editor.snapshot().currentSlide !== index) editor.goToSlide(index);
+    // A reload is a new document with no history: handles taken before it name another load.
+    session.store.clearHistory();
+    session.store.closeHistoryGroup();
+    loadIds.set(session, `load-${++nextLoad}`);
+    // Publish the empty history and the new load id.
+    editor.setMode(editor.snapshot().mode);
     return outcome;
   });
 }
@@ -195,7 +209,11 @@ export function reloadInPlace(
  *
  * @internal
  */
-export function withDocumentReplace(editor: PptxEditorInstance): PptxEditorInstance {
+export function withDocumentReplace(
+  editor: PptxEditorInstance,
+  translate?: Translate
+): PptxEditorInstance {
+  if (translate) translations.set(editor, translate);
   const exec = editor.exec;
   editor.exec = (command, options) => {
     if (command.type !== 'replaceDocument') return exec(command, options);

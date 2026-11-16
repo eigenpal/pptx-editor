@@ -441,6 +441,37 @@ export {
   type NewSlideControlProps,
 } from './SlideControls.tsx';
 export { EditorFontError } from '@pptx-editor.dev/core/editor';
+// The document refresh API, as DOCX Editor's adapters export it: one engine-owned controller
+// for both adapters (`createDocumentRefresh`), with the `replaceDocument` command types.
+export {
+  createDocumentRefresh,
+  describeRefreshChange,
+  DocumentRefreshError,
+} from '@pptx-editor.dev/core/editor';
+export type {
+  ClearRefreshHighlightsOptions,
+  ComputedRefreshChange,
+  DocumentChange,
+  DocumentHandle,
+  DocumentRefresh,
+  DocumentRefreshState,
+  NavigateToChangeOptions,
+  RefreshChange,
+  RefreshChangeAspect,
+  RefreshChangeInput,
+  RefreshComputedChange,
+  RefreshFailureCode,
+  RefreshHighlightOptions,
+  RefreshHighlightSurface,
+  RefreshLocation,
+  RefreshRefusalReason,
+  RefreshResult,
+  RefreshSubmission,
+  RefreshUpdate,
+  RefreshUpdateMode,
+  ReplaceDocumentOutcome,
+  ReplaceDocumentRequest,
+} from '@pptx-editor.dev/core/editor';
 export type {
   EditorFontErrorCode,
   FontConfiguration,

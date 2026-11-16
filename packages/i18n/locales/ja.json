@@ -1861,5 +1861,31 @@
     "previewUnavailable": "この元の色ではプレビューを表示できません。",
     "geometry": "サイズと位置",
     "numberRangeExclusive": "{min}より大きく{max}以下の数値を入力してください。"
+  },
+  "refresh": {
+    "changed": "変更あり",
+    "change": {
+      "added": {
+        "slide": "スライド {slide} を追加しました",
+        "shape": "スライド {slide} に図形を追加しました"
+      },
+      "removed": {
+        "slide": "スライド {slide} を削除しました",
+        "shape": "スライド {slide} から図形を削除しました"
+      },
+      "moved": {
+        "slide": "スライド {slide} を移動しました"
+      },
+      "changed": {
+        "slide": "スライド {slide} を変更しました",
+        "shape": "スライド {slide} の図形を変更しました",
+        "text": "スライド {slide} のテキストを変更しました",
+        "notes": "スライド {slide} のノートを変更しました",
+        "layout": "レイアウトを変更しました。使用しているスライド: {count}",
+        "master": "スライド マスターを変更しました。使用しているスライド: {count}",
+        "theme": "テーマを変更しました。使用しているスライド: {count}",
+        "package": "プレゼンテーションの設定を変更しました"
+      }
+    }
   }
 }

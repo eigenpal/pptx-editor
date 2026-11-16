@@ -53,6 +53,27 @@ export function altTextDraftFrom(alt: AltText | undefined): AltTextDraftFields;
 export const amountText: (n: number) => string;
 
 // @public
+export interface AnchorHighlightAnimation {
+    readonly durationMs?: number;
+    readonly easing?: string;
+    readonly exitDurationMs?: number;
+}
+
+// @public
+export interface AnchorHighlightOptions {
+    readonly animation?: boolean | AnchorHighlightAnimation;
+    readonly borderColor?: string;
+    readonly borderRadius?: number;
+    readonly borderStyle?: 'solid' | 'dashed' | 'dotted';
+    readonly borderWidth?: number;
+    readonly className?: string;
+    readonly color?: string;
+    readonly opacity?: number;
+    readonly padding?: number;
+    readonly timeoutMs?: number | null;
+}
+
+// @public
 export const ANIMATION_PRESET_GROUPS: readonly {
     readonly effectClass: 'entrance' | 'emphasis' | 'exit';
     readonly presets: readonly AnimationPreset[];
@@ -920,8 +941,16 @@ export function claimRejection(rejection: EditorRejection): void;
 // @internal
 export function clampSlide(index: number | undefined, count: number): number;
 
+// @public
+export interface ClearAnchorHighlightOptions {
+    readonly animation?: boolean | Pick<AnchorHighlightAnimation, 'exitDurationMs' | 'easing'>;
+}
+
 // @internal
 export function clearNotesFindMatch(root: HTMLElement | null): void;
+
+// @public
+export type ClearRefreshHighlightsOptions = ClearAnchorHighlightOptions;
 
 // @public
 export type ClipboardDrawingReader = () => Uint8Array | null | undefined | Promise<Uint8Array | null | undefined>;
@@ -1406,6 +1435,11 @@ export interface ComposePreparedFontOriginsOptions extends ComposeFontOriginsOpt
 }
 
 // @public
+export type ComputedRefreshChange = RefreshChangeInput & {
+    readonly computed: RefreshComputedChange;
+};
+
+// @public
 export function configuredDefaultFontFamily(configuration?: FontCatalogConfiguration): string;
 
 // @public
@@ -1513,6 +1547,9 @@ export function createCollaborationStatusTracker(initial?: CollaborationStatus):
 
 // @internal
 export function createDialogDraft<Fields extends object>(options: DialogDraftOptions<Fields>): DialogDraft<Fields>;
+
+// @public
+export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefresh;
 
 // @internal
 export function createEditorRefApi(getEditor: () => PptxEditorInstance | null): EditorRefApi;
@@ -1661,6 +1698,9 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
 
 // @public
+export function describeRefreshChange(change: RefreshChange, translate?: Translate_2): string;
+
+// @public
 export type DiagramCommand = {
     readonly type: 'addDiagramShape';
     readonly position: DiagramShapePosition;
@@ -1778,6 +1818,40 @@ export function documentOpenFailure(code: string): DocumentOpenFailure;
 
 // @public
 export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'blocked' | 'unknown';
+
+// @public
+export interface DocumentRefresh {
+    applyUpdate(update: RefreshUpdate): Promise<RefreshResult>;
+    cancel(): void;
+    capture(): Promise<RefreshSubmission>;
+    clearHighlights(options?: ClearRefreshHighlightsOptions): void;
+    finish(submission: RefreshSubmission): void;
+    highlightChanges(options?: RefreshHighlightOptions): number;
+    navigateToChange(id: string, options?: NavigateToChangeOptions): boolean;
+    onResult(listener: (result: RefreshResult) => void): () => void;
+    recover(): Promise<boolean>;
+    recoveryBytes(): ArrayBuffer | null;
+    snapshot(): DocumentRefreshState;
+    subscribe(listener: () => void): () => void;
+}
+
+// @public
+export class DocumentRefreshError extends Error {
+    constructor(code: RefreshFailureCode, cause?: unknown);
+    readonly code: RefreshFailureCode;
+}
+
+// @public
+export interface DocumentRefreshState {
+    // (undocumented)
+    readonly changes: readonly RefreshChange[];
+    readonly highlightsVisible: boolean;
+    // (undocumented)
+    readonly phase: 'idle' | 'capturing' | 'processing' | 'refreshing' | 'recovering' | 'complete' | 'failed';
+    readonly recoveryAvailable: boolean;
+    // (undocumented)
+    readonly result: RefreshResult | null;
+}
 
 // @internal
 export interface DocumentSearch {
@@ -4298,6 +4372,12 @@ export function mountedSections(grouped: readonly SlideSection[], limit: number)
 export function namedFamilies(pkg: PptxPackage): string[];
 
 // @public
+export interface NavigateToChangeOptions extends ScrollToAnchorOptions {
+    readonly block?: ScrollPlacement;
+    readonly focus?: boolean;
+}
+
+// @public
 export interface NewChartData {
     // (undocumented)
     readonly categories: readonly string[];
@@ -5243,6 +5323,142 @@ export function refocusAfterCollapse(list: HTMLElement | null, was: HTMLElement 
 export function refocusAfterSorterHides(list: HTMLElement, editor: PptxEditorInstance | null): void;
 
 // @public
+export interface RefreshChange {
+    readonly computed?: RefreshComputedChange;
+    readonly description?: string;
+    readonly diagnostic?: {
+        readonly code: RefreshDiagnosticCode;
+        readonly location?: RefreshLocation;
+    };
+    // (undocumented)
+    readonly id: string;
+    readonly isNew: boolean;
+    // (undocumented)
+    readonly location?: RefreshLocation;
+    readonly resultId: string;
+    // (undocumented)
+    readonly status: 'available' | 'deleted' | 'unavailable' | 'invalid' | 'unsupported-story';
+}
+
+// @public
+export type RefreshChangeAspect = 'position' | 'size' | 'rotation' | 'geometry' | 'fill' | 'line' | 'effects' | 'text' | 'textFormat' | 'picture' | 'table' | 'chart' | 'diagram' | 'transition' | 'animation' | 'background' | 'layout' | 'other';
+
+// @public
+export interface RefreshChangeInput {
+    readonly description?: string;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly location?: RefreshLocation;
+    readonly unavailableReason?: 'deleted' | 'unavailable';
+}
+
+// @public
+export interface RefreshComputedChange {
+    // (undocumented)
+    readonly action: 'added' | 'removed' | 'moved' | 'changed';
+    readonly affectedSlides?: readonly number[];
+    readonly aspects?: readonly RefreshChangeAspect[];
+    readonly previousSlideIndex?: number;
+    // (undocumented)
+    readonly scope: 'slide' | 'shape' | 'text' | 'notes' | 'layout' | 'master' | 'theme' | 'package';
+}
+
+// @public
+export type RefreshDiagnosticCode = 'missing-location' | 'deleted' | 'invalid-selector' | 'invalid-paragraph-id' | 'paragraph-not-found' | 'ambiguous-paragraph-id' | 'invalid-offsets' | 'text-mismatch' | 'not-rendered' | 'unsupported-story' | 'multiple-paragraphs' | 'invalid-slide-id' | 'slide-not-found' | 'shape-not-found' | 'ambiguous-shape-id';
+
+// @public
+export type RefreshFailureCode = 'unavailable' | 'collaboration' | 'busy' | 'cancelled' | 'superseded' | 'document-changed' | 'local-edits' | 'out-of-order' | 'invalid-result' | 'invalid-document' | 'input-failed' | 'load-failed' | 'recovery-failed' | 'edit-not-permitted' | 'edit-unsupported';
+
+// @public
+export type RefreshHighlightAnimation = AnchorHighlightAnimation;
+
+// @public
+export interface RefreshHighlightOptions extends AnchorHighlightOptions {
+    readonly changeIds?: readonly string[];
+    readonly includePrevious?: boolean;
+    readonly surfaces?: readonly RefreshHighlightSurface[];
+}
+
+// @public
+export type RefreshHighlightSurface = 'thumbnails' | 'canvas' | 'notes';
+
+// @public
+export interface RefreshLocation {
+    // (undocumented)
+    readonly end?: number;
+    readonly notes?: boolean;
+    readonly paragraphIndex?: number;
+    readonly shapeId?: number;
+    readonly slideId?: number;
+    readonly slideIndex?: number;
+    readonly start?: number;
+    readonly text?: string;
+}
+
+// @public
+export type RefreshRefusal = (RefreshRefusalFields & {
+    readonly code: 'edit-not-permitted';
+    readonly reason: 'viewing' | 'protected';
+}) | (RefreshRefusalFields & {
+    readonly code: 'edit-unsupported';
+    readonly reason: 'different-main-part' | 'unsupported-difference' | 'collaboration-refused';
+}) | (RefreshRefusalFields & {
+    readonly code: 'unavailable';
+    readonly reason?: 'collaboration-unavailable';
+}) | (RefreshRefusalFields & {
+    readonly code: Exclude<RefreshFailureCode, 'edit-not-permitted' | 'edit-unsupported' | 'unavailable'>;
+    readonly reason?: undefined;
+});
+
+// @public
+export interface RefreshRefusalFields {
+    readonly message: string;
+    // (undocumented)
+    readonly ok: false;
+    readonly recovered?: boolean;
+    // (undocumented)
+    readonly resultId: string;
+}
+
+// @public
+export type RefreshRefusalReason = 'viewing' | 'protected' | 'collaboration-unavailable' | 'different-main-part' | 'unsupported-difference' | 'collaboration-refused';
+
+// @public
+export type RefreshResult = {
+    readonly ok: true;
+    readonly resultId: string;
+    readonly mode: RefreshUpdateMode;
+    readonly changes: readonly RefreshChange[];
+    readonly changeInformation: 'available' | 'unavailable';
+    readonly failures: readonly string[];
+} | RefreshRefusal;
+
+// @public
+export interface RefreshSubmission {
+    // (undocumented)
+    readonly bytes: ArrayBuffer;
+    // (undocumented)
+    readonly id: string;
+}
+
+// @public
+export interface RefreshUpdate {
+    // (undocumented)
+    readonly bytes: ArrayBuffer | Uint8Array;
+    readonly changes?: readonly RefreshChangeInput[];
+    readonly failures?: readonly string[];
+    readonly mode?: RefreshUpdateMode;
+    // (undocumented)
+    readonly sequence: number;
+    // (undocumented)
+    readonly submission: RefreshSubmission;
+}
+
+// @public
+export type RefreshUpdateMode = 'reload' | 'edit';
+
+// @public
 export function registerCommentDraft(editor: object, open: () => void): () => void;
 
 // @internal
@@ -5432,6 +5648,7 @@ export interface ReviewModuleContribution {
     readonly collectReviewItems: CollectReviewItems;
     readonly displayModes: readonly ReviewDisplayMode[];
     readonly pane?: ReviewPaneOptions;
+    readonly refreshChanges?: (captured: PptxPackage, returned: PptxPackage) => readonly ComputedRefreshChange[];
 }
 
 // @public
@@ -5574,6 +5791,16 @@ export function sameParagraphFormat(a: ParagraphFormatRead | null, b: ParagraphF
 
 // @internal
 export function scrollIntoNearestScroller(target: HTMLElement, within?: Element | null): void;
+
+// @public
+export type ScrollPlacement = 'start' | 'center' | 'centerIfNeeded' | 'nearest';
+
+// @public
+export interface ScrollToAnchorOptions {
+    readonly behavior?: 'instant' | 'smooth';
+    readonly block?: ScrollPlacement;
+    readonly offsetPx?: number;
+}
 
 // @public
 export function secondsText(ms: number): string;
@@ -5969,6 +6196,9 @@ export interface ShapeFormatTarget {
     readonly part: string;
 }
 
+// @internal
+export function shapeParagraphTexts(shape: Element_2): string[];
+
 // @public
 export interface ShapePreview {
     // (undocumented)
@@ -5983,6 +6213,9 @@ export interface ShapePreview {
 
 // @public
 export function shapePreview(preset: string): ShapePreview | null;
+
+// @internal
+export function shapesById(root: Element_2 | undefined, id: number): Element_2[];
 
 // @public
 export interface ShapeStyleChoice {

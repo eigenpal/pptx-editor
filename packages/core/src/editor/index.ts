@@ -1,7 +1,7 @@
-// The `editor` lane: the browser composition root. Opens documents, composes layout and paint
-// into the editable surface, and publishes the chrome registry and command table.
+// The `editor` lane, the browser composition root: the editable surface, chrome, and commands.
 
 export * from './document-session.ts';
+export * from './document-refresh.ts';
 export { createPptxEditor } from './pptx-editor.ts';
 export { textClipboardParagraphs } from './clipboard-rich.ts';
 export { drawingClipboardPayload, DRAWING_CLIPBOARD_TYPES } from './clipboard-drawing.ts';

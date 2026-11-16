@@ -807,7 +807,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return refuseOpen(OPEN_FAILED);
     }
   };
-
   const instance: PptxEditorInstance = {
     get session() {
       return session;
@@ -996,5 +995,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   }
 
   if (options.document) void instance.load(options.document);
-  return withDocumentReplace(seam.withCollaborationFlag(removal.attach(instance), modules));
+  const editor = seam.withCollaborationFlag(removal.attach(instance), modules);
+  return withDocumentReplace(editor, options.translate);
 }

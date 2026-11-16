@@ -9,6 +9,16 @@
 import type { DocumentChange } from '../contracts/index.ts';
 
 const active = new WeakMap<object, NonNullable<DocumentChange['source']>>();
+/** The cause of the load that replaces load id `from`: a refresh that reloads with `load()`. */
+const nextLoad = new WeakMap<
+  object,
+  { readonly from: string | undefined; readonly source: NonNullable<DocumentChange['source']> }
+>();
+
+/** Name the cause of the editor's next load. @internal */
+export function expectLoad(editor: object, source: NonNullable<DocumentChange['source']>): void {
+  nextLoad.set(editor, { from: loadIdOf(editor), source });
+}
 
 /** Run `run` with `source` as the cause of the changes it publishes. @internal */
 export function withChangeSource<T>(
@@ -41,8 +51,10 @@ export function changeSourceTracker(editor: object): (revision: number) => Docum
   return (revision) => {
     const now = loadIdOf(editor);
     const loaded = now !== loadId;
+    const named = nextLoad.get(editor);
+    const expected = loaded && named && named.from === loadId ? named.source : undefined;
     loadId = now;
-    const source = active.get(editor) ?? (loaded ? 'load' : undefined);
+    const source = active.get(editor) ?? (loaded ? (expected ?? 'load') : undefined);
     return source ? { source, revision } : { revision };
   };
 }
