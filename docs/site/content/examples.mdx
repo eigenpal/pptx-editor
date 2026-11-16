@@ -8,12 +8,13 @@ Start with the example closest to your application. Each browser integration use
 
 ## Choose a framework
 
-| Example                                    | Use it for                                        |
-| ------------------------------------------ | ------------------------------------------------- |
-| [React with Vite](/docs/frameworks/vite)   | A browser application with React.                 |
-| [Vue with Vite](/docs/frameworks/vite-vue) | A browser application with Vue 3.                 |
-| [Next.js](/docs/frameworks/nextjs)         | A client editor inside an App Router application. |
-| [Chat panel](/docs/guides/chat-panel)      | A presentation beside a chat interface.           |
+| Example | Use it for |
+| --- | --- |
+| [React with Vite](/docs/frameworks/vite) | A browser application with React. |
+| [Vue with Vite](/docs/frameworks/vite-vue) | A browser application with Vue 3. |
+| [Next.js](/docs/frameworks/nextjs) | A client editor inside an App Router application. |
+| [Chat panel](/docs/guides/chat-panel) | A presentation beside a chat interface. |
+| [Document refresh](/docs/guides/document-refresh) | Server updates with change highlights. |
 
 For component-level examples, see [React examples](/docs/react/examples) and [Vue examples](/docs/vue/examples).
 
@@ -36,6 +37,7 @@ The React demo opens at `http://localhost:5274`. Run one of these commands for a
 | `bun run dev:chat`                                  | Chat panel at port 5276.                  |
 | `bun run dev:collaboration`                         | Peer-to-peer collaboration at port 5277.  |
 | `bun run dev:collaboration-hocuspocus`              | Server-backed collaboration at port 5278. |
+| `bun run dev:refresh`                               | Document refresh at port 5279.            |
 | `bun run build:packages`, then `bun run dev:nextjs` | Next.js at port 3000.                     |
 
 Each collaboration example also needs a second process: `bun run dev:collaboration:signal` starts the signaling server, and `bun run dev:collaboration-hocuspocus:server` starts the room server. For the steps, see [Collaboration](/docs/pro/collaboration#run-the-examples).

@@ -326,6 +326,12 @@ if (target && refresh.navigateToChange(target.id, { block: 'centerIfNeeded' })) 
 }
 ```
 
+<a id="try-the-effects" />
+
+This simulation shows highlights, navigation, and refusals with a sample presentation:
+
+<DocumentRefreshDemo />
+
 A highlight flashes each change on these surfaces:
 
 - **Thumbnails**: the slide rail and slide sorter thumbnails of every slide with a change.
@@ -401,6 +407,8 @@ Navigation returns `false` for an unavailable location or during replacement. It
 | `load-failed` | A valid file failed to open. Check `recovered` for restoration. | Report the failure. |
 | `recovery-failed` | Opening and restoration both failed. | Offer recovery. |
 
+A refusal for a result that the controller does not accept, such as `out-of-order` or `superseded`, does not change `snapshot()`. To show every outcome in a status line, use the return value of `applyUpdate()` or `onResult()`.
+
 Do not retry a refused result blindly. Connect your cancel control to both the transport and the controller, because cancellation does not reverse accepted files:
 
 ```ts
@@ -436,3 +444,4 @@ Recovery bytes are not an undo archive for accepted files.
 - [Compare presentations](/docs/pro/compare-presentations)
 - [Navigate a presentation](/docs/guides/navigation)
 - [Collaboration](/docs/pro/collaboration)
+- [Document refresh example](https://github.com/eigenpal/pptx-editor/tree/main/examples/document-refresh)

@@ -24,17 +24,17 @@
 - [x] Reload in place: open the returned file in a second session off the page, keep the loading screen hidden, and swap in one frame. Done differently: the returned file applies in place as a diff without history, so no second session is needed. Fallback: a quiet whole-file load without the loading screen.
 - [ ] Paint the new current slide off the page and wait for its font faces before the swap. Not done.
 - [x] Keep thumbnails of unchanged slides. Repaint changed thumbnails off the page. Never empty a painted container during a refresh. Unchanged parts keep their identity, so their thumbnails and canvas items do not repaint. Changed thumbnails repaint in place.
-- [ ] Key rail and sorter items by slide match in React and Vue, and keep the rail scroll position. Not verified: rail items keep their store node keys when slide parts survive.
-- [ ] Split parse, comparison, layout, and paint into steps under 50 milliseconds. Not done. Not benchmarked.
+- [ ] Key rail and sorter items by slide match in React and Vue, and keep the rail scroll position. Rail items keep their slide id key, and `e2e/document-refresh.spec.ts` shows that no thumbnail node is replaced. Gap: after an inserted slide, the thumbnail of each later slide paints again in place at its new index. The rail scroll position is not tested.
+- [x] Split parse, comparison, layout, and paint into steps under 50 milliseconds. `applyUpdate()` reads the file, takes the difference, commits with layout and paint, and computes the changes in separate tasks, and saves nothing during an update. Layout and paint of the commit stay one step. In Chromium, no task exceeds 50 ms at 20, 100, and 300 slides (`bun run bench:refresh:browser`). Before the split, a 100-slide reload took one task of 64 to 71 ms.
 - [x] Keep the old paint and return `load-failed` with `recovered: true` when the new file fails.
-- [ ] Add a Playwright frame test for both modes and both adapters: no loading screen, no empty canvas, no emptied thumbnail, and no long task. Not done.
+- [x] Add a Playwright frame test for both modes and both adapters: no loading screen, no empty canvas, no emptied thumbnail, and no long task. `e2e/document-refresh.spec.ts` checks these on 20 slides, and long tasks on 100 slides, in React and Vue.
 - [x] Flash changed thumbnails in the rail and sorter, with the ring, wash, and "Changed" marker.
 - [x] Flash shape rings and text bands on the canvas, and bands in the notes pane, from one start time. Shape rings and text bands are done. The notes pane gets a ring, not a text band.
 - [x] Add `RefreshHighlightOptions.surfaces` and the `pptx-refresh-*` classes. Apply reduced motion.
-- [ ] Test that a thumbnail that scrolls into view during the hold shows the remaining flash only. A MutationObserver marks new items; no dedicated test.
+- [x] Test that a thumbnail that scrolls into view during the hold shows the remaining flash only. `e2e/document-refresh.spec.ts` scrolls an offscreen rail item into view and opens the slide sorter during the hold.
 - [x] Implement `navigateToChange` with `block`, `behavior`, `offsetPx`, and `focus`.
 - [x] Add `refresh.change.*` strings to `en.json` and the `ja`, `ko`, and `zh-CN` catalogs.
-- [ ] Add a benchmark for comparison time on large fixtures. Set the time budget from it. Not done.
+- [x] Add a benchmark for comparison time on large fixtures. Set the time budget from it. `bun run bench:refresh` times each step at 20, 100, and 300 slides, and fails when a step median exceeds 50 ms at 100 slides. At 300 slides, the read, the comparison, and the change computation each take 25 to 30 ms.
 
 ## Stage 2: edit mode
 

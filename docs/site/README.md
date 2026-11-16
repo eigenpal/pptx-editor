@@ -32,6 +32,7 @@ The pages use these components without imports. A site that renders this directo
 | `FeatureMatrix` | `category`: a key of `FEATURE_CATEGORY_LABELS` | One table of the rows of that category: name (linked to `docsLink` when set), editing, rendering, round trip, and notes |
 | `FeatureSummary` | None | The number of rows, and the count for each editing status |
 | `FeatureBadge` | `id`: a row `id` | The name and editing status of one row, inline |
+| `DocumentRefreshDemo` | None | A simulated presentation that shows the document refresh flash, change navigation, an undoable update, a custom highlight, and a `local-edits` refusal |
 
 The three feature components are the DOCX Editor site components (`src/components/docs/FeatureMatrix.tsx` in the DOCX Editor website repository), bound to `pptxFeatures`, `pptxFeatureById`, and `FEATURE_CATEGORY_LABELS` from `data/pptx-features.ts` in place of the `word-features.ts` exports. The data file imports nothing, so the site can copy it as it is. A row has only the fields of a DOCX Editor row. The components show no `tier`, so a premium row says in its notes that it needs the EigenPal Pro License, as in DOCX Editor. The evidence for each row is in `data/pptx-feature-evidence.ts`, which the site does not sync.
 
