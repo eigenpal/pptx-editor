@@ -27,6 +27,17 @@ The example builds against the workspace source, so no package build runs first.
 8. Reset the example, request updates, and select **Cancel updates**. Accepted changes stay in the presentation.
 9. Reset again and type in a slide during processing. The controller refuses the result with `local-edits` and keeps your edit.
 
+## Replay an agent step by step
+
+Open `http://localhost:5279/agent.html`. A scripted agent edits the presentation in seven steps: it changes a figure, recolors a shape, retitles the deck, adds a slide, writes speaker notes, removes a shape, and reorders slides.
+
+1. Select **Next step** to run one step, or **Play all** to run every step with a pause between them.
+2. Watch the flash. The changed thumbnails flash, and the editor goes to each change.
+3. Select **Undo step** to take back the last step. This works in **Undoable edit** mode.
+4. Select **Restart** to return to the first file through the same refresh, with no loading screen.
+
+Each step returns the complete PPTX file. The page passes no `changes`, so `reviewModule()` compares the files and lists what changed. The steps are in `agent-script.ts`.
+
 ## How it works
 
 `runRefreshJob()` in `src/refresh-job.ts` captures the presentation and submits its bytes. It checks the response's `documentId` and `submissionId` before it applies each cumulative result. It stops after a refusal, except for `out-of-order` results. Its `finally` block finishes the submission after completion or transport failure. Cancellation stops the network request and invalidates pending controller work.
