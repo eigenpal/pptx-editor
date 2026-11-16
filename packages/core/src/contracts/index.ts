@@ -5,4 +5,5 @@
 // automation lane imports `neutral.ts` directly, so it compiles without the DOM library.
 
 export type * from './neutral.ts';
+export type * from './replace-document.ts';
 export type { Editor, RenderThumbnailOptions } from './editor.ts';

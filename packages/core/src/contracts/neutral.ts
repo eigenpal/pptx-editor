@@ -4,6 +4,7 @@
 // without the DOM library. The one DOM-typed contract, `Editor`, lives in `editor.ts`.
 
 import type { PatchShapeFormatCommand } from './format-detail.ts';
+import type { ReplaceDocumentCommand } from './replace-document.ts';
 export type * from './format-detail.ts';
 export type {
   EditorFontErrorCode,
@@ -158,6 +159,7 @@ export type OrderMove = 'forward' | 'backward' | 'front' | 'back';
 export type EditorCommand =
   | PatchShapeFormatCommand
   | CommentCommand
+  | ReplaceDocumentCommand
   | { readonly type: 'undo' }
   | { readonly type: 'redo' }
   | { readonly type: 'toggleBold' }
@@ -778,6 +780,12 @@ export interface LoadOptions {
    * that parses first. Default 0.
    */
   readonly startSlide?: number;
+  /**
+   * A document refresh that reloads: the loading screen does not show, the open deck stays on
+   * screen until the new one is ready, and the deck opens whole.
+   * @internal
+   */
+  readonly quiet?: boolean;
 }
 
 /**

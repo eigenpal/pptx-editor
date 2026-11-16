@@ -977,8 +977,9 @@ export function compile(
     case 'copyFormat':
     case 'pasteFormat':
     case 'toggleCrop':
+    case 'replaceDocument':
       // The painter and crop mode hold editor state: the facade runs them (format-painter.ts,
-      // crop-mode.ts).
+      // crop-mode.ts), and `replaceDocument` too (replace-document.ts).
       throw new CommandRefusal('errors.unsupported', command.type);
     default:
       return compileTable(ctx, batch, command);

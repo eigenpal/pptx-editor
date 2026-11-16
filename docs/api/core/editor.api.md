@@ -1243,11 +1243,13 @@ export class CommandRefusal extends Error {
 // @public
 export type CommandResult = {
     readonly ok: true;
+    readonly replaceDocument?: ReplaceDocumentOutcome;
 } | {
     readonly ok: false;
     readonly reason: string;
     readonly detail?: string;
     readonly noop?: boolean;
+    readonly replaceDocument?: ReplaceDocumentOutcome;
 };
 
 // @internal
@@ -1754,6 +1756,18 @@ export type DialogPartName = 'header' | 'title' | 'body' | 'footer' | 'field' | 
 export function dispatchFindRequest(editor: object | null, replace?: boolean): void;
 
 // @public
+export interface DocumentChange {
+    readonly revision: number;
+    readonly source?: 'load' | 'refresh' | 'recovery';
+}
+
+// @public
+export interface DocumentHandle {
+    readonly loadId: string;
+    readonly revision: number;
+}
+
+// @public
 export interface DocumentOpenFailure {
     readonly code: string;
     readonly reason: DocumentOpenFailureReason;
@@ -1936,6 +1950,7 @@ export interface Editor {
     detach(): void;
     exec(command: EditorCommand, options?: EditorExecOptions): CommandResult;
     focus(): void;
+    getDocumentHandle(): DocumentHandle;
     // (undocumented)
     goToSlide(index: number): void;
     load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
@@ -1995,7 +2010,7 @@ export interface EditorCollaborationSession {
 }
 
 // @public
-export type EditorCommand = PatchShapeFormatCommand | CommentCommand | {
+export type EditorCommand = PatchShapeFormatCommand | CommentCommand | ReplaceDocumentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -4054,6 +4069,8 @@ export function loadingSheetSize(snapshot: EditorSnapshot): LoadingSheetSize;
 
 // @public
 export interface LoadOptions {
+    // @internal
+    readonly quiet?: boolean;
     readonly startSlide?: number;
 }
 
@@ -5027,7 +5044,7 @@ export function positionPopover(panel: HTMLElement | null, anchor: HTMLElement, 
 
 // @public
 export interface PptxEditorEvents {
-    change: (snapshot: EditorSnapshot) => void;
+    change: (snapshot: EditorSnapshot, change: DocumentChange) => void;
     openFailure: (failure: DocumentOpenFailure, snapshot: EditorSnapshot) => void;
     rejection: (rejection: EditorRejection, snapshot: EditorSnapshot) => void;
     selectionChange: (snapshot: EditorSnapshot) => void;
@@ -5267,6 +5284,44 @@ export type ReplaceAllResult = {
     readonly detail?: string;
 };
 
+// @public
+export type ReplaceDocumentCommand = {
+    readonly type: 'replaceDocument';
+} & ReplaceDocumentRequest;
+
+// @public
+export type ReplaceDocumentOutcome = {
+    readonly ok: true;
+    readonly changed: boolean;
+} | ReplaceDocumentRefusal;
+
+// @public
+export type ReplaceDocumentRefusal = {
+    readonly ok: false;
+    readonly message: string;
+} & ({
+    readonly code: 'editNotPermitted';
+    readonly reason: 'viewing' | 'suggesting' | 'protected';
+} | {
+    readonly code: 'editUnsupported';
+    readonly reason: 'differentMainPart' | 'unsupportedDifference' | 'collaborationRefused';
+} | {
+    readonly code: 'staleDocument';
+    readonly reason: 'edited' | 'otherDocument';
+} | {
+    readonly code: 'unavailable';
+    readonly reason?: 'collaborationUnavailable';
+} | {
+    readonly code: 'invalidRequest' | 'invalidDocument' | 'busy';
+    readonly reason?: undefined;
+});
+
+// @public
+export interface ReplaceDocumentRequest {
+    readonly expected?: DocumentHandle;
+    readonly pptx: Uint8Array | ArrayBuffer;
+}
+
 // @internal
 export function reportFontError(error: EditorFontError, handler: ((error: EditorFontError) => void) | undefined): void;
 
@@ -5486,7 +5541,9 @@ export function runSectionSlot(editor: PptxEditorInstance, slot: 'section.rename
 export function runSlideStep(editor: PptxEditorInstance | null, command: EditorCommand | null): boolean;
 
 // @public
-export function runToolbarCommand<K extends ChromeSlotId>(editor: Editor | null, id: K, value?: ToolbarSlotValue<K>, options?: EditorExecOptions): CommandResult;
+export function runToolbarCommand<K extends ChromeSlotId>(editor: Editor | null, id: K, value?: ToolbarSlotValue<K>, options?: EditorExecOptions): {
+    ok: true;
+} | CommandResult;
 
 // @public
 export function safeParticipantColor(value: string | undefined): string | undefined;

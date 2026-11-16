@@ -5,7 +5,13 @@
 // after a notification and calls the handler when its part of the state moved. The React and
 // Vue `useEditorEvent` hooks both call `onEditorEvent`, so they report the same events.
 
-import type { DocumentOpenFailure, EditorRejection, EditorSnapshot } from '../contracts/index.ts';
+import type {
+  DocumentChange,
+  DocumentOpenFailure,
+  EditorRejection,
+  EditorSnapshot,
+} from '../contracts/index.ts';
+import { changeSourceTracker } from './change-source.ts';
 
 /** The events `useEditorEvent` subscribes to, and what each handler receives. @public */
 export interface PptxEditorEvents {
@@ -16,8 +22,11 @@ export interface PptxEditorEvents {
    * host that saves on `change` does not save, and parse the whole deck, while it opens. It
    * also fires once when the deck turns read-only (`EditorSnapshot.readOnlyReason`), so a host
    * that saves on `change` sees `save()` return `null` and can say why.
+   *
+   * `change.source` names a load, a document refresh, or a refresh recovery; it is absent for
+   * edits, undo, and redo. Do not start external processing for a change with a `source`.
    */
-  change: (snapshot: EditorSnapshot) => void;
+  change: (snapshot: EditorSnapshot, change: DocumentChange) => void;
   /**
    * The shape or text selection, the current slide, or the selected slides changed; or, while a
    * long deck opens, the count of slides still opening (`EditorSnapshot.pendingSlides`), as
@@ -82,14 +91,17 @@ export function onEditorEvent<E extends keyof PptxEditorEvents>(
   handler: PptxEditorEvents[E]
 ): () => void {
   let prev = editor.snapshot();
+  const sourceOf = event === 'change' ? changeSourceTracker(editor) : null;
   return editor.subscribe(() => {
     const next = editor.snapshot();
     const before = prev;
     prev = next;
     if (next === before || !happened(event, before, next)) return;
+    const change = sourceOf?.(next.revision);
     const call = handler as (...args: unknown[]) => void;
     if (event === 'rejection') call(next.lastRejection, next);
     else if (event === 'openFailure') call(next.openFailure, next);
+    else if (change) call(next, change);
     else call(next);
   });
 }
