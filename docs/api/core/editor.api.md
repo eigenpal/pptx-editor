@@ -1870,7 +1870,11 @@ export class DocumentSession {
     picturesReady(index?: number, options?: PicturesWait): Promise<boolean>;
     pictureStatus(index?: number): PictureStatus[];
     // @internal
+    get plannedSubstituteFamilies(): readonly DefaultFamily[] | null;
+    // @internal
     probeBatch(base?: PptxPackage): OpBatch;
+    // @internal
+    restSubstitutes: Promise<boolean> | null;
     // @internal
     setHostFaces(next: HostFaces): void;
     // @internal
@@ -1912,7 +1916,7 @@ export function drawingClipboardPayload(bytes: Uint8Array): ClipboardPayload | n
 export function dropSlideDrag(editor: PptxEditorInstance | null, drag: SlideDrag | null, grouped: readonly SlideSection[] | null): void;
 
 // @internal
-export const EAGER_FONTS_WAIT_MS = 2000;
+export const EAGER_FONTS_WAIT_MS = 3000;
 
 // @internal
 export function editBulletGlyph(d: BulletsDialogFields, field: 'char' | 'font', value: string, seed?: BulletsDialogFields): BulletsDialogFields;
@@ -4559,6 +4563,8 @@ export function openHyperlinkPopup(controller: HyperlinkPopupController, editor:
 
 // @public
 export interface OpenOptions {
+    // @internal
+    readonly firstSlideFonts?: number;
     readonly fixedMeasurer?: boolean;
     readonly fonts?: readonly FontSource_2[];
     // @internal
@@ -4567,6 +4573,8 @@ export interface OpenOptions {
     };
     // @internal
     readonly shapingWaitMs?: number;
+    // @internal
+    readonly standIn?: () => TextMeasurer | null;
     readonly substitutes?: boolean;
 }
 

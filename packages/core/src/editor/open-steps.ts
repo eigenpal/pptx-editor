@@ -4,6 +4,7 @@
 // and the mount (the first paint) of a slide of 24,000 shapes each take a task of their own,
 // so the page answers between them.
 
+import { createCanvasMeasurer } from './canvas-measurer.ts';
 import { resolveSlide } from '../cascade/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import {
@@ -40,7 +41,7 @@ export async function prepareDeck(
   options: OpenOptions,
   hostFonts: HostFonts,
   stale: () => boolean,
-  step: (phase: string) => void
+  step: (phase: string, slide?: { readonly width: number; readonly height: number }) => void
 ): Promise<PreparedDeck> {
   // Let the loading screen paint before the parse blocks the main thread (a large deck).
   await yieldToPaint();
@@ -48,13 +49,23 @@ export async function prepareDeck(
   step('parse');
   // The parse does not wait for the text engine: it and the host's fonts wait side by side.
   const parseAt = performance.now();
-  const r = await openPresentation(bytes, { ...options, shapingWaitMs: 0 });
+  // The open waits only for the fonts of the slide it shows; the others install after it.
+  const firstSlideFonts = options.progressive?.startSlide ?? 0;
+  // Until shaping starts, the browser canvas measures, so the text draws where it was measured.
+  const standIn = options.standIn ?? (() => createCanvasMeasurer());
+  const r = await openPresentation(bytes, {
+    ...options,
+    shapingWaitMs: 0,
+    firstSlideFonts,
+    standIn,
+  });
   const parseMs = performance.now() - parseAt;
   if (!r.ok) return stale() ? { kind: 'stale' } : { kind: 'refused', error: r.error };
   const session = r.session;
   let faces: FontFaceHandle | undefined;
   try {
-    step('fonts');
+    // The loading sheet takes the deck's slide size while the fonts load.
+    step('fonts', session.info);
     // One wait from the end of the parse, for the text engine and the host's fonts at once.
     const left = Math.max(0, session.parsedAt + FONT_WAIT_MS - performance.now());
     const shaping = session.shaping;

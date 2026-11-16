@@ -7,7 +7,7 @@ import { pickImageInto } from './chrome-actions.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
 import { slideRefAt, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
-import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
+import { replaceFontFaces, type FontFaceHandle } from '../output/font-faces.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
   CanResult,
@@ -203,8 +203,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       footer: pkg ? footerText(pkg, slide, (i) => !session!.slidePending(i)) : null,
       dateTime: pkg ? dateShown(pkg, slide, (i) => !session!.slidePending(i)) : null,
       slideBackground: stableBackground(lay),
-      slideWidth: info?.width ?? 12_192_000,
-      slideHeight: info?.height ?? 6_858_000,
+      slideWidth: (opening.incoming() ?? info)?.width ?? 12_192_000,
+      slideHeight: (opening.incoming() ?? info)?.height ?? 6_858_000,
       zoom: effectiveZoom(),
       fitZoom,
       insertions,
@@ -604,10 +604,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   /** The session's faces changed: register them for paint (in a browser) and publish. */
   const refreshFaces = async (owner: DocumentSession): Promise<void> => {
     if (typeof document !== 'undefined') {
-      fonts?.dispose();
-      const faces = registerFontFaces(document, owner.faces);
-      fonts = faces;
-      await faces.ready;
+      // The faces on screen stay until the new ones paint and the thumbnails repaint.
+      const retire = () => thumbnails.repainted();
+      await (fonts = replaceFontFaces(document, fonts, owner.faces, { retire })).ready;
       // A load or destroy in the meantime owns the faces now.
       if (destroyed || session !== owner) return;
     }
@@ -724,7 +723,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       reason: destroyed ? 'disabled.destroyed' : 'errors.superseded',
     });
     // Any throw ends the open with a refusal to report: the loading screen never stays up.
-    let phase = 'paint';
+    const steps = opening.steps();
     // The new deck's session once it mounts: a throw after that drops it.
     let adopted: DocumentSession | null = null;
     try {
@@ -736,13 +735,13 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
       const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
       const openOptions = { ...openOptionsOf(options), ...progressive };
-      const r = await prepareDeck(bytes, openOptions, hostFonts, stale, (s) => void (phase = s));
+      const r = await prepareDeck(bytes, openOptions, hostFonts, stale, steps.at);
       if (r.kind === 'stale') return superseded();
       if (r.kind === 'refused') {
         opening.resume(session);
         return refuseOpen(openRejectionCode(r.error));
       }
-      phase = 'mount';
+      steps.at('mount');
       adopted = r.session;
       session?.dispose();
       fonts?.dispose();
@@ -795,7 +794,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (opened.fontGeneration !== r.generation) void refreshFaces(opened);
       return { ok: true };
     } catch (cause) {
-      console.error(`[pptx-editor] The open failed (${phase})`, cause);
+      console.error(`[pptx-editor] The open failed (${steps.phase})`, cause);
       if (adopted && session === adopted) {
         // The new deck was on screen, half set up: it goes, as a deck with a damaged part does.
         // The load is over, so the refusal sets the status the open leaves.
@@ -911,6 +910,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         run: (command, options) => afterInsertCommand(instance, command, exec(command, options)),
         beginHistoryGroup: () => groups.begin(),
         refuse: (reason, detail) => void refuse(reason, detail),
+        openingSlide: opening.incoming,
         fitChanged: (value) => {
           if (Math.abs(value - fitValue) < 0.001) return;
           fitValue = value;

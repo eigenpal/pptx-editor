@@ -419,6 +419,15 @@
   border-radius: 14px;
   overflow: hidden;
 }
+/* The loading overlay keeps the sheet in the slide's box, clear of the status strip, so the
+   slide paints where the sheet was. It stays under the status strip (25), so the view switch and
+   the zoom stay in view while the deck opens, and it takes the workspace color, as the canvas
+   does: the overlay is an editor root of its own, with the editor's own colors. */
+.demo-canvas > .pptx-loading.pptx-loading--overlay {
+  --doc-bg: var(--demo-bg);
+  z-index: 24;
+  padding: inherit;
+}
 /* The editor's slide edge stays, so a dark slide shows its box on the dark workspace. */
 .demo-root .pptx-surface__stage {
   box-shadow:

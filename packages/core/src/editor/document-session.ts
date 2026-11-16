@@ -4,11 +4,7 @@
 
 import { partWithoutEditorMarks } from '../automation/commands/table-edit-marks.ts';
 import { openStore } from '../automation/commands/open-store.ts';
-import {
-  loadDefaultFonts,
-  ALL_DEFAULT_FONT_FAMILIES,
-  FONT_ASSET_ROOT,
-} from '@docx-editor.dev/fonts';
+import { loadDefaultFonts, FONT_ASSET_ROOT } from '@docx-editor.dev/fonts';
 import {
   binaryPartOf,
   decodeEmbeddedFont,
@@ -16,8 +12,6 @@ import {
   presentationInfo,
   slideRefAt,
   PptxDocumentStore,
-  attr,
-  NS,
   readPptx,
   readPptxDeferred,
   relTarget,
@@ -27,14 +21,9 @@ import {
   pendingDeferredBytes,
   deferredRejection,
   PPTX_ZIP_LIMITS,
-  type Element,
-  type XmlPart,
   type PackageRejection,
   type PptxPackage,
-  type PackagePart,
   type PresentationInfo,
-  changedPartNames,
-  deferredParseCount,
   imageSize,
   imageSizeEmu,
 } from '../store/index.ts';
@@ -70,6 +59,14 @@ import {
   ProgressiveOpen,
   PROGRESSIVE_OPEN_CONTENT_BYTES,
 } from './progressive-open.ts';
+import {
+  namedFamilies,
+  slideSubstituteFamilies,
+  substituteFamiliesFor,
+  type DefaultFamily,
+} from './substitute-families.ts';
+
+export { namedFamilies, substituteFamiliesFor } from './substitute-families.ts';
 
 /** The longest the late fit waits for substitutes that slides parsed late name. */
 const LATE_SUBSTITUTE_WAIT_MS = 10_000;
@@ -102,6 +99,18 @@ export interface OpenOptions {
    * hold less than `PROGRESSIVE_OPEN_CONTENT_BYTES` parses whole. @internal
    */
   readonly progressive?: { readonly startSlide?: number };
+  /**
+   * Load only the packaged substitutes that slide `firstSlideFonts` needs before the session
+   * opens. The others load after it (`DocumentSession.restSubstitutes`), so the first slide
+   * does not wait for the fonts of every slide. Requires `shapingWaitMs`. @internal
+   */
+  readonly firstSlideFonts?: number;
+  /**
+   * The measurer of an open that has stopped waiting for its fonts (`shapingWaitMs`), until
+   * shaping starts: the browser canvas (`canvas-measurer.ts`), so the text draws where it was
+   * measured. Null or omitted, the fixed measurer stands in. @internal
+   */
+  readonly standIn?: () => TextMeasurer | null;
 }
 
 /** A family the deck names that measures with another face. @public */
@@ -140,132 +149,6 @@ export interface SubstituteFontFailure {
   readonly diagnostic: string;
 }
 
-/** Elements whose `typeface` names a family layout measures with. */
-const TYPEFACE_ELEMENTS = new Set(['latin', 'sym', 'buFont']);
-const familyCache = new WeakMap<XmlPart, ReadonlySet<string>>();
-
-function partFamilies(part: XmlPart): ReadonlySet<string> {
-  const hit = familyCache.get(part);
-  if (hit) return hit;
-  const out = new Set<string>();
-  const walk = (el: Element, depth: number): void => {
-    if (depth > 256) return;
-    if (el.ns === NS.a && TYPEFACE_ELEMENTS.has(el.local)) {
-      const face = attr(el, 'typeface');
-      if (face && !face.startsWith('+') && face.length <= 64) out.add(face);
-    }
-    for (const c of el.children) if (c.type === 'element') walk(c, depth + 1);
-  };
-  walk(part.root, 0);
-  familyCache.set(part, out);
-  return out;
-}
-
-const FAMILY_PARTS = /^\/ppt\/(slides|slideLayouts|slideMasters)\//;
-
-/** The families of the parts that name measured text, for the last package read. */
-interface FamilyCount {
-  /** `deferredParseCount()` when counted: a slide that parses changes no part identity. */
-  readonly parsed: number;
-  readonly slides: PresentationInfo['slides'];
-  readonly themes: ReadonlySet<string | undefined>;
-  /** The number of parts that name each family, by its exact spelling. */
-  readonly counts: ReadonlyMap<string, number>;
-  readonly list: readonly string[];
-}
-
-const familyCounts = new WeakMap<PptxPackage, FamilyCount>();
-/** The last package counted, held weakly: a closed deck is not kept alive for it. */
-let lastFamilyPackage: WeakRef<PptxPackage> | null = null;
-const EMPTY_FAMILIES: ReadonlySet<string> = new Set();
-
-/** The families `part` adds to the count, or none. */
-function countedFamilies(
-  part: PackagePart | undefined,
-  themes: ReadonlySet<string | undefined>
-): ReadonlySet<string> {
-  if (part?.kind !== 'xml' || !(FAMILY_PARTS.test(part.partName) || themes.has(part.partName)))
-    return EMPTY_FAMILIES;
-  // A slide still opening names its families once it parses (`progressive-open.ts`).
-  if (isDeferredPending(part)) return EMPTY_FAMILIES;
-  return partFamilies(part.xml);
-}
-
-/**
- * The sorted list, one entry per case-folded family, or null when two spellings of one family
- * remain: a full pass then picks the spelling of the first part that names it.
- */
-function familyList(counts: ReadonlyMap<string, number>): string[] | null {
-  const folded = new Set<string>();
-  for (const f of counts.keys()) {
-    const key = f.toLowerCase();
-    if (folded.has(key)) return null;
-    folded.add(key);
-  }
-  return [...counts.keys()].sort((a, b) => a.localeCompare(b));
-}
-
-/**
- * Every family the deck names for measured text: run fonts, symbol fonts, bullet fonts, and
- * the theme's font scheme. Cached per part identity, so an edit rescans only the parts it
- * changed. After an edit that keeps the slide list, the count of the last package changes by
- * the changed parts only, so a keystroke walks no other part. The result is the one a full
- * pass gives.
- */
-export function namedFamilies(pkg: PptxPackage): string[] {
-  const info = presentationInfo(pkg);
-  const parsed = deferredParseCount();
-  const hit = familyCounts.get(pkg);
-  if (hit?.parsed === parsed) return rememberFamilies(pkg, hit);
-  const lastPkg = lastFamilyPackage?.deref();
-  const last = lastPkg && familyCounts.get(lastPkg);
-  const changed =
-    lastPkg && last && last.parsed === parsed && last.slides === info.slides
-      ? changedPartNames(lastPkg, pkg, 64)
-      : null;
-  if (last && changed) {
-    const counts = new Map(last.counts);
-    const add = (families: ReadonlySet<string>, by: number): void => {
-      for (const f of families) {
-        const n = (counts.get(f) ?? 0) + by;
-        if (n > 0) counts.set(f, n);
-        else counts.delete(f);
-      }
-    };
-    for (const name of changed) {
-      add(countedFamilies(lastPkg?.parts.get(name), last.themes), -1);
-      add(countedFamilies(pkg.parts.get(name), last.themes), 1);
-    }
-    const list = familyList(counts);
-    if (list) {
-      return rememberFamilies(pkg, {
-        parsed,
-        slides: info.slides,
-        themes: last.themes,
-        counts,
-        list,
-      });
-    }
-  }
-  // Only the themes slide masters use: a notes or handout master theme never reaches a slide.
-  const themes = new Set(info.slides.map((s) => s.themePart));
-  const counts = new Map<string, number>();
-  const byKey = new Map<string, string>();
-  for (const part of pkg.parts.values())
-    for (const f of countedFamilies(part, themes)) {
-      counts.set(f, (counts.get(f) ?? 0) + 1);
-      if (!byKey.has(f.toLowerCase())) byKey.set(f.toLowerCase(), f);
-    }
-  const list = [...byKey.values()].sort((a, b) => a.localeCompare(b));
-  return rememberFamilies(pkg, { parsed, slides: info.slides, themes, counts, list });
-}
-
-function rememberFamilies(pkg: PptxPackage, count: FamilyCount): string[] {
-  familyCounts.set(pkg, count);
-  lastFamilyPackage = new WeakRef(pkg);
-  return [...count.list];
-}
-
 const MIME_BY_EXT: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -281,33 +164,6 @@ const MIME_BY_EXT: Record<string, string> = {
 export function imageMime(partName: string): string | undefined {
   const ext = partName.slice(partName.lastIndexOf('.') + 1).toLowerCase();
   return MIME_BY_EXT[ext];
-}
-
-type DefaultFamily = (typeof ALL_DEFAULT_FONT_FAMILIES)[number];
-
-/**
- * Which packaged substitute family covers a typeface the deck names. A deck can name a packaged
- * open face itself (Carlito, Caladea, TeX Gyre Adventor): it loads the family that ships it, so
- * the face draws as itself and not as the Arial fallback.
- */
-function substituteFamilyFor(typeface: string): DefaultFamily {
-  const t = typeface.toLowerCase();
-  if (t.startsWith('calibri') || t.startsWith('aptos') || t === 'carlito') return 'Calibri';
-  if (t.startsWith('cambria') || t === 'caladea') return 'Cambria';
-  if (t.startsWith('tex gyre adventor')) return 'Century Gothic';
-  if (t.startsWith('times') || t.includes('serif') || t.startsWith('georgia'))
-    return 'Times New Roman';
-  if (t.startsWith('courier') || t.includes('mono') || t.startsWith('consolas'))
-    return 'Courier New';
-  if (t.startsWith('century gothic')) return 'Century Gothic';
-  return 'Arial';
-}
-
-/** The substitute families a deck needs: every typeface it names, plus the Arial fallback. */
-export function substituteFamiliesFor(pkg: PptxPackage): DefaultFamily[] {
-  const families = new Set<DefaultFamily>(['Arial']);
-  for (const f of namedFamilies(pkg)) families.add(substituteFamilyFor(f));
-  return [...families];
 }
 
 /** The packaged substitutes of one family, and the faces that failed to load. @internal */
@@ -465,17 +321,24 @@ interface FontSet {
   /** The substitute families loaded, or null when the open loads none. */
   readonly substituteFamilies: readonly DefaultFamily[] | null;
   readonly fixed: boolean;
+  /** Measures while `fixed`, instead of the fixed measurer (`OpenOptions.standIn`). */
+  readonly standIn?: TextMeasurer | null;
 }
 
 function buildMeasurer(set: FontSet): { measurer: TextMeasurer; faces: readonly RegisteredFace[] } {
-  if (set.fixed) return { measurer: createFixedMeasurer(), faces: [] };
-  const measurer = createHarfBuzzMeasurer([
+  if (set.fixed) return { measurer: set.standIn ?? createFixedMeasurer(), faces: [] };
+  const sources = [
     ...set.host,
     ...set.embedded,
     ...set.configured.faces,
     ...set.configured.substitutions.map((s) => s.face),
     ...set.substitutes,
-  ]);
+  ];
+  // Every font failed to load (a blocked network, a strict proxy): with no face, shaping would
+  // give each character half an em, and the letters spread or overlap. The browser's faces
+  // measure and paint the text instead, until a face arrives.
+  if (sources.length === 0 && set.standIn) return { measurer: set.standIn, faces: [] };
+  const measurer = createHarfBuzzMeasurer(sources);
   return { measurer, faces: measurer.faces };
 }
 
@@ -534,6 +397,11 @@ export class DocumentSession {
    * nothing is on the way. @internal
    */
   shaping: Promise<boolean> | null = null;
+  /**
+   * The substitutes that the open left for later (`OpenOptions.firstSlideFonts`): resolves
+   * `true` when they loaded and the session measures with them. Never rejects. @internal
+   */
+  restSubstitutes: Promise<boolean> | null = null;
   /** Why shaped measurement did not start, once `shaping` resolved `false`. @internal */
   shapingError: unknown = null;
   /**
@@ -667,10 +535,11 @@ export class DocumentSession {
 
   async #loadMissingSubstitutes(): Promise<boolean> {
     const loaded = this.#fonts.substituteFamilies;
-    if (this.#fonts.fixed || !loaded) return false;
+    if (this.#fonts.fixed || !loaded || this.#disposed) return false;
     const missing = substituteFamiliesFor(this.store.package).filter((f) => !loaded.includes(f));
     if (missing.length === 0) return false;
     const more = await substituteFonts(missing);
+    if (this.#disposed) return false;
     const now = this.#fonts;
     this.#fonts = {
       ...now,
@@ -862,7 +731,16 @@ export class DocumentSession {
     return bytes ? metafileSizeEmu(bytes) : undefined; // An EMF or WMF picture frame.
   };
 
-  /** The families whose packaged substitutes the session loads; null when it loads none. */
+  /**
+   * The substitute families the session loads: the loaded ones, and the ones a deck names that
+   * load after the open. Null when the session loads no substitutes. @internal
+   */
+  get plannedSubstituteFamilies(): readonly DefaultFamily[] | null {
+    const loaded = this.#fonts.substituteFamilies;
+    return loaded && [...new Set([...loaded, ...substituteFamiliesFor(this.store.package)])];
+  }
+
+  /** The families whose packaged substitutes the session has loaded; null when it loads none. */
   get substituteFamilies(): readonly DefaultFamily[] | null {
     return this.#fonts.substituteFamilies;
   }
@@ -924,7 +802,17 @@ export async function openPresentation(
     return made;
   };
   if (options.fixedMeasurer) return { ok: true, session: make({ ...base, fixed: true }) };
-  const families = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
+  const all = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
+  // The opening slide's substitutes first: the others load after the open (`restSubstitutes`).
+  const first =
+    all && options.firstSlideFonts !== undefined && options.shapingWaitMs !== undefined
+      ? slideSubstituteFamilies(
+          read.pkg,
+          clampSlide(options.firstSlideFonts, presentationInfo(read.pkg).slides.length)
+        ).filter((f) => all.includes(f))
+      : all;
+  const families = first;
+  const split = !!all && !!first && first.length < all.length;
   const parsedAt = performance.now();
   // The substitutes download next to the text engine, not after it: the two waits do not add up.
   const subs = families ? substituteFonts(families) : { sources: [], failures: [] };
@@ -947,31 +835,41 @@ export async function openPresentation(
   if (inTime && 'loaded' in inTime) {
     const session = make(shaped(inTime.loaded));
     session.parsedAt = parsedAt;
+    if (split) session.restSubstitutes = session.addMissingSubstitutes().catch(() => false);
     return { ok: true, session };
   }
-  const session = make({ ...base, substituteFamilies: families, fixed: true });
+  const standIn = options.standIn?.() ?? null;
+  const session = make({ ...base, substituteFamilies: families, fixed: true, standIn });
   session.parsedAt = parsedAt;
   session.shapingError = inTime?.error ?? null;
   // The shapes that edits fit with the fixed measurer fit again when shaping starts, unless
   // their XML is back to the opened package's (an undone edit).
   const openedPackage = session.store.package;
+  let restLoaded: (added: boolean) => void = () => {};
+  if (split) session.restSubstitutes = new Promise((resolve) => (restLoaded = resolve));
   session.shaping = inTime
-    ? Promise.resolve(false)
+    ? (restLoaded(false), Promise.resolve(false))
     : settled.then((late) => {
         if (!('loaded' in late)) {
           session.shapingError = late.error;
+          restLoaded(false);
           return false;
         }
         const fixed = session.measurer;
         session.useShapedMeasurer(late.loaded);
         // Slides that parsed while the measurer was fixed can name families the open did not
-        // load: `addMissingSubstitutes` skipped them then.
-        // The fit waits for those substitutes, but a stalled or failed load does not stop it.
-        const refit = (): true => (refitEditedText(session, fixed, openedPackage), true);
-        return within(session.addMissingSubstitutes(), LATE_SUBSTITUTE_WAIT_MS, undefined).then(
-          refit,
-          refit
-        );
+        // load: `addMissingSubstitutes` skipped them then, as it skipped the families that a
+        // split open leaves for later. The fit waits for those substitutes, but a stalled or
+        // failed load does not stop it.
+        const more = within(session.addMissingSubstitutes(), LATE_SUBSTITUTE_WAIT_MS, undefined);
+        const refit = (added?: boolean): true => {
+          refitEditedText(session, fixed, openedPackage);
+          restLoaded(added === true);
+          return true;
+        };
+        const fitted = more.then(refit, () => refit());
+        // A split open paints with the opening slide's faces now; the rest install on arrival.
+        return split ? true : fitted;
       });
   return { ok: true, session };
 }

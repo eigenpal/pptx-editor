@@ -210,11 +210,13 @@ export function withFontOrigin(
 const isAbort = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
 /**
- * The longest a deck that opens waits for the host's fonts, as DOCX Editor's
- * `PREPARED_WORK_WAIT_MS`. After it, the deck paints with the embedded and built-in faces, and
- * the host's faces install when they arrive. A stalled download never holds the loading screen.
+ * The longest a deck that opens waits for its fonts: the text engine, the opening slide's
+ * substitutes, and the host's fonts. The loading sheet shows meanwhile, so on most networks
+ * the first slide paints once, in its own faces. After it, the deck paints with the browser's
+ * faces as stand-ins, and the deck's faces install when they arrive. A stalled download never
+ * holds the loading screen.
  */
-export const FONT_WAIT_MS = 2000;
+export const FONT_WAIT_MS = 3000;
 
 /** The answer `within` gives when the host's fonts did not arrive in time. */
 const LATE = Symbol('late');
@@ -225,6 +227,14 @@ const LATE = Symbol('late');
  * that arrive after this still install.
  */
 export const LATE_FONT_WAIT_MS = 10_000;
+
+/**
+ * How long the packaged substitutes for the other slides may hold `resolving`. They are a few
+ * files from the editor's own assets, but they download after the opening slide's faces, so on
+ * a slow network they need longer than {@link LATE_FONT_WAIT_MS}. Until then the substitution
+ * notice does not name families whose faces are still on the way.
+ */
+export const REST_SUBSTITUTE_WAIT_MS = 30_000;
 
 /** The host's fonts for one editor. */
 export interface HostFonts {
@@ -249,8 +259,9 @@ export interface HostFonts {
   /** Whether faces the deck asked for are still on the way, for at most {@link LATE_FONT_WAIT_MS}. */
   resolving(): boolean;
   /**
-   * Shaped measurement that arrives after `session` opened: count it in `resolving`. Then,
-   * while the editor shows `session`, register the new faces, or report why it did not load.
+   * Shaped measurement and packaged substitutes that arrive after `session` opened: count them
+   * in `resolving`. Then, while the editor shows `session`, register the new faces, or report
+   * why shaped measurement did not load.
    */
   awaitShaping(session: DocumentSession): void;
   dispose(): void;
@@ -264,6 +275,8 @@ export function createHostFonts(
     readonly waitMs?: number;
     /** Overrides {@link LATE_FONT_WAIT_MS}; for tests. */
     readonly lateWaitMs?: number;
+    /** Overrides {@link REST_SUBSTITUTE_WAIT_MS}; for tests. */
+    readonly restWaitMs?: number;
     /** `resolving()` changed with nothing installed: publish. */
     readonly changed: () => void;
     readonly session: () => DocumentSession | null;
@@ -309,11 +322,15 @@ export function createHostFonts(
     }
   };
   /** Wait for `late`; `arrived` installs it and answers whether it installed anything. */
-  const track = <T>(late: Promise<T>, arrived: (value: T, token: object) => boolean): object => {
+  const track = <T>(
+    late: Promise<T>,
+    arrived: (value: T, token: object) => boolean,
+    waitMs = host.lateWaitMs ?? LATE_FONT_WAIT_MS
+  ): object => {
     const token = {};
     waiting.set(
       token,
-      setTimeout(() => settle(token), host.lateWaitMs ?? LATE_FONT_WAIT_MS)
+      setTimeout(() => settle(token), waitMs)
     );
     late.then(
       (value) => {
@@ -369,13 +386,14 @@ export function createHostFonts(
   };
 
   /**
-   * The faces the engine loads itself: the packaged substitutes of the session's families.
-   * An origin that serves the same files (`packagedFonts()`) skips them, so no file loads twice.
+   * The faces the engine loads itself: the packaged substitutes of the session's families,
+   * with those it loads after the open (`DocumentSession.restSubstitutes`). An origin that
+   * serves the same files (`packagedFonts()`) skips them, so no file loads twice.
    * The faces carry the substitute's own family (Carlito, not Calibri): an origin that serves
    * the requested family itself, such as `customFonts()` with the real Calibri, still loads it.
    */
   const engineFaces = (session: DocumentSession): { resolvedFaces?: FontFaceRequest[] } => {
-    const families = session.substituteFamilies;
+    const families = session.plannedSubstituteFamilies;
     if (!families || families.length === 0) return {};
     return {
       resolvedFaces: families.flatMap((family) =>
@@ -564,6 +582,22 @@ export function createHostFonts(
     resolving: () => waiting.size > 0,
 
     awaitShaping(session) {
+      // The substitutes that a split open left for later count in `resolving`, so the
+      // substitution notice waits for them, and they install when they arrive.
+      const rest = session.restSubstitutes;
+      if (rest) {
+        const token = track(
+          rest,
+          (added, own) => {
+            if (!added || destroyed || host.session() !== session) return false;
+            settle(own, true);
+            void host.installed(session);
+            return true;
+          },
+          host.restWaitMs ?? REST_SUBSTITUTE_WAIT_MS
+        );
+        shapingWaits.add(token);
+      }
       const work = session.shaping;
       if (!work) return;
       shapingWaits.add(track(work, () => false));

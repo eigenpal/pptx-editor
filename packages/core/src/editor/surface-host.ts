@@ -48,6 +48,7 @@ export type SurfaceHostBase = Pick<
   | 'idPrefix'
   | 'pickImage'
   | 'layout'
+  | 'openingSlide'
   | 'label'
   | 'select'
   | 'copy'

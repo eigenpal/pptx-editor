@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { RegisteredFace } from '../../layout/index.ts';
-import { registerFontFaces } from '../font-faces.ts';
+import { registerFontFaces, replaceFontFaces } from '../font-faces.ts';
 
 const face = { id: 'pptx-face-1', bytes: new Uint8Array([0, 1, 0, 0]) } as RegisteredFace;
 
@@ -174,4 +174,99 @@ test('a constructor failure removes faces already registered', () => {
   };
   expect(() => registerFontFaces(doc as unknown as Document, [face, face])).toThrow('font failure');
   expect(fonts.size).toBe(0);
+});
+
+describe('replaceFontFaces', () => {
+  test('keeps the previous faces until the new ones load and the next frame paints', async () => {
+    const loads: (() => void)[] = [];
+    class SlowFontFace {
+      constructor(readonly family: string) {}
+      load(): Promise<this> {
+        return new Promise((resolve) => loads.push(() => resolve(this)));
+      }
+    }
+    const frames: (() => void)[] = [];
+    const fonts = new Set<{ family: string }>();
+    const view = {
+      FontFace: SlowFontFace,
+      requestAnimationFrame: (run: () => void) => frames.push(run),
+      setTimeout: (run: () => void) => setTimeout(run, 0),
+      clearTimeout: (id: ReturnType<typeof setTimeout>) => clearTimeout(id),
+    };
+    const doc = {
+      defaultView: view,
+      fonts: {
+        add: (f: { family: string }) => fonts.add(f),
+        delete: (f: { family: string }) => fonts.delete(f),
+      },
+    } as unknown as Document;
+    const families = () => [...fonts].map((f) => f.family).sort();
+    const old = { id: 'pptx-f1-0', bytes: face.bytes } as RegisteredFace;
+    const next = { id: 'pptx-f2-0', bytes: face.bytes } as RegisteredFace;
+
+    const first = registerFontFaces(doc, [old]);
+    loads.shift()!();
+    await first.ready;
+    const second = replaceFontFaces(doc, first, [next]);
+    // Both sets are in the font set while the new faces load.
+    expect(families()).toEqual(['pptx-f1-0', 'pptx-f2-0']);
+    loads.shift()!();
+    await second.ready;
+    await new Promise((r) => setTimeout(r, 0));
+    // Loaded, but the frame that paints with them has not run: the old faces stay.
+    expect(families()).toEqual(['pptx-f1-0', 'pptx-f2-0']);
+    frames.shift()!();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(families()).toEqual(['pptx-f2-0']);
+    second.dispose();
+    expect(families()).toEqual([]);
+  });
+
+  test('releases the previous faces when the new ones are disposed before they load', async () => {
+    class NeverFontFace {
+      constructor(readonly family: string) {}
+      load(): Promise<this> {
+        return new Promise(() => {});
+      }
+    }
+    const fonts = new Set<unknown>();
+    const doc = {
+      defaultView: { FontFace: NeverFontFace },
+      fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+    } as unknown as Document;
+    const first = registerFontFaces(doc, [face], { waitMs: 1 });
+    await first.ready;
+    const second = replaceFontFaces(doc, first, [face], { waitMs: 10_000 });
+    expect(fonts.size).toBe(2);
+    second.dispose();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(fonts.size).toBe(0);
+  });
+
+  test('keeps the previous faces until `retire` resolves', async () => {
+    class FastFontFace {
+      constructor(readonly family: string) {}
+      load(): Promise<this> {
+        return Promise.resolve(this);
+      }
+    }
+    const fonts = new Set<unknown>();
+    const doc = {
+      defaultView: { FontFace: FastFontFace },
+      fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+    } as unknown as Document;
+    const first = registerFontFaces(doc, [face]);
+    await first.ready;
+    let retired!: () => void;
+    const retire = () => new Promise<void>((resolve) => (retired = resolve));
+    const second = replaceFontFaces(doc, first, [face], { retire });
+    await second.ready;
+    await new Promise((r) => setTimeout(r, 20));
+    // The thumbnails still draw with the previous faces: they stay.
+    expect(fonts.size).toBe(2);
+    retired();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(fonts.size).toBe(1);
+    second.dispose();
+  });
 });

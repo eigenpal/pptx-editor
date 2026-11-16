@@ -233,15 +233,19 @@ A lower rank still serves a style that a higher rank lacks. `snapshot().substitu
 
 ## Configure loading
 
-A deck that opens waits at most 2 seconds for its fonts: the text engine, the packaged substitutes, and the faces of your `fonts` origins. Faces that arrive later install when they land, and the slides lay out again. A slow or blocked font download never holds the loading screen.
+A deck that opens waits at most 3 seconds for its fonts: the text engine, the packaged substitutes, and the faces of your `fonts` origins. The loading sheet shows meanwhile, so on most networks the first slide paints once, in its own faces. Faces that arrive later install when they land, and the slides lay out again. A slow or blocked font download never holds the loading screen.
 
-Browser font registration has a separate 2-second limit. If registration stalls, the editor opens with available browser faces. Late faces remain registered and display when the browser finishes loading them.
+The editor waits only for the packaged substitutes of the slide it opens on: the families of that slide, its layout, its master, and its theme. The substitutes for the other slides load after the deck opens, and `resolving` stays `true` until they install. A deck that uses many families therefore shows its first slide sooner. A PDF export or a server session loads every substitute before it opens.
+
+Browser font registration has a separate 2-second limit. If registration stalls, the editor opens with available browser faces. Late faces remain registered and display when the browser finishes loading them. When late faces install, the faces on screen stay registered until the new faces load and the slide and its thumbnails repaint, so text never draws with a fallback face in between.
 
 A deferred font chain stops after 256 arrivals and reports a font error. Faces already received remain available. This limit prevents cyclic or endless resolver answers from blocking browser input.
 
-Until the text engine starts, the deck measures text with a fixed measurer and paints with the faces the browser already has. Embedded faces and your `fonts` faces paint when the text engine starts. The shapes whose text you edit before then fit again when the text engine starts. Other shapes keep the fit that the file has, also when you move them. The new fit is one undo step of its own, so the first undo gives back the estimated fit.
+If the fonts take longer than 3 seconds, the deck shows before the text engine starts. Until it starts, the deck measures and paints text with the faces the browser already has, so the text is readable and each character sits where it was measured. Without a browser canvas, for example in a server or a test, a fixed measurer estimates the widths instead. Embedded faces and your `fonts` faces paint when the text engine starts. The shapes whose text you edit before then fit again when the text engine starts. Other shapes keep the fit that the file has, also when you move them. The new fit is one undo step of its own, so the first undo gives back the estimated fit.
 
-When the text engine cannot start, for example because a Content Security Policy blocks WebAssembly, the fixed measurer and the browser's faces stay, and `onFontError` reports why.
+The editor registers each face it loads under a private family name. A face never replaces a font of your page, so your application's text keeps its fonts while a deck's fonts load.
+
+When the text engine cannot start, for example because a Content Security Policy blocks WebAssembly, the browser's faces stay, and `onFontError` reports why.
 
 `editor.fontMeasurement()` says which measurer the deck uses and whether fonts are still on the way. In this sample, `editor` is the `PptxEditorInstance` that `onReady` gives you. In React, `usePptxEditor()` returns it; in Vue, `usePptxEditor().value` holds it. A change of `resolving` publishes an editor state change, so read the value again in a `useEditorState` selector or a `subscribe` callback:
 

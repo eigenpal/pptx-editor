@@ -3,7 +3,7 @@
 // `packages/vue/test/demo-shell.test.ts`), which has no layout engine and no canvas. These
 // keep only what those cannot prove: pixels drawn on a canvas, and boxes from CSS layout.
 import { readFileSync } from 'node:fs';
-import { unzipSync } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { textDeck } from '../scripts/bench/text-deck.ts';
 
@@ -781,4 +781,160 @@ test('IME: the slide shows the composing text in place, and the model takes it o
   await expect(page.locator('.pptx-surface__composition line')).toHaveCount(0);
   expect(await revision()).toBe(before + 1);
   expect(await page.evaluate(() => window.__pptxEditor.find.matches('日本').length)).toBe(1);
+});
+
+test('loading: the sheet sits where the slide paints, at the zoom the deck opens at', async ({
+  page,
+}) => {
+  // Hold the deck, so the loading screen stays until the test measures it.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/showcase.pptx', async (route) => (await held, route.continue()));
+  await page.goto('/');
+  const sheet = page.locator('.pptx-loading__sheet');
+  await expect(sheet).toBeVisible();
+  const zoom = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as { __pptxEditor: { snapshot(): { zoom: number } } }
+        ).__pptxEditor.snapshot().zoom
+    );
+  const loadingBox = await sheet.boundingBox();
+  const loadingZoom = await zoom();
+  // The zoom and the view switch stay in view over the loading screen.
+  const pillOnTop = await page.evaluate(() => {
+    const pill = document.querySelector('.demo-status .pptx-zoom')!;
+    const r = pill.getBoundingClientRect();
+    return [r.top + 1, r.top + r.height / 2, r.bottom - 1].every((y) =>
+      pill.contains(document.elementFromPoint(r.left + r.width / 2, y))
+    );
+  });
+  expect(pillOnTop).toBe(true);
+  release();
+  const slide = page.locator('.pptx-surface__slide');
+  await expect(slide).toBeVisible();
+  const slideBox = await slide.boundingBox();
+  for (const key of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(slideBox![key] - loadingBox![key])).toBeLessThanOrEqual(1);
+  expect(await zoom()).toBeCloseTo(loadingZoom, 3);
+});
+
+test('loading: a 4:3 deck shows a 4:3 sheet while its fonts load, and paints in its box', async ({
+  page,
+}) => {
+  const parts = unzipSync(new Uint8Array(readFileSync('examples/vite/public/showcase.pptx')));
+  const presentation = strFromU8(parts['ppt/presentation.xml']!);
+  parts['ppt/presentation.xml'] = strToU8(
+    presentation.replace(/<p:sldSz[^>]*\/>/, '<p:sldSz cx="9144000" cy="6858000"/>')
+  );
+  const deck = zipSync(parts);
+  await page.route('**/showcase.pptx', (route) => route.fulfill({ body: Buffer.from(deck) }));
+  // Hold every font, so the deck waits for them behind the loading sheet.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\.(ttf|otf|woff2?)(\?|$)/, async (route) => (await held, route.continue()));
+  await page.goto('/');
+  const sheet = page.locator('.pptx-loading__sheet');
+  // Once the deck parsed, the sheet takes its slide size: 4:3, not the default 16:9.
+  await expect
+    .poll(async () => {
+      const box = await sheet.boundingBox();
+      return box ? Math.round((box.width / box.height) * 100) / 100 : 0;
+    })
+    .toBeCloseTo(4 / 3, 1);
+  const loadingBox = await sheet.boundingBox();
+  release();
+  const slide = page.locator('.pptx-surface__slide');
+  await expect(slide).toBeVisible();
+  const slideBox = await slide.boundingBox();
+  for (const key of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(slideBox![key] - loadingBox![key])).toBeLessThanOrEqual(1);
+});
+
+test('fonts: the first slide paints with its own fonts while the other slides fonts load', async ({
+  page,
+}) => {
+  // The showcase deck names serif and mono families on later slides only: hold their files.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  for (const file of ['**/LiberationSerif-*', '**/LiberationMono-*', '**/Caladea-*'])
+    await page.route(file, async (route) => (await held, route.continue()));
+  // Every frame, the text of the slide and of the thumbnails must name a face that has loaded:
+  // a fallback face is a flash.
+  await page.addInitScript(() => {
+    const store = window as unknown as { __unloaded: string[] };
+    store.__unloaded = [];
+    const loaded = (family: string): boolean =>
+      [...document.fonts].some(
+        (f) => f.family.replace(/["']/g, '') === family && f.status === 'loaded'
+      );
+    const check = (): void => {
+      const text = '.pptx-surface__stage text, .pptx-rail__thumb text';
+      for (const el of document.querySelectorAll(text)) {
+        const family = el.getAttribute('font-family')?.split(',')[0]?.trim().replace(/["']/g, '');
+        if (family?.startsWith('pptx-f') && !loaded(family)) store.__unloaded.push(family);
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+  type Ed = {
+    fontMeasurement(): { measurer: string; resolving: boolean };
+    snapshot(): { status: string };
+  };
+  const fonts = () =>
+    page.evaluate(() => {
+      const ed = (window as unknown as { __pptxEditor?: Ed }).__pptxEditor;
+      return ed ? { status: ed.snapshot().status, ...ed.fontMeasurement() } : null;
+    });
+  await page.goto('/');
+  await page.waitForSelector('.pptx-surface__slide');
+  // The opening slide's fonts arrived: shaped text, while the held families are on the way.
+  await expect.poll(fonts).toEqual({ status: 'ready', measurer: 'shaped', resolving: true });
+  release();
+  await expect.poll(async () => (await fonts())?.resolving, { timeout: 20_000 }).toBe(false);
+  // The late faces replaced the faces on screen with no frame that drew a fallback face.
+  await page.waitForTimeout(200);
+  expect(
+    await page.evaluate(() => (window as unknown as { __unloaded: string[] }).__unloaded)
+  ).toEqual([]);
+});
+
+test('fonts: before any font arrives, the slide text draws where layout measured it', async ({
+  page,
+}) => {
+  // Hold every packaged face: the deck opens on the stand-in measurer after the font wait.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/*.ttf', async (route) => (await held, route.continue()));
+  type Ed = { fontMeasurement(): { measurer: string; resolving: boolean } };
+  const measurement = () =>
+    page.evaluate(() =>
+      (window as unknown as { __pptxEditor?: Ed }).__pptxEditor?.fontMeasurement()
+    );
+  await page.goto('/');
+  await page.waitForSelector('.pptx-surface__slide text');
+  expect(await measurement()).toEqual({ measurer: 'fixed', resolving: true });
+  // Each character starts where the previous one ends: no overlap, and no gap in the title.
+  const fit = await page.evaluate(() => {
+    let overlap = 0;
+    let titleGap = 0;
+    for (const el of document.querySelectorAll<SVGTextElement>('.pptx-surface__slide text')) {
+      const n = el.getNumberOfChars();
+      if (n < 2 || (el.getAttribute('x') ?? '').trim().split(/\s+/).length < n) continue;
+      for (let i = 0; i + 1 < n; i += 1) {
+        const gap = el.getStartPositionOfChar(i + 1).x - el.getEndPositionOfChar(i).x;
+        overlap = Math.max(overlap, -gap);
+        if (el.textContent === 'PPTX Editor') titleGap = Math.max(titleGap, Math.abs(gap));
+      }
+    }
+    return { overlap, titleGap };
+  });
+  expect(fit.overlap).toBeLessThan(0.5);
+  expect(fit.titleGap).toBeLessThan(0.5);
+  release();
+  await expect
+    .poll(async () => (await measurement())?.measurer, { timeout: 20_000 })
+    .toBe('shaped');
 });

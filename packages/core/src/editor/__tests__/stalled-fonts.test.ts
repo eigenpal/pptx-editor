@@ -75,6 +75,35 @@ test('fonts that never arrive stop holding the notice after the late wait', asyn
   session.dispose();
 });
 
+test('substitutes for the other slides hold the notice longer than other late fonts', async () => {
+  const { createHostFonts } = await import('../host-fonts.ts');
+  const { openPresentation } = await import('../document-session.ts');
+  const opened = await openPresentation(missingFontsDeck());
+  if (!opened.ok) throw new Error('open failed');
+  const session = opened.session;
+  // A slow network: the other slides' substitutes are still downloading.
+  session.restSubstitutes = new Promise<boolean>(() => {});
+  const fonts = createHostFonts(
+    {},
+    {
+      session: () => session,
+      installed: async () => {},
+      changed: () => {},
+      waitMs: 10,
+      lateWaitMs: 30,
+      restWaitMs: 120,
+    }
+  );
+  fonts.awaitShaping(session);
+  await new Promise((r) => setTimeout(r, 60));
+  // Past the late wait: the notice still must not name families whose faces are on the way.
+  expect(fonts.resolving()).toBe(true);
+  await new Promise((r) => setTimeout(r, 100));
+  expect(fonts.resolving()).toBe(false);
+  fonts.dispose();
+  session.dispose();
+});
+
 test('an open that does not mount gives the shown deck its font state back', async () => {
   const { createHostFonts } = await import('../host-fonts.ts');
   const { openPresentation } = await import('../document-session.ts');

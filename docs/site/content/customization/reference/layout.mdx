@@ -34,7 +34,7 @@ The `PptxEditor.StatusBar` parts are `StatusBar.SlideNumber`, `.Notes`, `.Views`
 
 ### Loading screen
 
-`PptxEditor.Loading` shows while the editor has no deck and while a deck opens. The engine paints it before it parses a large deck. `overlay` pins it over the nearest positioned ancestor, so it covers the previous deck. `indicator` replaces the spinner. Children replace the sheet. `PptxEditor.Loading.Spinner` is the packaged spinner. A refused file clears it. In Vue, use `PptxEditorLoading` with the `indicator` and default slots. `PptxEditorLoading.Spinner` is the packaged spinner.
+`PptxEditor.Loading` shows while the editor has no deck and while a deck opens. The engine paints it before it parses a large deck. The sheet has the size of the slide at the zoom the deck opens at: before the first deck, a 16:9 slide that fits the canvas. In the box that holds `PptxEditor.Content`, the slide paints where the sheet was. `overlay` pins it over the nearest positioned ancestor, so it covers the previous deck. If that ancestor has padding, for example room for a status bar, set the same padding on the overlay. `indicator` replaces the spinner. Children replace the sheet. `PptxEditor.Loading.Spinner` is the packaged spinner. A refused file clears it. In Vue, use `PptxEditorLoading` with the `indicator` and default slots. `PptxEditorLoading.Spinner` is the packaged spinner.
 
 ## Pane configuration
 

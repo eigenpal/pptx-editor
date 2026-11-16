@@ -12,8 +12,12 @@ import type {
 
 /** EMU in one CSS pixel (ECMA-376 Part 1, 20.1.2.1: 914400 EMU per inch, 96 px per inch). */
 const EMU_PER_PX = 9525;
-/** The default slide size, 16:9 (13.333 in by 7.5 in), until a deck gives its own. */
-const DEFAULT_SLIDE = { width: 12_192_000, height: 6_858_000 };
+/**
+ * The default slide size in EMU, 16:9 (13.333 in by 7.5 in), until a deck gives its own. The
+ * surface fits it before a deck opens, so the loading sheet has the size the deck opens at.
+ * @internal
+ */
+export const DEFAULT_SLIDE = Object.freeze({ width: 12_192_000, height: 6_858_000 });
 
 /**
  * Whether the loading screen shows: no deck yet and nothing went wrong (`empty`), or a deck
