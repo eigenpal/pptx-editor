@@ -149,8 +149,8 @@ describe('math line extent', () => {
 describe('script shifts', () => {
   const part = (asc: number, desc = 0) => ({ asc: asc * EM, desc: desc * EM });
 
-  test('a superscript rises at least 0.36 em, and over a tall base by its ink', () => {
-    expect(scriptShifts(part(0.46), part(0.5), undefined, EM, false).u / EM).toBeCloseTo(0.36);
+  test('a superscript rises at least 0.365 em, and over a tall base by its ink', () => {
+    expect(scriptShifts(part(0.46), part(0.5), undefined, EM, false).u / EM).toBeCloseTo(0.365, 3);
     expect(scriptShifts(part(0.46), part(0.5), undefined, EM, true).u / EM).toBeCloseTo(0.293);
     // A base 0.7 em tall, as a letter with an ascender, gives a cramped superscript 0.3 em.
     expect(scriptShifts(part(0.7), part(0.5), undefined, EM, true).u / EM).toBeCloseTo(0.3);

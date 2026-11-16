@@ -269,12 +269,14 @@ export class PageOps {
 
   /**
    * Register a form XObject of ready operators that reads this page's resources. `group` makes it
-   * a transparency group.
+   * a transparency group. `matrix` maps the form's space to the space it is drawn in (the form's
+   * `/Matrix`); `bbox` is in the form's space.
    */
   form(
     ops: PDFOperator[],
     bbox: number[],
-    group?: { readonly S: 'Transparency'; readonly CS?: 'DeviceGray'; readonly I?: boolean }
+    group?: { readonly S: 'Transparency'; readonly CS?: 'DeviceGray'; readonly I?: boolean },
+    matrix?: readonly number[]
   ): PDFRef {
     const ctx = this.res.doc.context;
     let bytes = 0;
@@ -283,6 +285,7 @@ export class PageOps {
       Type: 'XObject',
       Subtype: 'Form',
       BBox: bbox,
+      ...(matrix ? { Matrix: [...matrix] } : {}),
       ...(group ? { Group: group } : {}),
       Resources: this.resources(),
     });

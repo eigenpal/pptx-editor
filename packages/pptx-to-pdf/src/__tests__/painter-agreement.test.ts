@@ -20,6 +20,7 @@ import { paintSlide } from '@pptx-editor.dev/core/output';
 import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
+import { EMU_PER_PT } from '../page-ops.ts';
 
 const IN = 914_400;
 const BEST = { fidelityPolicy: 'best-effort' } as const;
@@ -250,8 +251,13 @@ describe('the PDF writer and the SVG paint agree', () => {
       );
       expect(patterns).toHaveLength(1);
       const dict = patterns[0]!;
-      const num = (key: string): number => Number(dict.get(PDFName.of(key))!.toString());
-      const matrix = dict.lookup(PDFName.of('Matrix'), PDFArray).asArray().map(Number);
+      // The pattern works in points; the SVG paint in EMU.
+      const num = (key: string): number =>
+        Number(dict.get(PDFName.of(key))!.toString()) * EMU_PER_PT;
+      const matrix = dict
+        .lookup(PDFName.of('Matrix'), PDFArray)
+        .asArray()
+        .map((v) => Number(v) * EMU_PER_PT);
       expect(num('XStep')).toBeCloseTo(cw, 0);
       expect(num('YStep')).toBeCloseTo(ch, 0);
       // The pattern's origin is a corner of the same grid.

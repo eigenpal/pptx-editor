@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Text layout puts superscript rises, single and heavy underline bars, and the rows of multi-row equation arrays on measured positions. This changes laid-out, painted, and PDF positions only. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/layout/text/__tests__/line-metrics.test.ts",
+    "packages/core/src/layout/text/__tests__/underline-marks.test.ts",
+    "packages/core/src/layout/text/__tests__/math-line-extent.test.ts"
+  ]
+}

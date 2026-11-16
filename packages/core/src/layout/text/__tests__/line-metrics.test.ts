@@ -16,6 +16,7 @@ import {
   paragraphSpacingPt,
   placeColumn,
   roundToWholePoint,
+  scriptRise,
   singleLinePt,
   WHOLE_POINT_BASELINES,
 } from '../line-metrics.ts';
@@ -124,6 +125,13 @@ describe('whole points', () => {
   test('roundToWholePoint rounds baselines to whole points', () => {
     expect(roundToWholePoint(14.688 * EMU_PER_PT)).toBe(15 * EMU_PER_PT);
     expect(roundToWholePoint(53.568 * EMU_PER_PT)).toBe(54 * EMU_PER_PT);
+  });
+
+  test('a superscript rises whole points, half up; a subscript drops the exact offset', () => {
+    expect(scriptRise(30, 32)).toBe(10 * EMU_PER_PT);
+    expect(scriptRise(25, 18)).toBe(5 * EMU_PER_PT);
+    expect(scriptRise(-25, 18)).toBe(-4.5 * EMU_PER_PT);
+    expect(scriptRise(0, 18)).toBe(0);
   });
 });
 

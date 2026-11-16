@@ -43,6 +43,7 @@ import {
   singleLinePt,
   type LineBasis,
   SCRIPT_SIZE_SCALE,
+  scriptRise,
   SMALL_CAPS_SCALE,
   placeBaseline,
   placeColumn,
@@ -289,7 +290,9 @@ function buildSegments(
     const runSize = autofitSizePt(props.size / 100, fontScale);
     const baseSize = runSize * scriptScale;
     const face = faceFor(props, measurer);
-    const rise = (props.baseline / 100) * runSize * EMU_PER_PT;
+    // A superscript rises a whole number of points (`scriptRise`), so it stays on the
+    // whole-point grid of the baselines.
+    const rise = scriptRise(props.baseline, runSize);
     const spacing = (props.spacing / 100) * EMU_PER_PT;
     if (run.kind === 'math' && run.math) {
       const box = layoutMath(run.math, measurer, fontScale);

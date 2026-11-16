@@ -3,6 +3,7 @@
 // agree. The rules are measured on the reference PDF of the `underline-styles` fixture.
 
 import type { GlyphRun } from './text-layout.ts';
+import { roundToWholePoint, WHOLE_POINT_BASELINES } from './line-metrics.ts';
 
 const EMU_PER_PT = 12_700;
 
@@ -118,7 +119,10 @@ function dashes(
  * Measured on the reference PDF of `underline-styles`, with `t` the thickness and `p` the top:
  * - `sng` and `words` are one bar from `p` to `p + t`. `words` underlines the spaces too.
  * - `dbl` is two bars of `t / 2` from `p - t` to `p + t`, with `t` between them.
- * - `heavy` is one bar from `p - t` to `p + t / 2`: 1.5 `t` thick, at the top of the double bars.
+ * - `heavy` is one bar from `p - t` to `p + t / 2`, at the top of the double bars: 1.5 `t`
+ *   thick. Its bottom edge rounds half up to a whole point, as measured at a 3 pt thickness
+ *   (5 pt thick, not 4.5 pt). The rule also gives a 1 pt thickness a 2 pt bar; that size is
+ *   not measured.
  * - The dashed styles cut the single bar, or the heavy bar for their heavy style, into dashes
  *   that start with a dash at `origin`: `dotted` 1 on and 1 off, `dash` 3 on and 2 off,
  *   `dashLong` 7 on and 4 off, `dotDash` 3, 2, 1, 2, and `dotDotDash` 3, 2, 1, 2, 1, 2, all in
@@ -145,7 +149,9 @@ export function underlineRings(
   const p = y + top;
   const { plain, heavy } = plainStyle(style);
   const pattern = DASHES[plain];
-  const [y0, y1] = heavy ? [p - t, p + t / 2] : [p, p + t];
+  // The heavy bar's bottom edge rounds half up to a whole point, as its top (`p - t`) is one.
+  const half = Math.round(t / 2 / EMU_PER_PT) * EMU_PER_PT;
+  const [y0, y1] = heavy ? [p - t, p + half] : [p, p + t];
   if (pattern) return dashes(pattern, t, origin, x0, x1, y0, y1);
   if (plain === 'dbl') {
     return [rect(x0, x1, p - t, p - t / 2), rect(x0, x1, p + t / 2, p + t)];
@@ -169,6 +175,10 @@ export function underlineRings(
  *   run on it, so runs of two sizes share one bar.
  * - The thickness is the face's, rounded to whole points and at least 1 pt: the bars, dashes,
  *   and zigzags are whole multiples of it.
+ * - The distance from the baseline to the top of the bar is the face's, rounded to a whole
+ *   point, so the bars sit on the whole-point grid of the baselines (`roundToWholePoint`): the
+ *   28 pt bars of slide 4 sit 0.41 pt lower without the rounding. The bottom of the heavy bar
+ *   rounds too: at 3 pt, it is 5 pt thick, not 4.5 pt.
  * - Spaces at the end of the line are not underlined; spaces between runs are.
  *
  * Adjacent runs with the same style keep one dash and wave phase, as one run does.
@@ -202,7 +212,8 @@ export function lineUnderlines(
   for (const s of spans) if (s.run.sizePt > largest.sizePt) largest = s.run;
   const size = largest.sizePt * EMU_PER_PT;
   const m = largest.face.metrics;
-  const top = -m.underlinePosition * size;
+  const offset = -m.underlinePosition * size;
+  const top = WHOLE_POINT_BASELINES ? roundToWholePoint(offset) : offset;
   const face = Math.max(m.underlineThickness * size, size / 20);
   const thickness = Math.max(1, Math.round(face / EMU_PER_PT)) * EMU_PER_PT;
   let origin = spans[0]!.x0;

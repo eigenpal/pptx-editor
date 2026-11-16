@@ -48,6 +48,9 @@ import { flatColor, gradientBox, ownFill, strokeStyle, type FillScope } from './
 import { drawPicture } from './paint-picture.ts';
 import { clip, clipNonZero, EMU_PER_PT, rgb, tracePath, type PageOps } from './page-ops.ts';
 
+/** The horizontal shear of a synthetic italic: the lean of the browser's oblique face. */
+const SYNTHETIC_ITALIC_SHEAR = 0.25;
+
 /** The embedded face for a layout face id, or null with a diagnostic. */
 function fontFor(faceId: string, family: string, p: PageOps): EmbeddedFace | null {
   const cached = p.res.fonts.get(faceId);
@@ -182,12 +185,8 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         decorate();
         continue;
       }
-      if (run.face.synthBold || run.face.synthItalic)
-        p.diag.add(
-          'text.synthetic-style',
-          'approximation',
-          'Synthetic bold and italic are not drawn.'
-        );
+      if (run.face.synthBold)
+        p.diag.add('text.synthetic-style', 'approximation', 'Synthetic bold is not drawn.');
       const font = fontFor(run.face.id, run.face.family, p);
       if (!font) {
         decorate();
@@ -217,6 +216,9 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         p.push(setFillingRgbColor(...rgb(runColor)));
       } else p.push(setTextRenderingMode(TextRenderingMode.Clip));
       let shown = 0;
+      // A synthetic italic leans as the browser leans an oblique face (a shear of 0.25, about
+      // 14°), about the run's baseline.
+      const shear = run.face.synthItalic ? SYNTHETIC_ITALIC_SHEAR : 0;
       const extra: { id: number; x: number; y: number; scaleX: number }[] = [];
       const glyphs =
         run.glyphs?.map((g) => ({ ...g, x: run.x[0] + g.x, index: -1 })) ??
@@ -252,12 +254,19 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
           const [ux, uy] = uprightOrigin(layout.upright, line, run, x, end, advance * scaleX);
           // The glyph turns back by 90° in the turned frame: its advance runs up the frame and
           // its ascent points against the line, as in the SVG paint.
+          if (shear)
+            p.diag.add(
+              'text.synthetic-style',
+              'approximation',
+              'Synthetic italic is not drawn on upright glyphs of vertical text.'
+            );
           p.push(setTextMatrix(0, -scaleX, -1, 0, ux, uy), showText(encoded()));
           shown += 1;
           continue;
         }
-        // Text space: y up again inside the flipped page, at the size layout measured.
-        p.push(setTextMatrix(scaleX, 0, 0, -1, x, y + dy), showText(encoded()));
+        // Text space: y up again inside the flipped page, at the size layout measured. A glyph
+        // that sits `dy` off the baseline leans about the baseline too.
+        p.push(setTextMatrix(scaleX, 0, shear, -1, x - shear * dy, y + dy), showText(encoded()));
         shown += 1;
       }
       p.push(endText());
@@ -275,7 +284,7 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
           p.alpha(runColor.a, 1);
           p.push(setFillingRgbColor(...rgb(runColor)));
         }
-        traceGlyph(font, g.id, g.x, g.y, size / font.font.unitsPerEm, g.scaleX, p);
+        traceGlyph(font, g.id, g.x, g.y, size / font.font.unitsPerEm, g.scaleX, p, shear, y);
         if (gradient) {
           p.push(clipNonZero(), endPath());
           bounds ??= textBounds(layout);
@@ -585,7 +594,8 @@ export function fillTextOutlines(
         }));
       for (const g of glyphs) {
         if (g.id <= 0) continue;
-        traceGlyph(face, g.id, g.x, y + g.y, k, g.scaleX, p);
+        const shear = run.face.synthItalic ? SYNTHETIC_ITALIC_SHEAR : 0;
+        traceGlyph(face, g.id, g.x, y + g.y, k, g.scaleX, p, shear, y);
         p.push(strokeToo ? fillAndStroke() : fill());
       }
     }
@@ -601,31 +611,45 @@ function traceGlyph(
   y: number,
   k: number,
   scaleX: number,
-  p: PageOps
+  p: PageOps,
+  shear = 0,
+  baseline = y
 ): void {
   const glyph = face.font.getGlyph(id);
-  // Font units, y up → EMU, y down, at the glyph's origin.
-  const px = (gx: number): number => x + gx * k * scaleX;
+  // Font units, y up → EMU, y down, at the glyph's origin. A sheared glyph leans about
+  // `baseline`, as the run's other glyphs do.
   const py = (gy: number): number => y - gy * k;
+  const px = (gx: number, gy: number): number => x + gx * k * scaleX + shear * (baseline - py(gy));
   let [cx, cy] = [0, 0];
   for (const c of glyph.path.commands) {
     const a = c.args;
-    if (c.command === 'moveTo') p.push(moveTo(px(a[0]), py(a[1])));
-    else if (c.command === 'lineTo') p.push(lineTo(px(a[0]), py(a[1])));
+    if (c.command === 'moveTo') p.push(moveTo(px(a[0], a[1]), py(a[1])));
+    else if (c.command === 'lineTo') p.push(lineTo(px(a[0], a[1]), py(a[1])));
     else if (c.command === 'bezierCurveTo')
-      p.push(appendBezierCurve(px(a[0]), py(a[1]), px(a[2]), py(a[3]), px(a[4]), py(a[5])));
-    else if (c.command === 'quadraticCurveTo')
       p.push(
         appendBezierCurve(
-          px(cx + ((a[0] - cx) * 2) / 3),
-          py(cy + ((a[1] - cy) * 2) / 3),
-          px(a[2] + ((a[0] - a[2]) * 2) / 3),
-          py(a[3] + ((a[1] - a[3]) * 2) / 3),
-          px(a[2]),
+          px(a[0], a[1]),
+          py(a[1]),
+          px(a[2], a[3]),
+          py(a[3]),
+          px(a[4], a[5]),
+          py(a[5])
+        )
+      );
+    else if (c.command === 'quadraticCurveTo') {
+      const c1 = [cx + ((a[0] - cx) * 2) / 3, cy + ((a[1] - cy) * 2) / 3] as const;
+      const c2 = [a[2] + ((a[0] - a[2]) * 2) / 3, a[3] + ((a[1] - a[3]) * 2) / 3] as const;
+      p.push(
+        appendBezierCurve(
+          px(c1[0], c1[1]),
+          py(c1[1]),
+          px(c2[0], c2[1]),
+          py(c2[1]),
+          px(a[2], a[3]),
           py(a[3])
         )
       );
-    else p.push(closePath());
+    } else p.push(closePath());
     if (c.command !== 'closePath') [cx, cy] = [a[a.length - 2], a[a.length - 1]];
   }
 }
