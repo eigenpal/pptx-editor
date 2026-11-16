@@ -7,11 +7,12 @@
 // contradict a constant or a rule, the comment of the constant gives the measurement.
 
 /**
- * The least superscript baseline rise. DOCX Editor uses 750/2048 em. The reference PDFs give
- * 0.36 em: with 750/2048 em, the superscript of slide 1 of `preserved-content` and its line move
- * 1 pt down (0.99 pt from the reference, against 0.09 pt with 0.36 em).
+ * The least superscript baseline rise. DOCX Editor uses 750/2048 em (0.366 em). The reference
+ * PDFs give 0.365 em: the 13 pt superscripts of `equation-lines` (slide 1) rise 6.58 pt on
+ * average (seven samples), and with 0.366 em the superscript of slide 1 of `preserved-content`
+ * and its line move 1 pt down. With 0.36 em, the line of `equation-lines` sits 0.96 pt high.
  */
-const SUPERSCRIPT_SHIFT_UP = 0.36;
+const SUPERSCRIPT_SHIFT_UP = 0.365;
 /**
  * The least superscript baseline rise in a cramped style: under a radical, or in a subscript.
  * DOCX Editor has no cramped style. Measured on the reference PDF of `equations`.

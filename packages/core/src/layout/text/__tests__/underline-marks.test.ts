@@ -82,6 +82,14 @@ describe('underlineRings', () => {
     expect(bands(rings('dashHeavy'))[0]).toEqual([-2, 4]);
   });
 
+  test('the bottom of a heavy bar rounds half up to a whole point', () => {
+    const heavy = (t: number) => underlineRings('heavy', 0, 0, 20 * PT, 0, 2 * PT, t * PT);
+    // 3 pt: from 2 - 3 to 2 + 1.5, rounded to 4.
+    expect(bands(heavy(3))).toEqual([[-1, 4]]);
+    // 1 pt: from 2 - 1 to 2 + 0.5, rounded to 3.
+    expect(bands(heavy(1))).toEqual([[1, 3]]);
+  });
+
   test('dashes are multiples of the thickness from the origin, cut at the run end', () => {
     // 3 on and 2 off: 12 pt dashes every 20 pt.
     expect(spans(rings('dash'))).toEqual([
@@ -146,11 +154,12 @@ describe('underlineRings', () => {
 
 describe('lineUnderlines', () => {
   test('the thickness rounds to whole points, at least 1 pt', () => {
-    // Carlito at 18 pt: 1.71 pt thick, 0.91 pt below the baseline.
+    // Carlito at 18 pt: 1.71 pt thick, 0.91 pt below the baseline. The top rounds to 1 pt, on
+    // the whole-point grid of the baseline.
     const run = glyphRun('Text', 0, 18, 'sng');
     const [top, bottom] = bands(lineUnderlines([run], 0).get(run)!)[0]!;
     expect(round(bottom - top)).toBe(2);
-    expect(top).toBeCloseTo((103 / 2048) * 18, 3);
+    expect(top).toBe(1);
     const small = glyphRun('Text', 0, 6, 'sng');
     const [a, b] = bands(lineUnderlines([small], 0).get(small)!)[0]!;
     expect(round(b - a)).toBe(1);

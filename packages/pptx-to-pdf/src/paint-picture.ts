@@ -253,8 +253,8 @@ function recolored(image: PDFImage, allSteps: readonly BlipColorStep[], p: PageO
 /**
  * The tiling pattern of a tiled picture (ISO 32000-1, 8.7.3.3): one cell of 1 tile, or 2 or 4
  * tiles mirrored by `flip`, with the tile geometry of the SVG paint (`core/output`,
- * `tileGeometry`). The pattern space is the box's, with the grid's origin at `g.x`, `g.y`. Written
- * once per picture and geometry.
+ * `tileGeometry`), in points. The pattern space is the box's, with the grid's origin at `g.x`,
+ * `g.y`. Written once per picture and geometry.
  */
 function tilePattern(image: PDFRef, g: TileGeometry, p: PageOps): PDFRef {
   const { width: tw, height: th, flipX: fx, flipY: fy } = g;
@@ -394,21 +394,31 @@ export async function drawPicture(
   if (fill.mode === 'tile' && fill.tile) {
     // The tiles sit on the box, so a pattern in the space of a form drawn at the box's matrix.
     // A tiling pattern fill inverts the current transform, and slide EMU (1/12,700 pt per unit)
-    // is too close to singular for that. The form fills its box in points: the pattern maps to
-    // the form's space, whatever the current transform.
-    const g = tileGeometry(fill.tile, p.res.imageSize?.(sourcePart, fill.rId), w, h);
+    // is too close to singular for that. The form's matrix scales points to EMU, so the form
+    // and its pattern work in points, whatever the current transform. A pattern in EMU under
+    // the page's 1/12,700 scale also draws its tiles one device pixel too large in a reader
+    // that keeps the matrix in single precision, which leaves seams between the tiles.
+    const ge = tileGeometry(fill.tile, p.res.imageSize?.(sourcePart, fill.rId), w, h);
+    const g: TileGeometry = {
+      ...ge,
+      x: ge.x / EMU_PER_PT,
+      y: ge.y / EMU_PER_PT,
+      width: ge.width / EMU_PER_PT,
+      height: ge.height / EMU_PER_PT,
+    };
     const pattern = p.name('Pattern', tilePattern(ref, g, p));
-    const bbox = around(w, h);
-    const [l, t, r, b] = bbox.map((v) => v / EMU_PER_PT) as [number, number, number, number];
+    const bbox = around(w, h).map((v) => v / EMU_PER_PT);
+    const [l, t, r, b] = bbox as [number, number, number, number];
     const form = p.form(
       [
         PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
         PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [pattern]),
-        concatTransformationMatrix(EMU_PER_PT, 0, 0, EMU_PER_PT, 0, 0),
         ...rectOps(l, t, r - l, b - t),
         fillEvenOdd(),
       ],
-      bbox
+      bbox,
+      undefined,
+      [EMU_PER_PT, 0, 0, EMU_PER_PT, 0, 0]
     );
     p.push(pushGraphicsState());
     p.alpha(alpha, 1);

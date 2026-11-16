@@ -830,6 +830,9 @@ export function runGlyphs(run: Pick<GlyphRun, 'text' | 'x' | 'rtl'>): RunGlyph[]
 // @public
 export const SCRIPT_SIZE_SCALE: number;
 
+// @internal
+export function scriptRise(baseline: number, runSizePt: number): number;
+
 // @public
 export function setHarfBuzzWasmUrl(url: string | URL): void;
 

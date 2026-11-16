@@ -222,3 +222,19 @@ export const SMALL_CAPS_SCALE = 0.8;
  * -50 % to 80 % (`caps-scripts`): two thirds of the size, within 0.01.
  */
 export const SCRIPT_SIZE_SCALE = 2 / 3;
+
+/**
+ * The rise of a run with a `baseline` offset (a percentage of the run size), in EMU:
+ * positive is up. A superscript rises the offset rounded to a whole point, half up: the
+ * reference PDFs of `caps-scripts`, `font-effects`, and `text-runs` put every superscript
+ * baseline a whole number of points from the text top, on the grid of the line baselines
+ * (`roundToWholePoint`), at 10 % to 80 % and 10 to 60 pt (15 baselines, within 0.12 pt).
+ * A subscript drops the exact offset. The reference PDFs put a subscript 0.5 to 1.6 pt higher
+ * than that, and no rule of the line model explains it (see the "Superscript and subscript"
+ * approximation).
+ * @internal
+ */
+export function scriptRise(baseline: number, runSizePt: number): number {
+  const pt = (baseline / 100) * runSizePt;
+  return (baseline > 0 && WHOLE_POINT_BASELINES ? Math.round(pt) : pt) * EMU_PER_PT;
+}

@@ -131,6 +131,7 @@ export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<P
     async lines(index) {
       const page = await doc.getPage(index + 1);
       const viewport = page.getViewport({ scale: 1 });
+      const painted = paintedTextOrigins(await page.getOperatorList());
       const items: TextItem[] = [];
       for (const item of (await page.getTextContent()).items) {
         // Whitespace items carry no glyph; pdf.js also adds them to bridge gaps, which would join
@@ -145,6 +146,14 @@ export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<P
         // sheared (`c`) stays: its baseline is level. A synthetic oblique face shears its
         // glyphs, and pdf.js can merge upright text next to it into the same sheared item.
         if (Math.abs(b) > 1e-6 || a <= 0 || d <= 0 || Math.abs(c) >= d) continue;
+        // Text filled with a gradient or a pattern, or used as a clip, is checked by pixels only:
+        // a PDF can draw it as text or as glyph outlines, and outlines hold no text.
+        if (
+          painted.some(
+            ([px, py]) => Math.abs(px - e) < ORIGIN_MATCH_PT && Math.abs(py - f) < ORIGIN_MATCH_PT
+          )
+        )
+          continue;
         const [x, y] = viewport.convertToViewportPoint(e, f);
         items.push({ text: item.str, x, y, width: item.width, size: d, font: item.fontName });
       }
@@ -172,6 +181,119 @@ export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<P
       await doc.loadingTask.destroy();
     },
   };
+}
+
+/** A text item starts at a text-showing operator when their origins are this close (points). */
+const ORIGIN_MATCH_PT = 0.05;
+
+type Matrix = readonly [number, number, number, number, number, number];
+const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
+const multiply = (m: Matrix, n: Matrix): Matrix => [
+  m[0] * n[0] + m[2] * n[1],
+  m[1] * n[0] + m[3] * n[1],
+  m[0] * n[2] + m[2] * n[3],
+  m[1] * n[2] + m[3] * n[3],
+  m[0] * n[4] + m[2] * n[5] + m[4],
+  m[1] * n[4] + m[3] * n[5] + m[5],
+];
+
+/**
+ * The origins, in the page's user space, of the text-showing operators of a page that fill their
+ * glyphs with a pattern or a shading (ISO 32000-1, 8.7.3), or that only add them to the clip
+ * (text rendering modes 4 to 7, 9.3.6). A text item that starts at one of them holds such text.
+ * The text matrix is tracked through `Tm`, `Td`, `TD`, `T*`, and `BT`; a text-showing operator
+ * that follows another in the same text object without a new position is not tracked, so its
+ * item stays checked.
+ */
+function paintedTextOrigins(ops: { fnArray: number[]; argsArray: unknown[][] }): number[][] {
+  interface State {
+    ctm: Matrix;
+    pattern: boolean;
+    mode: number;
+    leading: number;
+  }
+  const out: number[][] = [];
+  const stack: State[] = [];
+  let state: State = { ctm: IDENTITY, pattern: false, mode: 0, leading: 0 };
+  let line: Matrix = IDENTITY;
+  let fresh = false;
+  const moveTo = (tx: number, ty: number): void => {
+    line = multiply(line, [1, 0, 0, 1, tx, ty]);
+    fresh = true;
+  };
+  ops.fnArray.forEach((fn, i) => {
+    const args = ops.argsArray[i] ?? [];
+    switch (fn) {
+      case OPS.save:
+        stack.push({ ...state });
+        break;
+      case OPS.restore:
+        state = stack.pop() ?? state;
+        break;
+      case OPS.transform:
+        state.ctm = multiply(state.ctm, args as unknown as Matrix);
+        break;
+      case OPS.paintFormXObjectBegin: {
+        stack.push({ ...state });
+        const m = args[0] as Matrix | null | undefined;
+        if (m) state.ctm = multiply(state.ctm, Array.from(m) as unknown as Matrix);
+        break;
+      }
+      case OPS.paintFormXObjectEnd:
+        state = stack.pop() ?? state;
+        break;
+      case OPS.setFillColorN:
+        state.pattern = args[0] === 'Shading' || args[0] === 'TilingPattern';
+        break;
+      case OPS.setFillRGBColor:
+      case OPS.setFillGray:
+      case OPS.setFillCMYKColor:
+      case OPS.setFillColor:
+        state.pattern = false;
+        break;
+      case OPS.setTextRenderingMode:
+        state.mode = Number(args[0]);
+        break;
+      case OPS.setLeading:
+        state.leading = Number(args[0]);
+        break;
+      case OPS.beginText:
+        line = IDENTITY;
+        fresh = true;
+        break;
+      case OPS.setTextMatrix:
+        line = Array.from(args[0] as ArrayLike<number>) as unknown as Matrix;
+        fresh = true;
+        break;
+      case OPS.moveText:
+        moveTo(Number(args[0]), Number(args[1]));
+        break;
+      case OPS.setLeadingMoveText:
+        state.leading = -Number(args[1]);
+        moveTo(Number(args[0]), Number(args[1]));
+        break;
+      case OPS.nextLine:
+        moveTo(0, -state.leading);
+        break;
+      case OPS.showText:
+      case OPS.showSpacedText:
+      case OPS.nextLineShowText:
+      case OPS.nextLineSetSpacingShowText: {
+        if (fn !== OPS.showText && fn !== OPS.showSpacedText) moveTo(0, -state.leading);
+        const clips = state.mode >= 4 && state.mode <= 7;
+        const fills = state.mode === 0 || state.mode === 2 || state.mode === 4 || state.mode === 6;
+        if (fresh && (clips || (fills && state.pattern))) {
+          const m = multiply(state.ctm, line);
+          out.push([m[4], m[5]]);
+        }
+        fresh = false;
+        break;
+      }
+      default:
+        break;
+    }
+  });
+  return out;
 }
 
 /** Open a PDF file (`openPdf`). */

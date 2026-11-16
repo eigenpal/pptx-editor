@@ -439,8 +439,20 @@ const childEnv = (env: Env, over: Partial<Env> = {}): Env => ({
   ...over,
 });
 
-/** Boxes of a row stacked on one another, centered, `gap` em apart at least. */
-function stackRows(rows: readonly Box[], rowSpace: number, em: number, axis: number): Box {
+/**
+ * Boxes of a row stacked on one another, centered, `gap` em apart at least. The rows' ink box
+ * centers on the math axis. With `baselines`, an equation array of two rows or more puts the
+ * middle of its first and last row baselines on the axis instead. Measured on the reference
+ * PDF of `equations` (slide 4, an equation array of two rows): centering the ink box puts both
+ * rows 0.72 pt low. Matrices and one-row arrays keep the ink rule. Arrays of three rows or more take the baseline rule, but no reference measures them.
+ */
+function stackRows(
+  rows: readonly Box[],
+  rowSpace: number,
+  em: number,
+  axis: number,
+  baselines = false
+): Box {
   const out = emptyBox();
   if (rows.length === 0) return out;
   const width = maxOf(rows.map((r) => r.w));
@@ -452,7 +464,10 @@ function stackRows(rows: readonly Box[], rowSpace: number, em: number, axis: num
   });
   const top = rows[0]!.asc;
   const bottom = y - rows[rows.length - 1]!.desc;
-  const dy = axis - (top + bottom) / 2;
+  const dy =
+    baselines && rows.length > 1
+      ? axis - (ys[0]! + ys[ys.length - 1]!) / 2
+      : axis - (top + bottom) / 2;
   rows.forEach((r, i) => place(out, r, (width - r.w) / 2, ys[i]! + dy));
   out.w = width;
   return out;
@@ -883,7 +898,7 @@ function nodeItems(node: MathNode, env: Env): Item[] {
     case 'eqArr': {
       const em = emOf(env.props, env);
       const rows = node.rows.map((r) => rowBox(r, childEnv(env)));
-      return [{ box: stackRows(rows, C.eqArrRow, em, C.axis * em), cls: 'ord' }];
+      return [{ box: stackRows(rows, C.eqArrRow, em, C.axis * em, true), cls: 'ord' }];
     }
     case 'phant': {
       const base = rowBox(node.base, env);

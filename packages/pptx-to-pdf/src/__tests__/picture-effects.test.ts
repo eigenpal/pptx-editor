@@ -15,6 +15,7 @@ import type { BlipEffect } from '@pptx-editor.dev/core/cascade';
 import { applyBlipColorSteps, blipColorSteps } from '@pptx-editor.dev/core/output';
 import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
+import { EMU_PER_PT } from '../page-ops.ts';
 import { colorStepsCode, MAX_COLOR_STEPS } from '../paint-picture.ts';
 
 const IN = 914_400;
@@ -266,11 +267,17 @@ describe('tiled pictures in the PDF', () => {
         obj.dict.has(PDFName.of('Filter')) ? decodePDFRawStream(obj).decode() : obj.contents
       );
       if (!content.includes('/Im Do')) continue;
-      const num = (key: string): number => Number(obj.dict.get(PDFName.of(key))!.toString());
-      const matrix = obj.dict.lookup(PDFName.of('Matrix'), PDFArray).asArray().map(Number);
+      // The pattern works in points, in a form that scales points to EMU: the values here are
+      // EMU again, as the tile geometry gives them.
+      const num = (key: string): number =>
+        Number(obj.dict.get(PDFName.of(key))!.toString()) * EMU_PER_PT;
+      const [a, b, c, d, e, f] = obj.dict
+        .lookup(PDFName.of('Matrix'), PDFArray)
+        .asArray()
+        .map(Number);
       out.push({
         step: [num('XStep'), num('YStep')],
-        matrix,
+        matrix: [a!, b!, c!, d!, e! * EMU_PER_PT, f! * EMU_PER_PT],
         draws: content.match(/\/Im Do/g)!.length,
       });
     }
@@ -301,6 +308,24 @@ describe('tiled pictures in the PDF', () => {
     expect(pattern!.step).toEqual([25_400, 12_700]);
     expect(pattern!.draws).toBe(1);
     expect(pattern!.matrix).toEqual([1, 0, 0, 1, 0, 0]);
+  });
+
+  test('the tile pattern sits in a form whose matrix scales points to EMU', async () => {
+    // In EMU under the page's 1/12,700 scale, a reader that keeps the matrix in single
+    // precision draws each tile one device pixel too large, and seams show between the tiles.
+    const tile = '<a:tile tx="0" ty="0" sx="100000" sy="100000" flip="none" algn="tl"/>';
+    const doc = await PDFDocument.load((await exportPdf(pictureDeck('', tile), BEST)).bytes);
+    const matrices: number[][] = [];
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFRawStream)) continue;
+      if (obj.dict.get(PDFName.of('Subtype'))?.toString() !== '/Form') continue;
+      const content = new TextDecoder().decode(
+        obj.dict.has(PDFName.of('Filter')) ? decodePDFRawStream(obj).decode() : obj.contents
+      );
+      if (!content.includes('scn')) continue;
+      matrices.push(obj.dict.lookup(PDFName.of('Matrix'), PDFArray).asArray().map(Number));
+    }
+    expect(matrices).toEqual([[EMU_PER_PT, 0, 0, EMU_PER_PT, 0, 0]]);
   });
 
   test('a tiled picture with effects tiles the recolored picture', async () => {
