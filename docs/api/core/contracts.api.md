@@ -352,13 +352,15 @@ export type ColorChoice = string | ThemeColorChoice;
 // @public
 export type CommandResult = {
     readonly ok: true;
-    readonly replaceDocument?: ReplaceDocumentOutcome;
+    readonly replaceDocument?: Extract<ReplaceDocumentOutcome, {
+        readonly ok: true;
+    }>;
 } | {
     readonly ok: false;
     readonly reason: string;
     readonly detail?: string;
     readonly noop?: boolean;
-    readonly replaceDocument?: ReplaceDocumentOutcome;
+    readonly replaceDocument?: ReplaceDocumentRefusal;
 };
 
 // @public
@@ -1676,6 +1678,9 @@ export type ReplaceDocumentCommand = {
 } & ReplaceDocumentRequest;
 
 // @public
+export type ReplaceDocumentErrorCode = 'invalidRequest' | 'invalidDocument' | 'staleDocument' | 'unavailable' | 'busy' | 'editNotPermitted' | 'editUnsupported';
+
+// @public
 export type ReplaceDocumentOutcome = {
     readonly ok: true;
     readonly changed: boolean;
@@ -1701,6 +1706,9 @@ export type ReplaceDocumentRefusal = {
     readonly code: 'invalidRequest' | 'invalidDocument' | 'busy';
     readonly reason?: undefined;
 });
+
+// @public
+export type ReplaceDocumentRefusalReason = 'viewing' | 'suggesting' | 'protected' | 'collaborationUnavailable' | 'differentMainPart' | 'unsupportedDifference' | 'collaborationRefused' | 'otherDocument' | 'edited';
 
 // @public
 export interface ReplaceDocumentRequest {

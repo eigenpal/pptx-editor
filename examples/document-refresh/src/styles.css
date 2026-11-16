@@ -84,10 +84,11 @@
   color: var(--doc-text);
   cursor: pointer;
 }
-.refresh-controls button:hover:not(:disabled) {
+.refresh-controls button:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--doc-bg-hover);
 }
-.refresh-controls button:disabled {
+.refresh-controls button:disabled,
+.refresh-controls button[aria-disabled='true'] {
   opacity: 0.55;
   cursor: default;
 }

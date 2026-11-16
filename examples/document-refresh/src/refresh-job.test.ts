@@ -70,9 +70,9 @@ test('successive jobs apply cumulative files, summaries, and partial failures; l
       ['revenue', 'available'],
       ['summary-slide', 'available'],
       ['launch-notes', 'available'],
-      ['draft-label', 'deleted'],
+      ['draft-label', 'available'],
     ]);
-    expect(refresh.highlightChanges({ includePrevious: true, animation: false })).toBe(3);
+    expect(refresh.highlightChanges({ includePrevious: true, animation: false })).toBe(4);
   }
 });
 

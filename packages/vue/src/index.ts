@@ -471,6 +471,17 @@ export type {
   RefreshUpdateMode,
   ReplaceDocumentOutcome,
   ReplaceDocumentRequest,
+  RefreshRefusal,
+  RefreshRefusalFields,
+  RefreshHighlightAnimation,
+  RefreshDiagnosticCode,
+  AnchorHighlightOptions,
+  AnchorHighlightAnimation,
+  ClearAnchorHighlightOptions,
+  ReplaceDocumentRefusal,
+  ReplaceDocumentCommand,
+  ReplaceDocumentErrorCode,
+  ReplaceDocumentRefusalReason,
 } from '@pptx-editor.dev/core/editor';
 export type {
   EditorFontErrorCode,

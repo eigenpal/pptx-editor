@@ -113,7 +113,8 @@ export function sampleUpdate(submissionId: string, round: number, sequence: numb
             {
               id: 'draft-label',
               description: 'Removed the draft label from slide 1',
-              unavailableReason: 'deleted' as const,
+              // The label has no surviving location, so locate the slide that lost it.
+              location: { slideIndex: 0 },
             },
           ]
         : []),

@@ -24,7 +24,11 @@ export const TEXT = {
   lateResult: 'Deliver an older result after the latest update',
   idle: 'Select Simulate server updates to start a job.',
   processing: 'The server is processing the presentation. You can keep working.',
-  applied: (sequence: number, mode: string) => `Applied result ${sequence} of 2 as a ${mode}.`,
+  applied: (sequence: number, mode: string, newChanges: number) =>
+    `Applied result ${sequence} of 2 as ${mode}. ${newChanges} new ${
+      newChanges === 1 ? 'change' : 'changes'
+    }.`,
+  showingSlide: (slide: number) => `Showing slide ${slide}.`,
   movedToChange: 'Moved to the first new change.',
   refused: 'The editor refused a result.',
   refusedLate: 'The editor refused an older result. Newer content stays.',

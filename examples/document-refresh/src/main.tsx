@@ -40,7 +40,10 @@ function UpdateControls() {
 
 /** The status text for one result. */
 function resultMessage(result: RefreshResult, sequence: number): string {
-  if (result.ok) return t.applied(sequence, result.mode === 'edit' ? 'undoable edit' : 'reload');
+  if (result.ok) {
+    const fresh = result.changes.filter((change) => change.isNew).length;
+    return t.applied(sequence, result.mode === 'edit' ? 'an undoable edit' : 'a reload', fresh);
+  }
   if (result.code === 'local-edits') return t.refusedEdits;
   if (result.code === 'out-of-order') return t.refusedLate;
   return t.refused;
@@ -61,6 +64,9 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
   const request = useRef<AbortController | null>(null);
   const round = useRef(0);
   const sampleEditedRef = useRef(false);
+  // The changes that were new in any result of the running submission. Each result highlights
+  // all of them, so a later result does not cut short the flash of an earlier one.
+  const submissionChanges = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<RefreshUpdateMode>('reload');
   const [computeChanges, setComputeChanges] = useState(false);
@@ -93,10 +99,14 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
     setLastResult(result);
     setMessage(resultMessage(result, sequence));
     if (!result.ok) return;
+    for (const c of result.changes) if (c.isNew) submissionChanges.current.add(c.id);
     const change = result.changes.find((c) => c.isNew && c.status === 'available');
     const moved =
       goToChange && change && refresh.navigateToChange(change.id, { block: 'centerIfNeeded' });
-    refresh.highlightChanges({ timeoutMs: HIGHLIGHT_MS });
+    refresh.highlightChanges({
+      changeIds: [...submissionChanges.current],
+      timeoutMs: HIGHLIGHT_MS,
+    });
     if (moved) setMessage(`${resultMessage(result, sequence)} ${t.movedToChange}`);
   }
 
@@ -104,6 +114,7 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
     if (request.current || sampleEditedRef.current) return;
     const controller = new AbortController();
     request.current = controller;
+    submissionChanges.current.clear();
     setBusy(true);
     try {
       setLastResult(null);
@@ -131,7 +142,8 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
   }
 
   function cancel() {
-    request.current?.abort();
+    if (!request.current) return;
+    request.current.abort();
     refresh.cancel();
     setMessage(t.cancelled);
   }
@@ -186,17 +198,19 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
         {t.lateResult}
       </label>
       <div className="refresh-actions">
-        <button type="button" disabled={busy || sampleEdited} onClick={update}>
+        {/* `aria-disabled` keeps these buttons focusable, so focus does not fall to the page
+            when a job starts or ends. The handlers ignore a press while they are disabled. */}
+        <button type="button" aria-disabled={busy || sampleEdited} onClick={() => void update()}>
           {busy ? t.processingLabel : t.start}
         </button>
-        <button type="button" disabled={!busy} onClick={cancel}>
+        <button type="button" aria-disabled={!busy} onClick={cancel}>
           {t.cancel}
         </button>
         <button type="button" disabled={busy} onClick={() => location.reload()}>
           {t.reset}
         </button>
       </div>
-      <p role="status" className="refresh-status">
+      <p role="status" aria-live="polite" className="refresh-status">
         {message}
         {code && (
           <>
@@ -239,7 +253,8 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
                     type="button"
                     aria-label={`${t.showChange}: ${describe(change)}`}
                     onClick={() => {
-                      refresh.navigateToChange(change.id, { block: 'centerIfNeeded' });
+                      if (!refresh.navigateToChange(change.id, { block: 'centerIfNeeded' })) return;
+                      setMessage(t.showingSlide(editor.snapshot().currentSlide + 1));
                       refresh.highlightChanges({
                         changeIds: [change.id],
                         timeoutMs: HIGHLIGHT_MS,

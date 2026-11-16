@@ -5,6 +5,8 @@
 ```ts
 
 import { AllowedComponentProps } from 'vue';
+import { AnchorHighlightAnimation } from '@pptx-editor.dev/core/editor';
+import { AnchorHighlightOptions } from '@pptx-editor.dev/core/editor';
 import { BulletFormat } from '@pptx-editor.dev/core/editor';
 import { BulletFormatMixed } from '@pptx-editor.dev/core/editor';
 import { BulletFormatRead } from '@pptx-editor.dev/core/editor';
@@ -15,6 +17,7 @@ import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
 import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
+import { ClearAnchorHighlightOptions } from '@pptx-editor.dev/core/editor';
 import { ClearRefreshHighlightsOptions } from '@pptx-editor.dev/core/editor';
 import { ClipboardDrawingReader } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
@@ -123,16 +126,24 @@ import { RefreshChange } from '@pptx-editor.dev/core/editor';
 import { RefreshChangeAspect } from '@pptx-editor.dev/core/editor';
 import { RefreshChangeInput } from '@pptx-editor.dev/core/editor';
 import { RefreshComputedChange } from '@pptx-editor.dev/core/editor';
+import { RefreshDiagnosticCode } from '@pptx-editor.dev/core/editor';
 import { RefreshFailureCode } from '@pptx-editor.dev/core/editor';
+import { RefreshHighlightAnimation } from '@pptx-editor.dev/core/editor';
 import { RefreshHighlightOptions } from '@pptx-editor.dev/core/editor';
 import { RefreshHighlightSurface } from '@pptx-editor.dev/core/editor';
 import { RefreshLocation } from '@pptx-editor.dev/core/editor';
+import { RefreshRefusal } from '@pptx-editor.dev/core/editor';
+import { RefreshRefusalFields } from '@pptx-editor.dev/core/editor';
 import { RefreshRefusalReason } from '@pptx-editor.dev/core/editor';
 import { RefreshResult } from '@pptx-editor.dev/core/editor';
 import { RefreshSubmission } from '@pptx-editor.dev/core/editor';
 import { RefreshUpdate } from '@pptx-editor.dev/core/editor';
 import { RefreshUpdateMode } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentCommand } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentErrorCode } from '@pptx-editor.dev/core/editor';
 import { ReplaceDocumentOutcome } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentRefusal } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentRefusalReason } from '@pptx-editor.dev/core/editor';
 import { ReplaceDocumentRequest } from '@pptx-editor.dev/core/editor';
 import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
@@ -159,6 +170,10 @@ import { VNodeChild } from 'vue';
 import { VNodeProps } from 'vue';
 import * as vue from 'vue';
 import * as vue_jsx_runtime from 'vue/jsx-runtime';
+
+export { AnchorHighlightAnimation }
+
+export { AnchorHighlightOptions }
 
 // @public
 export const BackgroundDialog: {
@@ -412,6 +427,8 @@ export { ChromeMenuId }
 export { ChromeSlotId }
 
 export { ChromeTranslate }
+
+export { ClearAnchorHighlightOptions }
 
 export { ClearRefreshHighlightsOptions }
 
@@ -7574,13 +7591,21 @@ export { RefreshChangeInput }
 
 export { RefreshComputedChange }
 
+export { RefreshDiagnosticCode }
+
 export { RefreshFailureCode }
+
+export { RefreshHighlightAnimation }
 
 export { RefreshHighlightOptions }
 
 export { RefreshHighlightSurface }
 
 export { RefreshLocation }
+
+export { RefreshRefusal }
+
+export { RefreshRefusalFields }
 
 export { RefreshRefusalReason }
 
@@ -7595,7 +7620,15 @@ export { RefreshUpdateMode }
 // @public
 export function rejectionMessage(t: Translate, rejection: EditorRejection): string;
 
+export { ReplaceDocumentCommand }
+
+export { ReplaceDocumentErrorCode }
+
 export { ReplaceDocumentOutcome }
+
+export { ReplaceDocumentRefusal }
+
+export { ReplaceDocumentRefusalReason }
 
 export { ReplaceDocumentRequest }
 

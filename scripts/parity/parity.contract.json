@@ -1368,7 +1368,18 @@
       "RefreshUpdate",
       "RefreshUpdateMode",
       "ReplaceDocumentOutcome",
-      "ReplaceDocumentRequest"
+      "ReplaceDocumentRequest",
+      "RefreshRefusal",
+      "RefreshRefusalFields",
+      "RefreshHighlightAnimation",
+      "RefreshDiagnosticCode",
+      "AnchorHighlightOptions",
+      "AnchorHighlightAnimation",
+      "ClearAnchorHighlightOptions",
+      "ReplaceDocumentRefusal",
+      "ReplaceDocumentCommand",
+      "ReplaceDocumentErrorCode",
+      "ReplaceDocumentRefusalReason"
     ],
     "reactNamesAsVueNames": {
       "SlideRail": "PptxEditorSlideRail",

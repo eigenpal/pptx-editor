@@ -59,6 +59,99 @@ else for (const change of result.changes) console.log(change.id, change.computed
 
 `result.changes` has the form that `RefreshUpdate.changes` takes. Send it with the revised file to a browser, and pass both to `applyUpdate()`. To pass your license key, use the `licenseKey` option.
 
+## Refresh with changes from your server
+
+<a id="refresh-with-changes-from-your-server" />
+
+When your server produces the revised file, it can also compare the files, so the browser does not need the review module. The browser captures the presentation and posts its bytes. The server revises the file, compares it with the original, and returns the revised bytes with the changes.
+
+The following server handler uses the Fetch API `Request` and `Response` types, as in Node.js 18 and later, Bun, and Deno. `processPresentation` is your own processing step. The handler returns the bytes as Base64 text in JSON:
+
+```ts
+import { Buffer } from 'node:buffer';
+import { comparePresentations } from '@pptx-editor.dev/pro';
+
+// Your own processing step that returns the revised presentation.
+declare function processPresentation(original: Uint8Array): Promise<Uint8Array>;
+
+export async function handleProcessPresentation(request: Request): Promise<Response> {
+  const original = new Uint8Array(await request.arrayBuffer());
+
+  let revised: Uint8Array;
+  try {
+    revised = await processPresentation(original);
+  } catch {
+    return Response.json({ error: 'processing-failed' }, { status: 502 });
+  }
+
+  const compared = comparePresentations(original, revised, {
+    licenseKey: process.env.PPTX_EDITOR_LICENSE_KEY,
+  });
+  if (!compared.ok) {
+    return Response.json({ error: compared.code }, { status: 422 });
+  }
+
+  return Response.json({
+    sequence: 1,
+    bytes: Buffer.from(revised).toString('base64'),
+    changes: compared.changes,
+  });
+}
+```
+
+In the browser, decode the response and pass the bytes and the changes to `applyUpdate()`. The controller validates every change, so a malformed response returns `invalid-result` instead of throwing. This sample expects an application route at `/api/process-presentation` that calls the handler:
+
+```ts
+import { createDocumentRefresh, DocumentRefreshError } from '@pptx-editor.dev/core/editor';
+import type { ComputedRefreshChange, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+interface ProcessedPresentation {
+  readonly sequence: number;
+  readonly bytes: string;
+  readonly changes: readonly ComputedRefreshChange[];
+}
+
+function decodeBase64(text: string): Uint8Array {
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+export async function refreshFromServer(editor: PptxEditorInstance) {
+  const refresh = createDocumentRefresh(editor);
+  try {
+    const submission = await refresh.capture();
+    try {
+      const response = await fetch('/api/process-presentation', {
+        method: 'POST',
+        body: submission.bytes,
+      });
+      if (!response.ok) throw new Error(`Processing failed: ${response.status}`);
+      const processed = (await response.json()) as ProcessedPresentation;
+
+      const result = await refresh.applyUpdate({
+        submission,
+        sequence: processed.sequence,
+        bytes: decodeBase64(processed.bytes),
+        changes: processed.changes,
+      });
+      if (result.ok) refresh.highlightChanges();
+      else console.warn(result.code, result.message);
+    } finally {
+      refresh.finish(submission);
+    }
+  } catch (error) {
+    // capture() rejects with DocumentRefreshError. fetch() and JSON errors
+    // are transport failures.
+    if (error instanceof DocumentRefreshError) console.warn(error.code);
+    else console.error(error);
+  }
+}
+```
+
+The changes keep their `computed` fields, so `describeRefreshChange()` describes them as it describes changes that the review module computes.
+
 ## Read the changes
 
 Each change has an `id`, an optional `location`, and a `computed` description:
@@ -67,11 +160,11 @@ Each change has an `id`, an optional `location`, and a `computed` description:
 | --- | --- |
 | `scope` | `'slide'`, `'shape'`, `'text'`, `'notes'`, `'layout'`, `'master'`, `'theme'`, or `'package'`. |
 | `action` | `'added'`, `'removed'`, `'moved'`, or `'changed'`. |
-| `aspects` | For changed shapes: `'position'`, `'size'`, `'rotation'`, `'geometry'`, `'fill'`, `'line'`, `'effects'`, `'text'`, `'textFormat'`, `'picture'`, `'table'`, `'chart'`, `'diagram'`, or `'other'`. For changed slides: `'background'`, `'layout'`, `'transition'`, or `'animation'`. |
+| `aspects` | For changed shapes: `'position'`, `'size'`, `'rotation'`, `'geometry'`, `'fill'`, `'line'`, `'effects'`, `'text'`, `'textFormat'`, `'picture'`, `'table'`, `'chart'`, `'diagram'`, or `'other'`. For changed slides: `'background'`, `'layout'`, `'transition'`, `'animation'`, or `'visibility'` (the slide became hidden or shown). |
 | `affectedSlides` | For layouts, masters, and themes: the zero-based indexes of the slides that show the change. |
 | `previousSlideIndex` | For removed and moved slides: the index in the original presentation. |
 
-The comparison matches slides by their creation ID, then by content, then by slide ID. Inserting a slide therefore reports one added slide, not a change to each later slide. A text change in a shape body is located at the revised text, so a highlight marks the changed words. A removed slide or shape has no location, and its status is `deleted`.
+The comparison matches slides by their creation ID, then by content, then by slide ID. Inserting a slide therefore reports one added slide, not a change to each later slide. A text change in a shape body is located at the revised text, so a highlight marks the changed words. A removed shape is located at its slide, so the slide flashes. A removed slide has no location, and its status is `deleted`. Removed speaker notes report a `notes` change with the action `removed`.
 
 To show a change in a list, call `describeRefreshChange(change, t)` from your adapter or `@pptx-editor.dev/core/editor`. It returns a localized summary from the `refresh.change.*` strings of `@pptx-editor.dev/i18n`, such as "Changed text on slide 3". Render the result as text.
 

@@ -19,7 +19,7 @@ The example builds against the workspace source, so no package build runs first.
 
 1. Go to slide 2 and select **Simulate server updates**. Two cumulative files change the revenue figure, add a summary slide, rewrite the notes of slide 3, and remove the draft label from slide 1.
 2. Watch the slide rail. Changed thumbnails flash, and the current slide shows a band behind the changed text. Unchanged thumbnails stay painted, and the loading screen does not show.
-3. Inspect **Review changes**. The deletion summary stays visible without a location. The mock also reports one failed processor operation.
+3. Inspect **Review changes**. The deletion summary is located at slide 1, so that slide flashes. The mock also reports one failed processor operation.
 4. Select **Show change** to go to a change. Highlights disappear after five seconds.
 5. Select **Undoable edit** and request another update. Each accepted result adds one undo step. With **Reload**, each result resets undo history.
 6. Select **Compute changes with Pro** and request another update. The client omits the processor changes, and `reviewModule()` computes them from the captured and returned files.

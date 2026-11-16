@@ -72,24 +72,24 @@ The replacement behaves as follows:
 
 - One undo returns to the presentation before the replacement. Earlier undo steps stay available.
 - Parts that the editor does not interpret arrive as the file has them.
-- The selection clears. The current slide index and the zoom stay.
+- The selection stays when its shapes and text survive. Otherwise it clears. The current slide index and the zoom stay.
 - Slides whose parts did not change keep their painted thumbnails and canvas content.
 - A file identical to the open presentation succeeds with `changed: false` and adds no undo step.
 - With `expected`, the command refuses with `staleDocument` unless the open presentation is still the one the handle describes. `reason: 'edited'` means anyone edited it, another participant included. `reason: 'otherDocument'` means another presentation was loaded, because each `load()` gives the handle a new `loadId`.
 
-`result.replaceDocument` carries the typed outcome. A refusal has a stable `code`, an English `message`, and for some codes a `reason`. Read this `code` rather than the coarser top-level `result.code`:
+`result.replaceDocument` carries the typed outcome. A refusal has a stable `code`, an English `message`, and for some codes a `reason`. Branch on this `code`. The top-level `result.reason` is the generic i18n key `errors.unsupported`, and `result.detail` repeats the `code`:
 
 | `code` | Situation | Action |
 | --- | --- | --- |
 | `staleDocument` | `reason` is `edited` or `otherDocument`: the open presentation is not the one `expected` describes. | Read the presentation again and redo your work. |
 | `invalidRequest` | The arguments are wrong. | Fix the call. A replacement is always its own undo step. |
 | `invalidDocument` | The bytes are not a valid PPTX file. | Report the failure. |
-| `unavailable` | No presentation is open, the editor was destroyed, or `reason: 'collaborationUnavailable'`. | Retry when a presentation is open and the session is connected. |
-| `busy` | A document refresh or a preview blocks edits. | Wait for it to finish. |
+| `unavailable` | No presentation is open, the presentation is still opening, or the editor was destroyed. | Retry when a presentation is open. |
+| `busy` | A document refresh is replacing the presentation. | Wait for it to finish, then retry. |
 | `editNotPermitted` | `reason` is `viewing`. A retry does not help. | Change the editing mode, or call `load()` outside a collaboration session. |
 | `editUnsupported` | `reason` is `differentMainPart`, `unsupportedDifference`, or `collaborationRefused`. | Outside a collaboration session, call `load()` instead. |
 
-The `reason` type also lists `suggesting` and `protected` for DOCX Editor compatibility. PresentationML has neither, so PPTX Editor does not produce them.
+The `reason` type also lists `suggesting`, `protected`, and `collaborationUnavailable` for DOCX Editor compatibility. PresentationML has no suggesting mode or enforced protection, and a PPTX Editor collaboration session accepts edits while it is attached, so PPTX Editor does not produce them. `collaborationRefused` means that a collaboration session is attached and the editor refused the edit.
 
 Use `replaceDocument` when your code owns the timing. Use the [Document refresh API](/docs/guides/document-refresh) for server jobs that return results while the user keeps editing. Refresh adds capture, sequencing, change highlights, and recovery, and its `mode: 'edit'` runs this command.
 
