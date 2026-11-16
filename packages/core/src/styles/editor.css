@@ -5355,6 +5355,13 @@ legend.pptx-dialog__label {
 .pptx-surface__refresh[data-refresh-highlight='exiting'] {
   transition-duration: var(--pptx-refresh-exit, 180ms);
 }
+/* The marks of a new place in a layer that shows already: they enter on their own. */
+.pptx-surface__refresh > * {
+  transition: opacity var(--pptx-refresh-enter, 180ms) var(--pptx-refresh-easing, ease-out);
+}
+.pptx-surface__refresh > [data-refresh-highlight='entering'] {
+  opacity: 0;
+}
 .pptx-refresh-ring {
   fill: var(--pptx-refresh-color, var(--doc-refresh-highlight-color));
   fill-opacity: var(--pptx-refresh-opacity, 0.14);

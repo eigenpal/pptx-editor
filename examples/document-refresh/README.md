@@ -33,10 +33,10 @@ The example builds against the workspace source, so no package build runs first.
 
 The two modes put a result on screen in different ways:
 
-- **Reload** (`mode: 'reload'`, the default) shows the returned file as a reload does. It resets selection and undo history. Slides whose parts did not change keep their painted thumbnails and canvas content.
-- **Undoable edit** (`mode: 'edit'`) applies the difference as one undoable edit. Undo returns to the captured presentation or the previous result. If the difference cannot apply as an edit, `runRefreshJob()` retries the same result as a reload.
+- **Reload** (`mode: 'reload'`, the default) shows the returned file as a reload does. It resets undo history. Slides whose parts did not change keep their painted thumbnails and canvas content.
+- **Undoable edit** (`mode: 'edit'`) applies the difference as one undoable edit. Undo returns to the captured presentation or the previous result. If the difference cannot apply as an edit, for example because it changes embedded fonts, `runRefreshJob()` retries the same result as a reload.
 
-Both modes keep the current slide and zoom, and never show the loading screen.
+Both modes keep the zoom and never show the loading screen. The editor follows the current slide when the result adds or removes slides before it. The selection stays when its shapes and text survive. Otherwise it clears. When a reload opens the whole file with `load()`, the selection clears.
 
 The Vite development server acts as the processing server. It generates controlled sample files from `sample-presentation.ts`, discards the uploaded bytes, and does not edit arbitrary presentations. Reset after manual edits. A production processor must edit the captured file and keep earlier successful changes.
 

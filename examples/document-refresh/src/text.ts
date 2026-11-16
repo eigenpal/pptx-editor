@@ -13,7 +13,6 @@ export const TEXT = {
   loading: 'Loading the presentation',
   loadError: 'The presentation did not load.',
   start: 'Simulate server updates',
-  processingLabel: 'Processing',
   cancel: 'Cancel updates',
   reset: 'Reset',
   modeLabel: 'Apply results as',

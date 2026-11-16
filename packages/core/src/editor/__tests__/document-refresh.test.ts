@@ -80,7 +80,7 @@ const slideText = (editor: PptxEditorInstance, index: number) => {
 };
 
 describe('document refresh: reload', () => {
-  test('keeps the instance, subscriptions, current slide, and zoom; resets undo', async () => {
+  test('keeps the instance, subscriptions, the shown slide, and zoom; resets undo', async () => {
     const { editor, done } = await mount(deck(['A'], ['B'], ['C']));
     expect(editor.exec({ type: 'duplicateSlide', index: 0 }).ok).toBe(true);
     editor.goToSlide(2);
@@ -99,7 +99,8 @@ describe('document refresh: reload', () => {
     if (result.ok) expect(result.mode).toBe('reload');
     expect(notified).toBeGreaterThan(0);
     expect(editor.snapshot().slides.length).toBe(4);
-    expect(editor.snapshot().currentSlide).toBe(2);
+    // Slide B moved to index 1 (the duplicate's part holds D now): the editor follows it.
+    expect(editor.snapshot().currentSlide).toBe(1);
     expect(editor.snapshot().zoom).toBe(1.5);
     expect(editor.snapshot().canUndo).toBe(false);
     refresh.finish(submission);

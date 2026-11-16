@@ -10,10 +10,12 @@
 //
 // A document refresh that reloads applies the same difference in place, with no history entry,
 // and then clears the history, as a load does (`reloadInPlace`). It gives the document a new
-// load id. The selection stays when the nodes it names stay, as after an edit. A file whose
-// difference touches embedded fonts, or that the part checks refuse as an edit, reloads through
-// `load()` instead: a session registers its embedded faces when it opens, and a load accepts
-// what an edit does not.
+// load id. In both paths the editor follows the slide on screen by its part, also when slides
+// before it come or go, and the selection stays when the nodes it names stay, as after an
+// edit. A file whose difference touches embedded fonts, or that the part checks refuse as an
+// edit, reloads through `load()` instead: a session registers its embedded faces when it opens,
+// and a load accepts what an edit does not. For the same reason, the command refuses a
+// difference that touches embedded fonts (`unsupportedDifference`).
 //
 // Both paths read the returned file as an open does: `readPptx`, then the sanitizers of
 // `openStore` (`withoutEditorMarks`). So a replacement and a reload give the same package.
@@ -31,6 +33,7 @@ import type {
 } from '../contracts/index.ts';
 import {
   diffPackages,
+  presentationInfo,
   readPptx,
   slideRefAt,
   type PackageDiff,
@@ -162,13 +165,20 @@ export function keepKeyboardFocus(editor: PptxEditorInstance): void {
   if (editor.snapshot().selection.kind !== 'text') focusSurfaceOf(editor);
 }
 
-/** Whether the ops change embedded fonts, which a session registers only when it opens. */
-const touchesFonts = (ops: readonly PptxOp[]): boolean =>
-  ops.some((op) => /^\/ppt\/fonts\//i.test(op.part));
+/**
+ * Whether going from `base` to `next` changes embedded fonts, which a session registers only
+ * when it opens: a font part, or the font list of the presentation (`p:embeddedFontLst`).
+ */
+const touchesFonts = (ops: readonly PptxOp[], base: PptxPackage, next: PptxPackage): boolean =>
+  ops.some((op) => /^\/ppt\/fonts\//i.test(op.part)) ||
+  JSON.stringify(presentationInfo(base).embeddedFonts) !==
+    JSON.stringify(presentationInfo(next).embeddedFonts);
 
 interface Prepared {
   readonly session: DocumentSession;
   readonly ops: readonly PptxOp[];
+  /** The difference changes embedded fonts. */
+  readonly fonts: boolean;
 }
 
 /** Check the editor and the request, and compute the difference. */
@@ -208,7 +218,8 @@ function prepare(
     return diff.reason === 'different-main-part'
       ? refusal('editUnsupported', 'The file names a different main part.', 'differentMainPart')
       : refusal('editUnsupported', 'The difference is not an edit.', 'unsupportedDifference');
-  return { session, ops: diff.ops };
+  const fonts = diff.ops.length > 0 && touchesFonts(diff.ops, session.store.package, next);
+  return { session, ops: diff.ops, fonts };
 }
 
 /** Commit the difference. `history: false` records no undo step. */
@@ -246,6 +257,9 @@ export function replaceDocument(
 ): ReplaceDocumentOutcome {
   const prepared = prepare(editor, command);
   if ('ok' in prepared) return prepared;
+  // A session registers embedded faces only when it opens: a reload opens such a file whole.
+  if (prepared.fonts)
+    return refusal('editUnsupported', 'The file changes embedded fonts.', 'unsupportedDifference');
   const outcome = withChangeSource(editor, 'refresh', () => commit(editor, prepared, true));
   if (outcome.ok) keepKeyboardFocus(editor);
   return outcome;
@@ -254,7 +268,8 @@ export function replaceDocument(
 /**
  * Show a returned file as a reload does: the content is the file's, and the history is reset.
  * The difference applies in place, so unchanged slides and thumbnails do not paint again and no
- * loading screen shows. The selection stays when the nodes it names stay, with a text selection
+ * loading screen shows. The editor follows the slide on screen by its part, also to a new
+ * index. The selection stays when the nodes it names stay, with a text selection
  * clamped into its text, as after an edit; else it is none, and the slide takes the keyboard
  * focus from the hidden text input. Returns `'load'` when the editor must open the file with
  * `load()` instead: embedded fonts changed, the difference is no edit, or the part checks refuse
@@ -270,10 +285,9 @@ export function reloadInPlace(
   const prepared = prepare(editor, { pptx: bytes }, true);
   if ('ok' in prepared)
     return prepared.code === 'invalidDocument' || prepared.code === 'busy' ? prepared : 'load';
-  if (touchesFonts(prepared.ops)) return 'load';
+  if (prepared.fonts) return 'load';
   const outcome = withChangeSource(editor, source, (): ReplaceDocumentOutcome | 'load' => {
     const { session } = prepared;
-    const index = editor.snapshot().currentSlide;
     // A reload is a new document. The new load id applies before the commit, so the change
     // event of the commit names it, and the next edit is no load (`adoptLoadId`).
     const before = loadIdOf(session);
@@ -287,8 +301,8 @@ export function reloadInPlace(
       return isCollaborating(editor) ? result : 'load';
     }
     adoptLoadId(editor, next);
-    // A reload keeps the slide index, clamped, as a load with `startSlide` does.
-    if (editor.snapshot().currentSlide !== index) editor.goToSlide(index);
+    // The editor's store listener followed the slide on screen by its part, and kept its
+    // selection when its nodes stay. A removed slide leaves the index, clamped.
     // Handles taken before the reload name another load: no undo step reaches them.
     session.store.clearHistory();
     session.store.closeHistoryGroup();
@@ -298,6 +312,23 @@ export function reloadInPlace(
   });
   if (outcome !== 'load' && outcome.ok) keepKeyboardFocus(editor);
   return outcome;
+}
+
+/**
+ * The index that the slide on screen has in the returned file `bytes` (read with
+ * `preparseReturned`): a reload with `load()` opens there, so the editor follows the slide when
+ * slides before it come or go. The index on screen when the file names no such slide part.
+ *
+ * @internal
+ */
+export function followedSlide(editor: PptxEditorInstance, bytes: Uint8Array): number {
+  const snap = editor.snapshot();
+  const session = editor.session;
+  const pkg = steps.get(bytes)?.pkg;
+  if (!session || !pkg || snap.presentationView === 'slideMaster') return snap.currentSlide;
+  const part = slideRefAt(session.store.package, snap.currentSlide)?.partName;
+  const at = part ? presentationInfo(pkg).slides.findIndex((s) => s.partName === part) : -1;
+  return at >= 0 ? at : snap.currentSlide;
 }
 
 /**

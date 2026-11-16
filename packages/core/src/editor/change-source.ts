@@ -34,6 +34,15 @@ export function expectLoad(editor: object, source: NonNullable<DocumentChange['s
   nextLoad.set(editor, { from: loadIdOf(editor), source });
 }
 
+/**
+ * Drop the cause that `expectLoad` named: the load ended. A load that failed, or that another
+ * load replaced, leaves the load id as it was, so the next load must not read that cause.
+ * @internal
+ */
+export function forgetLoad(editor: object): void {
+  nextLoad.delete(editor);
+}
+
 /** Run `run` with `source` as the cause of the changes it publishes. @internal */
 export function withChangeSource<T>(
   editor: object,

@@ -43,6 +43,7 @@ import { findItem } from '../automation/commands/placement.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { isCollaborating, moduleRegistryOf } from './modules.ts';
 import {
+  followedSlide,
   forgetReturned,
   keepKeyboardFocus,
   onEditorDestroy,
@@ -51,7 +52,7 @@ import {
   reloadInPlace,
   whileReplacing,
 } from './document-replace.ts';
-import { expectLoad } from './change-source.ts';
+import { expectLoad, forgetLoad } from './change-source.ts';
 import {
   isComputedShape,
   isLocationShape,
@@ -68,6 +69,7 @@ import {
   gestureActive,
   trackRefreshInput,
   waitUntil,
+  wakeRefreshWaits,
 } from './refresh-input.ts';
 import { revealRailItem } from './refresh-navigation.ts';
 
@@ -322,7 +324,7 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
   const settle = async (current: number) => {
     const ended = await waitUntil(
       editor,
-      () => composing(editor),
+      () => current === generation && composing(editor),
       REFRESH_INPUT_LIMITS.compositionMs
     );
     if (current !== generation) throw new Error('superseded');
@@ -344,7 +346,6 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     pkg: PptxPackage,
     at: DocumentHandle
   ): RefreshResult => {
-    highlights.clear();
     recovery = null;
     request.handle = at;
     request.current = update.bytes as Uint8Array;
@@ -360,6 +361,9 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     }
     located = inputs ? resolveRefreshChanges(pkg, resultId, inputs, request.seen, rendered) : [];
     for (const entry of located) request.seen.set(entry.change.id, entry.fingerprint);
+    // A flash that showed moves to the new places of the same shapes and slides.
+    const available = located.filter((entry) => entry.change.status === 'available');
+    const highlightsVisible = highlights.adopt(available.flatMap((entry) => entry.targets));
     acceptedHandle = at;
     const changes = Object.freeze(located.map((entry) => entry.change));
     const result: RefreshResult = Object.freeze({
@@ -370,7 +374,7 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
       changeInformation: inputs ? 'available' : 'unavailable',
       failures: Object.freeze(update.failures ?? []),
     });
-    notify({ changes, result, phase: 'complete', recoveryAvailable: false });
+    notify({ changes, result, phase: 'complete', recoveryAvailable: false, highlightsVisible });
     return result;
   };
   /** Show `bytes` as a reload: in place when it can, else with a quiet load. */
@@ -382,8 +386,10 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     if (inPlace !== 'load')
       return inPlace.ok ? 'ok' : inPlace.code === 'invalidDocument' ? 'invalid' : 'failed';
     expectLoad(editor, source);
-    const startSlide = editor.snapshot().currentSlide;
+    const startSlide = followedSlide(editor, bytes);
     const loaded = await editor.load(bytes, { startSlide, quiet: true });
+    // A load that failed or that another load replaced names no next load.
+    forgetLoad(editor);
     if (loaded.ok) keepKeyboardFocus(editor);
     return loaded.ok ? 'ok' : 'failed';
   };
@@ -392,15 +398,20 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
    * check sees it. A pointer gesture on the slide ends at its release; a lost release ends the
    * wait at its limit. False when a composition still runs at its limit.
    */
-  const settleInput = async (): Promise<boolean> => {
-    await waitUntil(editor, () => gestureActive(editor), REFRESH_INPUT_LIMITS.gestureMs);
+  const settleInput = async (): Promise<'ended' | 'composing' | 'cancelled'> => {
+    const current = generation;
+    const live = () => current === generation;
+    await waitUntil(editor, () => live() && gestureActive(editor), REFRESH_INPUT_LIMITS.gestureMs);
+    if (!live()) return 'cancelled';
     const ended = await waitUntil(
       editor,
-      () => composing(editor),
+      () => live() && composing(editor),
       REFRESH_INPUT_LIMITS.compositionMs
     );
-    if (ended) commitPendingInput(editor);
-    return ended;
+    if (!live()) return 'cancelled';
+    if (!ended) return 'composing';
+    commitPendingInput(editor);
+    return 'ended';
   };
   /**
    * The result of a reload whose load failed. A quiet load that fails keeps the open deck on
@@ -431,8 +442,10 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
     async capture() {
       // Capture serves both modes, so only `applyUpdate()` refuses a reload in collaboration.
       const code = refusal('edit');
+      // A running replacement comes first: during a reload's quiet load, recovery bytes exist.
+      if (busy) throw new DocumentRefreshError('busy');
       if (recovery) throw new DocumentRefreshError('recovery-failed');
-      if (code || busy) throw new DocumentRefreshError(code ?? 'busy');
+      if (code) throw new DocumentRefreshError(code);
       reset();
       recovery = null;
       const current = generation;
@@ -480,8 +493,11 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
       }
       const apply = async (): Promise<RefreshResult> => {
         // Input that runs now ends first: the checks below then see what it changed.
-        if (active && active.token === mine.submission && !(await settleInput()))
-          return publish(failure(resultId, 'local-edits'), 'failed');
+        if (active && active.token === mine.submission) {
+          const input = await settleInput();
+          if (input === 'cancelled') return publish(failure(resultId, 'cancelled'));
+          if (input === 'composing') return publish(failure(resultId, 'local-edits'), 'failed');
+        }
         const request = active;
         const code = refusal(mine.mode);
         if (code) return publish(failure(resultId, code));
@@ -514,11 +530,12 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
                   : null;
           let stop = unchanged();
           if (stop) return stop;
+          // A flash that shows continues through the commit, at places that still exist.
+          highlights.hold();
           if (mine.mode !== 'edit') {
-            highlights.clear();
             located = [];
             acceptedHandle = null;
-            notify({ phase: 'refreshing', changes: [], highlightsVisible: false });
+            notify({ phase: 'refreshing', changes: [], highlightsVisible: highlights.visible });
             if ((stop = unchanged())) return stop;
           }
           // Step 2: the difference from the open package.
@@ -563,6 +580,14 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
         } finally {
           busy = false;
           forgetReturned(bytes);
+          // No accepted result: a flash of the unchanged document shows on, else it goes.
+          if (highlights.holding) {
+            if (acceptedHandle && same(acceptedHandle, handle())) highlights.release();
+            else {
+              highlights.clear();
+              if (state.highlightsVisible) notify({ highlightsVisible: false });
+            }
+          }
         }
       };
       const result = queue.then(apply);
@@ -577,6 +602,8 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
       const keepRecovery = state.phase === 'recovering' || (!editor.session && recovery !== null);
       generation++;
       active = null;
+      // A wait for a gesture or a composition ends now, and its apply returns `cancelled`.
+      wakeRefreshWaits(editor);
       if (!keepRecovery) recovery = null;
       notify({
         phase:

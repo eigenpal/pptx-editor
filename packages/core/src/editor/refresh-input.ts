@@ -8,7 +8,22 @@
 //
 // The tracker listens on the editor's document in the capture phase, so it sees each press and
 // composition before the surface or a pane handles it. It is DOM state only: it changes nothing.
+// A press counts as a gesture on the slide when it goes down in a `.pptx-surface` element of
+// the editor. The tracker records that element at the press: the overlay draws its handles
+// again on each move, so the pressed handle leaves the page during a drag, but the surface
+// stays.
+//
+// `cancel()` ends each wait at once (`wakeRefreshWaits`): the waiting check then reads the
+// cancellation and stops.
+//
+// To commit a notes draft, `commitPendingInput` sends one `pointerdown` event to the document
+// itself, with pointer id `COMMIT_POINTER_ID`, which no real pointer uses. It does so only when
+// the focused notes field holds text that differs from the committed notes, as `setNotes`
+// normalizes it. The event has no target element, so no element of the page handles it; the
+// listeners on the document see it, the pane's commit listener among them. The tracker
+// does not record it as a press.
 
+import { cleanText } from '../automation/commands/text-units.ts';
 import { notesFieldText } from './notes-dom.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { COMPOSING_CLASS } from './surface-input.ts';
@@ -22,9 +37,12 @@ export const REFRESH_INPUT_LIMITS = {
   gestureMs: 30000,
 };
 
+/** The pointer id of the press that commits a notes draft: no real pointer has it. @internal */
+export const COMMIT_POINTER_ID = 2147483647;
+
 interface Tracker {
-  /** The press target of each pointer that is down. */
-  readonly pressed: Map<number, EventTarget | null>;
+  /** The surface element under the press of each pointer that is down, or null. */
+  readonly pressed: Map<number, Element | null>;
   /** The element an IME composes in, or null. */
   composing: Element | null;
   /** Called after each pointer release and composition end. */
@@ -32,6 +50,14 @@ interface Tracker {
 }
 
 const trackers = new WeakMap<Document, Tracker>();
+
+/** The `.pptx-surface` element that contains `target`, or null. */
+function surfaceAt(target: EventTarget | null): Element | null {
+  const node = target as Node | null;
+  if (!node || typeof node.nodeType !== 'number') return null;
+  const el = node.nodeType === 1 ? (node as Element) : node.parentElement;
+  return el?.closest?.('.pptx-surface') ?? null;
+}
 
 /** The tracker of `doc`, made with its listeners on first use. */
 function trackerOf(doc: Document): Tracker {
@@ -50,7 +76,13 @@ function trackerOf(doc: Document): Tracker {
     wake();
   };
   const id = (e: Event) => (e as PointerEvent).pointerId ?? 0;
-  doc.addEventListener('pointerdown', (e) => t.pressed.set(id(e), e.target), true);
+  doc.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (id(e) !== COMMIT_POINTER_ID) t.pressed.set(id(e), surfaceAt(e.target));
+    },
+    true
+  );
   doc.addEventListener('pointerup', up, true);
   doc.addEventListener('pointercancel', up, true);
   // A release the page never saw (outside the window): a move with no button ends the press.
@@ -109,8 +141,15 @@ export function gestureActive(editor: object): boolean {
   const root = surfaceRootOf(editor);
   const t = root ? trackers.get(root.ownerDocument) : undefined;
   if (!t) return false;
-  for (const target of t.pressed.values()) if (inside(root, target)) return true;
+  for (const surface of t.pressed.values()) if (inside(root, surface)) return true;
   return false;
+}
+
+/** Run each wait's check now: `cancel()` calls it, so a cancelled wait ends at once. */
+export function wakeRefreshWaits(editor: object): void {
+  const doc = editorHostDocument(editor);
+  const t = doc ? trackers.get(doc) : undefined;
+  for (const waiter of [...(t?.waiters ?? [])]) waiter();
 }
 
 /**
@@ -145,7 +184,8 @@ export function waitUntil(editor: object, busy: () => boolean, ms: number): Prom
  * Commit speaker notes text that the notes pane holds as a draft. The pane commits a draft
  * before a press anywhere else acts (a `pointerdown` listener on its document, in React and in
  * Vue); this sends that press to the document itself, so no element of the page handles it.
- * Nothing happens when the focused notes field shows the committed notes.
+ * Nothing happens when the focused notes field shows the committed notes, after the
+ * normalization of `setNotes`.
  */
 export function commitPendingInput(editor: PptxEditorInstance): void {
   const root = editorRoot(editor);
@@ -153,7 +193,12 @@ export function commitPendingInput(editor: PptxEditorInstance): void {
   const field = doc?.activeElement as HTMLElement | null | undefined;
   if (!doc || !field || !field.classList?.contains('pptx-notes__text') || !root!.contains(field))
     return;
-  if (notesFieldText(field) === editor.snapshot().notes) return;
-  const EventCtor = doc.defaultView?.Event ?? Event;
-  doc.dispatchEvent(new EventCtor('pointerdown'));
+  const text = cleanText(notesFieldText(field)).replace(/\u000B/g, '\n');
+  if (text === editor.snapshot().notes) return;
+  const win = doc.defaultView;
+  const init = { pointerId: COMMIT_POINTER_ID, isPrimary: false };
+  const press = win?.PointerEvent
+    ? new win.PointerEvent('pointerdown', init)
+    : Object.assign(new (win?.Event ?? Event)('pointerdown'), init);
+  doc.dispatchEvent(press);
 }

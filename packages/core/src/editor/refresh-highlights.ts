@@ -17,6 +17,13 @@
 // The flash is CSS on chrome the editor owns: it never paints a slide or a thumbnail again, and
 // it never reaches the slide paint, the thumbnails' images, the slide show, an export, or a
 // saved file. A fade is an opacity transition; reduced motion caps it at 125 milliseconds.
+//
+// A flash that shows when a new result arrives continues through it. The controller holds the
+// flash before the commit (`hold`): while the commit runs, the flash follows each slide by its
+// part and draws only nodes that the new layout has, so it never marks a moved or removed
+// place. After the commit, `adopt` moves it to the new places of the same shapes and slides.
+// A flash request that follows (`show`) starts the places that show already in the shown
+// state, and only new places run the entrance.
 
 import type { SlideLayout } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
@@ -29,6 +36,7 @@ import type {
   RefreshHighlightSurface,
 } from './document-refresh-types.ts';
 import type { RefreshTarget } from './document-refresh-changes.ts';
+import { presentationInfo } from '../store/index.ts';
 import { selectionRects } from './surface-text-selection.ts';
 import { surfaceRootOf } from './surface-registry.ts';
 import { translateOf } from './document-replace.ts';
@@ -160,6 +168,24 @@ function reducedMotion(win: Window | null | undefined): boolean {
 
 type Phase = 'entering' | 'shown' | 'exiting';
 
+/** The place of a target: its part, notes or not, and its shape. */
+const placeOf = (t: RefreshTarget): string => `${t.part}|${t.notes ? 1 : 0}|${t.nodeId ?? ''}`;
+/** The place of a target with its text range. */
+const keyOf = (t: RefreshTarget): string =>
+  t.text ? `${placeOf(t)}|${t.text.paragraph}:${t.text.start}:${t.text.end}` : placeOf(t);
+
+/** What showed before a flash request that continues the flash. */
+interface Kept {
+  /** The keys of the targets (`keyOf`). */
+  readonly keys: ReadonlySet<string>;
+  /** The slide indexes whose thumbnails showed. */
+  readonly slides: ReadonlySet<number>;
+  /** The slide indexes whose notes showed. */
+  readonly notes: ReadonlySet<number>;
+  /** The canvas layer showed marks. */
+  readonly layer: boolean;
+}
+
 /** The change flash of one editor. @internal */
 export class RefreshHighlights {
   #targets: readonly RefreshTarget[] = [];
@@ -174,6 +200,10 @@ export class RefreshHighlights {
   /** The `aria-description` each marked item had before the flash: null for none. */
   #descriptions = new Map<Element, string | null>();
   #disposed = false;
+  /** A commit runs: the flash follows slides by part (`hold`). */
+  #holding = false;
+  /** What showed before the current request, while its entrance runs. */
+  #kept: Kept | null = null;
 
   constructor(
     private readonly editor: PptxEditorInstance,
@@ -192,18 +222,31 @@ export class RefreshHighlights {
     const win = root?.ownerDocument.defaultView;
     const reduced = reducedMotion(win);
     const cap = (ms: number) => (reduced ? Math.min(ms, REDUCED_MS) : ms);
+    // Shown already: the timeout starts again, and the places that show do not enter again.
+    const before = this.visible ? this.#targets : null;
+    this.#holding = false;
+    this.#kept = before
+      ? {
+          keys: new Set(before.map(keyOf)),
+          slides: new Set(before.map((t) => t.slideIndex)),
+          notes: new Set(before.filter((t) => t.notes).map((t) => t.slideIndex)),
+          layer: !!this.#layer?.firstChild && this.#layer.getAttribute(MARK) !== 'exiting',
+        }
+      : null;
     this.#settings = { ...settings, enterMs: cap(settings.enterMs), exitMs: cap(settings.exitMs) };
     this.#targets = targets;
     this.#clearTimers();
-    // Shown already: the timeout starts again, and the entrance does not replay.
-    const replay = this.#phase === null || this.#phase === 'exiting';
-    this.#phase = replay && this.#settings.enterMs > 0 ? 'entering' : 'shown';
+    const kept = this.#kept;
+    const fresh = !kept || targets.some((t) => !kept.keys.has(keyOf(t)));
+    this.#phase = fresh && this.#settings.enterMs > 0 ? 'entering' : 'shown';
+    if (this.#phase === 'shown') this.#kept = null;
     this.#watch();
     this.draw();
     if (this.#phase === 'entering') {
       const next = () => {
         if (this.#phase !== 'entering') return;
         this.#phase = 'shown';
+        this.#kept = null;
         this.#applyPhase();
       };
       // The next frame, so the browser sees the start state and runs the transition.
@@ -231,9 +274,65 @@ export class RefreshHighlights {
     this.#exitTimer = setTimeout(() => this.clear(), exitMs);
   }
 
+  /**
+   * Keep the flash through a commit: until `adopt` or `release`, it follows each slide by its
+   * part and draws only nodes that the layout has. A flash that does not show goes.
+   */
+  hold(): void {
+    if (!this.visible) return this.clear();
+    this.#holding = true;
+  }
+
+  /** End a hold with no commit: the document did not change. */
+  release(): void {
+    this.#holding = false;
+  }
+
+  get holding(): boolean {
+    return this.#holding;
+  }
+
+  /**
+   * End a hold after the commit: each held target moves to the targets of the accepted result
+   * at the same place (`placeOf`), with their text ranges. A place the result does not name
+   * goes. Returns whether the flash still shows.
+   */
+  adopt(targets: readonly RefreshTarget[]): boolean {
+    if (!this.#holding) return this.visible;
+    this.#holding = false;
+    const held = new Set(this.#targets.map(placeOf));
+    const next = targets.filter((t) => held.has(placeOf(t)));
+    if (!this.visible || next.length === 0) {
+      this.clear();
+      return false;
+    }
+    const seen = new Set<string>();
+    this.#targets = next.filter((t) => !seen.has(keyOf(t)) && !!seen.add(keyOf(t)));
+    this.draw();
+    return true;
+  }
+
+  /** Move each held target to the index of its part; a removed part takes its target away. */
+  #followParts(): void {
+    const pkg = this.editor.session?.store.package;
+    if (!pkg) return;
+    const at = new Map<string, number>();
+    presentationInfo(pkg).slides.forEach((slide, i) => {
+      at.set(slide.partName, i);
+      if (slide.notesPart) at.set(slide.notesPart, i);
+    });
+    this.#targets = this.#targets.flatMap((t) => {
+      const i = at.get(t.part);
+      if (i === undefined) return [];
+      return i === t.slideIndex ? [t] : [{ ...t, slideIndex: i }];
+    });
+  }
+
   /** Remove the flash at once: a document edit, a reload, a new result. */
   clear(): void {
     this.#clearTimers();
+    this.#holding = false;
+    this.#kept = null;
     this.#phase = null;
     this.#targets = [];
     for (const el of this.#marked) this.#unmark(el);
@@ -264,7 +363,11 @@ export class RefreshHighlights {
 
   /** Follow the slide on screen, the zoom, and thumbnails that mount during the hold. */
   #watch(): void {
-    if (!this.#unsubscribe) this.#unsubscribe = this.editor.subscribe(() => this.draw());
+    if (!this.#unsubscribe)
+      this.#unsubscribe = this.editor.subscribe(() => {
+        if (this.#holding) this.#followParts();
+        this.draw();
+      });
     const root = this.#editorRoot();
     const MO = root?.ownerDocument.defaultView?.MutationObserver;
     if (!this.#observer && root && MO) {
@@ -303,9 +406,14 @@ export class RefreshHighlights {
     el.setAttribute('data-refresh-border', s.borderStyle);
   }
 
+  /** The phase of a mark: one with no entrance, or one that showed already, starts shown. */
+  #phaseOf(entrance: boolean): Phase {
+    return !entrance && this.#phase === 'entering' ? 'shown' : this.#phase!;
+  }
+
   #mark(el: HTMLElement, kind: string, entrance: boolean): void {
     const s = this.#settings!;
-    const phase = !entrance && this.#phase === 'entering' ? 'shown' : this.#phase!;
+    const phase = this.#phaseOf(entrance);
     if (!this.#marked.has(el)) {
       this.#marked.add(el);
       this.#style(el, s, s.borderWidth ?? 2);
@@ -333,6 +441,9 @@ export class RefreshHighlights {
   #applyPhase(): void {
     for (const el of this.#marked) if (el.hasAttribute(MARK)) el.setAttribute(MARK, this.#phase!);
     this.#layer?.setAttribute(MARK, this.#phase!);
+    // The canvas marks of new places in a layer that showed already.
+    for (const g of this.#layer?.querySelectorAll(`[${MARK}]`) ?? [])
+      g.setAttribute(MARK, this.#phase!);
   }
 
   #drawThumbnails(entrance: boolean): void {
@@ -353,12 +464,13 @@ export class RefreshHighlights {
         if (!thumb) continue;
         want.add(thumb);
         want.add(item);
-        this.#mark(thumb, 'thumbnail', entrance);
+        const enters = entrance && !this.#kept?.slides.has(index);
+        this.#mark(thumb, 'thumbnail', enters);
         if (!this.#marked.has(item)) {
           this.#marked.add(item);
           item.classList.add('pptx-refresh-item');
         }
-        item.setAttribute(MARK, this.#phase);
+        item.setAttribute(MARK, this.#phaseOf(enters));
         if (!this.#descriptions.has(item))
           this.#descriptions.set(item, item.getAttribute('aria-description'));
         item.setAttribute('aria-description', label);
@@ -405,12 +517,16 @@ export class RefreshHighlights {
     }
     const overlay = stage.querySelector(':scope > .pptx-surface__overlay');
     if (this.#layer.parentNode !== stage) stage.insertBefore(this.#layer, overlay);
-    this.#layer.setAttribute(MARK, this.#phase!);
+    // A layer that showed marks stays shown: only the marks of new places enter.
+    const kept = this.#kept?.layer ? this.#kept : null;
+    this.#layer.setAttribute(MARK, this.#phaseOf(!kept));
     const { width, height } = layout.slide;
     this.#layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
     this.#layer.setAttribute('preserveAspectRatio', 'none');
     const px = EMU_PER_PX / (snap.zoom || 1);
-    this.#layer.replaceChildren(...canvasMarks(doc, layout, targets, s, px));
+    const enters =
+      kept && this.#phase === 'entering' ? (t: RefreshTarget) => !kept.keys.has(keyOf(t)) : null;
+    this.#layer.replaceChildren(...canvasMarks(doc, layout, targets, s, px, enters));
   }
 
   #drawNotes(): void {
@@ -426,65 +542,78 @@ export class RefreshHighlights {
         this.#unmark(el);
         this.#marked.delete(el);
       }
-    if (pane && on) this.#mark(pane, 'notes', true);
+    if (pane && on) this.#mark(pane, 'notes', !this.#kept?.notes.has(snap.currentSlide));
   }
 }
 
-/** The canvas marks of `targets` on `layout`: slide rings, shape rings, and text bands. */
+/**
+ * The canvas marks of `targets` on `layout`: slide rings, shape rings, and text bands. The
+ * marks of a target that `enters` names start in the entering state.
+ */
 function canvasMarks(
   doc: Document,
   layout: SlideLayout,
   targets: readonly RefreshTarget[],
   s: Settings,
-  px: number
+  px: number,
+  enters: ((t: RefreshTarget) => boolean) | null
 ): Element[] {
   const out: Element[] = [];
+  for (const t of targets) {
+    const marks = targetMarks(doc, layout, t, s, px);
+    if (enters?.(t)) for (const el of marks) el.setAttribute(MARK, 'entering');
+    out.push(...marks);
+  }
+  return out;
+}
+
+/** The canvas marks of one target: a slide ring, a shape ring, or text bands. */
+function targetMarks(
+  doc: Document,
+  layout: SlideLayout,
+  t: RefreshTarget,
+  s: Settings,
+  px: number
+): Element[] {
   const stroke = (s.borderWidth ?? 2) * px;
   const pad = s.padding * px;
   const radius = s.borderRadius * px;
-  for (const t of targets) {
-    if (!t.nodeId) {
-      const rect = doc.createElementNS(SVG_NS, 'rect');
-      rect.setAttribute('class', 'pptx-refresh-ring pptx-refresh-ring--slide');
-      rect.setAttribute('x', String(stroke / 2));
-      rect.setAttribute('y', String(stroke / 2));
-      rect.setAttribute('width', String(Math.max(0, layout.slide.width - stroke)));
-      rect.setAttribute('height', String(Math.max(0, layout.slide.height - stroke)));
-      rect.setAttribute('rx', String(radius));
-      rect.setAttribute('stroke-width', String(stroke));
-      out.push(rect);
-      continue;
-    }
-    const item = findItem(layout.items, t.nodeId);
-    if (!item) continue;
-    if (t.text && t.text.end > t.text.start) {
-      const from = { paragraph: t.text.paragraph, offset: t.text.start };
-      const to = { paragraph: t.text.paragraph, offset: t.text.end };
-      const rects = selectionRects(doc, item, from, to, 'pptx-refresh-band');
-      for (const g of rects) {
-        g.setAttribute('class', 'pptx-refresh-band-group');
-        out.push(g);
-      }
-      if (rects.length > 0) continue;
-    }
-    const { cx, cy } = item.element.xfrm;
-    const [a, b, c, d] = item.matrix;
-    const sx = Math.hypot(a, b) || 1;
-    const sy = Math.hypot(c, d) || 1;
-    const g = doc.createElementNS(SVG_NS, 'g');
-    g.setAttribute('class', 'pptx-refresh-ring-group');
-    g.setAttribute('transform', `matrix(${item.matrix.join(' ')})`);
+  if (!t.nodeId) {
     const rect = doc.createElementNS(SVG_NS, 'rect');
-    rect.setAttribute('class', 'pptx-refresh-ring');
-    rect.setAttribute('x', String(-pad / sx));
-    rect.setAttribute('y', String(-pad / sy));
-    rect.setAttribute('width', String(cx + (2 * pad) / sx));
-    rect.setAttribute('height', String(Math.max(cy, 1) + (2 * pad) / sy));
-    rect.setAttribute('rx', String(radius / sx));
-    rect.setAttribute('ry', String(radius / sy));
-    rect.setAttribute('stroke-width', String(stroke / Math.sqrt(sx * sy)));
-    g.append(rect);
-    out.push(g);
+    rect.setAttribute('class', 'pptx-refresh-ring pptx-refresh-ring--slide');
+    rect.setAttribute('x', String(stroke / 2));
+    rect.setAttribute('y', String(stroke / 2));
+    rect.setAttribute('width', String(Math.max(0, layout.slide.width - stroke)));
+    rect.setAttribute('height', String(Math.max(0, layout.slide.height - stroke)));
+    rect.setAttribute('rx', String(radius));
+    rect.setAttribute('stroke-width', String(stroke));
+    return [rect];
   }
-  return out;
+  const item = findItem(layout.items, t.nodeId);
+  if (!item) return [];
+  if (t.text && t.text.end > t.text.start) {
+    const from = { paragraph: t.text.paragraph, offset: t.text.start };
+    const to = { paragraph: t.text.paragraph, offset: t.text.end };
+    const rects = selectionRects(doc, item, from, to, 'pptx-refresh-band');
+    for (const g of rects) g.setAttribute('class', 'pptx-refresh-band-group');
+    if (rects.length > 0) return rects;
+  }
+  const { cx, cy } = item.element.xfrm;
+  const [a, b, c, d] = item.matrix;
+  const sx = Math.hypot(a, b) || 1;
+  const sy = Math.hypot(c, d) || 1;
+  const g = doc.createElementNS(SVG_NS, 'g');
+  g.setAttribute('class', 'pptx-refresh-ring-group');
+  g.setAttribute('transform', `matrix(${item.matrix.join(' ')})`);
+  const rect = doc.createElementNS(SVG_NS, 'rect');
+  rect.setAttribute('class', 'pptx-refresh-ring');
+  rect.setAttribute('x', String(-pad / sx));
+  rect.setAttribute('y', String(-pad / sy));
+  rect.setAttribute('width', String(cx + (2 * pad) / sx));
+  rect.setAttribute('height', String(Math.max(cy, 1) + (2 * pad) / sy));
+  rect.setAttribute('rx', String(radius / sx));
+  rect.setAttribute('ry', String(radius / sy));
+  rect.setAttribute('stroke-width', String(stroke / Math.sqrt(sx * sy)));
+  g.append(rect);
+  return [g];
 }

@@ -16,8 +16,8 @@ Call `createDocumentRefresh(editor)` after the editor mounts. Repeated calls for
 | --- | --- |
 | `capture()` | Capture the current bytes and revision. Returns a submission. |
 | `applyUpdate(update)` | Accept a complete PPTX for that submission and sequence. Set `mode: 'edit'` to apply it as one undoable edit. Calls run one at a time, in call order. Returns a success or refusal result. |
-| `finish(submission)` | Close the submission when the job ends. Accepted content and change navigation stay. |
-| `cancel()` | Invalidate pending results. It does not cancel your network request. |
+| `finish(submission)` | Close the submission when the job ends. Accepted content and change navigation stay. While a replacement runs, the call does nothing. |
+| `cancel()` | Invalidate pending results, and end waits for input. It does not cancel your network request. |
 | `highlightChanges(options?)` | Flash available changes. Returns the selected available change count, including changes on other slides, or `0` during replacement. |
 | `clearHighlights(options?)` | Dismiss highlights, with or without a fade. |
 | `navigateToChange(id, options?)` | Go to the slide of a change and reveal its thumbnail. Returns whether the change is available. |
@@ -129,13 +129,17 @@ async function update() {
 
 Render the component inside the editor root. React returns an instance or `null`; Vue returns a shallow ref.
 
-- `capture()` commits buffered text input, and waits for text composition to end.
+- `capture()` commits buffered text input, including a speaker notes draft. It waits up to 5 seconds for a text composition to end, then rejects with `input-failed`.
 - Pass the same `submission` object to `applyUpdate()`. A copied, superseded, or other editor's token cannot authorize replacement.
 - Any edit after capture makes `applyUpdate()` return `local-edits`, even after undo. Typing in slide text or speaker notes and a completed IME composition count as edits, including input that is still pending when the result arrives. Capture again; do not replay the old result.
-- If a text composition or a shape drag is in progress when a result arrives, `applyUpdate()` waits for it to end before it applies the result.
+- If a pointer gesture on the slide, such as a shape drag or a resize, is in progress when a result arrives, `applyUpdate()` waits up to 30 seconds for it to end, then applies the result.
+- If a text composition is in progress when a result arrives, `applyUpdate()` waits up to 5 seconds for it to end. If the composition is still running, the result returns `local-edits`.
+- `cancel()` ends these waits at once. A waiting `applyUpdate()` returns `cancelled`, and a waiting `capture()` rejects with `superseded`.
 - `applyUpdate()` resolves when the returned presentation is on screen and accepts clicks.
 
-Both modes keep the current paint on screen until the new paint is ready. The editor does not show its loading screen. Slides whose parts did not change keep their painted thumbnails and canvas content. The current slide index and the zoom stay; if the returned file has fewer slides, the editor shows its last slide. The selection stays when its shapes and text survive. Otherwise it clears.
+Both modes keep the current paint on screen until the new paint is ready. The editor does not show its loading screen. Slides whose parts did not change keep their painted thumbnails and canvas content. The zoom stays. The editor keeps the current slide: when the returned file adds or removes slides before it, the editor follows it to its new index. If the returned file removes the current slide, the editor stays at the same index, or shows the last slide when the file has fewer slides.
+
+The selection stays when its shapes and text survive, also when the current slide moves to a new index. Otherwise it clears. When a reload opens the whole file with `load()`, the selection clears. A reload does this when the returned file changes embedded fonts, or when the difference cannot apply in place.
 
 ## Show refresh state in your UI
 
@@ -274,14 +278,16 @@ An update with `mode: 'edit'` behaves as follows:
 
 - One undo returns the presentation to the captured submission, and one redo applies the result again. Undo steps from before the update stay available.
 - The content matches what a reload of the returned file shows. Parts that the editor does not interpret arrive as the file has them.
-- The selection stays when its shapes and text survive. Otherwise it clears. The current slide and zoom stay.
+- The selection stays when its shapes and text survive. Otherwise it clears. The editor follows the current slide when slides before it move, and the zoom stays.
 - Each accepted cumulative result adds one undo step, so undo after the second result returns to the first.
 - The `change` event has `source: 'refresh'`, so it does not start another processing job. Undo and redo are user edits and omit `source`.
 - A result identical to the open presentation succeeds without an undo step.
 
 If the difference cannot apply as an edit, for example because the returned file names a different main presentation part, the update refuses with `edit-unsupported`. Nothing changes, and you can retry the same sequence with a reload. In a collaboration session, a reload refuses with `collaboration`, so report the failure instead.
 
-An editor in viewing mode refuses the update with `edit-not-permitted`.
+A returned file that changes embedded fonts also refuses with `edit-unsupported` and the reason `unsupported-difference`. The editor registers embedded fonts only when it opens a file, so a reload opens such a file whole.
+
+An editor in viewing mode refuses the update with `edit-not-permitted`. A read-only presentation, for example after a slide failed to parse, refuses it in the same way.
 
 ### Refusal causes
 
@@ -289,9 +295,9 @@ A refused update has a stable `code` and an English `message` for logs. With `mo
 
 | `reason` | `code` | Situation |
 | --- | --- | --- |
-| `viewing` | `edit-not-permitted` | The editor is in viewing mode. |
+| `viewing` | `edit-not-permitted` | The editor is in viewing mode, or the presentation is read-only. |
 | `different-main-part` | `edit-unsupported` | The returned file names a different main presentation part. |
-| `unsupported-difference` | `edit-unsupported` | The difference cannot be expressed as an edit of the open presentation. |
+| `unsupported-difference` | `edit-unsupported` | The difference cannot be expressed as an edit of the open presentation, or it changes embedded fonts. |
 | `collaboration-refused` | `edit-unsupported` | A collaboration session is attached, and the editor refused the edit, for example because a slide part is damaged. The presentation is unchanged. |
 
 The type also lists `protected` and `collaboration-unavailable` for DOCX Editor compatibility. PresentationML has no enforced edit protection, and a PPTX Editor collaboration session accepts edits while it is attached, so PPTX Editor does not produce them.
@@ -443,7 +449,7 @@ Invalid location metadata does not reject valid presentation bytes. That change 
 | --- | --- |
 | `invalid-selector` | Both slide selectors, neither, an invalid index, or a level without its parent. |
 | `invalid-slide-id` | The slide ID is outside the supported range. |
-| `slide-not-found` | The returned presentation lacks the slide. |
+| `slide-not-found` | The returned presentation lacks the slide, or `notes: true` names a slide without notes. |
 | `shape-not-found` | The slide lacks the shape. |
 | `ambiguous-shape-id` | Several shapes on the slide have the ID. |
 | `paragraph-not-found` | The shape lacks the paragraph. |
@@ -476,7 +482,9 @@ Each computed change has a `computed` field instead of a `description`:
 | `affectedSlides` | For layouts, masters, and themes, the zero-based indexes of the slides that show the change. These slides flash. |
 | `previousSlideIndex` | For removed and moved slides, the index in the captured presentation. |
 
-Removed speaker notes report a `notes` change with the action `removed`. Computed IDs stay stable across cumulative results, so `isNew` marks only new changes. To describe a change in a list, call `describeRefreshChange(change, t)`. It returns the processor `description`, or a localized summary such as "Changed text on slide 3". To compute changes without an editor, see [Compare presentations](/docs/pro/compare-presentations).
+Removed speaker notes report a `notes` change with the action `removed`. Computed IDs stay stable across cumulative results, so `isNew` marks only new changes.
+
+The module reports at most 10000 changes. When a comparison finds more, the result holds the first 9999 changes and one last change with `id: 'truncated'` and `computed: { scope: 'package', action: 'changed' }`. That change has no location, so it cannot flash. `describeRefreshChange()` describes it as "Other changes are not listed". [`comparePresentations()`](/docs/pro/compare-presentations#limits) reports `truncated: true` instead. To describe a change in a list, call `describeRefreshChange(change, t)`. It returns the processor `description`, or a localized summary such as "Changed text on slide 3". To compute changes without an editor, see [Compare presentations](/docs/pro/compare-presentations).
 
 ## Present changes
 
@@ -512,6 +520,7 @@ Other notes about change presentation:
 
 - `isNew` marks new IDs, changed text, and changed descriptions within one submission.
 - Locations stay valid until the next accepted result or local edit.
+- Highlights that show when the next result arrives stay on screen. During the replacement, they follow their slides and shapes to the new positions. A highlight request after the result starts the places that show already without the entrance. Only new places run the entrance.
 - Highlights change presentation only. They add no saved bytes and no undo entries.
 - Changed thumbnails get the accessible description **Changed**. Keep a text change list beside the presentation, because color alone does not explain a change.
 
@@ -562,24 +571,24 @@ Navigation returns `false` for an unavailable location or during replacement. It
 `capture()` rejects with `DocumentRefreshError`, whose `code` is one of these values:
 
 - `unavailable`: no presentation is mounted, or it is still opening.
-- `busy`: a replacement is running.
+- `busy`: a replacement is running, including a reload that opens the whole file.
 - `recovery-failed`: an earlier replacement failed and was not restored. Offer recovery first.
-- `input-failed`: pending input or serialization failed.
+- `input-failed`: pending input or serialization failed, or a text composition did not end within 5 seconds.
 - `superseded`: a later `capture()` or `cancel()` ran before this capture ended.
 
 `applyUpdate()` can return these codes:
 
 | Code | Situation | Action |
 | --- | --- | --- |
-| `local-edits` | The presentation changed after capture, even through undo. With `mode: 'edit'`, this includes another participant's edit. | Capture again and start a new job. |
+| `local-edits` | The presentation changed after capture, even through undo, or a text composition did not end within 5 seconds. With `mode: 'edit'`, this includes another participant's edit. | Capture again and start a new job. |
 | `out-of-order` | A duplicate or older sequence arrived. | Discard the result. |
 | `superseded` | The result belongs to an inactive submission, or arrived after cancellation. | Discard it. |
 | `document-changed` | Another presentation was loaded with `load()` after capture or during replacement. | Discard it. |
-| `cancelled` | Cancellation interrupted a replacement. | Stop the transport. |
+| `cancelled` | Cancellation interrupted a replacement, or a wait for input. | Stop the transport. |
 | `collaboration` | A reload while a collaboration session is attached, even if disconnected. | Use `mode: 'edit'`. |
 | `unavailable` | No mounted presentation, or the presentation is still opening. | Retry later. |
-| `edit-not-permitted` | An update with `mode: 'edit'` in viewing mode. A retry does not help. | Change the editing mode, or reload outside a collaboration session. |
-| `edit-unsupported` | The result cannot apply as an undoable edit. The presentation and its history are unchanged. | Outside a collaboration session, retry the same sequence without `mode: 'edit'`. |
+| `edit-not-permitted` | An update with `mode: 'edit'` in viewing mode, or on a read-only presentation. A retry does not help. | Change the editing mode, or reload outside a collaboration session. |
+| `edit-unsupported` | The result cannot apply as an undoable edit, for example because it changes embedded fonts. The presentation and its history are unchanged. | Outside a collaboration session, retry the same sequence without `mode: 'edit'`. |
 | `invalid-result` | The update object is malformed, such as a change with wrong field types. | Fix the update. |
 | `invalid-document` | The bytes are not a valid PPTX. The visible presentation stays. | Report the processor failure. |
 | `input-failed` | Pending input or serialization failed. | Report the failure. |
@@ -614,12 +623,14 @@ Recovery bytes are not an undo archive for accepted files.
 
 ## Limits
 
-- A reload resets undo history. An update with `mode: 'edit'` keeps undo history. In both modes, the selection stays when its shapes and text survive. Otherwise it clears.
+- A reload resets undo history. An update with `mode: 'edit'` keeps undo history. In both modes, the selection stays when its shapes and text survive, and the editor follows the current slide when slides before it move. Otherwise the selection clears.
 - A reload refuses collaborative sessions, including disconnected ones.
-- A reload keeps unchanged slides painted. If the returned file changes embedded fonts, or the editor cannot compare the files, the reload opens the whole file again without the loading screen. Long presentations then take longer to show.
+- A reload keeps unchanged slides painted. If the returned file changes embedded fonts, or the difference cannot apply in place, the reload opens the whole file again with `load()`, without the loading screen. The selection then clears, and long presentations take longer to show.
+- An update with `mode: 'edit'` refuses a file that changes embedded fonts with `edit-unsupported`.
+- `capture()` waits up to 5 seconds for a text composition. `applyUpdate()` waits up to 5 seconds for a text composition and up to 30 seconds for a pointer gesture on the slide. `cancel()` ends the waits.
 - The controller does not compare presentation meaning or reject unrelated content. Check presentation and job identity in your application before `applyUpdate()`.
 - An ordinary `editor.load()` invalidates pending submissions and recovery.
-- Computed changes report at most 10000 changes. A shape with more than 50 changed paragraphs reports one shape change.
+- Computed changes report at most 10000 changes. With `reviewModule()`, more than 10000 changes give the first 9999 changes and one change with `id: 'truncated'` and the scope `package`. `comparePresentations()` returns `truncated: true` instead. A shape with more than 50 changed paragraphs reports one shape change.
 - Highlight numbers must be finite. `padding`, `borderRadius`, and `borderWidth` must be nonnegative. `timeoutMs` accepts `0` through `2147483647` milliseconds, or `null`.
 - Reduced-motion preferences cap fades at 125 milliseconds and make smooth navigation instant.
 

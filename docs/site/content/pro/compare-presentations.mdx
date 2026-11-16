@@ -174,7 +174,7 @@ A refused comparison returns `ok: false` with `code: 'invalidDocument'` when a f
 
 ## Limits
 
-- One comparison reports at most 10000 changes. `truncated` is `true` when the limit stopped it.
+- One comparison reports at most 10000 changes. `comparePresentations()` returns the first 10000 changes with `truncated: true` when the limit stopped it. During a document refresh, `reviewModule()` returns the first 9999 changes and one last change with `id: 'truncated'` and `computed: { scope: 'package', action: 'changed' }`. That change has no location. `describeRefreshChange()` describes it as "Other changes are not listed".
 - A shape with more than 50 changed paragraphs, or with changed text formatting, reports one shape change with the `text` or `textFormat` aspect.
 - Changes to presentation-wide settings report one `package` change. Changes to document properties are not reported.
 - The comparison does not record changes in the file. PresentationML has no tracked changes.

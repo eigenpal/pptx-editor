@@ -8,12 +8,14 @@
 //   from the `applyUpdate()` call until the follow-up work settles.
 // - The change flash: the phases and the times of a thumbnail, the canvas band over changed
 //   text, a thumbnail that comes into view or mounts during the hold, reduced motion,
-//   `clearHighlights()`, and saved files without the flash.
+//   `clearHighlights()`, saved files without the flash, and a flash that continues through
+//   the next result without a frame that lacks the band and without a second entrance.
 //
 // - Input that runs when a result arrives: notes typed after capture, an IME composition, and
-//   a shape drag make the result wait or refuse with `local-edits`; the typing stays. After a
-//   reload, a caret in a kept text box stays and takes keys; a removed one moves the focus to
-//   the slide.
+//   a shape or handle drag make the result wait or refuse with `local-edits`; the typing stays.
+//   After a reload, a caret in a kept text box stays and takes keys; a removed one moves the
+//   focus to the slide. A slide inserted before the slide on screen keeps that slide and its
+//   caret.
 //
 // Screenshots during the flash go to `test-results/` (`REFRESH_SHOTS` sets another folder).
 
@@ -297,18 +299,26 @@ const railThumb = (page: Page, index: number) =>
   page.locator(`.pptx-rail [data-index="${index}"] .pptx-rail__thumb`);
 
 /** Start `applyUpdate()` with `bytes` in the page; `window.__pending` holds its result. */
-async function startApply(page: Page, bytes: Uint8Array): Promise<void> {
-  await page.evaluate((data) => {
-    const w = window as unknown as { __submission: unknown; __pending: unknown; __done: boolean };
-    w.__done = false;
-    w.__pending = window.__refresh
-      .applyUpdate({
-        submission: w.__submission as never,
-        sequence: 1,
-        bytes: new Uint8Array(data),
-      })
-      .then((r) => ((w.__done = true), r));
-  }, Array.from(bytes));
+async function startApply(
+  page: Page,
+  bytes: Uint8Array,
+  mode: 'reload' | 'edit' = 'reload'
+): Promise<void> {
+  await page.evaluate(
+    ({ data, mode }) => {
+      const w = window as unknown as { __submission: unknown; __pending: unknown; __done: boolean };
+      w.__done = false;
+      w.__pending = window.__refresh
+        .applyUpdate({
+          submission: w.__submission as never,
+          sequence: 1,
+          bytes: new Uint8Array(data),
+          mode,
+        })
+        .then((r) => ((w.__done = true), r));
+    },
+    { data: Array.from(bytes), mode }
+  );
 }
 
 /** Capture in the page, and keep the submission for `startApply`. */
@@ -404,9 +414,9 @@ async function caretIn(page: Page, name: string, offset: number): Promise<void> 
 }
 
 /** The XML of the first slide in the file that `save()` writes now. */
-const savedSlide = async (page: Page): Promise<string> => {
+const savedSlide = async (page: Page, part = 'slide1'): Promise<string> => {
   const bytes = await page.evaluate(() => Array.from(window.__pptxEditor.save()!));
-  return strFromU8(unzipSync(new Uint8Array(bytes))['ppt/slides/slide1.xml']!);
+  return strFromU8(unzipSync(new Uint8Array(bytes))[`ppt/slides/${part}.xml`]!);
 };
 
 for (const adapter of [{ name: 'react' }, { name: 'vue' }] as const) {
@@ -791,6 +801,128 @@ for (const adapter of [{ name: 'react' }, { name: 'vue' }] as const) {
       const slide = await savedSlide(page);
       expect(slide).not.toContain('Server');
       expect(slide).not.toContain('<a:off x="8000000" y="3000000"/>');
+    });
+
+    test('input: a result waits for a resize handle drag, and the drag refuses it', async ({
+      page,
+    }) => {
+      await openDeck(page, base(), twoBoxes('Hello', 'World'));
+      const start = await clientPoint(page, 9_000_000, 3_750_000);
+      await page.mouse.click(start.x, start.y);
+      const handle = page.locator('.pptx-surface__overlay [data-handle]').first();
+      await expect(handle).toBeVisible();
+      const box = (await handle.boundingBox())!;
+      await capture(page);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      // The overlay draws its handles again on each move: the pressed handle leaves the page.
+      await page.mouse.move(box.x + 30, box.y + 20, { steps: 5 });
+      await startApply(page, twoBoxes('Server', 'World'));
+      await page.mouse.move(box.x + 60, box.y + 40, { steps: 5 });
+      await page.waitForTimeout(300);
+      expect(await applied(page)).toBe(false);
+      await page.mouse.up();
+      expect(await resultCode(page)).toBe('local-edits');
+      expect(await savedSlide(page)).not.toContain('Server');
+    });
+
+    for (const mode of ['reload', 'edit'] as const) {
+      test(`focus: ${mode} follows the slide on screen past an inserted slide; the caret stays`, async ({
+        page,
+      }) => {
+        await openDeck(page, base(), refreshDeck(10));
+        await page.evaluate(() => window.__pptxEditor.goToSlide(5));
+        await page.waitForTimeout(200);
+        await caretIn(page, 'Title', 'Slide 6 title'.length);
+        await capture(page);
+        await startApply(page, refreshDeck(10, { insertAfter: 1 }), mode);
+        expect(await resultCode(page)).toBe('ok');
+        expect(await page.evaluate(() => window.__pptxEditor.snapshot().currentSlide)).toBe(6);
+        expect(await page.evaluate(() => window.__pptxEditor.snapshot().selection.kind)).toBe(
+          'text'
+        );
+        await expect(page.locator('.pptx-surface__input')).toBeFocused();
+        await page.keyboard.type('!');
+        expect(await savedSlide(page, 'slide6')).toContain('Slide 6 title!');
+      });
+    }
+
+    test('flash: a kept highlight stays through the next result, with no entrance', async ({
+      page,
+    }) => {
+      for (const mode of ['reload', 'edit'] as const) {
+        await openDeck(page, base(), refreshDeck(8));
+        await page.evaluate(() => window.__pptxEditor.goToSlide(2));
+        await page.waitForTimeout(200);
+        const out = await page.evaluate(
+          async ({ first, second, mode }) => {
+            const refresh = window.__refresh;
+            const options = { includePrevious: true, timeoutMs: 60_000 };
+            const submission = await refresh.capture();
+            const bytes = (data: number[]) => new Uint8Array(data);
+            const r1 = await refresh.applyUpdate({
+              submission,
+              sequence: 1,
+              bytes: bytes(first),
+              mode,
+            });
+            refresh.highlightChanges(options);
+            await new Promise((r) => setTimeout(r, 400));
+            const thumb = (i: number) =>
+              document.querySelector(`.pptx-rail [data-index="${i}"] .pptx-rail__thumb`);
+            // Each value of the kept thumbnail, and each frame without the canvas band.
+            const kept: (string | null)[] = [];
+            const mo = new MutationObserver(() =>
+              kept.push(thumb(2)?.getAttribute('data-refresh-highlight') ?? null)
+            );
+            mo.observe(document.body, {
+              subtree: true,
+              childList: true,
+              attributes: true,
+              attributeFilter: ['data-refresh-highlight'],
+            });
+            let frames = 0;
+            let bandless = 0;
+            let layerNotShown = 0;
+            let sampling = true;
+            const frame = () => {
+              frames += 1;
+              const layer = document.querySelector('.pptx-surface__refresh');
+              if (!layer?.querySelector('.pptx-refresh-band')) bandless += 1;
+              if (layer?.getAttribute('data-refresh-highlight') !== 'shown') layerNotShown += 1;
+              if (sampling) requestAnimationFrame(frame);
+            };
+            requestAnimationFrame(frame);
+            const r2 = await refresh.applyUpdate({
+              submission,
+              sequence: 2,
+              bytes: bytes(second),
+              mode,
+            });
+            const count = refresh.highlightChanges(options);
+            const fifth = thumb(5)?.getAttribute('data-refresh-highlight');
+            await new Promise((r) => setTimeout(r, 400));
+            sampling = false;
+            mo.disconnect();
+            refresh.clearHighlights({ animation: false });
+            refresh.finish(submission);
+            return { ok: [r1.ok, r2.ok], count, kept, frames, bandless, layerNotShown, fifth };
+          },
+          {
+            first: Array.from(refreshDeck(8, { text: [2] })),
+            second: Array.from(refreshDeck(8, { text: [2, 5] })),
+            mode,
+          }
+        );
+        console.log(`[${adapter.name} ${mode} kept flash]`, JSON.stringify(out));
+        expect(out.ok).toEqual([true, true]);
+        expect(out.count).toBe(2);
+        expect(out.frames).toBeGreaterThan(3);
+        expect(out.bandless).toBe(0);
+        expect(out.layerNotShown).toBe(0);
+        expect(out.kept.filter((v) => v !== 'shown')).toEqual([]);
+        expect(out.fifth).toBe('entering');
+      }
     });
 
     test('focus: a caret in a kept text box stays after a reload and takes keys', async ({

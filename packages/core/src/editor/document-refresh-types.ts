@@ -184,17 +184,21 @@ export interface RefreshSubmission {
 /**
  * How `applyUpdate()` puts returned bytes on screen.
  *
- * - `'reload'` (default): show the returned file as a reload does. Resets selection and undo
- *   history. Refused in collaboration sessions.
+ * - `'reload'` (default): show the returned file as a reload does. Resets undo history.
+ *   Refused in collaboration sessions. A file that changes embedded fonts, or whose difference
+ *   cannot apply in place, opens whole with `load()`, and the selection clears.
  * - `'edit'`: apply the difference as ONE undoable edit on top of the current history. Undo
  *   returns to the captured submission (or the previous accepted result), and redo applies the
  *   result again. Works in collaboration sessions, where the update reaches other participants
  *   as an ordinary edit. Refuses with `edit-unsupported` when the difference cannot apply as an
- *   edit; the document and its history stay unchanged, so outside a collaboration session you
- *   can retry with `'reload'`. Refuses with `edit-not-permitted` in viewing mode.
+ *   edit, or changes embedded fonts; the document and its history stay unchanged, so outside a
+ *   collaboration session you can retry with `'reload'`. Refuses with `edit-not-permitted` in
+ *   viewing mode and on a read-only presentation.
  *
  * Both modes keep the old paint on screen until the new one is ready, and never show the
- * loading screen.
+ * loading screen. In both modes the selection stays when its shapes and text survive, and the
+ * editor follows the current slide when slides before it are added or removed; otherwise the
+ * selection clears.
  *
  * @public
  */
@@ -262,7 +266,7 @@ export type RefreshFailureCode =
  * The specific cause behind a refusal code, for an update with `mode: 'edit'`.
  *
  * With code `edit-not-permitted`:
- * - `viewing`: the editor is in viewing mode.
+ * - `viewing`: the editor is in viewing mode, or the presentation is read-only.
  * - `protected`: not produced; PresentationML has no enforced edit protection.
  *
  * With code `unavailable`:
@@ -271,7 +275,7 @@ export type RefreshFailureCode =
  * With code `edit-unsupported`:
  * - `different-main-part`: the returned file names a different main presentation part.
  * - `unsupported-difference`: the difference cannot be expressed as an edit of the open
- *   presentation.
+ *   presentation, or it changes embedded fonts.
  * - `collaboration-refused`: the collaboration room refused the edit.
  *
  * @public
@@ -378,21 +382,31 @@ export interface NavigateToChangeOptions extends ScrollToAnchorOptions {
 }
 
 /**
- * External file transport stays in your application. A reload resets selection and undo
- * history; an update with `mode: 'edit'` keeps both and adds one undo step.
+ * External file transport stays in your application. A reload resets undo history; an update
+ * with `mode: 'edit'` keeps it and adds one undo step. In both modes the selection stays when
+ * its shapes and text survive, and clears when a reload opens the whole file with `load()`.
  * @public
  */
 export interface DocumentRefresh {
-  /** Finish pending input and capture bytes with their document revision. Supersedes earlier submissions. */
+  /**
+   * Finish pending input and capture bytes with their document revision. Supersedes earlier
+   * submissions. Waits up to 5 seconds for a text composition, then rejects with
+   * `input-failed`.
+   */
   capture(): Promise<RefreshSubmission>;
   /**
-   * Accept cumulative output. Keep the current slide and the zoom without moving focus. With
-   * `mode: 'edit'`, apply it as one undoable edit and keep selection where it maps.
+   * Accept cumulative output. Keep the current slide, also when slides before it move, and the
+   * zoom without moving focus. Waits up to 30 seconds for a pointer gesture on the slide, then
+   * applies; waits up to 5 seconds for a text composition, then returns `local-edits`. With
+   * `mode: 'edit'`, apply it as one undoable edit.
    */
   applyUpdate(update: RefreshUpdate): Promise<RefreshResult>;
-  /** Cancel pending processing. An accepted result stays loaded. */
+  /**
+   * Cancel pending processing, and end waits for input: a waiting `applyUpdate()` returns
+   * `cancelled`. An accepted result stays loaded.
+   */
   cancel(): void;
-  /** End processing when no further output will arrive. */
+  /** End processing when no further output will arrive. Does nothing while a replacement runs. */
   finish(submission: RefreshSubmission): void;
   /** Cached state, suitable for framework external-store subscriptions. */
   snapshot(): DocumentRefreshState;

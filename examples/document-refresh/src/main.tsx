@@ -199,9 +199,10 @@ function ReadyControls({ editor }: { editor: PptxEditorInstance }) {
       </label>
       <div className="refresh-actions">
         {/* `aria-disabled` keeps these buttons focusable, so focus does not fall to the page
-            when a job starts or ends. The handlers ignore a press while they are disabled. */}
+            when a job starts or ends. The handlers ignore a press while they are disabled. The
+            labels stay the same, so the buttons do not move; the status line shows the job. */}
         <button type="button" aria-disabled={busy || sampleEdited} onClick={() => void update()}>
-          {busy ? t.processingLabel : t.start}
+          {t.start}
         </button>
         <button type="button" aria-disabled={!busy} onClick={cancel}>
           {t.cancel}
