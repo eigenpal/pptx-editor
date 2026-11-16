@@ -31,6 +31,11 @@ export {
 } from './review/review-module.ts';
 export { legacyComments } from './review/legacy-comments.ts';
 export {
+  comparePresentations,
+  type ComparePresentationsOptions,
+  type ComparePresentationsResult,
+} from './review/refresh-changes.ts';
+export {
   collaborationModule,
   type CollaborationModuleOptions,
 } from './collaboration/collaboration-module.ts';

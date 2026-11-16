@@ -39,7 +39,8 @@ import {
   type LocatedChange,
 } from './document-refresh-changes.ts';
 import { RefreshHighlights } from './refresh-highlights.ts';
-import { editorHostDocument, surfaceRootOf } from './surface-registry.ts';
+import { surfaceRootOf } from './surface-registry.ts';
+import { COMPOSING_CLASS } from './surface-input.ts';
 import { revealRailItem } from './refresh-navigation.ts';
 
 export { DocumentRefreshError } from './document-refresh-types.ts';
@@ -120,24 +121,10 @@ function owned(update: RefreshUpdate): RefreshUpdate {
   };
 }
 
-/**
- * The editor's text input while an IME composition runs in it, or null. Composition events
- * bubble, so one pair of listeners on the editor's document sees every input it mounts.
- */
-function compositionTracker(editor: PptxEditorInstance): () => HTMLElement | null {
-  const doc = editorHostDocument(editor);
-  if (!doc) return () => null;
-  let input: HTMLElement | null = null;
-  const mine = (e: Event): HTMLElement | null => {
-    const target = e.target as HTMLElement | null;
-    const root = surfaceRootOf(editor);
-    return target?.classList?.contains('pptx-surface__input') && root?.contains(target)
-      ? target
-      : null;
-  };
-  doc.addEventListener('compositionstart', (e) => void (input = mine(e) ?? input), true);
-  doc.addEventListener('compositionend', (e) => void (mine(e) === input && (input = null)), true);
-  return () => (input?.isConnected ? input : null);
+/** The editor's text input while an IME composition runs in it, or null. */
+function composingInput(editor: PptxEditorInstance): HTMLElement | null {
+  const input = surfaceRootOf(editor)?.querySelector<HTMLElement>('.pptx-surface__input');
+  return input?.classList.contains(COMPOSING_CLASS) ? input : null;
 }
 
 /**
@@ -199,7 +186,6 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
       }
     }
   };
-  const composing = compositionTracker(editor);
   const highlights = new RefreshHighlights(editor, () => {
     if (state.highlightsVisible) notify({ highlightsVisible: false });
   });
@@ -292,7 +278,7 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
   };
   /** Wait for a running composition, then serialize with no await before the handle read. */
   const settle = async (current: number) => {
-    const input = composing();
+    const input = composingInput(editor);
     if (input)
       await new Promise<void>((resolve) => {
         const done = () => (input.removeEventListener('compositionend', done), resolve());

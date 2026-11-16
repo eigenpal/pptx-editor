@@ -17,6 +17,7 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import { presentationInfo, type PptxPackage } from '@pptx-editor.dev/core/store';
 import { rememberLicenseKey, type ProLicenseOptions } from '../license.ts';
+import { computeRefreshChanges } from './refresh-changes.ts';
 
 /** Options of `reviewModule`. @public */
 export interface ReviewModuleOptions extends ProLicenseOptions {
@@ -87,6 +88,7 @@ export function reviewModule(options: ReviewModuleOptions = {}): EditorModule {
     review: {
       displayModes: options.displayModes ?? ['final', 'markup'],
       collectReviewItems: ({ package: pkg }): readonly ReviewItem[] => reviewItems(pkg),
+      refreshChanges: (captured, returned) => computeRefreshChanges(captured, returned).changes,
       ...(pane ? { pane } : {}),
     },
   };

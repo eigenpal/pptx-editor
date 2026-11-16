@@ -267,6 +267,27 @@ describe('document refresh: reload', () => {
   });
 });
 
+describe('document refresh: capture', () => {
+  test('waits for an IME composition to end before it serializes', async () => {
+    const { editor, host, done } = await mount(deck(['A']));
+    const input = host.querySelector<HTMLElement>('.pptx-surface__input');
+    if (!input) throw new Error('no input');
+    input.classList.add('pptx-surface__input--composing');
+    const refresh = createDocumentRefresh(editor);
+    let captured = false;
+    const pending = refresh.capture().then((s) => ((captured = true), s));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(captured).toBe(false);
+    expect(refresh.snapshot().phase).toBe('capturing');
+    input.classList.remove('pptx-surface__input--composing');
+    input.dispatchEvent(new window.Event('compositionend') as unknown as Event);
+    const submission = await pending;
+    expect(submission.bytes.byteLength).toBeGreaterThan(0);
+    expect(refresh.snapshot().phase).toBe('processing');
+    done();
+  });
+});
+
 describe('document refresh: locations', () => {
   test('checks slides, shapes, paragraphs, and text, and reports why a location fails', async () => {
     const { editor, done } = await mount(deck(['A'], ['B']));
