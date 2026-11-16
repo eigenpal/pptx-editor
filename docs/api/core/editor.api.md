@@ -1874,6 +1874,8 @@ export class DocumentSession {
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal
+    restAddsFamilies: boolean;
+    // @internal
     restSubstitutes: Promise<boolean> | null;
     // @internal
     setHostFaces(next: HostFaces): void;

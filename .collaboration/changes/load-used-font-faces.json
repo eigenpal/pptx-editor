@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Which font faces load first, and when the other faces install, is local to each client. The font request to the host's origins is local too. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged. Two clients that load faces at different times measure the same text once both have the faces, as with late fonts before.",
+  "tests": [
+    "packages/core/src/editor/__tests__/opening-slide-faces.test.ts",
+    "packages/core/src/editor/__tests__/opening-slide-fonts.test.ts",
+    "packages/pro/src/__tests__/collaboration-coverage.test.ts"
+  ]
+}
