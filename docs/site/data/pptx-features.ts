@@ -874,6 +874,18 @@ export const pptxFeatures: PptxFeature[] = [
       'Add, edit, reply to, and resolve comments with @pptx-editor.dev/pro under the EigenPal Pro License. Legacy comments cannot resolve, and unsupported thread content remains preserved but read-only. Concurrent edits can shift text anchors, and importing slides with threaded comments is refused.',
     docsLink: '/docs/pro/comments',
   },
+  {
+    id: 'review.document-refresh',
+    name: 'Document refresh and change highlights',
+    category: 'review',
+    editing: 'partial',
+    rendering: 'none',
+    roundTrip: 'none',
+    tier: 'community',
+    notes:
+      'Apply a returned PPTX file as a reload or as one undoable edit. Highlights flash changed thumbnails, shapes, text, and the notes pane. Computed changes require @pptx-editor.dev/pro under the EigenPal Pro License.',
+    docsLink: '/docs/guides/document-refresh',
+  },
 
   // --- Collaboration & automation --------------------------------------
   {

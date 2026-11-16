@@ -235,6 +235,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'presenting.animations-transitions': { fixtures: ['preserved-content'] },
   // --- Comments & review -------------------------------------------------
   'review.comments': { fixtures: ['slide-structure', 'text-runs'] },
+  'review.document-refresh': { fixtures: ['slide-structure', 'text-runs'] },
   // --- Collaboration & automation ----------------------------------------
   'collaboration.realtime': { fixtures: ['text-runs', 'tables'] },
   'collaboration.automation-api': { fixtures: ['text-runs'] },

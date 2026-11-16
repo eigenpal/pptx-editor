@@ -3,6 +3,7 @@
   "pages": [
     "loading-and-saving",
     "open-failures",
+    "document-refresh",
     "navigation",
     "slide-master",
     "zoom",

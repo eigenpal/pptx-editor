@@ -291,7 +291,7 @@ After a successful update, `highlightChanges()` flashes what changed. The host c
 | Slide added or changed | The thumbnail flashes. | A ring inside the slide edge. | None. |
 | Shape added or changed | The thumbnail flashes. | A ring around the shape bounds. | None. |
 | Text changed | The thumbnail flashes. | A band over each line of the range. | None. |
-| Notes changed | The thumbnail flashes. | None. | A band over the range. |
+| Notes changed | The thumbnail flashes. | None. | A ring around the notes pane. |
 | Layout, master, or theme changed | Each affected thumbnail flashes. | A ring inside the slide edge, if the current slide is affected. | None. |
 | Slide removed or moved | None. The change is `deleted` or reports its new place. | None. | None. |
 

@@ -1,0 +1,93 @@
+---
+title: 'Compare presentations'
+description: 'List what changed between two PPTX files, in the editor during a document refresh or with a server function.'
+category: 'Pro'
+---
+
+Compare presentations lists the changes from an original to a revised PPTX file: slides, shapes, text, notes, layouts, slide masters, and themes. Each change has a stable ID and a location that the [Document refresh API](/docs/guides/document-refresh) can flash. It requires the EigenPal Pro License.
+
+## Compare during a document refresh
+
+Register `reviewModule()`, then call `applyUpdate()` without `changes`. The module compares the captured and returned presentations and supplies the changes:
+
+```ts
+import { createDocumentRefresh, createPptxEditor } from '@pptx-editor.dev/core/editor';
+import { reviewModule } from '@pptx-editor.dev/pro';
+
+declare function processPresentation(bytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+export async function updateWithChanges(container: HTMLElement, original: Uint8Array) {
+  const editor = createPptxEditor({ modules: [reviewModule()] });
+  container.classList.add('pptx-editor');
+  editor.attach(container);
+  const opened = await editor.load(original);
+  if (!opened.ok) throw new Error(opened.reason);
+
+  const refresh = createDocumentRefresh(editor);
+  const submission = await refresh.capture();
+  try {
+    const bytes = await processPresentation(submission.bytes);
+    const result = await refresh.applyUpdate({ submission, sequence: 1, bytes });
+    if (result.ok && result.changeInformation === 'available') {
+      refresh.highlightChanges();
+    }
+  } finally {
+    refresh.finish(submission);
+  }
+  return editor;
+}
+```
+
+Call `editor.destroy()` when your application releases the editor. For React and Vue registration, see [Pro modules](/docs/pro#register-a-module).
+
+Computed changes do not change the presentation. The returned file appears as it is, and the comparison only describes it.
+
+## Compare without an editor
+
+To compare two files on a server or in a worker, call `comparePresentations`. It needs no DOM:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { comparePresentations } from '@pptx-editor.dev/pro';
+
+const originalBytes = await readFile('original.pptx');
+const revisedBytes = await readFile('revised.pptx');
+const result = comparePresentations(originalBytes, revisedBytes);
+if (!result.ok) console.error(result.code, result.message);
+else for (const change of result.changes) console.log(change.id, change.computed);
+```
+
+`result.changes` has the form that `RefreshUpdate.changes` takes. Send it with the revised file to a browser, and pass both to `applyUpdate()`. To pass your license key, use the `licenseKey` option.
+
+## Read the changes
+
+Each change has an `id`, an optional `location`, and a `computed` description:
+
+| `computed` field | Meaning |
+| --- | --- |
+| `scope` | `'slide'`, `'shape'`, `'text'`, `'notes'`, `'layout'`, `'master'`, `'theme'`, or `'package'`. |
+| `action` | `'added'`, `'removed'`, `'moved'`, or `'changed'`. |
+| `aspects` | For changed shapes: `'position'`, `'size'`, `'rotation'`, `'geometry'`, `'fill'`, `'line'`, `'effects'`, `'text'`, `'textFormat'`, `'picture'`, `'table'`, `'chart'`, `'diagram'`, or `'other'`. For changed slides: `'background'`, `'layout'`, `'transition'`, or `'animation'`. |
+| `affectedSlides` | For layouts, masters, and themes: the zero-based indexes of the slides that show the change. |
+| `previousSlideIndex` | For removed and moved slides: the index in the original presentation. |
+
+The comparison matches slides by their creation ID, then by content, then by slide ID. Inserting a slide therefore reports one added slide, not a change to each later slide. A text change in a shape body is located at the revised text, so a highlight marks the changed words. A removed slide or shape has no location, and its status is `deleted`.
+
+To show a change in a list, call `describeRefreshChange(change, t)` from your adapter or `@pptx-editor.dev/core/editor`. It returns a localized summary from the `refresh.change.*` strings of `@pptx-editor.dev/i18n`, such as "Changed text on slide 3". Render the result as text.
+
+## Handle errors
+
+A refused comparison returns `ok: false` with `code: 'invalidDocument'` when a file is not a readable PPTX file. Both files go through the same archive and XML limits as a file that the editor opens. `message` is English, for logs.
+
+## Limits
+
+- One comparison reports at most 10000 changes. `truncated` is `true` when the limit stopped it.
+- A shape with more than 50 changed paragraphs, or with changed text formatting, reports one shape change with the `text` or `textFormat` aspect.
+- Changes to presentation-wide settings report one `package` change. Changes to document properties are not reported.
+- The comparison does not record changes in the file. PresentationML has no tracked changes.
+
+## See also
+
+- [Document refresh API](/docs/guides/document-refresh)
+- [Pro modules](/docs/pro)
+- [Comments](/docs/pro/comments)
