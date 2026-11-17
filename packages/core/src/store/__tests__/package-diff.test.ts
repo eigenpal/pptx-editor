@@ -162,24 +162,36 @@ describe('diffPackages', () => {
   });
 
   test('30000 changed paragraphs take linear time and replace the part whole', () => {
-    const paragraphs = (tag: string) =>
-      shape({
-        id: 2,
-        x: 1,
-        y: 1,
-        cx: 10,
-        cy: 10,
-        text: Array.from({ length: 30_000 }, (_, i) => para(run(`${tag}${i}`))).join(''),
-      });
-    const open = deck([{ shapes: paragraphs('a') }]);
-    const next = deck([{ shapes: paragraphs('b') }]);
-    const start = performance.now();
+    const pair = (n: number) => {
+      const body = (tag: string) =>
+        shape({
+          id: 2,
+          x: 1,
+          y: 1,
+          cx: 10,
+          cy: 10,
+          text: Array.from({ length: n }, (_, i) => para(run(`${tag}${i}`))).join(''),
+        });
+      return [deck([{ shapes: body('a') }]), deck([{ shapes: body('b') }])] as const;
+    };
+    // The best of three runs, so a slow runner or a collection pause does not decide it.
+    const fastest = (open: PptxPackage, next: PptxPackage) => {
+      let best = Infinity;
+      for (let i = 0; i < 3; i++) {
+        const start = performance.now();
+        diffPackages(open, next);
+        best = Math.min(best, performance.now() - start);
+      }
+      return best;
+    };
+    const [smallOpen, smallNext] = pair(3_000);
+    const [open, next] = pair(30_000);
     const diff = diffPackages(open, next);
-    const ms = performance.now() - start;
     if (!diff.ok) throw new Error(diff.reason);
     expect(diff.ops.some((op) => op.op === 'addPart')).toBe(true);
-    // A quadratic name match took about 1.8 s here.
-    expect(ms).toBeLessThan(600);
+    // Ten times the paragraphs take about ten times as long. A quadratic name match took
+    // about 100 times as long. A ratio does not depend on the speed of the machine.
+    expect(fastest(open, next) / Math.max(fastest(smallOpen, smallNext), 1)).toBeLessThan(25);
   });
 
   test('children of one name pair in order by name when their content differs', () => {

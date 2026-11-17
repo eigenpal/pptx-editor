@@ -1,0 +1,12 @@
+{
+  "impact": "compatible",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "replaceDocument and the document refresh controller apply a package diff as one store transaction of existing part, attribute, and tree operations. Refresh highlights and computed changes are local view state and never enter the room. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/core/src/store/__tests__/package-diff.test.ts",
+    "packages/core/src/editor/__tests__/document-refresh.test.ts",
+    "packages/pro/src/__tests__/collaboration-coverage.test.ts"
+  ]
+}
