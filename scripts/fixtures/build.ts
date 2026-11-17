@@ -9,6 +9,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { buildPptx, cell, para, run, shape, solid, table, type FixtureSlide } from './builder.ts';
 import { slideLayoutsDeck } from './slide-layouts.ts';
+import { backgroundFillDeck } from './background-fill.ts';
 import { fillFidelityDeck, TILE_FIXTURE_DPI, withResolution } from './fill-fidelity.ts';
 import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
@@ -863,6 +864,8 @@ for (const [name, slides] of Object.entries(fixtures)) {
 writeFileSync(`${OUT}/slide-structure.pptx`, buildPptx(slideStructureDeck(image, solidPng())));
 // Layouts, a hidden slide, sections, prompts, and formatted notes: the slide and layout checks.
 writeFileSync(`${OUT}/slide-layouts.pptx`, buildPptx(slideLayoutsDeck()));
+// Shapes that fill with the slide background (`useBgFill`).
+writeFileSync(`${OUT}/background-fill.pptx`, buildPptx(backgroundFillDeck(image)));
 // One slide per fill rule.
 writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
 // Picture bullets at several sizes, levels, and alignments.

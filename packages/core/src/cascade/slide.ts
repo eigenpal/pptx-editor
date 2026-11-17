@@ -25,6 +25,7 @@ import {
   type PptxPackage,
 } from '../store/index.ts';
 import { contentElements } from './alternate-content.ts';
+import { backgroundFillOf, fillsWithBackground, type SlideBackground } from './background-fill.ts';
 import {
   collectPlaceholders,
   findLayoutPlaceholder,
@@ -108,6 +109,8 @@ interface SlideScope {
   readonly layoutPart?: string;
   /** How many enclosing groups draw effects of their own (`boundGroupEffects`). */
   readonly effectDepth?: number;
+  /** The slide background, for shapes with `useBgFill`. */
+  readonly background?: SlideBackground;
 }
 
 /**
@@ -314,7 +317,8 @@ function resolveShapeLike(
   kind: 'shape' | 'connector' | 'picture',
   layer: Layer,
   partName: string,
-  scope: SlideScope
+  scope: SlideScope,
+  slideSpace = false
 ): ResolvedElement {
   const ph = placeholderOf(el);
   const inherited: Element[] = [];
@@ -355,6 +359,8 @@ function resolveShapeLike(
   if (kind === 'picture') {
     const blip = resolveFillElement(child(el, 'p:blipFill'), ctx);
     fill = blip && blip.type === 'picture' ? blip : { type: 'none' };
+  } else if (kind === 'shape' && scope.background && fillsWithBackground(el)) {
+    fill = backgroundFillOf(scope.background, xfrm ?? ZERO_XFRM, partName, slideSpace);
   } else if (fillEl) fill = resolveFillElement(fillEl, ctx) ?? { type: 'none' };
   else {
     const ref = child(style, 'a:fillRef');
@@ -736,7 +742,8 @@ function resolveElement(
 ): ResolvedElement | undefined {
   switch (el.kind) {
     case 'sp':
-      return resolveShapeLike(el, 'shape', layer, partName, scope);
+      // A shape outside a group has its box in slide space (`useBgFill`).
+      return resolveShapeLike(el, 'shape', layer, partName, scope, depth === 0);
     case 'cxnSp':
       return resolveShapeLike(el, 'connector', layer, partName, scope);
     case 'pic':
@@ -877,7 +884,7 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
   }
   const presentation = xmlPartOf(pkg, info.presentationPart)?.root;
   const kinsoku = readKinsoku(presentation);
-  const scope: SlideScope = {
+  const base: SlideScope = {
     pkg,
     theme,
     ctx: { scheme: theme.colors, colorMap },
@@ -901,9 +908,13 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
   };
   const bg = resolveBackground(
     template === 'master' ? [slide, undefined, undefined] : [slide, layout, master],
-    scope
+    base
   );
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;
+  const scope: SlideScope = {
+    ...base,
+    background: { fill: bg.fill, part: backgroundPart, width: info.width, height: info.height },
+  };
   const showMaster = (el: Element | undefined): boolean => attr(el, 'showMasterSp') !== '0';
   const out: ResolvedElement[] = [];
   // Everything the elements of every layer read from outside their part (see `layerKey`).
@@ -915,6 +926,8 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     info.width,
     info.height,
     child(slide, 'p:clrMapOvr'),
+    // A shape with `useBgFill` on the layout or the master shows this slide's background.
+    path(slide, 'p:cSld', 'p:bg'),
     child(presentation, 'p:defaultTextStyle'),
     JSON.stringify(kinsoku ?? null),
     partContent(pkg, relTargetByType(pkg, info.presentationPart, REL.tableStyles)),

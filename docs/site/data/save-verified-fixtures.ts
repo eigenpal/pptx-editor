@@ -17,11 +17,13 @@
  * 2026: `underline-styles` and `caps-scripts`, 4 copies, no prompt; `picture-adjustments`, 2
  * copies, no prompt; `group-effects`, 2 copies, no prompt; `closed-dashes`, 2 copies, no prompt;
  * and again `underline-styles`, with its outline and small-wave slide, 2 copies, no prompt.
+ * On 17 November 2026: `background-fill`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
   'arrange-flip-hidden',
   'autofit',
+  'background-fill',
   'bullets-gallery',
   'bullets-numbering',
   'caps-scripts',

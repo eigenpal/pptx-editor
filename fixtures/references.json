@@ -28,6 +28,15 @@
         540
       ]
     },
+    "background-fill": {
+      "deck": "69d4c05701c409df7f3d87825969322dbd74d1581f8d83e6c80256ef99b88c06",
+      "pdf": "8e727c799a9976fb8634870003178442f7f3cf676938d078ec966b0846b07ca1",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "bullets-gallery": {
       "deck": "1442fec7d720ee914f8db06c37139356ced555f7eb5203560406ebf59e5dfc17",
       "pdf": "1e15a1fcdd004b6fe3cfef705274406d59cebb08c9d59e25751f975ceff9d31f",
