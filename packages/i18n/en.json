@@ -1861,5 +1861,33 @@
     "previewUnavailable": "Preview unavailable for this source color.",
     "geometry": "Size and position",
     "numberRangeExclusive": "Enter a number greater than {min} and no greater than {max}."
+  },
+  "refresh": {
+    "changed": "Changed",
+    "change": {
+      "added": {
+        "slide": "Added slide {slide}",
+        "shape": "Added a shape to slide {slide}"
+      },
+      "removed": {
+        "slide": "Removed slide {slide}",
+        "shape": "Removed a shape from slide {slide}",
+        "notes": "Removed the notes of slide {slide}"
+      },
+      "moved": {
+        "slide": "Moved slide {slide}"
+      },
+      "changed": {
+        "slide": "Changed slide {slide}",
+        "shape": "Changed a shape on slide {slide}",
+        "text": "Changed text on slide {slide}",
+        "notes": "Changed the notes of slide {slide}",
+        "layout": "Changed a layout. Slides that use it: {count}",
+        "master": "Changed a slide master. Slides that use it: {count}",
+        "theme": "Changed the theme. Slides that use it: {count}",
+        "package": "Changed the presentation settings"
+      },
+      "truncated": "Other changes are not listed"
+    }
   }
 }

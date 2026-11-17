@@ -155,6 +155,9 @@ export function deferredXmlPart(partName: string, bytes: Uint8Array, decode: (by
     readonly onReject?: DeferredPartReject;
 }): PackagePart;
 
+// @internal
+export function diffPackages(open: PptxPackage, next: PptxPackage, hashes?: PackageHashes): PackageDiff;
+
 // @public
 export interface DocumentStoreOptions {
     readonly onListenerError?: (error: unknown, change: StoreChange) => void;
@@ -522,8 +525,27 @@ export type OpResult = {
     readonly rejection: OpRejection;
 };
 
+// @internal
+export type PackageDiff = {
+    readonly ok: true;
+    readonly ops: readonly PptxOp[];
+    readonly parts: readonly string[];
+} | {
+    readonly ok: false;
+    readonly reason: PackageDiffRefusal;
+    readonly detail?: string;
+};
+
+// @internal
+export type PackageDiffRefusal = 'different-main-part' | 'unsafe-part-name';
+
 // @public
 export function packageFingerprints(pkg: PptxPackage): ReadonlyMap<string, string>;
+
+// @internal
+export class PackageHashes {
+    of(node: Node_2): string;
+}
 
 // @public
 export type PackageInvariantRule = 'slide-list' | 'relationship-target' | 'content-type';
@@ -605,6 +627,7 @@ export class PptxDocumentStore {
     get canRedo(): boolean;
     // (undocumented)
     get canUndo(): boolean;
+    clearHistory(): void;
     closeHistoryGroup(): void;
     dryRun(ops: readonly PptxOp[]): TransactResult;
     // @internal
@@ -988,6 +1011,7 @@ export function timingRemovals(root: Element_2, gone: ReadonlySet<string>): Elem
 
 // @public
 export interface TransactOptions {
+    readonly exact?: boolean;
     readonly historyGroup?: HistoryGroup;
     readonly label?: string;
     readonly origin?: TransactOrigin;

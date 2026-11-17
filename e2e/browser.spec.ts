@@ -260,6 +260,18 @@ test('embedding: a host CSS reset changes no chrome style', async ({ page }) => 
   ];
   for (const [name, open] of states) {
     await ready(page);
+    // Font work ends first: faces that arrive late shape the slide text again with a new
+    // measurer, whose face names (`pptx-f2-*`) differ, between the two readings.
+    await page.waitForFunction(
+      () => {
+        const ed = (window as unknown as Record<string, unknown>).__pptxEditor as
+          { fontMeasurement(): { measurer: string; resolving: boolean } } | undefined;
+        const fonts = ed?.fontMeasurement();
+        return fonts?.measurer === 'shaped' && !fonts.resolving;
+      },
+      undefined,
+      { timeout: 30_000 }
+    );
     // The demo shell sets its own font and line height on the editor scope. Take them off, so
     // what the host page passes down reaches the editor as it does on a plain page.
     await page.evaluate(() => document.querySelector('.demo-root')?.classList.remove('demo-root'));

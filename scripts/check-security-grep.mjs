@@ -27,6 +27,7 @@ walk('packages');
 walk('examples/vite/src');
 walk('examples/vue/src');
 walk('examples/chat/src');
+walk('examples/document-refresh/src');
 if (hits.length) {
   console.error(`Security grep: ${hits.length} hit(s)\n${hits.join('\n')}`);
   process.exit(1);

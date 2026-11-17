@@ -1,0 +1,458 @@
+/* The document refresh example: the editor stylesheet, then a three-column layout with the
+   slide rail, the slide and its notes, and the refresh controls. The controls use the editor's
+   `--doc-*` tokens, so they follow its light and dark themes. Below 760 px, the controls go
+   under the slide and the row of thumbnails. */
+@import '@pptx-editor.dev/core/styles/editor.css';
+
+.refresh-app {
+  /* The example's own motion: the editor's strong ease-out, and an ease-in-out for height. */
+  --example-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --example-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--doc-bg);
+}
+.refresh-workspace {
+  display: flex;
+  flex: 1 1 0%;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+}
+.refresh-docpane {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+.refresh-canvas {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* The control panel. */
+.refresh-controls {
+  display: flex;
+  flex: 0 0 340px;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--doc-border);
+  border-radius: 12px;
+  color: var(--doc-text);
+  background: var(--doc-surface);
+  font-size: 14px;
+  line-height: 1.45;
+}
+/* The panel scrolls; its sections keep their height. */
+.refresh-controls > * {
+  flex-shrink: 0;
+  margin: 0;
+}
+.refresh-intro {
+  display: grid;
+  gap: 6px;
+}
+.refresh-controls h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.refresh-controls h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.refresh-controls p {
+  margin: 0;
+}
+.refresh-intro p {
+  color: var(--doc-text-muted);
+  font-size: 13px;
+}
+.refresh-count {
+  color: var(--doc-text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings: a fieldset of options and the checkboxes under it. */
+.refresh-settings {
+  display: grid;
+  gap: 2px;
+}
+.refresh-controls fieldset {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.refresh-controls legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.refresh-controls label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.refresh-controls fieldset:disabled label,
+.refresh-controls label:has(input:disabled) {
+  color: var(--doc-text-muted);
+  cursor: default;
+}
+.refresh-controls input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--doc-primary);
+}
+
+/* Actions: one primary button over a row of secondary buttons that share the width. The
+   primary place holds Play all or Pause, so the swap never moves a button. */
+.refresh-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.refresh-actions > button {
+  flex: 1 1 0%;
+  white-space: nowrap;
+}
+.refresh-actions > .refresh-primary,
+.refresh-actions > p {
+  flex-basis: 100%;
+}
+.refresh-controls button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  font: inherit;
+  font-weight: 500;
+  color: var(--doc-text);
+  cursor: pointer;
+  transition:
+    transform 160ms var(--example-ease-out),
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+.refresh-controls .refresh-primary {
+  border-color: transparent;
+  color: var(--doc-on-primary);
+  background: var(--doc-primary);
+}
+@media (hover: hover) and (pointer: fine) {
+  .refresh-controls button:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--doc-bg-hover);
+  }
+  .refresh-controls .refresh-primary:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--doc-primary-hover);
+  }
+}
+/* The press: instant feedback on pointer down. */
+.refresh-controls button:active:not(:disabled, [aria-disabled='true']) {
+  transform: scale(0.97);
+}
+.refresh-controls button:disabled,
+.refresh-controls button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.refresh-controls :focus-visible {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 2px;
+}
+.refresh-controls input:focus-visible {
+  outline-offset: 1px;
+}
+.refresh-controls code {
+  margin-inline-end: 6px;
+  font-size: 12px;
+}
+
+/* The status line: room for two lines, so a longer message does not move the list under it. */
+.refresh-controls .refresh-status {
+  min-height: calc(2 * 1.45em + 20px);
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--doc-text);
+  background: var(--doc-bg-subtle);
+  font-size: 13px;
+}
+.refresh-code {
+  display: block;
+  margin-top: 4px;
+  color: var(--doc-text-muted);
+}
+.refresh-review summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.refresh-change-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.refresh-change-list li {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--doc-border);
+  border-radius: 10px;
+}
+.refresh-change-list li button {
+  justify-self: start;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+.refresh-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.refresh-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: 999px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+/* A new change: the badge carries the marker of the flash, a shape beside the text. */
+.refresh-badge[data-new] {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--doc-text);
+}
+.refresh-badge[data-new]::before,
+.agent-step__changes li::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--doc-refresh-highlight-color);
+}
+
+/* The agent replay page: one row per agent step, with its state and the changes it made. */
+.agent-progress {
+  display: grid;
+  gap: 10px;
+}
+.agent-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--doc-border);
+  border-radius: 10px;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+.agent-step__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+/* The state line is always there and has one line, so a state change never moves the row. */
+.agent-step__state {
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.agent-step__title {
+  font-weight: 600;
+}
+.agent-step__detail {
+  color: var(--doc-text-muted);
+  font-size: 13px;
+}
+.agent-step[data-state='pending'] .agent-step__title {
+  color: var(--doc-text-muted);
+}
+.agent-step[data-state='running'] {
+  border-color: var(--doc-text-muted);
+  background: var(--doc-bg-subtle);
+}
+.agent-step[data-state='running'] .agent-step__state {
+  color: var(--doc-text);
+}
+
+/* The mark: a number, a spinner while the step runs, then a check. */
+.agent-step__mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--doc-border);
+  border-radius: 50%;
+  box-sizing: border-box;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+.agent-step[data-state='done'] .agent-step__mark > * {
+  animation: agent-mark-in 200ms var(--example-ease-out) both;
+}
+.agent-step[data-state='running'] .agent-step__mark {
+  border-color: var(--doc-border);
+  border-top-color: var(--doc-text);
+  animation: agent-spin 700ms linear infinite;
+}
+.agent-step[data-state='done'] .agent-step__mark {
+  border-color: transparent;
+  color: var(--doc-surface);
+  background: var(--doc-text);
+}
+.agent-step__mark svg {
+  display: block;
+}
+
+/* The changes of a step: they open under the step, and the rows under them move down. */
+.agent-step__reveal {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 240ms var(--example-ease-in-out),
+    opacity 200ms ease;
+}
+@starting-style {
+  .agent-step__reveal {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.agent-step__reveal > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.agent-step__changes {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+  font-size: 13px;
+}
+.agent-step__changes li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.agent-step__changes li::before {
+  transform: translateY(-1px);
+}
+
+@keyframes agent-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes agent-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* Narrow windows (`narrow.ts`): the slide, its notes (closed at first), and the row of
+   thumbnails stay on screen; the controls under them scroll on their own. So the flash shows
+   while you use the controls. A short window scrolls the whole column. */
+@media (max-width: 760px) {
+  .refresh-workspace {
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .refresh-docpane {
+    flex: none;
+    gap: 8px;
+  }
+  /* Room for a 16:9 slide and its margin, and no more. */
+  .refresh-canvas {
+    flex: none;
+    aspect-ratio: 16 / 10;
+    max-height: 45svh;
+  }
+  .refresh-workspace > .pptx-rail {
+    --pptx-rail-thumb-width: 88px;
+    order: 1;
+  }
+  .refresh-controls {
+    flex: 1 0 280px;
+    order: 2;
+    padding: 16px;
+  }
+}
+
+/* Reduced motion: no spin, no growth, no height change. Color and opacity changes stay. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-step[data-state='running'] .agent-step__mark {
+    animation: none;
+    border-color: var(--doc-text);
+  }
+  .agent-step[data-state='done'] .agent-step__mark > * {
+    animation-name: agent-fade-in;
+  }
+  .agent-step__reveal {
+    transition: opacity 125ms ease;
+  }
+  @starting-style {
+    .agent-step__reveal {
+      grid-template-rows: 1fr;
+    }
+  }
+  .refresh-controls button {
+    transition: none;
+  }
+}
+@keyframes agent-fade-in {
+  from {
+    opacity: 0;
+  }
+}

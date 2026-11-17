@@ -13,6 +13,7 @@ import type {
   LoadOptions,
   SlideSelectMode,
 } from './neutral.ts';
+import type { DocumentHandle } from './replace-document.ts';
 
 /** Options of `renderThumbnail`. @public */
 export interface RenderThumbnailOptions {
@@ -70,6 +71,8 @@ export interface Editor {
    * `EditorSnapshot.openFailure` reports the refused file (with no edits).
    */
   save(): Uint8Array<ArrayBuffer> | null;
+  /** The open document's load and revision, for `replaceDocument({ expected })`. */
+  getDocumentHandle(): DocumentHandle;
   setZoom(zoom: number | 'fit'): void;
   setMode(mode: EditorMode): void;
   goToSlide(index: number): void;

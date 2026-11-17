@@ -96,6 +96,11 @@ export interface TransactOptions {
    * identical paragraphs apart. Omitted: the text alone decides.
    */
   readonly textAt?: TextEditAt;
+  /**
+   * The ops already hold every dependent change, as a whole returned file does
+   * (`diffPackages`): the store adds no follow-up fixes of animation ranges or comment anchors.
+   */
+  readonly exact?: boolean;
 }
 
 interface HistoryEntry {
@@ -285,7 +290,7 @@ export class PptxDocumentStore {
     if (!r.ok) return r;
     // A local edit of paragraphs moves the animation ranges that name them (`paragraph-ranges.ts`).
     // A remote transaction holds the fixes that its peer made.
-    if (origin !== 'remote') {
+    if (origin !== 'remote' && !options.exact) {
       const fixes = this.#rangeFixes(r.pkg, r.parts, options.textAt);
       if (fixes.length > 0) {
         ops = [...ops, ...fixes];
@@ -390,6 +395,13 @@ export class PptxDocumentStore {
     this.#cutGroup = this.#openGroup();
     this.#undo = [];
     this.#redo = [];
+  }
+
+  /** Forget undo and redo, as a load does: a refresh that reloads in place keeps no history. */
+  clearHistory(): void {
+    this.#undo = [];
+    this.#redo = [];
+    this.#cutGroup = undefined;
   }
 
   /**

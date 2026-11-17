@@ -5,6 +5,8 @@
 ```ts
 
 import { AllowedComponentProps } from 'vue';
+import { AnchorHighlightAnimation } from '@pptx-editor.dev/core/editor';
+import { AnchorHighlightOptions } from '@pptx-editor.dev/core/editor';
 import { BulletFormat } from '@pptx-editor.dev/core/editor';
 import { BulletFormatMixed } from '@pptx-editor.dev/core/editor';
 import { BulletFormatRead } from '@pptx-editor.dev/core/editor';
@@ -15,6 +17,8 @@ import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
 import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
+import { ClearAnchorHighlightOptions } from '@pptx-editor.dev/core/editor';
+import { ClearRefreshHighlightsOptions } from '@pptx-editor.dev/core/editor';
 import { ClipboardDrawingReader } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
@@ -25,14 +29,22 @@ import { ComponentOptionsMixin } from 'vue';
 import { composeFontConfiguration } from '@pptx-editor.dev/core/editor';
 import { composeFontOrigins } from '@pptx-editor.dev/core/editor';
 import { ComputedRef } from 'vue';
+import { ComputedRefreshChange } from '@pptx-editor.dev/core/editor';
 import { ContextMenuPartName } from '@pptx-editor.dev/core/editor';
+import { createDocumentRefresh } from '@pptx-editor.dev/core/editor';
 import { createFontSource } from '@pptx-editor.dev/core/editor';
 import { CSSProperties } from 'vue';
 import { DEFAULT_FONT } from '@pptx-editor.dev/core/editor';
 import { deferFonts } from '@pptx-editor.dev/core/editor';
 import { DefineComponent } from 'vue';
 import { defineFontResolver } from '@pptx-editor.dev/core/editor';
+import { describeRefreshChange } from '@pptx-editor.dev/core/editor';
+import { DocumentChange } from '@pptx-editor.dev/core/editor';
+import { DocumentHandle } from '@pptx-editor.dev/core/editor';
 import { DocumentOpenFailure } from '@pptx-editor.dev/core/editor';
+import { DocumentRefresh } from '@pptx-editor.dev/core/editor';
+import { DocumentRefreshError } from '@pptx-editor.dev/core/editor';
+import { DocumentRefreshState } from '@pptx-editor.dev/core/editor';
 import { DocumentSearchFindOptions } from '@pptx-editor.dev/core/editor';
 import { DocumentSearchState } from '@pptx-editor.dev/core/editor';
 import { EditorCaret } from '@pptx-editor.dev/core/editor';
@@ -92,6 +104,7 @@ import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
 import { MaybeRefOrGetter } from 'vue';
 import { MenuNamedRow } from '@pptx-editor.dev/core/editor';
 import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
+import { NavigateToChangeOptions } from '@pptx-editor.dev/core/editor';
 import { PaneRequest } from '@pptx-editor.dev/core/editor';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
@@ -109,6 +122,29 @@ import { PptxFontsSource } from '@pptx-editor.dev/core/editor';
 import { PptxSource } from '@pptx-editor.dev/core/editor';
 import { PropType } from 'vue';
 import { Ref } from 'vue';
+import { RefreshChange } from '@pptx-editor.dev/core/editor';
+import { RefreshChangeAspect } from '@pptx-editor.dev/core/editor';
+import { RefreshChangeInput } from '@pptx-editor.dev/core/editor';
+import { RefreshComputedChange } from '@pptx-editor.dev/core/editor';
+import { RefreshDiagnosticCode } from '@pptx-editor.dev/core/editor';
+import { RefreshFailureCode } from '@pptx-editor.dev/core/editor';
+import { RefreshHighlightAnimation } from '@pptx-editor.dev/core/editor';
+import { RefreshHighlightOptions } from '@pptx-editor.dev/core/editor';
+import { RefreshHighlightSurface } from '@pptx-editor.dev/core/editor';
+import { RefreshLocation } from '@pptx-editor.dev/core/editor';
+import { RefreshRefusal } from '@pptx-editor.dev/core/editor';
+import { RefreshRefusalFields } from '@pptx-editor.dev/core/editor';
+import { RefreshRefusalReason } from '@pptx-editor.dev/core/editor';
+import { RefreshResult } from '@pptx-editor.dev/core/editor';
+import { RefreshSubmission } from '@pptx-editor.dev/core/editor';
+import { RefreshUpdate } from '@pptx-editor.dev/core/editor';
+import { RefreshUpdateMode } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentCommand } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentErrorCode } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentOutcome } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentRefusal } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentRefusalReason } from '@pptx-editor.dev/core/editor';
+import { ReplaceDocumentRequest } from '@pptx-editor.dev/core/editor';
 import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 import { ReviewAuthorInfo } from '@pptx-editor.dev/core/editor';
@@ -134,6 +170,10 @@ import { VNodeChild } from 'vue';
 import { VNodeProps } from 'vue';
 import * as vue from 'vue';
 import * as vue_jsx_runtime from 'vue/jsx-runtime';
+
+export { AnchorHighlightAnimation }
+
+export { AnchorHighlightOptions }
 
 // @public
 export const BackgroundDialog: {
@@ -388,6 +428,10 @@ export { ChromeSlotId }
 
 export { ChromeTranslate }
 
+export { ClearAnchorHighlightOptions }
+
+export { ClearRefreshHighlightsOptions }
+
 export { ClipboardDrawingReader }
 
 export { ColorMode }
@@ -513,6 +557,8 @@ export { composeFontConfiguration }
 
 export { composeFontOrigins }
 
+export { ComputedRefreshChange }
+
 // @public
 export const ContextMenu: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly at: {
@@ -604,6 +650,8 @@ export interface ContextMenuRequest {
     readonly owner: HTMLElement;
 }
 
+export { createDocumentRefresh }
+
 export { createFontSource }
 
 export { DEFAULT_FONT }
@@ -624,6 +672,8 @@ export interface DefinePopupOptions {
     readonly reading?: boolean;
 }
 
+export { describeRefreshChange }
+
 // @public
 export interface DialogCustomizationProps {
     readonly className?: string;
@@ -643,7 +693,17 @@ export interface DialogPartProps {
     readonly title?: string;
 }
 
+export { DocumentChange }
+
+export { DocumentHandle }
+
 export { DocumentOpenFailure }
+
+export { DocumentRefresh }
+
+export { DocumentRefreshError }
+
+export { DocumentRefreshState }
 
 export { DocumentSearchFindOptions }
 
@@ -2009,6 +2069,8 @@ export const MenuTableGrid: vue.DefineComponent<vue.ExtractPropTypes<{
 
 // @public
 export type MenuTableGridProps = ExtractPublicPropTypes<typeof menuTableGridProps>;
+
+export { NavigateToChangeOptions }
 
 // @internal
 export const NewSlideControl: vue.DefineComponent<vue.ExtractPropTypes<{
@@ -7521,8 +7583,54 @@ export interface RailMenuState {
     readonly owner: HTMLElement | null;
 }
 
+export { RefreshChange }
+
+export { RefreshChangeAspect }
+
+export { RefreshChangeInput }
+
+export { RefreshComputedChange }
+
+export { RefreshDiagnosticCode }
+
+export { RefreshFailureCode }
+
+export { RefreshHighlightAnimation }
+
+export { RefreshHighlightOptions }
+
+export { RefreshHighlightSurface }
+
+export { RefreshLocation }
+
+export { RefreshRefusal }
+
+export { RefreshRefusalFields }
+
+export { RefreshRefusalReason }
+
+export { RefreshResult }
+
+export { RefreshSubmission }
+
+export { RefreshUpdate }
+
+export { RefreshUpdateMode }
+
 // @public
 export function rejectionMessage(t: Translate, rejection: EditorRejection): string;
+
+export { ReplaceDocumentCommand }
+
+export { ReplaceDocumentErrorCode }
+
+export { ReplaceDocumentOutcome }
+
+export { ReplaceDocumentRefusal }
+
+export { ReplaceDocumentRefusalReason }
+
+export { ReplaceDocumentRequest }
 
 // @public
 export function requestFindBar(editor: PptxEditorInstance | null, replace?: boolean): void;

@@ -24,6 +24,12 @@ export { readZip, writeZip, DEFAULT_ZIP_LIMITS, type ZipLimits } from '@eigenpal
 export * from './store/tree-edit.ts';
 export * from './store/ops.ts';
 export * from './store/document-store.ts';
+export {
+  diffPackages,
+  PackageHashes,
+  type PackageDiff,
+  type PackageDiffRefusal,
+} from './store/package-diff.ts';
 export type { ParagraphText } from './store/comment-anchors.ts';
 export * from './store/history-group.ts';
 export * from './store/replica-part.ts';

@@ -23,6 +23,9 @@ const files = [
   'examples/vite/public/icon.svg',
   ...walk('examples/chat/src').filter((path) => /\.(tsx?|html)$/.test(path)),
   'examples/chat/index.html',
+  ...walk('examples/document-refresh/src').filter((path) => /\.(tsx?|html)$/.test(path)),
+  'examples/document-refresh/index.html',
+  'examples/document-refresh/README.md',
   ...walk('.github/ISSUE_TEMPLATE'),
   '.github/pull_request_template.md',
 ];

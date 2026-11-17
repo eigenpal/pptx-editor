@@ -175,6 +175,8 @@ const COMMAND_TABLE = {
   deleteComment: true,
   resolveComment: true,
   reopenComment: true,
+  // Document
+  replaceDocument: true,
 } as const satisfies Record<EditorCommandType, true>;
 
 /** Every `EditorCommand['type']`, checked against the union by the compiler. @internal */

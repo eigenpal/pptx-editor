@@ -85,6 +85,22 @@
         "@hocuspocus/server": "^4.8.0",
       },
     },
+    "examples/document-refresh": {
+      "name": "@pptx-editor.dev/example-document-refresh",
+      "version": "0.0.0",
+      "dependencies": {
+        "@docx-editor.dev/fonts": "^2.34.0",
+        "@pptx-editor.dev/core": "workspace:*",
+        "@pptx-editor.dev/i18n": "workspace:*",
+        "@pptx-editor.dev/pro": "workspace:*",
+        "@pptx-editor.dev/react": "workspace:*",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
+      },
+      "devDependencies": {
+        "fflate": "^0.8.2",
+      },
+    },
     "examples/nextjs": {
       "name": "@pptx-editor.dev/example-nextjs",
       "version": "0.0.0",
@@ -563,6 +579,8 @@
     "@pptx-editor.dev/example-collaboration": ["@pptx-editor.dev/example-collaboration@workspace:examples/collaboration"],
 
     "@pptx-editor.dev/example-collaboration-hocuspocus": ["@pptx-editor.dev/example-collaboration-hocuspocus@workspace:examples/collaboration-hocuspocus"],
+
+    "@pptx-editor.dev/example-document-refresh": ["@pptx-editor.dev/example-document-refresh@workspace:examples/document-refresh"],
 
     "@pptx-editor.dev/example-nextjs": ["@pptx-editor.dev/example-nextjs@workspace:examples/nextjs"],
 

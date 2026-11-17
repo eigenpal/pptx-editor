@@ -1,6 +1,8 @@
 // What the edit notice reports: a refused edit (`snapshot.lastRejection`) and the last Delete
 // the user can undo (`snapshot.lastRemoval`). Moved out of `index.ts` (the 1000-line cap).
 
+import type { ReplaceDocumentOutcome, ReplaceDocumentRefusal } from './replace-document.ts';
+
 /** A Delete that the user can undo: what it removed and how many. @public */
 export interface EditorRemoval {
   readonly kind: 'shapes' | 'slides';
@@ -31,10 +33,16 @@ export type CanResult = { readonly ok: true } | { readonly ok: false; readonly r
  * to undo, nothing selected): nothing changed, and nothing went wrong. @public
  */
 export type CommandResult =
-  | { readonly ok: true }
+  | {
+      readonly ok: true;
+      /** The typed outcome of `replaceDocument`: whether the document changed. */
+      readonly replaceDocument?: Extract<ReplaceDocumentOutcome, { readonly ok: true }>;
+    }
   | {
       readonly ok: false;
       readonly reason: string;
       readonly detail?: string;
       readonly noop?: boolean;
+      /** The typed refusal of `replaceDocument`: read its `code` rather than `reason`. */
+      readonly replaceDocument?: ReplaceDocumentRefusal;
     };

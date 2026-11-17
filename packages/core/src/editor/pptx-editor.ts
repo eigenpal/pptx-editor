@@ -1,6 +1,5 @@
-// `createPptxEditor`: the full Editor contract over the document session and the surface.
-// As in DOCX Editor, `snapshot()` keeps its identity until state changes.
-// `useSyncExternalStore` selectors re-render only when their selected value changes.
+// `createPptxEditor`: the Editor contract over the document session and the surface. As in DOCX
+// Editor, `snapshot()` keeps its identity until state changes, for `useSyncExternalStore`.
 
 import { shapeFormatAt } from './format-detail.ts';
 import { pickImageInto } from './chrome-actions.ts';
@@ -52,6 +51,7 @@ import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.t
 import { MasterView, railSummaries } from './master-view.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
+import { documentHandleOf, withDocumentReplace } from './document-replace.ts';
 import { CanCache, checkCommand, createStructureKey, typingBox } from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
 import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surface-host.ts';
@@ -86,6 +86,7 @@ import * as seam from './modules.ts';
 import type { PptxEditorInstance, PptxEditorOptions } from './pptx-editor-types.ts';
 import { PresenceLink } from './collaboration-presence.ts';
 import { INSERT_COMMAND_TYPES as INSERTS } from './command-types.ts';
+import { createListenerRelay } from './listener-relay.ts';
 
 export type { PptxEditorInstance, PptxEditorOptions } from './pptx-editor-types.ts';
 
@@ -127,7 +128,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   // `load` calls in flight: only the newest may install its session, and none after `destroy`.
   let generation = 0;
   let destroyed = false;
-  const listeners = new Set<() => void>();
+  const listeners = createListenerRelay(() => instance); // Deferred by a refresh commit.
   const modules = seam.resolveEditorModules(options.modules);
   const comments = new CommentState(options.author, modules);
   const presence = new PresenceLink(modules);
@@ -174,7 +175,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     cropping(); // Crop mode ends as soon as the selection is no longer its picture.
     presence.publish(session?.store.package, shownPart, selection);
     surface?.render();
-    for (const l of [...listeners]) l();
+    listeners.notify();
   };
   // Commits the editor makes itself emit once, after it has set the selection and the slide.
   let committing = 0;
@@ -485,8 +486,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     }
     pasteSeries = nextPasteSeries(command, pasteSeries);
     emit();
-    // Deleting a table removes its contextual chrome, and the focus with it: it goes to the
-    // slide, not to the page.
+    // Deleting a table removes its chrome and the focus: the focus goes to the slide, not the page.
     if (effect.selection?.kind === 'text' || effect.label === 'deleteTable') surface?.focus();
     return { ok: true };
   };
@@ -659,8 +659,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     ...(options.readClipboardDrawing ? { readDrawing: options.readClipboardDrawing } : {}),
   });
 
-  // Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
-  // kept, so the next deck opens in it.
+  // Put the host's mode in effect, or view while the deck is read-only; the next deck takes it.
   const applyMode = (): void => {
     mode = readOnly || session?.damage ? 'view' : hostMode;
     if (mode !== 'view') return;
@@ -727,13 +726,14 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     // The new deck's session once it mounts: a throw after that drops it.
     let adopted: DocumentSession | null = null;
     try {
-      status = 'loading';
+      if (!loadOptions?.quiet) status = 'loading'; // A refresh that reloads shows no loading screen.
       // The open deck's background parse waits: the new file gets the thread.
       opening.pause(session);
       emit();
-      // A collaboration room needs every part, so a deck that joins one opens whole.
+      // A collaboration room needs every part, and so does a refresh: those decks open whole.
       const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
-      const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
+      const whole = modules.collaboration || loadOptions?.quiet;
+      const progressive = whole ? {} : { progressive: { startSlide } };
       const openOptions = { ...openOptionsOf(options), ...progressive };
       const r = await prepareDeck(bytes, openOptions, hostFonts, stale, steps.at);
       if (r.kind === 'stale') return superseded();
@@ -807,7 +807,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return refuseOpen(OPEN_FAILED);
     }
   };
-
   const instance: PptxEditorInstance = {
     get session() {
       return session;
@@ -819,6 +818,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       measurer: session && !session.fixedMeasurer ? 'shaped' : 'fixed',
       resolving: hostFonts.resolving(),
     }),
+    getDocumentHandle: () => documentHandleOf(instance),
     get lastCopied() {
       return clipboard.lastCopied;
     },
@@ -840,10 +840,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       exec,
     }),
     snapshot,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
+    subscribe: (listener) => listeners.add(listener),
     can,
     exec,
     beginHistoryGroup: () => groups.begin(),
@@ -917,7 +914,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           if (fitZoom) {
             cached = null;
             surface?.render();
-            for (const l of [...listeners]) l();
+            listeners.notify();
           }
         },
         zoom: effectiveZoom,
@@ -996,5 +993,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   }
 
   if (options.document) void instance.load(options.document);
-  return seam.withCollaborationFlag(removal.attach(instance), modules);
+  const editor = seam.withCollaborationFlag(removal.attach(instance), modules);
+  return withDocumentReplace(editor, options.translate);
 }

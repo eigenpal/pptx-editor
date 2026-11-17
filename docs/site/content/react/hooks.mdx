@@ -224,7 +224,7 @@ export function RefusalToast({ show }: { show: (text: string) => void }) {
 
 | Event | Handler | Occurs when |
 | --- | --- | --- |
-| `change` | `(snapshot) => void` | An edit applies, an undo or redo runs, or a load finishes or fails. |
+| `change` | `(snapshot, change) => void` | An edit applies, an undo or redo runs, or a load finishes or fails. `change` is a `DocumentChange`: its `source` is `'load'`, `'refresh'`, or `'recovery'` for those causes, and absent for edits, undo, and redo. |
 | `selectionChange` | `(snapshot) => void` | The shape or text selection, the current slide, or the selected slides change. |
 | `rejection` | `(rejection, snapshot) => void` | The editor refuses an edit. |
 | `openFailure` | `(failure, snapshot) => void` | A file does not open. |

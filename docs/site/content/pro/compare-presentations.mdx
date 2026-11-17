@@ -1,0 +1,186 @@
+---
+title: 'Compare presentations'
+description: 'List what changed between two PPTX files, in the editor during a document refresh or with a server function.'
+category: 'Pro'
+---
+
+Compare presentations lists the changes from an original to a revised PPTX file: slides, shapes, text, notes, layouts, slide masters, and themes. Each change has a stable ID and a location that the [Document refresh API](/docs/guides/document-refresh) can flash. It requires the EigenPal Pro License.
+
+## Compare during a document refresh
+
+Register `reviewModule()`, then call `applyUpdate()` without `changes`. The module compares the captured and returned presentations and supplies the changes:
+
+```ts
+import { createDocumentRefresh, createPptxEditor } from '@pptx-editor.dev/core/editor';
+import { reviewModule } from '@pptx-editor.dev/pro';
+
+declare function processPresentation(bytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+export async function updateWithChanges(container: HTMLElement, original: Uint8Array) {
+  const editor = createPptxEditor({ modules: [reviewModule()] });
+  container.classList.add('pptx-editor');
+  editor.attach(container);
+  const opened = await editor.load(original);
+  if (!opened.ok) throw new Error(opened.reason);
+
+  const refresh = createDocumentRefresh(editor);
+  const submission = await refresh.capture();
+  try {
+    const bytes = await processPresentation(submission.bytes);
+    const result = await refresh.applyUpdate({ submission, sequence: 1, bytes });
+    if (result.ok && result.changeInformation === 'available') {
+      refresh.highlightChanges();
+    }
+  } finally {
+    refresh.finish(submission);
+  }
+  return editor;
+}
+```
+
+Call `editor.destroy()` when your application releases the editor. For React and Vue registration, see [Pro modules](/docs/pro#register-a-module).
+
+Computed changes do not change the presentation. The returned file appears as it is, and the comparison only describes it.
+
+## Compare without an editor
+
+To compare two files on a server or in a worker, call `comparePresentations`. It needs no DOM:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { comparePresentations } from '@pptx-editor.dev/pro';
+
+const originalBytes = await readFile('original.pptx');
+const revisedBytes = await readFile('revised.pptx');
+const result = comparePresentations(originalBytes, revisedBytes);
+if (!result.ok) console.error(result.code, result.message);
+else for (const change of result.changes) console.log(change.id, change.computed);
+```
+
+`result.changes` has the form that `RefreshUpdate.changes` takes. Send it with the revised file to a browser, and pass both to `applyUpdate()`. To pass your license key, use the `licenseKey` option.
+
+## Refresh with changes from your server
+
+<a id="refresh-with-changes-from-your-server" />
+
+When your server produces the revised file, it can also compare the files, so the browser does not need the review module. The browser captures the presentation and posts its bytes. The server revises the file, compares it with the original, and returns the revised bytes with the changes.
+
+The following server handler uses the Fetch API `Request` and `Response` types, as in Node.js 18 and later, Bun, and Deno. `processPresentation` is your own processing step. The handler returns the bytes as Base64 text in JSON:
+
+```ts
+import { Buffer } from 'node:buffer';
+import { comparePresentations } from '@pptx-editor.dev/pro';
+
+// Your own processing step that returns the revised presentation.
+declare function processPresentation(original: Uint8Array): Promise<Uint8Array>;
+
+export async function handleProcessPresentation(request: Request): Promise<Response> {
+  const original = new Uint8Array(await request.arrayBuffer());
+
+  let revised: Uint8Array;
+  try {
+    revised = await processPresentation(original);
+  } catch {
+    return Response.json({ error: 'processing-failed' }, { status: 502 });
+  }
+
+  const compared = comparePresentations(original, revised, {
+    licenseKey: process.env.PPTX_EDITOR_LICENSE_KEY,
+  });
+  if (!compared.ok) {
+    return Response.json({ error: compared.code }, { status: 422 });
+  }
+
+  return Response.json({
+    sequence: 1,
+    bytes: Buffer.from(revised).toString('base64'),
+    changes: compared.changes,
+  });
+}
+```
+
+In the browser, decode the response and pass the bytes and the changes to `applyUpdate()`. The controller validates every change, so a malformed response returns `invalid-result` instead of throwing. This sample expects an application route at `/api/process-presentation` that calls the handler:
+
+```ts
+import { createDocumentRefresh, DocumentRefreshError } from '@pptx-editor.dev/core/editor';
+import type { ComputedRefreshChange, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+interface ProcessedPresentation {
+  readonly sequence: number;
+  readonly bytes: string;
+  readonly changes: readonly ComputedRefreshChange[];
+}
+
+function decodeBase64(text: string): Uint8Array {
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+export async function refreshFromServer(editor: PptxEditorInstance) {
+  const refresh = createDocumentRefresh(editor);
+  try {
+    const submission = await refresh.capture();
+    try {
+      const response = await fetch('/api/process-presentation', {
+        method: 'POST',
+        body: submission.bytes,
+      });
+      if (!response.ok) throw new Error(`Processing failed: ${response.status}`);
+      const processed = (await response.json()) as ProcessedPresentation;
+
+      const result = await refresh.applyUpdate({
+        submission,
+        sequence: processed.sequence,
+        bytes: decodeBase64(processed.bytes),
+        changes: processed.changes,
+      });
+      if (result.ok) refresh.highlightChanges();
+      else console.warn(result.code, result.message);
+    } finally {
+      refresh.finish(submission);
+    }
+  } catch (error) {
+    // capture() rejects with DocumentRefreshError. fetch() and JSON errors
+    // are transport failures.
+    if (error instanceof DocumentRefreshError) console.warn(error.code);
+    else console.error(error);
+  }
+}
+```
+
+The changes keep their `computed` fields, so `describeRefreshChange()` describes them as it describes changes that the review module computes.
+
+## Read the changes
+
+Each change has an `id`, an optional `location`, and a `computed` description:
+
+| `computed` field | Meaning |
+| --- | --- |
+| `scope` | `'slide'`, `'shape'`, `'text'`, `'notes'`, `'layout'`, `'master'`, `'theme'`, or `'package'`. |
+| `action` | `'added'`, `'removed'`, `'moved'`, or `'changed'`. |
+| `aspects` | For changed shapes: `'position'`, `'size'`, `'rotation'`, `'geometry'`, `'fill'`, `'line'`, `'effects'`, `'text'`, `'textFormat'`, `'picture'`, `'table'`, `'chart'`, `'diagram'`, or `'other'`. For changed slides: `'background'`, `'layout'`, `'transition'`, `'animation'`, or `'visibility'` (the slide became hidden or shown). |
+| `affectedSlides` | For layouts, masters, and themes: the zero-based indexes of the slides that show the change. |
+| `previousSlideIndex` | For removed and moved slides: the index in the original presentation. |
+
+The comparison matches slides by their creation ID, then by content, then by slide ID. Inserting a slide therefore reports one added slide, not a change to each later slide. A text change in a shape body is located at the revised text, so a highlight marks the changed words. A removed shape is located at its slide, so the slide flashes. A removed slide has no location, and its status is `deleted`. Removed speaker notes report a `notes` change with the action `removed`.
+
+To show a change in a list, call `describeRefreshChange(change, t)` from your adapter or `@pptx-editor.dev/core/editor`. It returns a localized summary from the `refresh.change.*` strings of `@pptx-editor.dev/i18n`, such as "Changed text on slide 3". Render the result as text.
+
+## Handle errors
+
+A refused comparison returns `ok: false` with `code: 'invalidDocument'` when a file is not a readable PPTX file. Both files go through the same archive and XML limits as a file that the editor opens. `message` is English, for logs.
+
+## Limits
+
+- One comparison reports at most 10000 changes. `comparePresentations()` returns the first 10000 changes with `truncated: true` when the limit stopped it. During a document refresh, `reviewModule()` returns the first 9999 changes and one last change with `id: 'truncated'` and `computed: { scope: 'package', action: 'changed' }`. That change has no location. `describeRefreshChange()` describes it as "Other changes are not listed".
+- A shape with more than 50 changed paragraphs, or with changed text formatting, reports one shape change with the `text` or `textFormat` aspect.
+- Changes to presentation-wide settings report one `package` change. Changes to document properties are not reported.
+- The comparison does not record changes in the file. PresentationML has no tracked changes.
+
+## See also
+
+- [Document refresh API](/docs/guides/document-refresh)
+- [Pro modules](/docs/pro)
+- [Comments](/docs/pro/comments)

@@ -233,7 +233,8 @@ export async function convergeEdit(
       edit(a),
       `${label} was refused on peer A. Change the fixture's \`arrange\` (selection, slide, or ` +
         `state) so that the edit applies. ${HOW_TO}`
-    ).toEqual({ ok: true });
+      // A command can add its typed outcome, such as `replaceDocument`.
+    ).toMatchObject({ ok: true });
     expect(
       differingParts(before, a.session!.store.package),
       `${label} did not change peer A's deck: it is a no-op on this fixture, so the fixture ` +

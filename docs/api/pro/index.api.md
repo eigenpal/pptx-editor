@@ -7,6 +7,7 @@
 import { CollaborationFailureCode } from '@pptx-editor.dev/core/editor';
 import { CollaborationIdentity } from '@pptx-editor.dev/core/editor';
 import { CommentMarkerStyle } from '@pptx-editor.dev/core/editor';
+import { ComputedRefreshChange } from '@pptx-editor.dev/core/editor';
 import { EditorCollaborationSession } from '@pptx-editor.dev/core/editor';
 import { EditorModule } from '@pptx-editor.dev/core/editor';
 import { PptxPackage } from '@pptx-editor.dev/core/store';
@@ -49,6 +50,23 @@ export class CollaborationSchemaError extends Error {
 }
 
 export { CommentMarkerStyle }
+
+// @public
+export function comparePresentations(original: Uint8Array | ArrayBuffer, revised: Uint8Array | ArrayBuffer, options?: ComparePresentationsOptions): ComparePresentationsResult;
+
+// @public
+export type ComparePresentationsOptions = ProLicenseOptions;
+
+// @public
+export type ComparePresentationsResult = {
+    readonly ok: true;
+    readonly changes: readonly ComputedRefreshChange[];
+    readonly truncated: boolean;
+} | {
+    readonly ok: false;
+    readonly code: 'invalidDocument';
+    readonly message: string;
+};
 
 // @public
 export function createYjsCollaborationSession(options: YjsCollaborationSessionOptions): YjsCollaborationSession;

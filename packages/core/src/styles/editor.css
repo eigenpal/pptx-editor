@@ -241,6 +241,13 @@
   --doc-slide-caret: #202124;
   --doc-selection-mark: #1a73e8;
   --doc-selection-halo: #ffffff;
+  /* The change flash of a document refresh, over the slide and its thumbnails. */
+  --doc-refresh-highlight-color: #e37400;
+  /* The default easings of the change flash. The entrance uses a strong ease-out, the curve
+     of the editor's other entrances: the flash shows at once and then settles. The exit uses an
+     ease-in-out, so the flash fades over the whole exit and does not look like a cut. */
+  --doc-motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --doc-motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   /* The slide's edge against the workspace: a dark slide on dark chrome still shows its box. */
   --doc-slide-edge: rgba(60, 64, 67, 0.12);
   /* Smart guides drawn over the slide while a shape moves or resizes. */
@@ -5331,5 +5338,125 @@ legend.pptx-dialog__label {
   .pptx-editor .pptx-gradient-picker__marker {
     width: 32px;
     height: 44px;
+  }
+}
+
+/* The change flash of a document refresh (refresh-highlights.ts). The script sets the
+   `--pptx-refresh-*` properties from `highlightChanges()` options on each marked element, and
+   `data-refresh-highlight` to `entering`, `shown`, or `exiting`: a fade is an opacity
+   transition, so a new flash during an exit turns back from the opacity on screen. The canvas
+   layer fades as one element, because each redraw replaces its marks. Editing chrome only: no
+   slide paint, thumbnail image, slide show, or export shows it. */
+.pptx-surface__refresh {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--pptx-refresh-enter, 180ms) var(--pptx-refresh-easing, ease-out);
+}
+.pptx-surface__refresh[data-refresh-highlight='shown'] {
+  opacity: 1;
+}
+.pptx-surface__refresh[data-refresh-highlight='exiting'] {
+  transition-duration: var(--pptx-refresh-exit, 180ms);
+  transition-timing-function: var(--pptx-refresh-exit-easing, var(--pptx-refresh-easing, ease-out));
+}
+/* The marks of a new place in a layer that shows already: they enter on their own. */
+.pptx-surface__refresh > * {
+  transition: opacity var(--pptx-refresh-enter, 180ms) var(--pptx-refresh-easing, ease-out);
+}
+.pptx-surface__refresh > [data-refresh-highlight='entering'] {
+  opacity: 0;
+}
+.pptx-refresh-ring {
+  fill: var(--pptx-refresh-color, var(--doc-refresh-highlight-color));
+  fill-opacity: var(--pptx-refresh-opacity, 0.14);
+  stroke: var(--pptx-refresh-border-color, var(--doc-refresh-highlight-color));
+}
+.pptx-refresh-ring--slide {
+  fill: none;
+}
+.pptx-refresh-band {
+  fill: var(--pptx-refresh-color, var(--doc-refresh-highlight-color));
+  fill-opacity: calc(var(--pptx-refresh-opacity, 0.14) * 2);
+}
+.pptx-surface__refresh[data-refresh-border='dashed'] .pptx-refresh-ring {
+  stroke-dasharray: 6 4;
+}
+.pptx-surface__refresh[data-refresh-border='dotted'] .pptx-refresh-ring {
+  stroke-dasharray: 1 3;
+  stroke-linecap: round;
+}
+/* A thumbnail of a changed slide: a ring and a light wash, and a corner marker. */
+.pptx-rail__thumb.pptx-refresh-thumbnail {
+  position: relative;
+}
+.pptx-rail__thumb.pptx-refresh-thumbnail::after,
+.pptx-rail__thumb.pptx-refresh-thumbnail::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--pptx-refresh-enter, 180ms) var(--pptx-refresh-easing, ease-out);
+}
+.pptx-rail__thumb.pptx-refresh-thumbnail::after {
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--pptx-refresh-color, var(--doc-refresh-highlight-color))
+      calc(var(--pptx-refresh-opacity, 0.14) * 100%),
+    transparent
+  );
+  outline: var(--pptx-refresh-border-width, 2px) var(--pptx-refresh-border-style, solid)
+    var(--pptx-refresh-border-color, var(--doc-refresh-highlight-color));
+  outline-offset: calc(-1 * var(--pptx-refresh-border-width, 2px));
+}
+/* The marker: a filled dot with a light edge, so it shows on any slide and is a shape, not
+   only a color. It grows from 60% as it fades in, so the eye finds it, and shrinks back as it
+   fades out. The ring and the wash only fade: they cover the whole thumbnail. */
+.pptx-rail__thumb.pptx-refresh-thumbnail::before {
+  z-index: 1;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pptx-refresh-border-color, var(--doc-refresh-highlight-color));
+  box-shadow: 0 0 0 2px var(--doc-selection-halo);
+  transform: scale(0.6);
+  transition-property: opacity, transform;
+}
+.pptx-rail__thumb[data-refresh-highlight='shown']::after,
+.pptx-rail__thumb[data-refresh-highlight='shown']::before {
+  opacity: 1;
+}
+.pptx-rail__thumb[data-refresh-highlight='shown']::before {
+  transform: none;
+}
+.pptx-rail__thumb[data-refresh-highlight='exiting']::after,
+.pptx-rail__thumb[data-refresh-highlight='exiting']::before {
+  transition-duration: var(--pptx-refresh-exit, 180ms);
+  transition-timing-function: var(--pptx-refresh-exit-easing, var(--pptx-refresh-easing, ease-out));
+}
+/* The notes pane while the slide on screen has changed notes. */
+.pptx-notes.pptx-refresh-notes {
+  outline: var(--pptx-refresh-border-width, 2px) var(--pptx-refresh-border-style, solid) transparent;
+  outline-offset: calc(-1 * var(--pptx-refresh-border-width, 2px));
+  transition: outline-color var(--pptx-refresh-enter, 180ms) var(--pptx-refresh-easing, ease-out);
+}
+.pptx-notes.pptx-refresh-notes[data-refresh-highlight='shown'] {
+  outline-color: var(--pptx-refresh-border-color, var(--doc-refresh-highlight-color));
+}
+.pptx-notes.pptx-refresh-notes[data-refresh-highlight='exiting'] {
+  transition-duration: var(--pptx-refresh-exit, 180ms);
+  transition-timing-function: var(--pptx-refresh-exit-easing, var(--pptx-refresh-easing, ease-out));
+}
+/* Reduced motion: the flash only fades. The script caps the fades at 125 milliseconds. */
+@media (prefers-reduced-motion: reduce) {
+  .pptx-rail__thumb.pptx-refresh-thumbnail::before {
+    transform: none;
   }
 }

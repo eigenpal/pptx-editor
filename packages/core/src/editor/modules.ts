@@ -18,6 +18,7 @@ import type {
   StoreChange,
 } from '../store/index.ts';
 import type { ReviewPaneOptions } from '../contracts/index.ts';
+import type { ComputedRefreshChange } from './document-refresh-types.ts';
 import { bindReplicaIds } from './replica-ids.ts';
 
 // --- Collaboration --------------------------------------------------------------------------
@@ -341,6 +342,14 @@ export interface ReviewModuleContribution {
   readonly collectReviewItems: CollectReviewItems;
   /** The comment view settings: how a comment marker looks and what a press on it opens. */
   readonly pane?: ReviewPaneOptions;
+  /**
+   * The changes from a captured presentation to a returned one, for a document refresh whose
+   * update has no `changes`. Each change carries a stable id and its `computed` fields.
+   */
+  readonly refreshChanges?: (
+    captured: PptxPackage,
+    returned: PptxPackage
+  ) => readonly ComputedRefreshChange[];
 }
 
 // --- Registration ---------------------------------------------------------------------------
@@ -482,7 +491,15 @@ export function withCollaborationFlag<T extends object>(
   modules: EditorModuleRegistry
 ): T {
   if (modules.collaboration) COLLABORATING.add(editor);
+  REGISTRIES.set(editor, modules);
   return editor;
+}
+
+const REGISTRIES = new WeakMap<object, EditorModuleRegistry>();
+
+/** The modules `editor` dispatches over. @internal */
+export function moduleRegistryOf(editor: object): EditorModuleRegistry {
+  return REGISTRIES.get(editor) ?? EMPTY_REGISTRY;
 }
 
 /** True when `editor` holds a collaboration module. @internal */

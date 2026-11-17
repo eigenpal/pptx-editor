@@ -352,11 +352,15 @@ export type ColorChoice = string | ThemeColorChoice;
 // @public
 export type CommandResult = {
     readonly ok: true;
+    readonly replaceDocument?: Extract<ReplaceDocumentOutcome, {
+        readonly ok: true;
+    }>;
 } | {
     readonly ok: false;
     readonly reason: string;
     readonly detail?: string;
     readonly noop?: boolean;
+    readonly replaceDocument?: ReplaceDocumentRefusal;
 };
 
 // @public
@@ -521,6 +525,18 @@ export interface DiagramNodeState {
 export type DiagramShapePosition = 'after' | 'before' | 'below';
 
 // @public
+export interface DocumentChange {
+    readonly revision: number;
+    readonly source?: 'load' | 'refresh' | 'recovery';
+}
+
+// @public
+export interface DocumentHandle {
+    readonly loadId: string;
+    readonly revision: number;
+}
+
+// @public
 export interface DocumentOpenFailure {
     readonly code: string;
     readonly reason: DocumentOpenFailureReason;
@@ -542,6 +558,7 @@ export interface Editor {
     detach(): void;
     exec(command: EditorCommand, options?: EditorExecOptions): CommandResult;
     focus(): void;
+    getDocumentHandle(): DocumentHandle;
     // (undocumented)
     goToSlide(index: number): void;
     load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
@@ -560,7 +577,7 @@ export interface Editor {
 }
 
 // @public
-export type EditorCommand = PatchShapeFormatCommand | CommentCommand | {
+export type EditorCommand = PatchShapeFormatCommand | CommentCommand | ReplaceDocumentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -1444,6 +1461,8 @@ export type LineKind = 'line' | 'arrow' | 'elbow' | 'curved';
 
 // @public
 export interface LoadOptions {
+    // @internal
+    readonly quiet?: boolean;
     readonly startSlide?: number;
 }
 
@@ -1651,6 +1670,50 @@ export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching'
 // @public
 export interface RenderThumbnailOptions {
     readonly defer?: boolean;
+}
+
+// @public
+export type ReplaceDocumentCommand = {
+    readonly type: 'replaceDocument';
+} & ReplaceDocumentRequest;
+
+// @public
+export type ReplaceDocumentErrorCode = 'invalidRequest' | 'invalidDocument' | 'staleDocument' | 'unavailable' | 'busy' | 'editNotPermitted' | 'editUnsupported';
+
+// @public
+export type ReplaceDocumentOutcome = {
+    readonly ok: true;
+    readonly changed: boolean;
+} | ReplaceDocumentRefusal;
+
+// @public
+export type ReplaceDocumentRefusal = {
+    readonly ok: false;
+    readonly message: string;
+} & ({
+    readonly code: 'editNotPermitted';
+    readonly reason: 'viewing' | 'suggesting' | 'protected';
+} | {
+    readonly code: 'editUnsupported';
+    readonly reason: 'differentMainPart' | 'unsupportedDifference' | 'collaborationRefused';
+} | {
+    readonly code: 'staleDocument';
+    readonly reason: 'edited' | 'otherDocument';
+} | {
+    readonly code: 'unavailable';
+    readonly reason?: 'collaborationUnavailable';
+} | {
+    readonly code: 'invalidRequest' | 'invalidDocument' | 'busy';
+    readonly reason?: undefined;
+});
+
+// @public
+export type ReplaceDocumentRefusalReason = 'viewing' | 'suggesting' | 'protected' | 'collaborationUnavailable' | 'differentMainPart' | 'unsupportedDifference' | 'collaborationRefused' | 'otherDocument' | 'edited';
+
+// @public
+export interface ReplaceDocumentRequest {
+    readonly expected?: DocumentHandle;
+    readonly pptx: Uint8Array | ArrayBuffer;
 }
 
 // @public
