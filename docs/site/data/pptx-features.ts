@@ -821,7 +821,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Background dialog sets a color, gradient, pattern, or stretched or tiled picture. OK applies it as one undo step.',
+      'The Background dialog sets a color, gradient, pattern, or stretched or tiled picture. OK applies it as one undo step. A shape with `useBgFill` fills with the slide background.',
   },
   {
     id: 'themes.change-layout-theme',

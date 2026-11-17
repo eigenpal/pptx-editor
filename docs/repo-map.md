@@ -119,6 +119,7 @@ Each directory is a lane with allowed imports (`src/__tests__/core-lane-graph.ts
 | `math.ts` | Office Math (`a14:m`, ECMA-376 Part 1, 22.1): `isSupportedMath` (the constructs the layout reads, within the depth, node, and run length limits) and `readMathZone`, the math tree of a zone with the run properties of each math run. `alternate-content.ts` picks an `a14` choice only when its math is supported |
 | `script-fonts.ts` | The ISO 15924 script of a run's language (`lang`, `altLang`), which picks a theme script font (`a:font`) for the `ea` and `cs` slots |
 | `paint-props.ts` | Fills, lines, effects |
+| `background-fill.ts` | The fill of a shape with `useBgFill`: the slide background, mapped from the slide box to the shape box |
 | `three-d.ts` | The 3-D scene and shape properties (`a:scene3d`, `a:sp3d`) from the shape, its placeholders, or the theme effect style, and the preset shadows (`a:prstShdw`) as one or two shadow placements |
 | `chart-part.ts` | The chart part (`c:chartSpace`) behind a chart frame, parsed read-only from the part's bytes |
 | `table.ts`, `table-styles.ts` | Tables and table styles |

@@ -226,8 +226,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['content-placeholders'],
   },
   'themes.backgrounds': {
-    fixtures: ['placeholders-background'],
-    approximations: ['gradient-colors'],
+    fixtures: ['placeholders-background', 'background-fill'],
+    approximations: ['gradient-colors', 'gradient-tiles'],
   },
   'themes.change-layout-theme': { fixtures: ['slide-layouts'] },
   // --- Presenting --------------------------------------------------------

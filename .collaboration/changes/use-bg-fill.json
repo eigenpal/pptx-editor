@@ -1,0 +1,8 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Shapes with useBgFill resolve their fill from the slide background. This changes resolved, painted, and PDF fills only. The attribute is kept as it is. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": ["packages/core/src/cascade/__tests__/background-fill.test.ts"]
+}
