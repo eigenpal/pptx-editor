@@ -139,6 +139,8 @@ Render the component inside the editor root. React returns an instance or `null`
 
 Both modes keep the current paint on screen until the new paint is ready. The editor does not show its loading screen. Slides whose parts did not change keep their painted thumbnails and canvas content. The zoom stays. The editor keeps the current slide: when the returned file adds or removes slides before it, the editor follows it to its new index. If the returned file removes the current slide, the editor stays at the same index, or shows the last slide when the file has fewer slides.
 
+The controller reads, compares, and applies the returned file in separate browser tasks, so the page stays responsive during a large update. The editor paints the slide in the task that applies the file. Its `subscribe` listeners, and so the React and Vue toolbar and slide rail, receive that change in the next task. The `change` event of the update still has `source: 'refresh'`.
+
 The selection stays when its shapes and text survive, also when the current slide moves to a new index. Otherwise it clears. When a reload opens the whole file with `load()`, the selection clears. A reload does this when the returned file changes embedded fonts, or when the difference cannot apply in place.
 
 ## Show refresh state in your UI

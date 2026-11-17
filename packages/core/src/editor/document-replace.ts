@@ -33,6 +33,7 @@ import type {
 } from '../contracts/index.ts';
 import {
   diffPackages,
+  PackageHashes,
   presentationInfo,
   readPptx,
   slideRefAt,
@@ -46,6 +47,7 @@ import { isCollaborating } from './modules.ts';
 import type { DocumentSession } from './document-session.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { adoptLoadId, withChangeSource } from './change-source.ts';
+import { deferListeners } from './listener-relay.ts';
 import { focusSurfaceOf, surfaceInputOf } from './surface-registry.ts';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -124,16 +126,38 @@ export function preparseReturned(bytes: Uint8Array): boolean {
   return read.ok;
 }
 
+/** The longest run of hashing in one task before `prediffReturned` yields. */
+const HASH_STEP_MS = 8;
+
 /**
  * Take the difference from the open package to `bytes` (read with `preparseReturned`) ahead of
- * the commit. The commit reuses it only while the open package stays the same. @internal
+ * the commit. The commit reuses it only while the open package stays the same. The subtree
+ * hashes of both packages come first, in steps that `pause` separates, so a large package does
+ * not hash in one long task. @internal
  */
-export function prediffReturned(editor: PptxEditorInstance, bytes: Uint8Array): void {
+export async function prediffReturned(
+  editor: PptxEditorInstance,
+  bytes: Uint8Array,
+  pause: () => Promise<void>
+): Promise<void> {
   const known = steps.get(bytes);
   const session = editor.session;
   if (!known || !session || editor.snapshot().isOpening || !editor.finishOpening()) return;
+  const hashes = new PackageHashes();
+  let start = performance.now();
+  for (const pkg of [session.store.package, known.pkg])
+    for (const part of pkg.parts.values()) {
+      if (part.kind !== 'xml') continue;
+      hashes.of(part.xml.root);
+      if (performance.now() - start < HASH_STEP_MS) continue;
+      await pause();
+      // A load from outside replaced the document: no difference is useful now.
+      if (editor.session !== session) return;
+      start = performance.now();
+    }
+  // The open package can change between steps; the hashes of its kept nodes stay true.
   const base = session.store.package;
-  known.diff = { base, result: diffPackages(base, known.pkg) };
+  known.diff = { base, result: diffPackages(base, known.pkg, hashes) };
 }
 
 /**
@@ -313,7 +337,14 @@ export function reloadInPlace(
     const before = loadIdOf(session);
     const next = `load-${++nextLoad}`;
     loadIds.set(session, next);
-    const result = commit(editor, prepared, false);
+    // Handles taken before the reload name another load: no undo step reaches them. The history
+    // empties before the commit, so the one change event of the commit publishes it with the
+    // new load id, and the adapters render once. A refused commit falls back to a load, which
+    // opens with an empty history too.
+    session.store.clearHistory();
+    session.store.closeHistoryGroup();
+    // The slide paints in this task; the chrome renders in the next (`deferListeners`).
+    const result = deferListeners(editor, () => commit(editor, prepared, false));
     if (!result.ok) {
       loadIds.set(session, before);
       // The part checks refuse the difference as an edit: a load opens the file whole. A
@@ -322,12 +353,9 @@ export function reloadInPlace(
     }
     adoptLoadId(editor, next);
     // The editor's store listener followed the slide on screen by its part, and kept its
-    // selection when its nodes stay. A removed slide leaves the index, clamped.
-    // Handles taken before the reload name another load: no undo step reaches them.
-    session.store.clearHistory();
-    session.store.closeHistoryGroup();
-    // Publish the empty history and the new load id.
-    editor.setMode(editor.snapshot().mode);
+    // selection when its nodes stay. A removed slide leaves the index, clamped. With no
+    // difference, no commit published the empty history and the new load id: publish them.
+    if (!result.changed) editor.setMode(editor.snapshot().mode);
     return result;
   });
   if (outcome !== 'load' && outcome.ok) keepKeyboardFocus(editor);

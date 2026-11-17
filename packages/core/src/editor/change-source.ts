@@ -1,8 +1,10 @@
 // What caused a `change` event (`DocumentChange.source`), after DOCX Editor's
 // `refresh-edit-source.ts` (docx-editor/packages/core/src/editor at b63cbea4a).
 //
-// The editor publishes every change through `subscribe`, synchronously. A replacement runs its
-// commit inside `withChangeSource`, so the event that the commit fires reads the source. A load
+// The editor publishes every change through `subscribe`, synchronously, except the commit of a
+// document refresh, which its listeners hear of in the next task (`listener-relay.ts`). A
+// replacement runs its commit inside `withChangeSource`, so the event that the commit fires
+// reads the source; a deferred notification runs inside it again. A load
 // gives the document a new load id: the first `change` event with a new load id has
 // `source: 'load'`, unless a refresh named the load. A reload in place gives a new load id
 // too, but its commit reports the refresh itself (`adoptLoadId`): the next edit has no source.
@@ -57,6 +59,11 @@ export function withChangeSource<T>(
     if (before) active.set(editor, before);
     else active.delete(editor);
   }
+}
+
+/** The cause that `withChangeSource` names now, if any. @internal */
+export function changeSourceOf(editor: object): DocumentChange['source'] {
+  return active.get(editor);
 }
 
 /** The load id of the editor's handle, when it has one. @internal */

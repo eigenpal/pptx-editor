@@ -68,11 +68,16 @@ const declsOf = (el: Element): string =>
 
 /**
  * A content hash of each subtree: names, attributes (sorted), namespace declarations (sorted),
- * children; no ids or element prefixes.
+ * children; no ids or element prefixes. Package trees never change after they are made (store
+ * ops copy what they touch), so a hash stays true for its node. A caller can fill one ahead in
+ * short steps and pass it to `diffPackages`, so a large package does not hash in one task.
+ *
+ * @internal
  */
-class Hashes {
+export class PackageHashes {
   readonly #memo = new WeakMap<Node, string>();
 
+  /** The hash of `node` and its subtree, taken once per node. */
   of(node: Node): string {
     const known = this.#memo.get(node);
     if (known !== undefined) return known;
@@ -150,7 +155,7 @@ function specOf(el: Element): NodeSpec {
 function matchChildren(
   a: readonly Node[],
   b: readonly Node[],
-  hashes: Hashes
+  hashes: PackageHashes
 ): Map<number, number> {
   const pairs = new Map<number, number>(); // b index -> a index
   const usedA = new Set<number>();
@@ -229,7 +234,7 @@ class PartDiff {
 
   constructor(
     readonly part: string,
-    readonly hashes: Hashes
+    readonly hashes: PackageHashes
   ) {}
 
   #push(op: PptxOp): void {
@@ -350,7 +355,12 @@ function newRootPrefixes(open: Element, next: Element): boolean {
 }
 
 /** The node ops of one XML part, or null when it should be replaced whole. */
-function xmlPartOps(name: string, open: Element, next: Element, hashes: Hashes): PptxOp[] | null {
+function xmlPartOps(
+  name: string,
+  open: Element,
+  next: Element,
+  hashes: PackageHashes
+): PptxOp[] | null {
   if (open.ns !== next.ns || open.local !== next.local || newRootPrefixes(open, next)) return null;
   const diff = new PartDiff(name, hashes);
   try {
@@ -365,18 +375,21 @@ function xmlPartOps(name: string, open: Element, next: Element, hashes: Hashes):
 /**
  * The ops that turn `open` into `next`, as one transaction. Parts match by name, folded as OPC
  * folds them; the open package's spelling stays. Refuses when the main presentation part of the
- * two packages differs.
+ * two packages differs. `hashes` reuses subtree hashes taken ahead (`PackageHashes`).
  *
  * @internal
  */
-export function diffPackages(open: PptxPackage, next: PptxPackage): PackageDiff {
+export function diffPackages(
+  open: PptxPackage,
+  next: PptxPackage,
+  hashes: PackageHashes = new PackageHashes()
+): PackageDiff {
   const mainOpen = mainPresentationPart(open);
   const mainNext = mainPresentationPart(next);
   if (!mainOpen || !mainNext || partNameKey(mainOpen) !== partNameKey(mainNext))
     return { ok: false, reason: 'different-main-part' };
   const openByKey = new Map<string, string>();
   for (const name of open.parts.keys()) openByKey.set(partNameKey(name), name);
-  const hashes = new Hashes();
   const ops: PptxOp[] = [];
   const parts: string[] = [];
   const whole: [string, boolean, PackagePart][] = [];

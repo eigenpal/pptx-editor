@@ -86,6 +86,7 @@ import * as seam from './modules.ts';
 import type { PptxEditorInstance, PptxEditorOptions } from './pptx-editor-types.ts';
 import { PresenceLink } from './collaboration-presence.ts';
 import { INSERT_COMMAND_TYPES as INSERTS } from './command-types.ts';
+import { createListenerRelay } from './listener-relay.ts';
 
 export type { PptxEditorInstance, PptxEditorOptions } from './pptx-editor-types.ts';
 
@@ -127,7 +128,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   // `load` calls in flight: only the newest may install its session, and none after `destroy`.
   let generation = 0;
   let destroyed = false;
-  const listeners = new Set<() => void>();
+  const listeners = createListenerRelay(() => instance); // Deferred by a refresh commit.
   const modules = seam.resolveEditorModules(options.modules);
   const comments = new CommentState(options.author, modules);
   const presence = new PresenceLink(modules);
@@ -174,7 +175,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     cropping(); // Crop mode ends as soon as the selection is no longer its picture.
     presence.publish(session?.store.package, shownPart, selection);
     surface?.render();
-    for (const l of [...listeners]) l();
+    listeners.notify();
   };
   // Commits the editor makes itself emit once, after it has set the selection and the slide.
   let committing = 0;
@@ -840,10 +841,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       exec,
     }),
     snapshot,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
+    subscribe: (listener) => listeners.add(listener),
     can,
     exec,
     beginHistoryGroup: () => groups.begin(),
@@ -916,7 +914,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           if (fitZoom) {
             cached = null;
             surface?.render();
-            for (const l of [...listeners]) l();
+            listeners.notify();
           }
         },
         zoom: effectiveZoom,

@@ -156,7 +156,7 @@ export function deferredXmlPart(partName: string, bytes: Uint8Array, decode: (by
 }): PackagePart;
 
 // @internal
-export function diffPackages(open: PptxPackage, next: PptxPackage): PackageDiff;
+export function diffPackages(open: PptxPackage, next: PptxPackage, hashes?: PackageHashes): PackageDiff;
 
 // @public
 export interface DocumentStoreOptions {
@@ -541,6 +541,11 @@ export type PackageDiffRefusal = 'different-main-part' | 'unsafe-part-name';
 
 // @public
 export function packageFingerprints(pkg: PptxPackage): ReadonlyMap<string, string>;
+
+// @internal
+export class PackageHashes {
+    of(node: Node_2): string;
+}
 
 // @public
 export type PackageInvariantRule = 'slide-list' | 'relationship-target' | 'content-type';

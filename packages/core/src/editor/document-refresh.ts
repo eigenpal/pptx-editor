@@ -54,6 +54,7 @@ import {
   whileReplacing,
 } from './document-replace.ts';
 import { expectLoad, forgetLoad } from './change-source.ts';
+import { deferListeners } from './listener-relay.ts';
 import {
   isComputedShape,
   isLocationShape,
@@ -543,7 +544,7 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
           }
           // Step 2: the difference from the open package.
           if (parsed) {
-            prediffReturned(editor, bytes);
+            await prediffReturned(editor, bytes, nextTask);
             await nextTask();
             if ((stop = unchanged())) return stop;
           }
@@ -554,7 +555,10 @@ export function createDocumentRefresh(editor: PptxEditorInstance): DocumentRefre
           // Step 3: commit and paint.
           let done: { pkg: PptxPackage; at: DocumentHandle };
           if (mine.mode === 'edit') {
-            const result = editor.exec({ type: 'replaceDocument', pptx: bytes, expected: now });
+            // The slide paints in this task; the chrome renders in the next.
+            const result = deferListeners(editor, () =>
+              editor.exec({ type: 'replaceDocument', pptx: bytes, expected: now })
+            );
             const outcome = result.replaceDocument;
             if (!outcome) return publish(failure(resultId, 'unavailable'), 'failed');
             if (!outcome.ok) return publish(editFailure(resultId, outcome), 'failed');

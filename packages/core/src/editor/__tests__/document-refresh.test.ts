@@ -306,8 +306,9 @@ describe('document refresh: steps in separate tasks', () => {
     let saves = 0;
     editor.save = () => (saves++, save());
     let recovery: ArrayBuffer | null = null;
-    // The commit publishes a change while the recovery bytes are set.
-    editor.subscribe(() => void (recovery ??= refresh.recoveryBytes()));
+    // The store commits while the recovery bytes are set. The editor's own listeners hear of
+    // the commit in the next task (`deferListeners`), after the reload ends.
+    editor.session!.store.subscribe(() => void (recovery ??= refresh.recoveryBytes()));
     const r1 = await refresh.applyUpdate({ submission, sequence: 1, bytes: deck(['X'], ['B']) });
     expect(r1.ok).toBe(true);
     // The recovery of the first update: the captured file.
