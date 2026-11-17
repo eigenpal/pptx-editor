@@ -16,12 +16,12 @@ Call `createDocumentRefresh(editor)` after the editor mounts. Repeated calls for
 | --- | --- |
 | `capture()` | Capture the current bytes and revision. Returns a submission. |
 | `applyUpdate(update)` | Accept a complete PPTX for that submission and sequence. Set `mode: 'edit'` to apply it as one undoable edit. Calls run one at a time, in call order. Returns a success or refusal result. |
-| `finish(submission)` | Close the submission when the job ends. Accepted content and change navigation stay. While a replacement runs, the call does nothing. |
+| `finish(submission)` | Close the submission when the job ends. Accepted content and change navigation stay. |
 | `cancel()` | Invalidate pending results, and end waits for input. It does not cancel your network request. |
-| `highlightChanges(options?)` | Flash available changes. Returns the selected available change count, including changes on other slides, or `0` during replacement. |
+| `highlightChanges(options?)` | Flash available changes. Returns the selected available change count, or `0` during replacement. |
 | `clearHighlights(options?)` | Dismiss highlights, with or without a fade. |
 | `navigateToChange(id, options?)` | Go to the slide of a change and reveal its thumbnail. Returns whether the change is available. |
-| `snapshot()`, `subscribe(listener)`, `onResult(listener)` | Read cached status, observe changes, and receive every result, including refusals. Both listeners return an unsubscribe function. |
+| `snapshot()`, `subscribe(listener)`, `onResult(listener)` | Read cached status, observe changes, and receive every result, including refusals. `snapshot()` returns the same object until the state changes, so it works with `useSyncExternalStore`. |
 | `recover()`, `recoveryBytes()` | Retry restoration after a failed replacement, or get the previous bytes. |
 
 The flow is `capture()`, then your server job, then `applyUpdate()`, then `finish()`.
@@ -30,249 +30,61 @@ The flow is `capture()`, then your server job, then `applyUpdate()`, then `finis
 
 <a id="accept-an-updated-file" />
 
-Capture the presentation, send its bytes to your backend, and apply the response. The examples expect an application route at `/api/update-presentation` and your own `showRefreshError` function:
+Capture the presentation, send its bytes to your backend, and apply the response:
 
-<FrameworkTabs>
-<Framework value="react">
+```ts
+import { createDocumentRefresh } from '@pptx-editor.dev/react';
 
-```tsx
-import { createDocumentRefresh, DocumentRefreshError, usePptxEditor } from '@pptx-editor.dev/react';
+const refresh = createDocumentRefresh(editor);
+const submission = await refresh.capture();
 
-declare function showRefreshError(code: string): void;
+try {
+  const response = await fetch('/api/update-presentation', {
+    method: 'POST',
+    body: submission.bytes,
+  });
+  if (!response.ok) throw new Error('Processing failed');
 
-export function UpdateButton() {
-  const editor = usePptxEditor();
-
-  async function update() {
-    if (!editor) return;
-    const refresh = createDocumentRefresh(editor);
-    try {
-      const submission = await refresh.capture();
-      try {
-        const response = await fetch('/api/update-presentation', {
-          method: 'POST',
-          body: submission.bytes,
-        });
-        if (!response.ok) throw new Error('Processing failed');
-
-        const result = await refresh.applyUpdate({
-          submission,
-          sequence: 1,
-          bytes: await response.arrayBuffer(),
-        });
-        if (result.ok) refresh.highlightChanges();
-        else showRefreshError(result.code);
-      } finally {
-        refresh.finish(submission);
-      }
-    } catch (error) {
-      // capture() rejects with DocumentRefreshError; fetch() errors are
-      // transport failures.
-      const code = error instanceof DocumentRefreshError ? error.code : 'transport';
-      showRefreshError(code);
-    }
+  const result = await refresh.applyUpdate({
+    submission,
+    sequence: 1,
+    bytes: await response.arrayBuffer(),
+  });
+  if (result.ok) {
+    refresh.highlightChanges();
+  } else {
+    showRefreshError(result.code);
   }
-
-  return <button onClick={() => void update()}>Update</button>;
+} finally {
+  refresh.finish(submission);
 }
 ```
 
-</Framework>
-<Framework value="vue">
+Get `editor` from `usePptxEditor()` inside the editor root. React returns an instance or `null`; Vue returns a shallow ref. In Vue, import from `@pptx-editor.dev/vue`. `capture()` rejects with `DocumentRefreshError`; see [Handle refusals and recovery](#handle-refusals-and-recovery).
 
-```vue
-<script setup lang="ts">
-import { createDocumentRefresh, DocumentRefreshError, usePptxEditor } from '@pptx-editor.dev/vue';
-
-declare function showRefreshError(code: string): void;
-
-const editor = usePptxEditor();
-
-async function update() {
-  if (!editor.value) return;
-  const refresh = createDocumentRefresh(editor.value);
-  try {
-    const submission = await refresh.capture();
-    try {
-      const response = await fetch('/api/update-presentation', {
-        method: 'POST',
-        body: submission.bytes,
-      });
-      if (!response.ok) throw new Error('Processing failed');
-
-      const result = await refresh.applyUpdate({
-        submission,
-        sequence: 1,
-        bytes: await response.arrayBuffer(),
-      });
-      if (result.ok) refresh.highlightChanges();
-      else showRefreshError(result.code);
-    } finally {
-      refresh.finish(submission);
-    }
-  } catch (error) {
-    // capture() rejects with DocumentRefreshError; fetch() errors are
-    // transport failures.
-    const code = error instanceof DocumentRefreshError ? error.code : 'transport';
-    showRefreshError(code);
-  }
-}
-</script>
-
-<template>
-  <button @click="update">Update</button>
-</template>
-```
-
-</Framework>
-</FrameworkTabs>
-
-Render the component inside the editor root. React returns an instance or `null`; Vue returns a shallow ref.
-
-- `capture()` commits buffered text input, including a speaker notes draft. It waits up to 5 seconds for a text composition to end, then rejects with `input-failed`.
+- `capture()` commits buffered text input, including a speaker notes draft, and waits for a text composition to end.
 - Pass the same `submission` object to `applyUpdate()`. A copied, superseded, or other editor's token cannot authorize replacement.
-- Any edit after capture makes `applyUpdate()` return `local-edits`, even after undo. Typing in slide text or speaker notes and a completed IME composition count as edits, including input that is still pending when the result arrives. Capture again; do not replay the old result.
-- If a pointer gesture on the slide, such as a shape drag or a resize, is in progress when a result arrives, `applyUpdate()` waits up to 30 seconds for it to end, then applies the result.
-- If a text composition is in progress when a result arrives, `applyUpdate()` waits up to 5 seconds for it to end. If the composition is still running, the result returns `local-edits`.
-- `cancel()` ends these waits at once. A waiting `applyUpdate()` returns `cancelled`, and a waiting `capture()` rejects with `superseded`.
+- Any edit after capture makes `applyUpdate()` return `local-edits`, even after undo. Capture again; do not replay the old result.
+- A result that arrives during a shape drag or a text composition waits for it to end. See [Limits](#limits).
 - `applyUpdate()` resolves when the returned presentation is on screen and accepts clicks.
 
-Both modes keep the current paint on screen until the new paint is ready. The editor does not show its loading screen. Slides whose parts did not change keep their painted thumbnails and canvas content. The zoom stays. The editor keeps the current slide: when the returned file adds or removes slides before it, the editor follows it to its new index. If the returned file removes the current slide, the editor stays at the same index, or shows the last slide when the file has fewer slides.
-
-The controller reads, compares, and applies the returned file in separate browser tasks, so the page stays responsive during a large update. The editor paints the slide in the task that applies the file. Its `subscribe` listeners, and so the React and Vue toolbar and slide rail, receive that change in the next task. The `change` event of the update still has `source: 'refresh'`.
-
-The selection stays when its shapes and text survive, also when the current slide moves to a new index. Otherwise it clears. When a reload opens the whole file with `load()`, the selection clears. A reload does this when the returned file changes embedded fonts, or when the difference cannot apply in place.
-
-## Show refresh state in your UI
-
-`refresh.snapshot()` returns a cached, immutable `DocumentRefreshState`, and `refresh.subscribe(listener)` reports each change to it. Use them to show the phase and the last result in your interface. Call `refresh.cancel()` when the component that owns the job unmounts, so that late results do not apply.
-
-<FrameworkTabs>
-<Framework value="react">
-
-```tsx
-import { useEffect, useSyncExternalStore } from 'react';
-import { createDocumentRefresh, usePptxEditor } from '@pptx-editor.dev/react';
-import type { DocumentRefresh, DocumentRefreshState } from '@pptx-editor.dev/react';
-
-const labels: Record<DocumentRefreshState['phase'], string> = {
-  idle: '',
-  capturing: 'Saving your edits',
-  processing: 'Processing',
-  refreshing: 'Updating the presentation',
-  recovering: 'Restoring the presentation',
-  complete: 'Updated',
-  failed: 'The update failed',
-};
-
-function RefreshStatus({ refresh }: { refresh: DocumentRefresh }) {
-  const state = useSyncExternalStore(refresh.subscribe, refresh.snapshot);
-  useEffect(() => () => refresh.cancel(), [refresh]);
-  return <p role="status">{labels[state.phase]}</p>;
-}
-
-export function RefreshStatusLine() {
-  const editor = usePptxEditor();
-  if (!editor) return null;
-  return <RefreshStatus refresh={createDocumentRefresh(editor)} />;
-}
-```
-
-</Framework>
-<Framework value="vue">
-
-```vue
-<script setup lang="ts">
-import { onBeforeUnmount, shallowRef, watch } from 'vue';
-import { createDocumentRefresh, usePptxEditor } from '@pptx-editor.dev/vue';
-import type { DocumentRefresh, DocumentRefreshState } from '@pptx-editor.dev/vue';
-
-const labels: Record<DocumentRefreshState['phase'], string> = {
-  idle: '',
-  capturing: 'Saving your edits',
-  processing: 'Processing',
-  refreshing: 'Updating the presentation',
-  recovering: 'Restoring the presentation',
-  complete: 'Updated',
-  failed: 'The update failed',
-};
-
-const editor = usePptxEditor();
-const state = shallowRef<DocumentRefreshState | null>(null);
-let refresh: DocumentRefresh | null = null;
-let unsubscribe = () => {};
-
-function stop() {
-  unsubscribe();
-  refresh?.cancel();
-  refresh = null;
-}
-
-// The editor ref is null until the editor mounts.
-watch(
-  editor,
-  (instance) => {
-    stop();
-    if (!instance) return;
-    const current = createDocumentRefresh(instance);
-    refresh = current;
-    state.value = current.snapshot();
-    unsubscribe = current.subscribe(() => {
-      state.value = current.snapshot();
-    });
-  },
-  { immediate: true }
-);
-
-onBeforeUnmount(stop);
-</script>
-
-<template>
-  <p role="status">{{ state ? labels[state.phase] : '' }}</p>
-</template>
-```
-
-</Framework>
-</FrameworkTabs>
-
-`snapshot()` returns the same object until the state changes, so `useSyncExternalStore` renders again only on a change. `cancel()` does not stop your network request; see [Handle refusals and recovery](#handle-refusals-and-recovery).
+Both modes keep the current paint on screen until the new paint is ready, without the loading screen. Unchanged slides keep their thumbnails and canvas content. The zoom stays, and the editor follows the current slide to its new index when slides before it come or go. The selection stays when its shapes and text survive.
 
 ## Apply an update as one undoable edit
 
 <a id="undoable-update" />
 
-By default, `applyUpdate()` reloads the presentation, which resets undo history. To keep undo history, pass `mode: 'edit'`. The editor applies the difference between the open presentation and the returned file as one edit, through the [`replaceDocument` command](/docs/guides/loading-and-saving#replace-the-document-as-one-undoable-edit).
-
-The following sample applies the result as an edit, and falls back to a reload when the difference cannot apply as an edit. The editor has no public collaboration flag, so the sample reads your application's own state. `refresh` is the controller from `createDocumentRefresh(editor)`:
+By default, `applyUpdate()` reloads the presentation, which resets undo history. To keep it, pass `mode: 'edit'`. The editor applies the difference between the open presentation and the returned file as one edit, through the [`replaceDocument` command](/docs/guides/loading-and-saving#replace-the-document-as-one-undoable-edit):
 
 ```ts
-import type { DocumentRefresh } from '@pptx-editor.dev/core/editor';
+const submission = await refresh.capture();
+const bytes = await processPresentation(submission.bytes);
 
-declare const refresh: DocumentRefresh;
-// Your own server call that returns the processed presentation.
-declare function processPresentation(bytes: ArrayBuffer): Promise<ArrayBuffer>;
-// True while your application has a collaboration session attached.
-declare const collaborating: boolean;
-
-export async function updateAsEdit() {
-  const submission = await refresh.capture();
-  try {
-    const bytes = await processPresentation(submission.bytes);
-    let result = await refresh.applyUpdate({
-      submission,
-      sequence: 1,
-      bytes,
-      mode: 'edit',
-    });
-    if (!result.ok && result.code === 'edit-unsupported' && !collaborating) {
-      // The presentation and its undo history are unchanged, so a reload of
-      // the same sequence can still apply.
-      result = await refresh.applyUpdate({ submission, sequence: 1, bytes });
-    }
-    return result;
-  } finally {
-    refresh.finish(submission);
-  }
+let result = await refresh.applyUpdate({ submission, sequence: 1, bytes, mode: 'edit' });
+if (!result.ok && result.code === 'edit-unsupported') {
+  // The presentation and its undo history are unchanged. Outside a
+  // collaboration session, reload instead.
+  result = await refresh.applyUpdate({ submission, sequence: 1, bytes });
 }
 ```
 
@@ -280,41 +92,29 @@ An update with `mode: 'edit'` behaves as follows:
 
 - One undo returns the presentation to the captured submission, and one redo applies the result again. Undo steps from before the update stay available.
 - The content matches what a reload of the returned file shows. Parts that the editor does not interpret arrive as the file has them.
-- The selection stays when its shapes and text survive. Otherwise it clears. The editor follows the current slide when slides before it move, and the zoom stays.
 - Each accepted cumulative result adds one undo step, so undo after the second result returns to the first.
 - The `change` event has `source: 'refresh'`, so it does not start another processing job. Undo and redo are user edits and omit `source`.
 - A result identical to the open presentation succeeds without an undo step.
 
-If the difference cannot apply as an edit, for example because the returned file names a different main presentation part, the update refuses with `edit-unsupported`. Nothing changes, and you can retry the same sequence with a reload. In a collaboration session, a reload refuses with `collaboration`, so report the failure instead.
-
-A returned file that changes embedded fonts also refuses with `edit-unsupported` and the reason `unsupported-difference`. The editor registers embedded fonts only when it opens a file, so a reload opens such a file whole.
-
-An editor in viewing mode refuses the update with `edit-not-permitted`. A read-only presentation, for example after a slide failed to parse, refuses it in the same way.
+A difference that cannot apply as an edit refuses with `edit-unsupported`, and nothing changes. This includes a file that names a different main presentation part, or that changes embedded fonts. An editor in viewing mode, or a read-only presentation, refuses with `edit-not-permitted`.
 
 ### Refusal causes
 
-A refused update has a stable `code` and an English `message` for logs. With `mode: 'edit'`, it can also carry `reason`, a `RefreshRefusalReason` that names the specific cause. Each `reason` belongs to one `code`, so checking `reason` also narrows `code` in TypeScript:
+With `mode: 'edit'`, a refusal can also carry `reason`, a `RefreshRefusalReason`. Each `reason` belongs to one `code`, so checking `reason` also narrows `code` in TypeScript:
 
 | `reason` | `code` | Situation |
 | --- | --- | --- |
 | `viewing` | `edit-not-permitted` | The editor is in viewing mode, or the presentation is read-only. |
 | `different-main-part` | `edit-unsupported` | The returned file names a different main presentation part. |
-| `unsupported-difference` | `edit-unsupported` | The difference cannot be expressed as an edit of the open presentation, or it changes embedded fonts. |
-| `collaboration-refused` | `edit-unsupported` | A collaboration session is attached, and the editor refused the edit, for example because a slide part is damaged. The presentation is unchanged. |
+| `unsupported-difference` | `edit-unsupported` | The difference cannot apply as an edit, or it changes embedded fonts. |
+| `collaboration-refused` | `edit-unsupported` | The collaboration session refused the edit, for example because a slide part is damaged. |
 
-The type also lists `protected` and `collaboration-unavailable` for DOCX Editor compatibility. PresentationML has no enforced edit protection, and a PPTX Editor collaboration session accepts edits while it is attached, so PPTX Editor does not produce them.
-
-The following sample reports a refusal that a retry cannot fix. `result` is the value that `applyUpdate()` returned:
+The type also lists `protected` and `collaboration-unavailable` for DOCX Editor compatibility. PPTX Editor does not produce them.
 
 ```ts
-import type { RefreshResult } from '@pptx-editor.dev/core/editor';
-
-declare const result: RefreshResult;
-// Your own error reporting.
-declare function reportProcessorFailure(message: string): void;
-
 if (!result.ok && result.reason === 'collaboration-refused') {
   // Reprocessing returns the same file, so report it instead of retrying.
+  // reportProcessorFailure is your own error reporting.
   reportProcessorFailure(result.message);
 }
 ```
@@ -325,32 +125,15 @@ An update with `mode: 'edit'` works while a [collaboration session](/docs/pro/co
 
 - Undo on the participant who applied the update takes back that update only. Edits that other participants made meanwhile stay.
 - An edit by any participant after `capture()` refuses the update with `local-edits`. Capture again and process the newer presentation.
-- If the editor refuses the edit, the update refuses with `edit-unsupported`, and the presentation keeps the room's content.
+- If the session refuses the edit, the update refuses with `edit-unsupported`, and the presentation keeps the room's content.
 
 A reload still refuses collaboration sessions with `collaboration`, because it would replace the shared presentation for every participant.
 
 ## Receive cumulative results
 
-The processor assigns each result a nonnegative integer `sequence`. Each file holds the complete cumulative output for the submission. In the following sample, `receiveProcessorUpdates` is your own transport, for example a server-sent event stream, and the `show*` functions are your own interface:
+The processor assigns each result a nonnegative integer `sequence`. Each file holds the complete cumulative output for the submission:
 
 ```ts
-import type {
-  DocumentRefresh,
-  RefreshChange,
-  RefreshChangeInput,
-} from '@pptx-editor.dev/core/editor';
-
-declare const refresh: DocumentRefresh;
-declare function receiveProcessorUpdates(bytes: ArrayBuffer): AsyncIterable<{
-  sequence: number;
-  bytes: ArrayBuffer;
-  changes?: readonly RefreshChangeInput[];
-  failedOperationIds?: readonly string[];
-}>;
-declare function showRefreshError(code: string): void;
-declare function showChanges(changes: readonly RefreshChange[]): void;
-declare function showPartialFailures(ids: readonly string[]): void;
-
 const submission = await refresh.capture();
 
 try {
@@ -378,20 +161,16 @@ try {
 | `update` field | Meaning |
 | --- | --- |
 | `submission` | The object that `capture()` returned. |
-| `sequence` | Processor order, never network arrival order. Duplicate or older sequences return `out-of-order`. Replacements run one at a time, and only a successful replacement advances the accepted sequence and revision baseline. |
+| `sequence` | Processor order, never network arrival order. Duplicate or older sequences return `out-of-order`. Only a successful replacement advances the accepted sequence and revision baseline. |
 | `bytes` | The complete PPTX, as `ArrayBuffer` or `Uint8Array`. |
 | `mode` | `'reload'` (default) or `'edit'`. See [Apply an update as one undoable edit](#undoable-update). |
 | `changes` | Optional change metadata. See [Provide change locations](#provide-reliable-change-locations). |
 | `failures` | Optional failed processor operation IDs. The controller reports them and never retries them. |
 
-Do not start processing from every `change` event. Replacements and undoable updates have `source: 'refresh'` or `source: 'recovery'`, loads have `source: 'load'`, and user edits omit `source`. In the following sample, `scheduleProcessing` is your own function that starts a job:
+Do not start processing from every `change` event. Replacements and undoable updates have `source: 'refresh'` or `source: 'recovery'`, loads have `source: 'load'`, and user edits omit `source`:
 
 ```ts
 import { onEditorEvent } from '@pptx-editor.dev/core/editor';
-import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
-
-declare const editor: PptxEditorInstance;
-declare function scheduleProcessing(): void;
 
 onEditorEvent(editor, 'change', (_snapshot, change) => {
   if (change.source) return;
@@ -403,15 +182,9 @@ onEditorEvent(editor, 'change', (_snapshot, change) => {
 
 <a id="provide-reliable-change-locations" />
 
-A plain file does not identify its changes. Without metadata or a registered review module, the result reports `changeInformation: 'unavailable'`. Supply metadata with stable IDs across cumulative results. In the following sample, `updatedBytes` is the second cumulative file from your processor:
+A plain file does not identify its changes. Without metadata or a registered review module, the result reports `changeInformation: 'unavailable'`. Supply metadata with stable IDs across cumulative results:
 
 ```ts
-import type { DocumentRefresh, RefreshSubmission } from '@pptx-editor.dev/core/editor';
-
-declare const refresh: DocumentRefresh;
-declare const submission: RefreshSubmission;
-declare const updatedBytes: ArrayBuffer;
-
 const result = await refresh.applyUpdate({
   submission,
   sequence: 2,
@@ -423,22 +196,18 @@ const result = await refresh.applyUpdate({
       location: { slideIndex: 2, shapeId: 4, paragraphIndex: 0, start: 9, end: 14, text: '$4.2M' },
     },
     { id: 'summary-slide', description: 'Added a summary slide', location: { slideIndex: 5 } },
-    {
-      id: 'speaker-notes',
-      description: 'Rewrote the notes',
-      location: { slideIndex: 0, notes: true },
-    },
+    { id: 'notes', description: 'Rewrote the notes', location: { slideIndex: 0, notes: true } },
     { id: 'old-appendix', description: 'Removed the appendix', unavailableReason: 'deleted' },
   ],
 });
 ```
 
-A location names a slide, a shape on that slide, or a text range in one paragraph of that shape. Each level is valid alone:
+A location names a slide, a shape on that slide, or a text range in one paragraph of that shape:
 
 | Location rule | Detail |
 | --- | --- |
-| Slide | Exactly one of `slideId` (the `p:sldId/@id`, 256 through 2147483647) or `slideIndex` (zero-based presentation order, hidden slides included). |
-| `shapeId` | The `p:cNvPr/@id` of a shape on that slide, including shapes inside groups. Omit it to locate the whole slide. |
+| Slide | Exactly one of `slideId` (the `p:sldId/@id`) or `slideIndex` (zero-based, hidden slides included). |
+| `shapeId` | The `p:cNvPr/@id` of a shape on that slide, including shapes inside groups. |
 | `paragraphIndex` | Zero-based paragraph index in the shape's text body. Requires `shapeId`. |
 | Offsets | `start` and `end` in UTF-16 code units, a nonempty range within one paragraph. Require `paragraphIndex`. |
 | `text` | Must equal the returned text between `start` and `end`. Required with offsets. |
@@ -450,7 +219,7 @@ Invalid location metadata does not reject valid presentation bytes. That change 
 | Diagnostic code | Meaning |
 | --- | --- |
 | `invalid-selector` | Both slide selectors, neither, an invalid index, or a level without its parent. |
-| `invalid-slide-id` | The slide ID is outside the supported range. |
+| `invalid-slide-id` | The slide ID is outside 256 through 2147483647. |
 | `slide-not-found` | The returned presentation lacks the slide, or `notes: true` names a slide without notes. |
 | `shape-not-found` | The slide lacks the shape. |
 | `ambiguous-shape-id` | Several shapes on the slide have the ID. |
@@ -459,44 +228,15 @@ Invalid location metadata does not reject valid presentation bytes. That change 
 | `text-mismatch` | The returned text differs from `text`. |
 | `missing-location` | The change has no location. |
 | `deleted` | The deleted content has no surviving location. |
-| `not-rendered` | The target has no layout position, so it cannot flash. The status is `unavailable`. |
+| `not-rendered` | The target has no layout position. |
 
-The diagnostic type also lists `invalid-paragraph-id`, `ambiguous-paragraph-id`, `unsupported-story`, and `multiple-paragraphs`, and the status type lists `unsupported-story`. These values keep the types compatible with DOCX Editor. PPTX Editor does not produce them.
-
-### Computed changes
-
-If you omit `changes` and register `reviewModule()`, the module compares the captured and returned presentations and supplies the changes. The review module requires the EigenPal Pro License. If your server already ran [`comparePresentations()`](/docs/pro/compare-presentations#refresh-with-changes-from-your-server), pass its changes in `changes`. The result keeps their `computed` fields:
-
-```ts
-import { createPptxEditor } from '@pptx-editor.dev/core/editor';
-import { reviewModule } from '@pptx-editor.dev/pro';
-
-const editor = createPptxEditor({ modules: [reviewModule()] });
-```
-
-Each computed change has a `computed` field instead of a `description`:
-
-| `computed` field | Meaning |
-| --- | --- |
-| `scope` | `'slide'`, `'shape'`, `'text'`, `'notes'`, `'layout'`, `'master'`, `'theme'`, or `'package'`. |
-| `action` | `'added'`, `'removed'`, `'moved'`, or `'changed'`. |
-| `aspects` | For changed shapes and slides, what changed, such as `'position'`, `'size'`, `'fill'`, `'text'`, `'picture'`, or `'visibility'` (a slide that became hidden or shown). |
-| `affectedSlides` | For layouts, masters, and themes, the zero-based indexes of the slides that show the change. These slides flash. |
-| `previousSlideIndex` | For removed and moved slides, the index in the captured presentation. |
-
-Removed speaker notes report a `notes` change with the action `removed`. Computed IDs stay stable across cumulative results, so `isNew` marks only new changes.
-
-The module reports at most 10000 changes. When a comparison finds more, the result holds the first 9999 changes and one last change with `id: 'truncated'` and `computed: { scope: 'package', action: 'changed' }`. That change has no location, so it cannot flash. `describeRefreshChange()` describes it as "Other changes are not listed". [`comparePresentations()`](/docs/pro/compare-presentations#limits) reports `truncated: true` instead. To describe a change in a list, call `describeRefreshChange(change, t)`. It returns the processor `description`, or a localized summary such as "Changed text on slide 3". To compute changes without an editor, see [Compare presentations](/docs/pro/compare-presentations).
+If you omit `changes` and register `reviewModule()`, the module compares the captured and returned presentations and supplies the changes, with stable IDs across cumulative results. It requires the EigenPal Pro License. To compare on your server instead, pass the result of `comparePresentations()` in `changes`. For the change fields and limits, see [Compare presentations](/docs/pro/compare-presentations).
 
 ## Present changes
 
-Flash new available changes after a successful `applyUpdate()`, then navigate. `refresh` is the controller from `createDocumentRefresh(editor)`:
+Flash new available changes after a successful `applyUpdate()`, then navigate:
 
 ```ts
-import type { DocumentRefresh } from '@pptx-editor.dev/core/editor';
-
-declare const refresh: DocumentRefresh;
-
 const target = refresh
   .snapshot()
   .changes.find((change) => change.isNew && change.status === 'available');
@@ -506,25 +246,19 @@ if (target && refresh.navigateToChange(target.id, { block: 'centerIfNeeded' })) 
 }
 ```
 
+A highlight flashes the rail and sorter thumbnail of each changed slide. On the current slide, it rings a changed shape or slide, puts a band over changed text, and rings the notes pane when the notes changed.
+
+- `isNew` marks new IDs, changed text, and changed descriptions within one submission.
+- Locations stay valid until the next accepted result or local edit.
+- Highlights that show when the next result arrives stay on screen and follow their shapes. Only new places replay the entrance.
+- Highlights change presentation only. They add no saved bytes and no undo entries.
+- Changed thumbnails get the accessible description **Changed**. Keep a text change list beside the presentation, because color alone does not explain a change. `describeRefreshChange(change, t)` returns a localized summary for each change.
+
 <a id="try-the-effects" />
 
 This simulation shows highlights, navigation, and refusals with a sample presentation:
 
 <DocumentRefreshDemo />
-
-A highlight flashes each change on these surfaces:
-
-- **Thumbnails**: the slide rail and slide sorter thumbnails of every slide with a change.
-- **Canvas**: on the current slide, a ring around a changed shape or slide, and a band over a changed text range. The band is drawn at reduced opacity, so the text stays readable.
-- **Notes**: a ring around the notes pane when the current slide's notes changed.
-
-Other notes about change presentation:
-
-- `isNew` marks new IDs, changed text, and changed descriptions within one submission.
-- Locations stay valid until the next accepted result or local edit.
-- Highlights that show when the next result arrives stay on screen. During the replacement, they follow their slides and shapes to the new positions. A highlight request after the result starts the places that show already without the entrance. Only new places run the entrance. This also applies while highlights fade out: a place that fades out returns to full opacity from its opacity on screen.
-- Highlights change presentation only. They add no saved bytes and no undo entries.
-- Changed thumbnails get the accessible description **Changed**. Keep a text change list beside the presentation, because color alone does not explain a change.
 
 ### Customize highlights and motion
 
@@ -544,70 +278,54 @@ Other notes about change presentation:
 | `opacity` | `0.14` | Fill opacity between 0 and 1. |
 | `className` | Omitted | CSS classes for shadows, outlines, or patterns. |
 | `timeoutMs` | `3000` | Milliseconds before dismissal, or `null` to keep the highlight until you clear it. |
-| `animation` | `true` | `false` changes at once. An object sets `durationMs` (default 180), `exitDurationMs` (default `durationMs`), and `easing` (default `--doc-motion-ease-out` for the entrance and `--doc-motion-ease-in-out` for the exit). |
+| `animation` | `true` | `false` changes at once. An object sets `durationMs` (default 180), `exitDurationMs` (default `durationMs`), and `easing`. |
 
 Each call starts from the defaults, so reuse one options object. Repeated calls reset the timeout without replaying the entrance. To replay it, call `clearHighlights({ animation: false })` first.
 
-- `highlightChanges()` validates options even when change locations are stale or unavailable. Invalid values throw `RangeError` or `TypeError`.
+- `highlightChanges()` validates options even when change locations are stale. Invalid values throw `RangeError` or `TypeError`.
 - Expiration removes the styling. Change metadata and navigation stay available.
-- Without overrides, `clearHighlights()` uses the last requested exit duration and easing. `snapshot().highlightsVisible` becomes `false` when dismissal starts, before the exit animation ends.
-- To restyle highlights for your theme, set `--doc-refresh-highlight-color`. To change the default curves, set `--doc-motion-ease-out` and `--doc-motion-ease-in-out`. See [Appearance](/docs/customization/appearance).
+- `snapshot().highlightsVisible` becomes `false` when dismissal starts, before the exit animation ends.
+- To restyle highlights, set `--doc-refresh-highlight-color`, `--doc-motion-ease-out`, and `--doc-motion-ease-in-out`. See [Appearance](/docs/customization/appearance).
 
 ### Control change navigation
 
-`navigateToChange()` goes to the slide of the change and scrolls its thumbnail into view. It takes `NavigateToChangeOptions`:
+`navigateToChange()` takes `NavigateToChangeOptions`:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `block` | `'center'` | Thumbnail placement: `'start'`, `'center'`, `'centerIfNeeded'`, or `'nearest'`. |
 | `behavior` | `'instant'` | `'smooth'` for an explicit animated action. |
 | `offsetPx` | `24` | Nonnegative edge padding for `'start'` and `'nearest'`, in CSS pixels. |
-| `focus` | `false` | Select the changed shape, or put the caret at the start of the changed text, and move focus to the editor. |
+| `focus` | `false` | Select the changed shape, or put the caret at the changed text, and focus the editor. |
 
 Navigation returns `false` for an unavailable location or during replacement. It does not wait for smooth scrolling. Invalid modes throw `TypeError`; invalid padding throws `RangeError`.
 
 ## Handle refusals and recovery
 
-`applyUpdate()` returns `{ ok: false, code, message }` with a `RefreshFailureCode`. `message` is an English explanation for logs; do not parse it. Edit refusals also carry a `reason`; see [Refusal causes](#refusal-causes). Handle codes, not messages.
-
-`capture()` rejects with `DocumentRefreshError`, whose `code` is one of these values:
-
-- `unavailable`: no presentation is mounted, or it is still opening.
-- `busy`: a replacement is running, including a reload that opens the whole file.
-- `recovery-failed`: an earlier replacement failed and was not restored. Offer recovery first.
-- `input-failed`: pending input or serialization failed, or a text composition did not end within 5 seconds.
-- `superseded`: a later `capture()` or `cancel()` ran before this capture ended.
-
-`applyUpdate()` can return these codes:
+`applyUpdate()` returns `{ ok: false, code, message }` with a `RefreshFailureCode`. `message` is an English explanation for logs; do not parse it. Edit refusals also carry a `reason`; see [Refusal causes](#refusal-causes). `capture()` rejects with `DocumentRefreshError` and one of `unavailable`, `busy`, `recovery-failed`, `input-failed`, or `superseded`. Handle codes, not messages:
 
 | Code | Situation | Action |
 | --- | --- | --- |
-| `local-edits` | The presentation changed after capture, even through undo, or a text composition did not end within 5 seconds. With `mode: 'edit'`, this includes another participant's edit. | Capture again and start a new job. |
+| `local-edits` | The presentation changed after capture, even through undo, or a text composition did not end in time. With `mode: 'edit'`, this includes another participant's edit. | Capture again and start a new job. |
 | `out-of-order` | A duplicate or older sequence arrived. | Discard the result. |
 | `superseded` | The result belongs to an inactive submission, or arrived after cancellation. | Discard it. |
-| `document-changed` | Another presentation was loaded with `load()` after capture or during replacement. | Discard it. |
-| `cancelled` | Cancellation interrupted a replacement, or a wait for input. | Stop the transport. |
+| `document-changed` | Another presentation was loaded after capture or during replacement. | Discard it. |
+| `cancelled` | Cancellation interrupted a replacement or a wait for input. | Stop the transport. |
 | `collaboration` | A reload while a collaboration session is attached, even if disconnected. | Use `mode: 'edit'`. |
 | `unavailable` | No mounted presentation, or the presentation is still opening. | Retry later. |
-| `edit-not-permitted` | An update with `mode: 'edit'` in viewing mode, or on a read-only presentation. A retry does not help. | Change the editing mode, or reload outside a collaboration session. |
-| `edit-unsupported` | The result cannot apply as an undoable edit, for example because it changes embedded fonts. The presentation and its history are unchanged. | Outside a collaboration session, retry the same sequence without `mode: 'edit'`. |
+| `edit-not-permitted` | An update with `mode: 'edit'` in viewing mode or on a read-only presentation. | Change the editing mode, or reload outside a collaboration session. |
+| `edit-unsupported` | The result cannot apply as an undoable edit. The presentation and its history are unchanged. | Outside a collaboration session, retry the same sequence without `mode: 'edit'`. |
 | `invalid-result` | The update object is malformed, such as a change with wrong field types. | Fix the update. |
 | `invalid-document` | The bytes are not a valid PPTX. The visible presentation stays. | Report the processor failure. |
 | `input-failed` | Pending input or serialization failed. | Report the failure. |
 | `load-failed` | A valid file failed to open. Check `recovered` for restoration. | Report the failure. |
 | `recovery-failed` | Opening and restoration both failed. | Offer recovery. |
 
-A refusal for a result that the controller does not accept, such as `out-of-order` or `superseded`, does not change `snapshot()`. To show every outcome in a status line, use the return value of `applyUpdate()` or `onResult()`.
-
-`applyUpdate()` does not return `busy`: calls wait in a queue and run one at a time.
+`applyUpdate()` does not return `busy`: calls wait in a queue. A refusal for a result that the controller does not accept, such as `out-of-order`, does not change `snapshot()`; use the return value or `onResult()` to show every outcome.
 
 Do not retry a refused result blindly. Connect your cancel control to both the transport and the controller, because cancellation does not reverse accepted files:
 
 ```ts
-import type { DocumentRefresh } from '@pptx-editor.dev/core/editor';
-
-declare const refresh: DocumentRefresh;
-
 const transport = new AbortController();
 // Pass transport.signal to your fetch calls.
 function cancelProcessing() {
@@ -625,14 +343,13 @@ Recovery bytes are not an undo archive for accepted files.
 
 ## Limits
 
-- A reload resets undo history. An update with `mode: 'edit'` keeps undo history. In both modes, the selection stays when its shapes and text survive, and the editor follows the current slide when slides before it move. Otherwise the selection clears.
+- A reload resets undo history. An update with `mode: 'edit'` keeps it.
 - A reload refuses collaborative sessions, including disconnected ones.
-- A reload keeps unchanged slides painted. If the returned file changes embedded fonts, or the difference cannot apply in place, the reload opens the whole file again with `load()`, without the loading screen. The selection then clears, and long presentations take longer to show.
-- An update with `mode: 'edit'` refuses a file that changes embedded fonts with `edit-unsupported`.
+- If the returned file changes embedded fonts, or the difference cannot apply in place, a reload opens the whole file again with `load()`, without the loading screen. The selection then clears.
 - `capture()` waits up to 5 seconds for a text composition. `applyUpdate()` waits up to 5 seconds for a text composition and up to 30 seconds for a pointer gesture on the slide. `cancel()` ends the waits.
+- The editor paints the slide in the task that applies the file. `subscribe` listeners, including the React and Vue chrome, hear of it in the next task.
 - The controller does not compare presentation meaning or reject unrelated content. Check presentation and job identity in your application before `applyUpdate()`.
 - An ordinary `editor.load()` invalidates pending submissions and recovery.
-- Computed changes report at most 10000 changes. With `reviewModule()`, more than 10000 changes give the first 9999 changes and one change with `id: 'truncated'` and the scope `package`. `comparePresentations()` returns `truncated: true` instead. A shape with more than 50 changed paragraphs reports one shape change.
 - Highlight numbers must be finite. `padding`, `borderRadius`, and `borderWidth` must be nonnegative. `timeoutMs` accepts `0` through `2147483647` milliseconds, or `null`.
 - Reduced-motion preferences cap fades at 125 milliseconds and make smooth navigation instant.
 
@@ -641,5 +358,4 @@ Recovery bytes are not an undo archive for accepted files.
 - [Load and save presentations](/docs/guides/loading-and-saving)
 - [Compare presentations](/docs/pro/compare-presentations)
 - [Navigate a presentation](/docs/guides/navigation)
-- [Collaboration](/docs/pro/collaboration)
 - [Document refresh example](https://github.com/eigenpal/pptx-editor/tree/main/examples/document-refresh)
