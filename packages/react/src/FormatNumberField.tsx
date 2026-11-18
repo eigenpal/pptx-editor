@@ -23,6 +23,8 @@ export interface FormatNumberFieldProps {
   readonly step?: number;
   /** Show the label beside the field, as the other rows of a format section do. */
   readonly inline?: boolean;
+  /** The hint for a field without a value that is not a mixed selection. */
+  readonly placeholder?: string;
   /** Write one value. Pass `options` to `exec` so that one edit is one undo step. */
   readonly onCommit: (value: number, options: EditorExecOptions) => string | null;
 }
@@ -45,6 +47,7 @@ export function FormatNumberField({
   max,
   step = 1,
   inline,
+  placeholder,
   onCommit,
 }: FormatNumberFieldProps) {
   const { t } = useTranslation();
@@ -84,7 +87,7 @@ export function FormatNumberField({
           aria-label={label}
           data-format-property={property}
           value={field.draft ?? value ?? ''}
-          placeholder={value === null && mixed ? t('inspector.mixed') : undefined}
+          placeholder={value === null ? (mixed ? t('inspector.mixed') : placeholder) : undefined}
           disabled={disabled}
           aria-invalid={!!error}
           aria-describedby={error ? errorId : undefined}

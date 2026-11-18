@@ -5175,6 +5175,19 @@ legend.pptx-dialog__label {
 .pptx-editor .pptx-field--inline > [role='alert'] {
   grid-column: 1 / -1;
 }
+/* Outline Width: the exact field, with the preset weights menu at its end. */
+.pptx-editor .pptx-format-control > .pptx-format-line-width {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: none;
+}
+.pptx-editor .pptx-format-line-width > .pptx-field {
+  flex: 1;
+  min-width: 0;
+}
 /* Fill Transparency: a slider beside the percent field, on the field's input row. */
 .pptx-editor .pptx-format-transparency {
   display: grid;

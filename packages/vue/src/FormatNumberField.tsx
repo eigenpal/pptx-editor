@@ -30,6 +30,8 @@ export const FormatNumberField = defineComponent({
     step: { type: Number, default: 1 },
     /** Show the label beside the field, as the other rows of a format section do. */
     inline: Boolean,
+    /** The hint for a field without a value that is not a mixed selection. */
+    placeholder: { type: String, default: undefined },
     onCommit: {
       type: Function as PropType<(value: number, options: EditorExecOptions) => string | null>,
       required: true,
@@ -79,7 +81,13 @@ export const FormatNumberField = defineComponent({
               aria-label={props.label}
               data-format-property={props.property}
               value={field.draft ?? props.value ?? ''}
-              placeholder={props.value === null && props.mixed ? t('inspector.mixed') : undefined}
+              placeholder={
+                props.value === null
+                  ? props.mixed
+                    ? t('inspector.mixed')
+                    : props.placeholder
+                  : undefined
+              }
               disabled={props.disabled}
               aria-invalid={!!error}
               aria-describedby={error ? errorId : undefined}

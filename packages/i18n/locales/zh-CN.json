@@ -1856,6 +1856,7 @@
     "stopLimit": "渐变至少需要两个光圈。",
     "addStopLimit": "渐变光圈少于十个时可以添加。",
     "lineWidth": "宽度",
+    "noLine": "无",
     "line": "线条",
     "outline": "轮廓",
     "previewUnavailable": "此源颜色无法预览。",
