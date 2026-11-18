@@ -1,5 +1,20 @@
 # @pptx-editor.dev/core
 
+## 0.6.0
+
+### Minor Changes
+
+- 4d97642: Add the document refresh API, as in DOCX Editor: `createDocumentRefresh(editor)` shows updated `.pptx` files from your server without the loading screen and flashes what changed. Add the `replaceDocument` command, `getDocumentHandle()`, and `DocumentChange.source` on the `change` event. With `reviewModule()`, results get computed changes; `comparePresentations()` lists them on a server.
+- e0ac835: A deck shows its first slide sooner because the editor first loads only the font faces that the slide's text uses, and loads the other faces in the background. Font resolvers receive these faces in the new `faces` field of the request, so `packagedFonts()` and `googleFonts()` from `@docx-editor.dev/fonts` 2.38 or later load the same way.
+
+### Patch Changes
+
+- 3f0ad32: Improve rendering fidelity. Underlines and superscripts sit on the whole-point baseline grid, equation arrays center their baselines on the math axis, and superscripts in equations rise 0.365 em. The PDF export slants synthetic italic text and draws tiled pictures without seams between the tiles.
+- 31be6ab: A deck that opens waits only for the fonts of the slide it shows, and the fonts of the other slides install afterward without a flash of fallback text. The loading sheet has the size and place of the slide that replaces it.
+- e22f3f3: Shapes with `useBgFill="1"` fill with the slide background instead of their style fill. A gradient or stretched picture background keeps its place on the slide. Save keeps the attribute.
+- 31be6ab: A deck that opens waits up to 3 seconds for its fonts, and then shows slide text in the browser's own faces at the right character positions until its fonts arrive or when they fail to load, instead of with estimated widths that spread or overlap the letters.
+- Updated dependencies: @pptx-editor.dev/i18n@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
