@@ -4,7 +4,12 @@
 // demo's theme switch into File > Page setup. Everything loads and saves in the browser;
 // nothing is uploaded.
 import { computed, h, onBeforeUnmount, onMounted, shallowRef, watch, watchEffect } from 'vue';
-import { PageSetupDialog, PptxEditorRoot, type PptxEditorPopups } from '@pptx-editor.dev/vue';
+import {
+  PageSetupDialog,
+  PptxEditorRoot,
+  createDocumentRefresh,
+  type PptxEditorPopups,
+} from '@pptx-editor.dev/vue';
 import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import { reviewModule } from '@pptx-editor.dev/pro/vue';
@@ -117,8 +122,9 @@ const popups = computed<PptxEditorPopups>(() => ({
 }));
 
 function onReady(instance: PptxEditorInstance): void {
-  // The e2e suite and the verification scripts drive the editor through this handle.
-  (window as unknown as { __pptxEditor?: unknown }).__pptxEditor = instance;
+  // The e2e suite and the verification scripts drive the editor through these handles.
+  // The refresh factory is the demo's own, so it works in a production build too.
+  Object.assign(window, { __pptxEditor: instance, __createDocumentRefresh: createDocumentRefresh });
   editor.value = instance;
   unsaved?.dispose();
   unsaved = trackUnsavedEdits(instance);

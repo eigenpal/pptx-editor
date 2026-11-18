@@ -231,7 +231,12 @@ async function chromeStyles(page: Page): Promise<Record<string, string>> {
       for (const p of props) {
         // A flex or grid item ignores vertical-align.
         if (p === 'vertical-align' && /flex|grid/.test(parent)) continue;
-        out[`${tag} ${p}`] = s.getPropertyValue(p);
+        const value = s.getPropertyValue(p);
+        // The engine names its faces `pptx-f<measurer>-<face>`. Faces that arrive late build a
+        // new measurer and face list, so the same text gets a new face id. A host style cannot
+        // set that id, so compare the value without it.
+        out[`${tag} ${p}`] =
+          p === 'font-family' ? value.replace(/pptx-f\d+-\d+/g, 'pptx-face') : value;
       }
     });
     return out;
@@ -260,8 +265,7 @@ test('embedding: a host CSS reset changes no chrome style', async ({ page }) => 
   ];
   for (const [name, open] of states) {
     await ready(page);
-    // Font work ends first: faces that arrive late shape the slide text again with a new
-    // measurer, whose face names (`pptx-f2-*`) differ, between the two readings.
+    // Font work ends first, so the slide text does not move between the two readings.
     await page.waitForFunction(
       () => {
         const ed = (window as unknown as Record<string, unknown>).__pptxEditor as
