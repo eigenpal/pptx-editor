@@ -64,7 +64,7 @@ The **Chart** tab of the side panel shows these sections above the data:
 - **Chart elements** turns the **Title**, **Data labels**, **Axes**, and **Gridlines** on and off, sets the title text, places the **Legend** (none, top, bottom, left, or right), and sets the axis titles. Leave an axis title empty for no title. While **Axes** is off, the axis title fields are unavailable. The gridlines stay as you set them. A pie or doughnut chart has no axis fields.
 - **Colors** sets the color of each series, or of each slice of a pie or doughnut chart. **Automatic** gives back the color of the chart style.
 
-A check box, list, or color applies when it changes. A text field applies when you press Enter or leave it. Each change is one undo step.
+A check box, list, or color applies when it changes. A text field applies while you type. Each change is one undo step, and one field edit is one change.
 
 From code, `editor.chartFormat(nodeId?)` reads the type, elements, and colors of the selected chart. `setChartType`, `setChartFormat`, and `setChartColor` change them:
 
@@ -97,7 +97,7 @@ Select a chart. Then choose **Edit chart…** on the chart toolbar group, on the
 
 - **Categories** lists a field for each category label, or **X values** for a scatter chart. Each row has a remove button. **Add category** adds a category at the end.
 - **Series** shows a card for each series, with its name and a value field for each category. A card opens and closes with its title. **Add series** adds a series at the end, and **Remove series** removes the series of its card.
-- A field applies when you press Enter or leave it. Each applied field, add, or remove is one undo step, and the slide updates at once.
+- A field applies while you type, and the slide updates at once. Each field edit, add, or remove is one undo step. Enter or leaving the field ends the edit.
 - An empty value field is a blank value. Text that is not a number stays in the field with a reason, and Escape restores the chart's value.
 
 Removing categories or series, changing their labels, or selecting another chart clears uncommitted fields. Appending categories or series preserves drafts in existing cells. Clearing a draft keeps the field focused when that field remains in the grid. This prevents a draft from moving to another data cell.

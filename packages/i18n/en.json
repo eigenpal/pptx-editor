@@ -1856,6 +1856,7 @@
     "stopLimit": "A gradient requires at least two stops.",
     "addStopLimit": "You can add stops when fewer than ten stops exist.",
     "lineWidth": "Width",
+    "noLine": "None",
     "line": "Line",
     "outline": "Outline",
     "previewUnavailable": "Preview unavailable for this source color.",

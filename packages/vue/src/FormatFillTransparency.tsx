@@ -4,13 +4,15 @@ import {
   formatFillTransparency,
   formatTargetKey,
   translateKeyOrText,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { FormatNumberField } from './FormatNumberField.tsx';
+import { useHistoryGroup } from './headless-hooks.ts';
 
 /**
- * The Transparency of one shape's solid fill: a slider and a percent field. The slider shows its
- * value while it moves and writes once on release, so one drag is one undo step. @internal
+ * The Transparency of one shape's solid fill: a slider and a percent field. The slider writes
+ * while it moves, so the slide shows the value at once, and one drag is one undo step. @internal
  */
 export const FormatFillTransparency = defineComponent({
   name: 'FormatFillTransparency',
@@ -18,26 +20,25 @@ export const FormatFillTransparency = defineComponent({
     const editor = usePptxEditor();
     const snapshot = useEditorState((s) => s);
     const { t } = useTranslation();
-    const preview = ref<number | null>(null);
+    const group = useHistoryGroup({ kind: 'range' });
     const error = ref<string | null>(null);
     return () => {
       const field = formatFillTransparency(editor.value);
       if (!field) return null;
       const key = `${editor.value?.session?.id}:${formatTargetKey(snapshot.value)}`;
-      const commit = (percent: number): string | null => {
+      const commit = (percent: number, options?: EditorExecOptions): string | null => {
         const instance = editor.value;
         if (!instance || `${instance.session?.id}:${formatTargetKey(instance.snapshot())}` !== key)
           return t('disabled.invalidValue');
         if (percent === field.value) return null;
-        const result = instance.exec({
-          type: 'patchShapeFormat',
-          target: field.target,
-          patch: field.patch(percent),
-        });
+        const result = instance.exec(
+          { type: 'patchShapeFormat', target: field.target, patch: field.patch(percent) },
+          options
+        );
         return result.ok ? null : translateKeyOrText(t, result.reason);
       };
       const label = t(field.labelKey);
-      const value = preview.value ?? field.value;
+      const value = field.value;
       const disabled = snapshot.value.mode === 'view';
       return (
         <div class="pptx-format-transparency" data-format-fill-transparency="">
@@ -52,16 +53,9 @@ export const FormatFillTransparency = defineComponent({
             step={1}
             value={value}
             disabled={disabled}
+            ref={group.ref}
             onInput={(e: Event) => {
-              preview.value = Number((e.target as HTMLInputElement).value);
-            }}
-            // The `change` event marks the release of a drag or one arrow key step.
-            onChange={(e: Event) => {
-              preview.value = null;
-              error.value = commit(Number((e.target as HTMLInputElement).value));
-            }}
-            onBlur={() => {
-              preview.value = null;
+              error.value = commit(Number((e.target as HTMLInputElement).value), group.options());
             }}
           />
           <FormatNumberField
@@ -73,9 +67,9 @@ export const FormatFillTransparency = defineComponent({
             min={field.min}
             max={field.max}
             disabled={disabled}
-            onCommit={(percent: number) => {
+            onCommit={(percent: number, options: EditorExecOptions) => {
               error.value = null;
-              return commit(percent);
+              return commit(percent, options);
             }}
           />
           {error.value ? (

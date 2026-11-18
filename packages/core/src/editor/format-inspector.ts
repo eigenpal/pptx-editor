@@ -6,6 +6,8 @@ import type { Editor, EditorSnapshot, LineEndType, ShapeSummary } from '../contr
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import type { ChromeSlotId } from './chrome-controls.ts';
 
+export * from './live-field.ts';
+
 /** Stable identifiers for the selection's formatting sections. @public */
 export type FormatSectionId =
   | 'fill'
@@ -415,4 +417,60 @@ export function formatLineSlotValue(editor: Editor | null, slot: ChromeSlotId): 
   const value =
     slot === 'shape.lineWidth' ? state.width : slot === 'shape.lineStart' ? state.head : state.tail;
   return value === null ? undefined : String(value);
+}
+
+/** The range that an inspector number field accepts. @internal */
+export interface FormatNumberLimits {
+  readonly min?: number;
+  readonly max?: number;
+  readonly exclusiveMin?: boolean;
+}
+
+/** A parsed inspector number, or the translation key that explains the refusal. @internal */
+export type FormatNumberParse =
+  | { readonly ok: true; readonly value: number }
+  | {
+      readonly ok: false;
+      /** True when the text has no number yet: an empty or partial entry such as `-`. */
+      readonly incomplete: boolean;
+      readonly key: TranslationKey;
+      readonly params?: Readonly<Record<string, number>>;
+    };
+
+/** Parse one inspector number field. A comma is a decimal separator. @internal */
+export function parseFormatNumber(text: string, limits: FormatNumberLimits): FormatNumberParse {
+  const trimmed = text.trim();
+  const value = trimmed === '' ? NaN : Number(trimmed.replace(',', '.'));
+  const { min, max, exclusiveMin } = limits;
+  if (
+    Number.isFinite(value) &&
+    (min === undefined || value > min || (!exclusiveMin && value === min)) &&
+    (max === undefined || value <= max)
+  )
+    return { ok: true, value };
+  const incomplete = !Number.isFinite(value);
+  if (min !== undefined && max !== undefined)
+    return {
+      ok: false,
+      incomplete,
+      key: exclusiveMin ? 'inspector.numberRangeExclusive' : 'inspector.numberRange',
+      params: { min, max },
+    };
+  if (min !== undefined)
+    return { ok: false, incomplete, key: 'inspector.numberMinimum', params: { min } };
+  return { ok: false, incomplete, key: 'disabled.invalidValue' };
+}
+
+/**
+ * Whether the document value `value` shows the number in `draft`, after the rounding of the
+ * displayed value. A field that wrote `0.125` keeps that draft while the value shows `0.13`.
+ * @internal
+ */
+export function sameFormatNumber(draft: string, value: string | null): boolean {
+  if (value === null) return false;
+  const a = Number(draft.trim().replace(',', '.'));
+  const b = Number(value);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return draft === value;
+  const decimals = value.split('.')[1]?.length ?? 0;
+  return Math.abs(a - b) <= 0.5 * 10 ** -decimals + 1e-9;
 }

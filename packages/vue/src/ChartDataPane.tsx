@@ -4,7 +4,7 @@
 // type, elements, and colors, then its data. A field applies when the user presses Enter or
 // leaves it, and a check box, list, or color when it changes, each as one undo step.
 
-import { defineComponent, ref, useId, watch, type PropType } from 'vue';
+import { defineComponent, ref, useId, type PropType } from 'vue';
 import {
   CHART_LEGEND_CHOICES,
   CHART_TYPE_CHOICES,
@@ -23,6 +23,7 @@ import {
   colorPickOf,
   nextChartCategoryLabel,
   renderedColorOf,
+  sameFormatNumber,
   type ChartData,
   type ChartFormatChange,
   type ChartLegendPosition,
@@ -30,16 +31,19 @@ import {
   type ChartType,
   type ColorPick,
   type EditorCommand,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton } from './chrome.tsx';
 import { ColorField } from './dialog-color.tsx';
 import { SelectField } from './dialog-form.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import { useLiveField } from './live-field.ts';
 
 /**
- * A text field that applies on Enter or blur and shows the chart's value otherwise. Text that
- * the tab or the editor refuses stays in the field with its reason; Escape restores the value.
+ * A text field that applies each keystroke at once and shows the chart's value otherwise. Enter
+ * or blur ends the edit, and Escape restores the start value. Text that the tab or the editor
+ * refuses stays in the field; Enter or blur shows its reason.
  */
 const ChartField = defineComponent({
   name: 'PptxChartDataField',
@@ -50,54 +54,64 @@ const ChartField = defineComponent({
     value: { type: String, required: true },
     numeric: { type: Boolean, default: false },
     disabled: { type: Boolean, required: true },
-    onCommit: { type: Function as PropType<(text: string) => string | null>, required: true },
+    onCommit: {
+      type: Function as PropType<(text: string, options: EditorExecOptions) => string | null>,
+      required: true,
+    },
   },
   setup(props) {
     const errorId = useId();
-    const draft = ref<string | null>(null);
-    const error = ref<string | null>(null);
-    const reset = (): void => {
-      draft.value = null;
-      error.value = null;
-    };
-    watch(() => props.draftKey, reset, { flush: 'sync' });
-    const commit = (): void => {
-      const d = draft.value;
-      if (d === null) return;
-      if (d === props.value) return reset();
-      const refused = props.onCommit(d);
-      if (refused === null) reset();
-      else error.value = refused;
-    };
-    return () => (
-      <label class="pptx-field pptx-chart-pane__field">
-        {props.visibleLabel ? (
-          <span class="pptx-chart-pane__label">{props.visibleLabel}</span>
-        ) : null}
-        <input
-          aria-label={props.label}
-          inputmode={props.numeric ? 'decimal' : undefined}
-          aria-invalid={error.value !== null}
-          aria-describedby={error.value !== null ? errorId : undefined}
-          value={draft.value ?? props.value}
-          disabled={props.disabled}
-          data-draft={draft.value !== null}
-          onInput={(e: Event) => {
-            draft.value = (e.target as HTMLInputElement).value;
-          }}
-          onBlur={commit}
-          onKeydown={(e: KeyboardEvent) => {
-            if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') reset();
-          }}
-        />
-        {error.value !== null ? (
-          <span id={errorId} class="pptx-chart-pane__error" role="alert">
-            {error.value}
-          </span>
-        ) : null}
-      </label>
+    const editor = usePptxEditor();
+    const field = useLiveField(
+      () => ({
+        editor: editor.value,
+        value: () => props.value,
+        ...(props.numeric ? { same: sameFormatNumber } : {}),
+        write: (text, options, final) => {
+          const refused = props.onCommit(text, options);
+          return refused === null || final ? refused : undefined;
+        },
+      }),
+      () => `${props.draftKey}\u0000${props.value}`
     );
+    return () => {
+      const error = field.error;
+      return (
+        <label class="pptx-field pptx-chart-pane__field">
+          {props.visibleLabel ? (
+            <span class="pptx-chart-pane__label">{props.visibleLabel}</span>
+          ) : null}
+          <input
+            aria-label={props.label}
+            inputmode={props.numeric ? 'decimal' : undefined}
+            aria-invalid={error !== null}
+            aria-describedby={error !== null ? errorId : undefined}
+            value={field.draft ?? props.value}
+            disabled={props.disabled}
+            data-draft={field.draft !== null}
+            onInput={(e: Event) =>
+              field.input(
+                (e.target as HTMLInputElement).value,
+                (e as InputEvent).isComposing === true
+              )
+            }
+            onCompositionend={(e: CompositionEvent) =>
+              field.input((e.target as HTMLInputElement).value)
+            }
+            onBlur={() => field.commit()}
+            onKeydown={(e: KeyboardEvent) => {
+              if (e.key === 'Enter') field.commit();
+              if (e.key === 'Escape') field.cancel();
+            }}
+          />
+          {error !== null ? (
+            <span id={errorId} class="pptx-chart-pane__error" role="alert">
+              {error}
+            </span>
+          ) : null}
+        </label>
+      );
+    };
   },
 });
 
@@ -112,7 +126,9 @@ const SeriesCard = defineComponent({
     disabled: { type: Boolean, required: true },
     onToggle: { type: Function as PropType<(open: boolean) => void>, required: true },
     apply: {
-      type: Function as PropType<(change: ChartPaneChange) => string | null>,
+      type: Function as PropType<
+        (change: ChartPaneChange, options?: EditorExecOptions) => string | null
+      >,
       required: true,
     },
     run: { type: Function as PropType<(change: ChartPaneChange) => boolean>, required: true },
@@ -140,7 +156,9 @@ const SeriesCard = defineComponent({
               visibleLabel={t('chartData.name')}
               value={series.name}
               disabled={disabled}
-              onCommit={(text: string) => props.apply({ type: 'seriesName', series: index, text })}
+              onCommit={(text: string, options: EditorExecOptions) =>
+                props.apply({ type: 'seriesName', series: index, text }, options)
+              }
             />
             <div class="pptx-panel__grid">
               {data.categories.map((c, i) => (
@@ -152,8 +170,8 @@ const SeriesCard = defineComponent({
                   value={chartValueText(series.values[i])}
                   numeric
                   disabled={disabled}
-                  onCommit={(text: string) =>
-                    props.apply({ type: 'value', series: index, category: i, text })
+                  onCommit={(text: string, options: EditorExecOptions) =>
+                    props.apply({ type: 'value', series: index, category: i, text }, options)
                   }
                 />
               ))}
@@ -219,7 +237,9 @@ const ChartFormatSection = defineComponent({
     seriesCount: { type: Number, required: true },
     /** Runs a command: null when it ran (or there was none), else the reason. */
     run: {
-      type: Function as PropType<(command: EditorCommand | null) => string | null>,
+      type: Function as PropType<
+        (command: EditorCommand | null, options?: EditorExecOptions) => string | null
+      >,
       required: true,
     },
   },
@@ -288,7 +308,9 @@ const ChartFormatSection = defineComponent({
                   visibleLabel={t('chartFormat.titleText')}
                   value={format.title}
                   disabled={disabled}
-                  onCommit={(text: string) => run(chartTitleCommand(format, 'title', text))}
+                  onCommit={(text: string, options: EditorExecOptions) =>
+                    run(chartTitleCommand(format, 'title', text), options)
+                  }
                 />
               </div>
             ) : null}
@@ -329,8 +351,8 @@ const ChartFormatSection = defineComponent({
                     visibleLabel={t(axisLabels.category)}
                     value={format.axisTitles?.category ?? ''}
                     disabled={disabled || !format.axes}
-                    onCommit={(text: string) =>
-                      run(chartTitleCommand(format, 'categoryAxisTitle', text))
+                    onCommit={(text: string, options: EditorExecOptions) =>
+                      run(chartTitleCommand(format, 'categoryAxisTitle', text), options)
                     }
                   />
                   <ChartField
@@ -339,8 +361,8 @@ const ChartFormatSection = defineComponent({
                     visibleLabel={t(axisLabels.value)}
                     value={format.axisTitles?.value ?? ''}
                     disabled={disabled || !format.axes}
-                    onCommit={(text: string) =>
-                      run(chartTitleCommand(format, 'valueAxisTitle', text))
+                    onCommit={(text: string, options: EditorExecOptions) =>
+                      run(chartTitleCommand(format, 'valueAxisTitle', text), options)
                     }
                   />
                 </div>
@@ -423,20 +445,23 @@ export const ChartDataPane = defineComponent({
       const draftKey = String(draftScope.reset);
       const disabled = readOnly.value || !selected.editable;
       /** Applies one change: null when it applied, else the reason. */
-      const apply = (change: ChartPaneChange): string | null => {
+      const apply = (change: ChartPaneChange, options?: EditorExecOptions): string | null => {
         const command = chartPaneCommand(data, change);
         if (!command.ok) return t(command.error);
-        const result = editor.value?.exec(command.command);
+        const result = editor.value?.exec(command.command, options);
         refusal.value = null;
         return !result || result.ok ? null : t(result.reason as TranslationKey);
       };
       /** Runs a command of the type, elements, or colors; the tab announces a refusal. */
-      const runFormat = (command: EditorCommand | null): string | null => {
+      const runFormat = (
+        command: EditorCommand | null,
+        options?: EditorExecOptions
+      ): string | null => {
         if (!command) {
           refusal.value = null;
           return null;
         }
-        const result = editor.value?.exec(command);
+        const result = editor.value?.exec(command, options);
         const reason = !result || result.ok ? null : t(result.reason as TranslationKey);
         refusal.value = reason;
         return reason;
@@ -483,7 +508,9 @@ export const ChartDataPane = defineComponent({
                     value={c.label}
                     numeric={xy}
                     disabled={disabled}
-                    onCommit={(text: string) => apply({ type: 'label', category: i, text })}
+                    onCommit={(text: string, options: EditorExecOptions) =>
+                      apply({ type: 'label', category: i, text }, options)
+                    }
                   />
                   <ToolButton
                     label={t(xy ? 'chartData.removeXValueNamed' : 'chartData.removeCategoryNamed', {

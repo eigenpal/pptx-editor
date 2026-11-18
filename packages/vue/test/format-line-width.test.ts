@@ -127,6 +127,18 @@ for (const adapter of ['react', 'vue'] as const)
       await update(() => fireEvent.keyDown(input(), { key: 'Enter' }));
       expect(source()).toBe(before);
     });
+    test('the preset weights menu beside the field sets a preset width', async () => {
+      await mount();
+      const trigger = host.querySelector<HTMLButtonElement>('[data-slot="shape.lineWidth"]')!;
+      expect(trigger.getAttribute('aria-label')).toBe('Border weight');
+      await update(() => fireEvent.click(trigger));
+      const preset = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find(
+        (item) => item.textContent?.trim() === '3 pt'
+      )!;
+      await update(() => fireEvent.click(preset));
+      expect(source()).toContain('w="38100"');
+      expect(input().value).toBe('3');
+    });
     test('different exact widths stay mixed even when they round to the same display', async () => {
       await mount(true);
       const before = source();

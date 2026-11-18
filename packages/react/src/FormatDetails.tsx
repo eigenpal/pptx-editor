@@ -8,6 +8,7 @@ import {
   formatPropertyGroups,
   formatTargetKey,
   translateKeyOrText,
+  type EditorExecOptions,
   type ShapeFormatPatch,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useTranslation, useOfferedControl } from './context.ts';
@@ -55,10 +56,10 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
       (stop) => selectedStop !== null && identity(stop.id) === selectedStop
     ) ?? detail.gradient?.stops[0];
   const key = `${editor?.session?.id}:${formatTargetKey(snapshot)}`;
-  const apply = (patch: ShapeFormatPatch): string | null => {
+  const apply = (patch: ShapeFormatPatch, options?: EditorExecOptions): string | null => {
     if (!editor || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== key)
       return t('disabled.invalidValue');
-    const result = editor.exec({ type: 'patchShapeFormat', target: detail.target, patch });
+    const result = editor.exec({ type: 'patchShapeFormat', target: detail.target, patch }, options);
     if (result.ok && patch.kind === 'gradient') {
       const next = editor.shapeFormat();
       if (next.ok && next.format.gradient && detail.gradient) {
@@ -123,7 +124,7 @@ export function FormatDetails({ section }: { section: 'fill' | 'effects' }) {
                   max={field.max}
                   label={t(field.labelKey)}
                   disabled={disabled || unavailable(group.id)}
-                  onCommit={(value) => apply(field.patch(value))}
+                  onCommit={(value, options) => apply(field.patch(value), options)}
                 />
               ))}
             </div>

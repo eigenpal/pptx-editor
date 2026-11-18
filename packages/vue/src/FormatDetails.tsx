@@ -9,6 +9,7 @@ import {
   formatTargetKey,
   translateKeyOrText,
   type ShapeFormatPatch,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useTranslation, useOfferedControl } from './composables.ts';
 import { FormatGradientPicker } from './FormatGradientPicker.tsx';
@@ -51,17 +52,16 @@ export const FormatDetails = defineComponent({
           (stop) => selectedStop.value !== null && identity(stop.id) === selectedStop.value
         ) ?? detail.gradient?.stops[0];
       const key = `${editor.value?.session?.id}:${formatTargetKey(snapshot.value)}`;
-      const apply = (patch: ShapeFormatPatch): string | null => {
+      const apply = (patch: ShapeFormatPatch, options?: EditorExecOptions): string | null => {
         if (
           !editor.value ||
           `${editor.value.session?.id}:${formatTargetKey(editor.value.snapshot())}` !== key
         )
           return t('disabled.invalidValue');
-        const result = editor.value.exec({
-          type: 'patchShapeFormat',
-          target: detail.target,
-          patch,
-        });
+        const result = editor.value.exec(
+          { type: 'patchShapeFormat', target: detail.target, patch },
+          options
+        );
         if (result.ok && patch.kind === 'gradient') {
           const next = editor.value.shapeFormat();
           if (next.ok && next.format.gradient && detail.gradient) {
@@ -133,7 +133,9 @@ export const FormatDetails = defineComponent({
                       max={field.max}
                       label={t(field.labelKey)}
                       disabled={disabled || unavailable(group.id)}
-                      onCommit={(value) => apply(field.patch(value))}
+                      onCommit={(value: number, options: EditorExecOptions) =>
+                        apply(field.patch(value), options)
+                      }
                     />
                   ))}
                 </div>

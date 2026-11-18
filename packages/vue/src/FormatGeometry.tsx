@@ -10,6 +10,7 @@ import {
   formatTargetKey,
   translateKeyOrText,
   type EditorCommand,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { useEditorDialog } from './popups.ts';
@@ -70,17 +71,18 @@ export const FormatGeometry = defineComponent({
       const target = editor.value
         ? `${editor.value.session?.id}:${formatTargetKey(editor.value.snapshot())}`
         : '';
-      const run = (command: EditorCommand): string | null => {
+      const run = (command: EditorCommand, options?: EditorExecOptions): string | null => {
         if (
           !editor.value ||
           `${editor.value.session?.id}:${formatTargetKey(editor.value.snapshot())}` !== target
         )
           return t('disabled.invalidValue');
-        const result = editor.value.exec(command);
+        const result = editor.value.exec(command, options);
         return result.ok ? null : translateKeyOrText(t, result.reason);
       };
       const move = (
-        patch: Partial<Record<'x' | 'y' | 'cx' | 'cy' | 'rot', number>>
+        patch: Partial<Record<'x' | 'y' | 'cx' | 'cy' | 'rot', number>>,
+        options?: EditorExecOptions
       ): string | null => {
         if (
           !editor.value ||
@@ -89,15 +91,18 @@ export const FormatGeometry = defineComponent({
           return t('disabled.invalidValue');
         const current = editor.value.snapshot().geometry;
         if (!current || current.nodeId !== g.nodeId) return t('disabled.invalidValue');
-        return run({
-          type: 'setTransform',
-          nodeId: g.nodeId,
-          x: patch.x ?? current.x,
-          y: patch.y ?? current.y,
-          cx: patch.cx ?? current.cx,
-          cy: patch.cy ?? current.cy,
-          rot: patch.rot ?? current.rot,
-        });
+        return run(
+          {
+            type: 'setTransform',
+            nodeId: g.nodeId,
+            x: patch.x ?? current.x,
+            y: patch.y ?? current.y,
+            cx: patch.cx ?? current.cx,
+            cy: patch.cy ?? current.cy,
+            rot: patch.rot ?? current.rot,
+          },
+          options
+        );
       };
       const inch = (v: number): number => Math.round(v * EMU_PER_INCH);
       const unit = t('panel.format.inchUnit');
@@ -115,7 +120,9 @@ export const FormatGeometry = defineComponent({
                 value={inches(tb.rowHeight)}
                 unit={unit}
                 disabled={readOnly.value}
-                onCommit={(v: number) => run({ type: 'setRowHeight', height: inch(v) })}
+                onCommit={(v: number, options: EditorExecOptions) =>
+                  run({ type: 'setRowHeight', height: inch(v) }, options)
+                }
               />
               <FormatNumberField
                 label={t('panel.format.columnWidth')}
@@ -124,7 +131,9 @@ export const FormatGeometry = defineComponent({
                 value={inches(tb.columnWidth)}
                 unit={unit}
                 disabled={readOnly.value}
-                onCommit={(v: number) => run({ type: 'setColumnWidth', width: inch(v) })}
+                onCommit={(v: number, options: EditorExecOptions) =>
+                  run({ type: 'setColumnWidth', width: inch(v) }, options)
+                }
               />
             </div>
             <div class="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
@@ -152,9 +161,10 @@ export const FormatGeometry = defineComponent({
           unit={unit}
           disabled={readOnly.value}
           // A locked aspect ratio sizes both sides from one.
-          onCommit={(v: number) =>
+          onCommit={(v: number, options: EditorExecOptions) =>
             move(
-              key === 'cx' || key === 'cy' ? formatPanelSize(g, key, inch(v)) : { [key]: inch(v) }
+              key === 'cx' || key === 'cy' ? formatPanelSize(g, key, inch(v)) : { [key]: inch(v) },
+              options
             )
           }
         />
@@ -206,7 +216,7 @@ export const FormatGeometry = defineComponent({
                 value={String(Math.round(g.rot * 10) / 10)}
                 unit="°"
                 disabled={readOnly.value}
-                onCommit={(v: number) => move({ rot: v })}
+                onCommit={(v: number, options: EditorExecOptions) => move({ rot: v }, options)}
               />
             </div>
           </div>

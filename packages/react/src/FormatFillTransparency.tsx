@@ -1,84 +1,68 @@
 /** @jsxImportSource react */
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   formatFillTransparency,
   formatTargetKey,
   translateKeyOrText,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { FormatNumberField } from './FormatNumberField.tsx';
+import { useHistoryGroup } from './headless-hooks.tsx';
 
 /**
- * The Transparency of one shape's solid fill: a slider and a percent field. The slider shows its
- * value while it moves and writes once on release, so one drag is one undo step. @internal
+ * The Transparency of one shape's solid fill: a slider and a percent field. The slider writes
+ * while it moves, so the slide shows the value at once, and one drag is one undo step. @internal
  */
 export function FormatFillTransparency() {
   const editor = usePptxEditor();
   const snapshot = useEditorState((s) => s);
   const { t } = useTranslation();
-  const [preview, setPreview] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const group = useHistoryGroup({ kind: 'range' });
   const field = formatFillTransparency(editor);
   const key = `${editor?.session?.id}:${formatTargetKey(snapshot)}`;
-  const commit = (percent: number): string | null => {
+  const commit = (percent: number, options?: EditorExecOptions): string | null => {
     if (!editor || !field || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== key)
       return t('disabled.invalidValue');
     if (percent === field.value) return null;
-    const result = editor.exec({
-      type: 'patchShapeFormat',
-      target: field.target,
-      patch: field.patch(percent),
-    });
+    const result = editor.exec(
+      { type: 'patchShapeFormat', target: field.target, patch: field.patch(percent) },
+      options
+    );
     return result.ok ? null : translateKeyOrText(t, result.reason);
   };
-  const latest = useRef(commit);
-  latest.current = commit;
-  // React's `onChange` fires on every `input` event; the native `change` event marks the release.
-  const attached = useRef<(() => void) | null>(null);
-  const slider = useCallback((el: HTMLInputElement | null) => {
-    attached.current?.();
-    attached.current = null;
-    if (!el) return;
-    const release = () => {
-      setPreview(null);
-      setError(latest.current(Number(el.value)));
-    };
-    el.addEventListener('change', release);
-    attached.current = () => el.removeEventListener('change', release);
-  }, []);
   if (!field) return null;
   const label = t(field.labelKey);
-  const value = preview ?? field.value;
   const disabled = snapshot.mode === 'view';
   return (
     <div className="pptx-format-transparency" data-format-fill-transparency="">
       <input
-        ref={slider}
+        ref={group.ref}
         type="range"
         className="pptx-format-transparency__slider"
         data-format-slider={field.id}
         aria-label={label}
-        aria-valuetext={`${value}${field.unit}`}
+        aria-valuetext={`${field.value}${field.unit}`}
         min={field.min}
         max={field.max}
         step={1}
-        value={value}
+        value={field.value}
         disabled={disabled}
-        onChange={(e) => setPreview(Number(e.target.value))}
-        onBlur={() => setPreview(null)}
+        onChange={(e) => setError(commit(Number(e.target.value), group.options()))}
       />
       <FormatNumberField
         key={key}
         label={label}
         property={field.id}
-        value={String(value)}
+        value={String(field.value)}
         unit={field.unit}
         min={field.min}
         max={field.max}
         disabled={disabled}
-        onCommit={(percent) => {
+        onCommit={(percent, options) => {
           setError(null);
-          return commit(percent);
+          return commit(percent, options);
         }}
       />
       {error ? (

@@ -95,7 +95,7 @@ export const FormatSection = defineComponent({
                           {t(chromeControlForSlot(slot)!.labelKey)}
                         </span>
                       ) : null}
-                      {formatControlMixed(editor.value, slot) ? (
+                      {slot !== 'shape.lineWidth' && formatControlMixed(editor.value, slot) ? (
                         <span class="pptx-format-mixed">{t('inspector.mixed')}</span>
                       ) : null}
                       {slot === 'shape.lineWidth' ? (

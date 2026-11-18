@@ -219,7 +219,8 @@ describe('Chart Data tab', () => {
     expect(editor.snapshot().chart!.nodeId).not.toBe(original);
     const field = el.querySelector<HTMLInputElement>('input[aria-label="Plan, East"]')!;
     field.focus();
-    fireEvent.input(field, { target: { value: '77' } });
+    // Text that the tab refuses stays as a draft; a valid value would apply at once.
+    fireEvent.input(field, { target: { value: 'many' } });
     await flush();
     const before = data(editor);
     editor.exec({
@@ -234,7 +235,7 @@ describe('Chart Data tab', () => {
       },
     });
     await flush();
-    expect(field.value).toBe('77');
+    expect(field.value).toBe('many');
     expect(document.activeElement).toBe(field);
     // Restore the same grid before checking chart identity independently of its size.
     editor.exec({ type: 'undo' });
