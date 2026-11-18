@@ -261,7 +261,14 @@ test('embedding: a host CSS reset changes no chrome style', async ({ page }) => 
   for (const [name, open] of states) {
     await ready(page);
     // Font work ends first: faces that arrive late shape the slide text again with a new
-    // measurer, whose face names (`pptx-f2-*`) differ, between the two readings.
+    // measurer, whose face names (`pptx-f2-*`) differ, between the two readings. The other
+    // faces of the deck's families (`restSubstitutes`) do not count in `resolving`, so wait
+    // for them too.
+    await page.evaluate(async () => {
+      const ed = (window as unknown as Record<string, unknown>).__pptxEditor as
+        { session?: { restSubstitutes: Promise<boolean> | null } } | undefined;
+      await ed?.session?.restSubstitutes;
+    });
     await page.waitForFunction(
       () => {
         const ed = (window as unknown as Record<string, unknown>).__pptxEditor as
