@@ -22,6 +22,7 @@ import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import { PptxEditorReview, reviewModule } from '@pptx-editor.dev/pro/react';
 import {
   PptxEditor,
+  createDocumentRefresh,
   Icon,
   keepFocus,
   useEditorCommand,
@@ -492,8 +493,12 @@ export function App() {
       fonts={fonts}
       fontFamilies={CATALOG_FAMILIES}
       onReady={(instance) => {
-        // The e2e suite and the verification scripts drive the editor through this handle.
-        (window as unknown as { __pptxEditor?: unknown }).__pptxEditor = instance;
+        // The e2e suite and the verification scripts drive the editor through these handles.
+        // The refresh factory is the demo's own, so it works in a production build too.
+        Object.assign(window, {
+          __pptxEditor: instance,
+          __createDocumentRefresh: createDocumentRefresh,
+        });
         setEditor(instance);
       }}
     >

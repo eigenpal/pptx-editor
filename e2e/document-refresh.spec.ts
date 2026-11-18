@@ -37,6 +37,7 @@ declare global {
   interface Window {
     __pptxEditor: PptxEditorInstance;
     __refresh: DocumentRefresh;
+    __createDocumentRefresh(editor: PptxEditorInstance): DocumentRefresh;
     __flash: { t0: number; els: Element[]; log: { el: number; value: string | null; t: number }[] };
   }
 }
@@ -82,14 +83,10 @@ async function openDeck(page: Page, base: string, bytes: Uint8Array): Promise<vo
   }, Array.from(bytes));
   const n = await page.evaluate(() => window.__pptxEditor.snapshot().slides.length);
   await expect(page.locator('.pptx-rail [data-index]')).toHaveCount(n, { timeout: 30_000 });
-  // The engine module of the demo itself: the same URL, so the same instance.
-  await page.evaluate(async (root) => {
-    const url = `/@fs${root}/packages/core/src/editor/index.ts`;
-    const core = (await import(/* @vite-ignore */ url)) as {
-      createDocumentRefresh(e: PptxEditorInstance): DocumentRefresh;
-    };
-    window.__refresh = core.createDocumentRefresh(window.__pptxEditor);
-  }, ROOT);
+  // The demo's own factory (`onReady` in the demo), so the same engine instance.
+  await page.evaluate(() => {
+    window.__refresh = window.__createDocumentRefresh(window.__pptxEditor);
+  });
   await scrollRail(page, 'bottom');
   await expect
     .poll(
@@ -421,9 +418,10 @@ const savedSlide = async (page: Page, part = 'slide1'): Promise<string> => {
 
 for (const adapter of [{ name: 'react' }, { name: 'vue' }] as const) {
   test.describe(`${adapter.name}: document refresh`, () => {
-    /** The demo's origin: the configured base URL for React, the Vue server for Vue. */
+    // The demo's production build (`e2e/playwright.config.ts`): these tests check long tasks,
+    // and React's development build makes a render several times longer.
     const base = (): string =>
-      adapter.name === 'vue' ? String(test.info().config.metadata.vueUrl) : '';
+      String(test.info().config.metadata[adapter.name === 'vue' ? 'vueBuildUrl' : 'reactBuildUrl']);
 
     for (const mode of ['reload', 'edit'] as const) {
       test(`${mode}: no loading screen, no empty canvas or thumbnail, kept nodes, no long task`, async ({
