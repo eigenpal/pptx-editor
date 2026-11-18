@@ -1,5 +1,15 @@
 # @pptx-editor.dev/vue
 
+## 0.6.0
+
+### Minor Changes
+
+- 4d97642: Add the document refresh API, as in DOCX Editor: `createDocumentRefresh(editor)` shows updated `.pptx` files from your server without the loading screen and flashes what changed. Add the `replaceDocument` command, `getDocumentHandle()`, and `DocumentChange.source` on the `change` event. With `reviewModule()`, results get computed changes; `comparePresentations()` lists them on a server.
+
+### Patch Changes
+
+- Updated dependencies: @pptx-editor.dev/core@0.6.0, @pptx-editor.dev/i18n@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

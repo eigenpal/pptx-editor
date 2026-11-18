@@ -1,5 +1,12 @@
 # @pptx-editor.dev/pptx-to-pdf
 
+## 0.6.0
+
+### Patch Changes
+
+- 3f0ad32: Improve rendering fidelity. Underlines and superscripts sit on the whole-point baseline grid, equation arrays center their baselines on the math axis, and superscripts in equations rise 0.365 em. The PDF export slants synthetic italic text and draws tiled pictures without seams between the tiles.
+- Updated dependencies: @pptx-editor.dev/core@0.6.0, @pptx-editor.dev/pro@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
