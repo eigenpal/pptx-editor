@@ -21,12 +21,14 @@ export function FormatLineWidth() {
       exclusiveMin
       mixed={line.widthMixed}
       max={1584}
+      step={0.25}
+      inline
       disabled={snapshot.mode === 'view'}
-      onCommit={(points) => {
+      onCommit={(points, options) => {
         if (!editor || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== key)
           return t('disabled.invalidValue');
         if (points === line.width) return null;
-        const result = editor.exec({ type: 'setLineWidth', points });
+        const result = editor.exec({ type: 'setLineWidth', points }, options);
         return result.ok ? null : translateKeyOrText(t, result.reason);
       }}
     />

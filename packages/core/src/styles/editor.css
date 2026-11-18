@@ -5158,6 +5158,23 @@ legend.pptx-dialog__label {
   flex-shrink: 0;
   max-width: 65%;
 }
+/* A number row of a format section (Width): the label at the start and a compact field at the
+   end, as the other rows of the section show their controls. */
+.pptx-editor .pptx-field--inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+  min-width: 0;
+}
+.pptx-editor .pptx-field--inline > .pptx-field__label {
+  font-size: 12px;
+  color: var(--doc-text-muted);
+}
+.pptx-editor .pptx-field--inline > [role='alert'] {
+  grid-column: 1 / -1;
+}
 /* Fill Transparency: a slider beside the percent field, on the field's input row. */
 .pptx-editor .pptx-format-transparency {
   display: grid;

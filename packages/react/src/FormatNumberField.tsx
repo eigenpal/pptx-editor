@@ -1,6 +1,12 @@
 /** @jsxImportSource react */
-import { useId, useRef, useState } from 'react';
-import { useTranslation } from './context.ts';
+import { useId } from 'react';
+import {
+  parseFormatNumber,
+  sameFormatNumber,
+  type EditorExecOptions,
+} from '@pptx-editor.dev/core/editor';
+import { usePptxEditor, useTranslation } from './context.ts';
+import { useLiveField } from './live-field.ts';
 
 /** Shared inspector numeric lifecycle. Null displays Mixed without inventing a value. @internal */
 export interface FormatNumberFieldProps {
@@ -13,9 +19,20 @@ export interface FormatNumberFieldProps {
   readonly exclusiveMin?: boolean;
   readonly mixed?: boolean;
   readonly max?: number;
-  readonly onCommit: (value: number) => string | null;
+  /** The Arrow Up and Arrow Down increment. Shift multiplies it by 10. */
+  readonly step?: number;
+  /** Show the label beside the field, as the other rows of a format section do. */
+  readonly inline?: boolean;
+  /** Write one value. Pass `options` to `exec` so that one edit is one undo step. */
+  readonly onCommit: (value: number, options: EditorExecOptions) => string | null;
 }
-/** Enter or blur commits once; invalid values remain available for correction. @internal */
+
+/**
+ * Each valid keystroke writes at once, so the slide shows the value while the user types.
+ * Arrow Up and Arrow Down step the value. Enter or blur ends the edit, and Escape restores the
+ * start value. One edit is one undo step. Invalid values remain available for correction.
+ * @internal
+ */
 export function FormatNumberField({
   label,
   value,
@@ -26,77 +43,69 @@ export function FormatNumberField({
   exclusiveMin,
   mixed = true,
   max,
+  step = 1,
+  inline,
   onCommit,
 }: FormatNumberFieldProps) {
   const { t } = useTranslation();
+  const editor = usePptxEditor();
   const errorId = useId();
-  const [draft, setDraft] = useState<string | null>(null);
-  const pending = useRef<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState(value);
-  const reset = () => {
-    pending.current = null;
-    setDraft(null);
-    setError(null);
+  const field = useLiveField(
+    {
+      editor,
+      value: () => value,
+      same: sameFormatNumber,
+      write(text, options, final) {
+        const parsed = parseFormatNumber(text, { min, max, exclusiveMin });
+        if (!parsed.ok)
+          return final || !parsed.incomplete ? t(parsed.key, parsed.params) : undefined;
+        if (value !== null && parsed.value === Number(value)) return null;
+        return onCommit(parsed.value, options);
+      },
+    },
+    value
+  );
+  const nudge = (direction: 1 | -1, large: boolean) => {
+    const parsed = parseFormatNumber(field.draft ?? value ?? '', {});
+    if (!parsed.ok) return;
+    let next = Math.round((parsed.value + direction * step * (large ? 10 : 1)) * 1000) / 1000;
+    if (max !== undefined) next = Math.min(max, next);
+    if (min !== undefined) next = Math.max(min, next);
+    if (exclusiveMin && min !== undefined && next <= min) return;
+    field.input(String(next));
   };
-  if (source !== value) {
-    setSource(value);
-    reset();
-  }
-  const commit = () => {
-    if (pending.current === null) return;
-    const text = pending.current;
-    const number = text.trim() === '' ? NaN : Number(text.replace(',', '.'));
-    if (
-      !Number.isFinite(number) ||
-      (min !== undefined && (number < min || (exclusiveMin && number === min))) ||
-      (max !== undefined && number > max)
-    ) {
-      setError(
-        min !== undefined && max !== undefined
-          ? t(exclusiveMin ? 'inspector.numberRangeExclusive' : 'inspector.numberRange', {
-              min,
-              max,
-            })
-          : min !== undefined
-            ? t('inspector.numberMinimum', { min })
-            : t('disabled.invalidValue')
-      );
-      return;
-    }
-    if (value !== null && number === Number(value)) return reset();
-    const refused = onCommit(number);
-    if (refused) setError(refused);
-    else reset();
-  };
+  const error = field.error;
   return (
-    <label className="pptx-field">
-      {label}
+    <label className={inline ? 'pptx-field pptx-field--inline' : 'pptx-field'}>
+      {inline ? <span className="pptx-field__label">{label}</span> : label}
       <span className="pptx-field__control">
         <input
           inputMode="decimal"
           aria-label={label}
           data-format-property={property}
-          value={draft ?? value ?? ''}
+          value={field.draft ?? value ?? ''}
           placeholder={value === null && mixed ? t('inspector.mixed') : undefined}
           disabled={disabled}
           aria-invalid={!!error}
           aria-describedby={error ? errorId : undefined}
-          data-draft={draft !== null}
-          onChange={(e) => {
-            pending.current = e.target.value;
-            setDraft(e.target.value);
-          }}
-          onBlur={commit}
+          data-draft={field.draft !== null}
+          onChange={(e) =>
+            field.input(e.target.value, (e.nativeEvent as InputEvent).isComposing === true)
+          }
+          onCompositionEnd={(e) => field.input(e.currentTarget.value)}
+          onBlur={() => field.commit()}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === 'Enter') {
               e.preventDefault();
-              commit();
-            }
-            if (e.key === 'Escape') {
+              field.commit();
+            } else if (e.key === 'Escape') {
               e.preventDefault();
               e.stopPropagation();
-              reset();
+              field.cancel();
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              nudge(e.key === 'ArrowUp' ? 1 : -1, e.shiftKey);
             }
           }}
         />

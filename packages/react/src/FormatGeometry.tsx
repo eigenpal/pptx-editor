@@ -9,6 +9,7 @@ import {
   formatTargetKey,
   translateKeyOrText,
   type EditorCommand,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { useEditorDialog } from './popups.tsx';
@@ -62,26 +63,32 @@ export function FormatGeometry() {
     );
   const g = geometry;
   const target = editor ? `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` : '';
-  const run = (command: EditorCommand): string | null => {
+  const run = (command: EditorCommand, options?: EditorExecOptions): string | null => {
     if (!editor || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== target)
       return t('disabled.invalidValue');
-    const result = editor.exec(command);
+    const result = editor.exec(command, options);
     return result.ok ? null : translateKeyOrText(t, result.reason);
   };
-  const move = (patch: Partial<Record<'x' | 'y' | 'cx' | 'cy' | 'rot', number>>): string | null => {
+  const move = (
+    patch: Partial<Record<'x' | 'y' | 'cx' | 'cy' | 'rot', number>>,
+    options?: EditorExecOptions
+  ): string | null => {
     if (!editor || `${editor.session?.id}:${formatTargetKey(editor.snapshot())}` !== target)
       return t('disabled.invalidValue');
     const current = editor.snapshot().geometry;
     if (!current || current.nodeId !== g.nodeId) return t('disabled.invalidValue');
-    return run({
-      type: 'setTransform',
-      nodeId: g.nodeId,
-      x: patch.x ?? current.x,
-      y: patch.y ?? current.y,
-      cx: patch.cx ?? current.cx,
-      cy: patch.cy ?? current.cy,
-      rot: patch.rot ?? current.rot,
-    });
+    return run(
+      {
+        type: 'setTransform',
+        nodeId: g.nodeId,
+        x: patch.x ?? current.x,
+        y: patch.y ?? current.y,
+        cx: patch.cx ?? current.cx,
+        cy: patch.cy ?? current.cy,
+        rot: patch.rot ?? current.rot,
+      },
+      options
+    );
   };
   const inch = (v: number): number => Math.round(v * EMU_PER_INCH);
   const unit = t('panel.format.inchUnit');
@@ -94,8 +101,11 @@ export function FormatGeometry() {
       unit={unit}
       disabled={readOnly}
       // A locked aspect ratio sizes both sides from one.
-      onCommit={(v) =>
-        move(key === 'cx' || key === 'cy' ? formatPanelSize(g, key, inch(v)) : { [key]: inch(v) })
+      onCommit={(v, options) =>
+        move(
+          key === 'cx' || key === 'cy' ? formatPanelSize(g, key, inch(v)) : { [key]: inch(v) },
+          options
+        )
       }
     />
   );
@@ -142,7 +152,7 @@ export function FormatGeometry() {
               value={String(Math.round(g.rot * 10) / 10)}
               unit="°"
               disabled={readOnly}
-              onCommit={(v) => move({ rot: v })}
+              onCommit={(v, options) => move({ rot: v }, options)}
             />
           </div>
         </div>
@@ -158,7 +168,7 @@ export function FormatGeometry() {
               value={inches(table.rowHeight)}
               unit={unit}
               disabled={readOnly}
-              onCommit={(v) => run({ type: 'setRowHeight', height: inch(v) })}
+              onCommit={(v, options) => run({ type: 'setRowHeight', height: inch(v) }, options)}
             />
             <FormatNumberField
               label={t('panel.format.columnWidth')}
@@ -167,7 +177,7 @@ export function FormatGeometry() {
               value={inches(table.columnWidth)}
               unit={unit}
               disabled={readOnly}
-              onCommit={(v) => run({ type: 'setColumnWidth', width: inch(v) })}
+              onCommit={(v, options) => run({ type: 'setColumnWidth', width: inch(v) }, options)}
             />
           </div>
           <div className="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>

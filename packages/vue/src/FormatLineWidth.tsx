@@ -1,6 +1,11 @@
 /** @jsxImportSource vue */
 import { defineComponent } from 'vue';
-import { formatLineState, formatTargetKey, translateKeyOrText } from '@pptx-editor.dev/core/editor';
+import {
+  formatLineState,
+  formatTargetKey,
+  translateKeyOrText,
+  type EditorExecOptions,
+} from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { FormatNumberField } from './FormatNumberField.tsx';
 /** Exact width in points, including a mixed selection. @internal */
@@ -25,15 +30,17 @@ export const FormatLineWidth = defineComponent({
           exclusiveMin
           mixed={line.widthMixed}
           max={1584}
+          step={0.25}
+          inline
           disabled={snapshot.value.mode === 'view'}
-          onCommit={(points) => {
+          onCommit={(points: number, options: EditorExecOptions) => {
             if (
               !editor.value ||
               `${editor.value.session?.id}:${formatTargetKey(editor.value.snapshot())}` !== key
             )
               return t('disabled.invalidValue');
             if (points === line.width) return null;
-            const result = editor.value.exec({ type: 'setLineWidth', points });
+            const result = editor.value.exec({ type: 'setLineWidth', points }, options);
             return result.ok ? null : translateKeyOrText(t, result.reason);
           }}
         />

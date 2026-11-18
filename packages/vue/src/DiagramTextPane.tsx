@@ -4,15 +4,20 @@
 // it, as one undo step (`setDiagramText`).
 
 import { defineComponent, nextTick, ref, useId, type PropType } from 'vue';
-import type { DiagramNodeState, EditorCommand } from '@pptx-editor.dev/core/contracts';
+import type {
+  DiagramNodeState,
+  EditorCommand,
+  EditorExecOptions,
+} from '@pptx-editor.dev/core/contracts';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import { useLiveField } from './live-field.ts';
 
 /**
- * The text field of one node: it applies on Enter (Shift+Enter starts a paragraph) or blur and
- * shows the node's text otherwise. Text that the editor refuses stays with its reason; Escape
- * restores the text.
+ * The text field of one node: each keystroke applies at once, and Enter (Shift+Enter starts a
+ * paragraph) or blur ends the edit. Text that the editor refuses stays with its reason; Escape
+ * restores the start text.
  */
 const NodeField = defineComponent({
   name: 'PptxDiagramNodeField',
@@ -25,56 +30,64 @@ const NodeField = defineComponent({
     readOnly: { type: Boolean, required: true },
     /** The id of a note that describes the field, if any. */
     note: { type: String, default: undefined },
-    onCommit: { type: Function as PropType<(text: string) => string | null>, required: true },
+    onCommit: {
+      type: Function as PropType<(text: string, options: EditorExecOptions) => string | null>,
+      required: true,
+    },
   },
   setup(props) {
     const errorId = useId();
-    const draft = ref<string | null>(null);
-    const error = ref<string | null>(null);
-    const reset = (): void => {
-      draft.value = null;
-      error.value = null;
-    };
-    const commit = (): void => {
-      const d = draft.value;
-      if (d === null) return;
-      if (d === props.value) return reset();
-      const refused = props.onCommit(d);
-      if (refused === null) reset();
-      else error.value = refused;
-    };
+    const editor = usePptxEditor();
+    const field = useLiveField(
+      () => ({
+        editor: editor.value,
+        value: () => props.value,
+        write: (text, options, final) => {
+          const refused = props.onCommit(text, options);
+          return refused === null || final ? refused : undefined;
+        },
+      }),
+      () => props.value
+    );
     return () => {
-      const shown = draft.value ?? props.value;
+      const draft = field.draft;
+      const error = field.error;
+      const shown = draft ?? props.value;
       return (
         <label class="pptx-field pptx-diagram-pane__field">
           <textarea
             aria-label={props.label}
-            aria-invalid={error.value !== null}
+            aria-invalid={error !== null}
             aria-describedby={
-              [error.value !== null ? errorId : null, props.note].filter(Boolean).join(' ') ||
-              undefined
+              [error !== null ? errorId : null, props.note].filter(Boolean).join(' ') || undefined
             }
             rows={Math.min(6, shown.split('\n').length)}
             value={shown}
             readonly={props.readOnly}
             data-node={props.node}
-            data-draft={draft.value !== null}
-            onInput={(e: Event) => {
-              draft.value = (e.target as HTMLTextAreaElement).value;
-            }}
-            onBlur={commit}
+            data-draft={draft !== null}
+            onInput={(e: Event) =>
+              field.input(
+                (e.target as HTMLTextAreaElement).value,
+                (e as InputEvent).isComposing === true
+              )
+            }
+            onCompositionend={(e: CompositionEvent) =>
+              field.input((e.target as HTMLTextAreaElement).value)
+            }
+            onBlur={() => field.commit()}
             onKeydown={(e: KeyboardEvent) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
                 e.stopPropagation();
-                commit();
+                field.commit();
               }
-              if (e.key === 'Escape') reset();
+              if (e.key === 'Escape') field.cancel();
             }}
           />
-          {error.value !== null ? (
+          {error !== null ? (
             <span id={errorId} class="pptx-chart-pane__error" role="alert">
-              {error.value}
+              {error}
             </span>
           ) : null}
         </label>
@@ -117,8 +130,8 @@ export const DiagramTextPane = defineComponent({
         );
       const frame = selected.nodeId;
       /** Runs one command: null when it applied, else the reason. */
-      const apply = (command: EditorCommand): string | null => {
-        const result = editor.value?.exec(command);
+      const apply = (command: EditorCommand, options?: EditorExecOptions): string | null => {
+        const result = editor.value?.exec(command, options);
         return !result || result.ok ? null : t(result.reason as TranslationKey);
       };
       /**
@@ -180,8 +193,11 @@ export const DiagramTextPane = defineComponent({
                     node={node.node}
                     readOnly={readOnly.value || !node.editable}
                     note={node.editable ? undefined : `${noteId}-${i}`}
-                    onCommit={(text: string) =>
-                      apply({ type: 'setDiagramText', nodeId: frame, node: node.node, text })
+                    onCommit={(text: string, options: EditorExecOptions) =>
+                      apply(
+                        { type: 'setDiagramText', nodeId: frame, node: node.node, text },
+                        options
+                      )
                     }
                   />
                   <div class="pptx-diagram-pane__actions">

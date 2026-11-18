@@ -83,7 +83,7 @@ export function FormatSection({ section }: FormatSectionProps) {
                       {t(chromeControlForSlot(slot)!.labelKey)}
                     </span>
                   ) : null}
-                  {formatControlMixed(editor, slot) ? (
+                  {slot !== 'shape.lineWidth' && formatControlMixed(editor, slot) ? (
                     <span className="pptx-format-mixed">{t('inspector.mixed')}</span>
                   ) : null}
                   {slot === 'shape.lineWidth' ? <FormatLineWidth /> : <ToolbarSlot slotId={slot} />}

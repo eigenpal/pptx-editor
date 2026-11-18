@@ -110,6 +110,9 @@ test('inspector: a selection change discards a draft before another object recei
   const initial = await slideXml(page, 7);
   const angle = page.locator('input[data-format-property="gradient.angle"]');
   await angle.fill('175');
+  // The typed value applies to the selected shape at once.
+  const typed = await slideXml(page, 7);
+  expect(typed).not.toBe(initial);
   // A programmatic selection change represents a host or collaborator changing the target.
   await page.evaluate(() => {
     const editor = (window as unknown as { __pptxEditor: PptxEditorInstance }).__pptxEditor;
@@ -118,7 +121,7 @@ test('inspector: a selection change discards a draft before another object recei
   });
   await expect(angle).toHaveValue('0');
   await angle.press('Enter');
-  expect(await slideXml(page, 7)).toBe(initial);
+  expect(await slideXml(page, 7)).toBe(typed);
 });
 
 test('inspector: chart, diagram, and equation selections expose their specialized controls', async ({

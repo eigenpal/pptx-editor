@@ -387,13 +387,19 @@ The default inspector SHALL put the selection's primary controls before secondar
 
 ### Requirement: Inspector field recovery
 
-Numeric fields SHALL show units and retain invalid drafts with an accessible reason. Enter or blur SHALL commit a valid draft once. Escape SHALL restore the source value. Selection changes SHALL discard stale drafts. Updates SHALL NOT steal field focus.
+Numeric fields SHALL show units and retain invalid drafts with an accessible reason. Side-panel fields SHALL write each valid entry while the user types, and all writes of one edit SHALL be one undo step. Enter or blur SHALL end the edit. Escape SHALL restore the value from the start of the edit. A field SHALL NOT write during an IME composition. Selection changes and changes from another source SHALL discard stale drafts. Updates SHALL NOT steal field focus.
 
 #### Scenario: Correct an invalid geometry value
 
 - **WHEN** a user submits an invalid geometry value
 - **THEN** the field keeps the draft and identifies the error
 - **AND** Escape restores the document value without a document edit
+
+#### Scenario: See a typed value at once
+
+- **WHEN** a user types a valid value in a side-panel field
+- **THEN** the slide shows the value before the field loses focus
+- **AND** one undo step reverts all writes of that edit
 
 #### Scenario: Select a gradient stop without dragging
 

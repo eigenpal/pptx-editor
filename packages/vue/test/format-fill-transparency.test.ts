@@ -139,14 +139,22 @@ for (const adapter of ['react', 'vue'] as const)
       expect(number()?.value).toBe('50');
     });
 
-    test('writes a slider drag once, on release', async () => {
+    test('writes while the slider moves, and one drag is one undo step', async () => {
       await mount('Half');
+      await update(() => {
+        fireEvent.pointerDown(slider()!, { button: 0, pointerId: 1 });
+      });
       await slide('40', false);
+      expect(opacity()).toBe(0.6);
       await slide('20', false);
-      expect(opacity()).toBe(0.5);
+      expect(opacity()).toBe(0.8);
       expect(number()?.value).toBe('20');
       expect(slider()?.getAttribute('aria-valuetext')).toBe('20%');
       await slide('20', true);
+      await update(() => {
+        fireEvent.pointerUp(document, { button: 0, pointerId: 1 });
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(opacity()).toBe(0.8);
       await update(() => {
         editor.exec({ type: 'undo' });
