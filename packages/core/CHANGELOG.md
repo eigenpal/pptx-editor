@@ -1,5 +1,13 @@
 # @pptx-editor.dev/core
 
+## 0.7.0
+
+### Patch Changes
+
+- 95106bb: Side-panel fields apply each valid entry while you type, as one undo step per edit, and Escape restores the start value. The Transparency slider writes while it moves. The outline **Width** row has an exact field and a preset weights menu.
+- 194c9fe: A click in a text placeholder that has no `p:txBody` places the caret, and the placeholder shows its prompt. The first edit that adds text adds the text body, which inherits the body properties of the layout and master placeholders. A click, a read, or a delete key leaves the file unchanged. In a collaboration room, two peers that type into such a placeholder at once both keep their text.
+- Updated dependencies: @pptx-editor.dev/i18n@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes

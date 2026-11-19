@@ -1,5 +1,16 @@
 # @pptx-editor.dev/vue
 
+## 0.7.0
+
+### Minor Changes
+
+- 613fe5c: Breaking: `useEditorCommand` and `useEditorValueCommand` return `disabledReason` as readable text in the root locale, not a catalog key. The text follows the `locale` prop, and the engine's own text stays unchanged. Remove `translateKeyOrText` around the reason, and do not compare it with a key.
+
+### Patch Changes
+
+- 95106bb: Side-panel fields apply each valid entry while you type, as one undo step per edit, and Escape restores the start value. The Transparency slider writes while it moves. The outline **Width** row has an exact field and a preset weights menu.
+- Updated dependencies: @pptx-editor.dev/core@0.7.0, @pptx-editor.dev/i18n@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
