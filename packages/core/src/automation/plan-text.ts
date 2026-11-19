@@ -25,7 +25,7 @@ import {
   removeUnusedHyperlink,
   xmlAttr,
 } from './commands/package-edits.ts';
-import { specFromXml } from './commands/shape-commands.ts';
+import { addTextBody, specFromXml } from './commands/shape-commands.ts';
 import {
   aSpec,
   deleteRange,
@@ -133,32 +133,12 @@ function textTarget(
   if (cell !== undefined) return cellTarget(ctx, at, cell, read);
   let txBody = child(at.el, 'p:txBody');
   if (!txBody && create && at.el.kind === 'sp') {
-    const id = edit(() => addTextBody(ctx.batch, at));
+    const id = edit(() => addTextBody(ctx.batch, at.part, at.el));
     txBody = ctx.batch.element(at.part, id);
   }
   if (!txBody)
     throw new AutomationFailure('unsupported-content', 'that shape has no text frame', 'no-text');
   return { at, txBody, slideNumber: slideNumberOf(ctx.batch, at.part) };
-}
-
-/**
- * The text body a `p:sp` without one gets: the body a read describes and a write adds. Plain
- * body properties, so the body, list styles, and run properties come from the cascade
- * (placeholder, layout, master, `p:style`) as for any other body.
- */
-const NEW_TEXT_BODY = '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>';
-
-/** Add {@link NEW_TEXT_BODY} to a `p:sp`; the id of the new `p:txBody`. */
-function addTextBody(batch: TextPlanContext['batch'], at: ShapeLocation): string {
-  // CT_Shape (ECMA-376 Part 1, 19.3.1.43): nvSpPr, spPr, style, txBody, extLst.
-  const ext = at.el.children.findIndex((c) => c.type === 'element' && c.local === 'extLst');
-  return batch.insert({
-    op: 'insertNode',
-    part: at.part,
-    parent: at.el.id,
-    index: ext < 0 ? at.el.children.length : ext,
-    spec: specFromXml(NEW_TEXT_BODY),
-  });
 }
 
 /**
@@ -179,7 +159,7 @@ function readTarget(
   if (cell === undefined && !child(at.el, 'p:txBody')) {
     if (at.el.kind === 'sp') {
       const batch = new OpBatch(ctx.batch.pkg, { reservedPartNames: ctx.batch.reservedPartNames });
-      const id = addTextBody(batch, at);
+      const id = addTextBody(batch, at.part, at.el);
       const virtual: TextPlanContext = { ...ctx, batch };
       return {
         t: {

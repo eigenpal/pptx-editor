@@ -264,6 +264,10 @@ const MERGED_KINDS = new Set([
   'defRPr',
   'endParaRPr',
   'bodyPr',
+  // A shape's text body (19.3.1.51 txBody). Two peers that type into a placeholder with no body
+  // each add one: the copies merge, so both authors' paragraphs show. A cell's body never
+  // groups (`cellBody`).
+  'txBody',
   'tblPr',
   'tcPr',
   // CT_LineProperties: an outline and the cell borders. Its width, cap, and compound type are

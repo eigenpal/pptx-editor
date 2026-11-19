@@ -21,6 +21,7 @@ import {
   slideRefAt,
 } from '../store/index.ts';
 import { layoutPlaceholderOf, resolveSlide } from '../cascade/index.ts';
+import { textPlaceholderWithoutBody } from '../cascade/placeholders.ts';
 import {
   layoutSlide,
   type LayoutItem,
@@ -34,6 +35,7 @@ import { insertText, paragraphsOf, splitParagraph } from '../automation/commands
 import { addSlide, FOOTER_PLACEHOLDERS } from '../automation/commands/slide-commands.ts';
 import { deckLayouts } from '../automation/commands/slide-layouts.ts';
 import { emptyText } from '../automation/commands/placeholder-fill.ts';
+import { addTextBody } from '../automation/commands/shape-commands.ts';
 import { warnUnknownLayout } from './dev-warnings.ts';
 
 /** The prompt key of each placeholder type (§19.7.10 `ST_PlaceholderType`). */
@@ -179,13 +181,17 @@ export function withPrompts(
   try {
     for (const el of elements(shapeTreeOf(pkg, part))) {
       const ph = path(el, 'p:nvSpPr', 'p:nvPr', 'p:ph');
-      const txBody = child(el, 'p:txBody');
+      const own = child(el, 'p:txBody');
+      const bodyless = !own && textPlaceholderWithoutBody(el);
       const type = attr(ph, 'type') ?? 'obj';
-      if (el.kind !== 'sp' || !ph || !txBody || el.id === editing) continue;
-      if (FOOTER_PLACEHOLDERS.has(type) || !emptyText(txBody)) continue;
+      if (el.kind !== 'sp' || !ph || (!own && !bodyless) || el.id === editing) continue;
+      if (FOOTER_PLACEHOLDERS.has(type) || (own && !emptyText(own))) continue;
       if (boolAttr(path(el, 'p:nvSpPr', 'p:cNvPr'), 'hidden')) continue;
       const lines = promptOf(layoutPlaceholderOf(pkg, index, el), type, t);
-      if (!lines.length || !paragraphsOf(txBody).length) continue;
+      if (!lines.length) continue;
+      // A text placeholder without a body shows its prompt in the body a first edit adds.
+      const txBody = own ?? batch.element(part, addTextBody(batch, part, el));
+      if (!paragraphsOf(txBody).length) continue;
       let at = { paragraph: 0, offset: 0 };
       lines.forEach((line, i) => {
         if (i > 0) at = splitParagraph(batch, part, txBody.id, at);

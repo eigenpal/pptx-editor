@@ -13,7 +13,7 @@ import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
 import { caretParagraph, replacementRange, type ContextEdit } from './replacement-text.ts';
-import { selectionBody, textItemOf } from './table-cells.ts';
+import { editBody, textItemOf } from './table-cells.ts';
 import { editText } from './text-input.ts';
 
 type TextSelection = Extract<EditorSelection, { kind: 'text' }>;
@@ -98,7 +98,7 @@ export function compositionView(
   try {
     const batch = session.probeBatch(text ? host.armed() : undefined);
     const over: TextSelection = { ...sel, anchor: from, focus: to };
-    const txBody = selectionBody(batch, part, over);
+    const txBody = editBody(batch, part, over);
     if (!txBody) return undefined;
     editText(batch, part, txBody.id, item, over, text ? 'text' : 'deleteBackward', text);
     refit(batch, layout.slide.index, part, sel.nodeId, session.measurer);

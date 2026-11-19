@@ -66,7 +66,7 @@ import { comparePoints } from '../automation/commands/text-model.ts';
 import { CaretArm, armedCaretOf, caretSelection } from './caret-arm.ts';
 import { fontFamilyOf } from '../automation/commands/font-format.ts';
 import { createHostFonts, openOptionsOf } from './host-fonts.ts';
-import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
+import { editBody, selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
 import { packageForSave } from '../automation/commands/save-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
 import { firstCellCaret } from './table-keys.ts';
@@ -514,8 +514,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     let at: TextPoint;
     let list = false;
     try {
-      const txBody = sel.diagramNode === undefined ? selectionBody(batch, part, sel) : undefined;
+      const body = deletes ? selectionBody : editBody; // A delete adds no text body.
+      const txBody = sel.diagramNode === undefined ? body(batch, part, sel) : undefined;
       if (sel.diagramNode !== undefined) at = typeDiagram(batch, part, sel, item, kind, data);
+      else if (!txBody && deletes) return { ok: true };
       else if (!txBody) throw new CommandRefusal('disabled.noText');
       else {
         ({ at, list } = typeText(batch, part, slide, txBody.id, item, sel, kind, data, !!was));

@@ -7,9 +7,10 @@
 
 import type { EditorSelection, TableCellAddress } from '../contracts/index.ts';
 import type { OpBatch } from '../automation/commands/op-batch.ts';
-import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
+import { paragraphText, slideNumberOf } from '../automation/commands/text-model.ts';
 import { elements, type Element } from '../store/index.ts';
-import { selectionBody } from './table-cells.ts';
+import { EMPTY_PLACEHOLDER_PARAGRAPH } from '../cascade/placeholders.ts';
+import { selectionParagraphs } from './table-cells.ts';
 
 type TextCaret = Extract<EditorSelection, { kind: 'text' }>;
 
@@ -60,7 +61,10 @@ export function placeCaret(batch: OpBatch, part: string, place: TextPlace): Text
   const { at: sel, paragraph: id, before } = place;
   if (sel.kind !== 'text' || sel.diagramNode !== undefined) return null;
   const root = batch.element(part, sel.nodeId);
-  const at = root ? find(root, id) : null;
+  // A text placeholder without a body reads as one empty paragraph that no part holds. The
+  // check below finds it only while the placeholder still has no body.
+  const virtual = id === EMPTY_PLACEHOLDER_PARAGRAPH.id;
+  const at = virtual ? { paragraph: 0 } : root ? find(root, id) : null;
   if (!at) return null;
   const point = { paragraph: at.paragraph, offset: before.length };
   const { cell: _cell, ...rest } = sel;
@@ -70,8 +74,7 @@ export function placeCaret(batch: OpBatch, part: string, place: TextPlace): Text
     anchor: point,
     focus: point,
   };
-  const body = selectionBody(batch, part, caret);
-  const p = body && paragraphsOf(body)[at.paragraph];
+  const p = selectionParagraphs(batch, part, caret)[at.paragraph];
   if (p?.id !== id) return null;
   return paragraphText(p, slideNumberOf(batch, part)).startsWith(before) ? caret : null;
 }
@@ -100,8 +103,7 @@ export function selectionPlace(
 ): SelectionPlace {
   const none = { at: sel, ids: null, text: '', revision };
   if (sel.kind !== 'text' || sel.diagramNode !== undefined) return none;
-  const body = selectionBody(batch, part, sel);
-  const paragraphs = body ? paragraphsOf(body) : [];
+  const paragraphs = selectionParagraphs(batch, part, sel);
   const a = paragraphs[sel.anchor.paragraph];
   const f = paragraphs[sel.focus.paragraph];
   if (!a || !f) return none;

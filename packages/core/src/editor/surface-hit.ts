@@ -6,6 +6,7 @@
 import { apply, invert, type LayoutItem, type SlideLayout } from '../layout/index.ts';
 import { textFrameMatrix } from './surface-geometry.ts';
 import { isLineItem, scopeItems } from '../automation/commands/placement.ts';
+import { placeholderTakesText } from '../cascade/placeholders.ts';
 import type { EditorSelection } from '../contracts/index.ts';
 
 const EMU_PER_PX = 9_525;
@@ -84,28 +85,6 @@ function onText(item: LayoutItem, p: Point): boolean {
   return onGlyph(item, p);
 }
 
-/**
- * Placeholder types whose content is not text (ECMA-376 Part 1, 19.7.10 ST_PlaceholderType):
- * their prompt asks for a picture, table, chart, diagram, or media object.
- */
-const NON_TEXT_PLACEHOLDERS: ReadonlySet<string> = new Set([
-  'pic',
-  'clipArt',
-  'tbl',
-  'chart',
-  'dgm',
-  'media',
-  'sldImg',
-]);
-
-/**
- * Whether an empty placeholder takes a press in its box as a caret placement. A text
- * placeholder (19.3.1.36 ph) does: it shows a text prompt. A text box does too (`inText`).
- * Another empty shape does not, so a press anywhere in it moves it.
- */
-const takesText = (type: string | undefined): boolean =>
-  type !== undefined && !NON_TEXT_PLACEHOLDERS.has(type);
-
 /** The border band width: 8 screen pixels, in slide EMU. */
 const bandOf = (zoom: number): number => (8 * EMU_PER_PX) / zoom;
 
@@ -141,7 +120,10 @@ export function inText(item: LayoutItem, p: Point, zoom: number): boolean {
   if (item.kind !== 'shape' || !item.text) return false;
   const el = item.element;
   const hasRuns = el.text?.paragraphs.some((para) => para.runs.length > 0);
-  if (!hasRuns && !el.textBox && !takesText(el.placeholder?.type)) return false;
+  // An empty text placeholder (19.3.1.36 ph) takes a press in its box as a caret placement:
+  // it shows a text prompt. An empty text box does too. Another empty shape does not, so a
+  // press anywhere in it moves it.
+  if (!hasRuns && !el.textBox && !placeholderTakesText(el.placeholder?.type)) return false;
   if (onGlyph(item, p)) return true;
   const band = bandOf(zoom);
   const local = apply(invert(item.matrix), p.x, p.y);
