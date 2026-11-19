@@ -63,23 +63,26 @@ describe('Diagram tab (React)', () => {
     expect(screen.getByText('No diagram selected')).toBeTruthy();
   });
 
-  test('a field applies on Enter as one undo step; Shift+Enter keeps typing', async () => {
+  test('a field applies as the user types, as one undo step; Shift+Enter keeps typing', async () => {
     const editor = await mount(<SidePanel tab="diagram" />);
     selectDiagram(editor);
     const before = texts(editor);
     const field = screen.getByRole('textbox', { name: 'Text of shape 1' }) as HTMLTextAreaElement;
     expect(field.value).toBe(before[0]!);
+    act(() => void fireEvent.change(field, { target: { value: 'Sc' } }));
+    expect(texts(editor)[0]).toBe('Sc');
     act(() => void fireEvent.change(field, { target: { value: 'Scope' } }));
     act(() => void fireEvent.keyDown(field, { key: 'Enter', shiftKey: true }));
-    expect(texts(editor)[0]).toBe(before[0]!);
     act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
     expect(texts(editor)[0]).toBe('Scope');
     expect(field.value).toBe('Scope');
     act(() => void editor.exec({ type: 'undo' }));
     expect(texts(editor)[0]).toBe(before[0]!);
-    // Escape drops a draft.
+    // Escape restores the text from the start of the edit.
     act(() => void fireEvent.change(field, { target: { value: 'Draft' } }));
+    expect(texts(editor)[0]).toBe('Draft');
     act(() => void fireEvent.keyDown(field, { key: 'Escape' }));
+    expect(texts(editor)[0]).toBe(before[0]!);
     expect(field.value).toBe(before[0]!);
   });
 

@@ -9,9 +9,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Vectors use slide axes: x to the right, y down, and z toward the viewer for normals and light
 // directions. A turned point keeps z as depth away from the viewer.
 //
-// The camera rotations are measured on the `three-d-effects` reference PDF (slide 3): the
-// projected outlines of 12 isometric presets fall within 0.03 in. The perspective presets draw
-// as parallel projections.
+// The camera rotations of the presets are measured: the rotation of each preset about x, y, and
+// z in degrees, converted to lat = y, lon = -x, and rev = -z, and rounded to 0.01 degree. The
+// reference PDF of the `three-d-effects` fixture (slide 3) checks 12 isometric presets: their
+// projected outlines fall within 0.03 in. The other presets have no reference check. The
+// perspective presets draw as parallel projections.
 //
 // The light lies in the shape's own axes and is fitted to that fixture: the three-point rig from
 // the top on the warm matte material, over bevels, faces, and extrusion sides under many cameras.

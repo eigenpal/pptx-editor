@@ -1588,6 +1588,9 @@ export function createHyperlinkPopupStore(): HyperlinkPopupStore;
 export function createItemMemo<V>(): (key: object, inputs: readonly unknown[], make: () => V) => V;
 
 // @internal
+export function createLiveField(host: () => LiveFieldHost, changed: () => void): LiveField;
+
+// @internal
 export function createNotesFindPainter(): {
     paint(editor: PptxEditorInstance | null, root: HTMLElement | null, paragraphs: readonly NotesParagraph[], drafting?: boolean): boolean;
     stop(): void;
@@ -3452,6 +3455,27 @@ export interface FormatLineState {
 export function formatLineState(editor: Editor | null): FormatLineState | null;
 
 // @internal
+export interface FormatNumberLimits {
+    // (undocumented)
+    readonly exclusiveMin?: boolean;
+    // (undocumented)
+    readonly max?: number;
+    // (undocumented)
+    readonly min?: number;
+}
+
+// @internal
+export type FormatNumberParse = {
+    readonly ok: true;
+    readonly value: number;
+} | {
+    readonly ok: false;
+    readonly incomplete: boolean;
+    readonly key: TranslationKey;
+    readonly params?: Readonly<Record<string, number>>;
+};
+
+// @internal
 export function formatNumberProperties(detail: ShapeFormatDetail, section: 'fill' | 'effects'): readonly FormatNumberProperty[];
 
 // @internal
@@ -4116,6 +4140,25 @@ export function listenSlideshowStartKeys(anchor: () => Element | null | undefine
 export interface ListGalleryItem<K extends string = string> {
     readonly format: BulletFormat | null;
     readonly key: K;
+}
+
+// @internal
+export interface LiveField {
+    cancel(): void;
+    commit(): void;
+    dispose(): void;
+    readonly draft: string | null;
+    readonly error: string | null;
+    input(text: string, composing?: boolean): void;
+    sync(): void;
+}
+
+// @internal
+export interface LiveFieldHost {
+    readonly editor: Pick<Editor, 'beginHistoryGroup' | 'exec'> | null | undefined;
+    same?(draft: string, value: string | null): boolean;
+    value(): string | null;
+    write(text: string, options: EditorExecOptions, final: boolean): string | null | undefined;
 }
 
 // @public
@@ -4843,6 +4886,9 @@ export const parseAmount: (text: string) => number;
 
 // @public
 export function parseChartValue(text: string): number | null | undefined;
+
+// @internal
+export function parseFormatNumber(text: string, limits: FormatNumberLimits): FormatNumberParse;
 
 // @public
 export function parseSeconds(text: string): number | null;
@@ -5797,6 +5843,9 @@ export function sameChromeCommandState(a: ChromeCommandState | null, b: ChromeCo
 
 // @internal
 export function sameFontFormat(a: FontFormatRead | null, b: FontFormatRead | null): boolean;
+
+// @internal
+export function sameFormatNumber(draft: string, value: string | null): boolean;
 
 // @internal
 export function sameLoadingSheetSize(a: LoadingSheetSize, b: LoadingSheetSize): boolean;

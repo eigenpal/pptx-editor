@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Side-panel fields run the existing commands while the user types, with a local history group per field edit. The preset weights menu runs the existing setLineWidth command. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged. A history group only groups local undo steps.",
+  "tests": [
+    "packages/vue/test/format-panel.test.ts",
+    "packages/vue/test/format-line-width.test.ts",
+    "packages/pro/src/__tests__/yjs-history-presence.test.ts"
+  ]
+}

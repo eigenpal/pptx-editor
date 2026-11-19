@@ -1,0 +1,8 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "A comment in the 3-D scene module now states which camera preset rotations have a reference check. No value or code path changes. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": ["packages/pro/src/drawing/__tests__/three-d.test.ts"]
+}

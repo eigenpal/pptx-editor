@@ -99,6 +99,21 @@ test('inspector task: imported line width and independent arrow ends retain unre
   await width.press('ControlOrMeta+z');
   await expect(width).toHaveValue('2.25');
   expect(connector(await xml(page, 8), 'Straight connector')).toBe(before);
+  // Each keystroke applies at once, without Enter or blur; Escape restores the start value.
+  await width.fill('');
+  await width.pressSequentially('4');
+  await expect(width).toBeFocused();
+  expect(connector(await xml(page, 8), 'Straight connector')).toBe(
+    before.replace('w="28575"', 'w="50800"')
+  );
+  await width.press('ArrowUp');
+  await expect(width).toHaveValue('4.25');
+  expect(connector(await xml(page, 8), 'Straight connector')).toBe(
+    before.replace('w="28575"', 'w="53975"')
+  );
+  await width.press('Escape');
+  await expect(width).toHaveValue('2.25');
+  expect(connector(await xml(page, 8), 'Straight connector')).toBe(before);
   await menuPick(page, 'shape.lineStart', 'Diamond');
   const changed = connector(await xml(page, 8), 'Straight connector');
   expect(changed).toBe(before.replace('type="oval"', 'type="diamond"'));

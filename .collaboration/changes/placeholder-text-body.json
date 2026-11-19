@@ -1,0 +1,11 @@
+{
+  "impact": "compatible",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The first edit in a text placeholder without p:txBody adds the body with an existing tree operation. A read now merges two concurrent copies of a shape's text body, so two peers that type into such a placeholder at once both keep their text. A replica of an earlier build shows only the first copy in that concurrent case. Room metadata and the format fields remain unchanged.",
+  "tests": [
+    "packages/core/src/editor/__tests__/placeholder-without-body.test.ts",
+    "packages/pro/src/__tests__/yjs-placeholder-body.test.ts"
+  ]
+}

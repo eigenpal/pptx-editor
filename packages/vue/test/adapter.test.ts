@@ -30,6 +30,10 @@ import {
   useEditorValueCommand,
 } from '../src/index.ts';
 import { editorStateActiveSubscriptionCount, providePptxEditor } from '../src/composables.ts';
+import { createTranslator } from '@pptx-editor.dev/i18n';
+
+/** The English text of a catalog key, as the command hooks return it. */
+const en = createTranslator();
 
 const IN = 914_400;
 const deckBytes = (): Uint8Array =>
@@ -328,7 +332,7 @@ describe('composables', () => {
       const cmd = useEditorCommand('history.undo');
       return () => h('output', `${cmd.isEnabled.value}|${cmd.disabledReason.value}`);
     });
-    expect(empty.textContent).toBe('false|disabled.noEditor');
+    expect(empty.textContent).toBe(`false|${en('disabled.noEditor')}`);
     app?.unmount();
     host?.remove();
 

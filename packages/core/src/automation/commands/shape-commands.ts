@@ -64,6 +64,26 @@ export function specFromXml(xml: string): NodeSpec {
   return spec;
 }
 
+/**
+ * The text body that a `p:sp` without one gets. Empty body properties and list style, so the
+ * body, list styles, and run properties come from the cascade (placeholder, layout, master,
+ * `p:style`), as for any other body.
+ */
+const NEW_TEXT_BODY = '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>';
+
+/** Add an empty text body to the `p:sp` `el` of `part`; the id of the new `p:txBody`. @internal */
+export function addTextBody(batch: OpBatch, part: string, el: Element): string {
+  // CT_Shape (ECMA-376 Part 1, 19.3.1.43): nvSpPr, spPr, style, txBody, extLst.
+  const ext = el.children.findIndex((c) => c.type === 'element' && c.local === 'extLst');
+  return batch.insert({
+    op: 'insertNode',
+    part,
+    parent: el.id,
+    index: ext < 0 ? el.children.length : ext,
+    spec: specFromXml(NEW_TEXT_BODY),
+  });
+}
+
 const int = (v: number): string => String(Math.round(v));
 
 /** The element holding a shape's `a:xfrm`: `p:spPr`, `p:grpSpPr`, or the frame's own `p:xfrm`. */

@@ -1856,6 +1856,7 @@
     "stopLimit": "グラデーションには2つ以上の分岐点が必要です。",
     "addStopLimit": "分岐点が10個未満の場合に追加できます。",
     "lineWidth": "幅",
+    "noLine": "なし",
     "line": "線",
     "outline": "枠線",
     "previewUnavailable": "この元の色ではプレビューを表示できません。",

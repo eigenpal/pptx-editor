@@ -35,7 +35,7 @@ export function App({ bytes }: { bytes: Uint8Array }) {
 }
 ```
 
-To build your own chrome, use `usePptxEditor()`, `useEditorState(selector)`, and `useEditorCommand(slotId)`. As in DOCX Editor, `useEditorCommand(slotId).execute()` returns `true` when the engine ran the command and `false` on a refusal. `disabledReason` is the engine's catalog key, or its own text for a developer reason: show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`, with `t` from `useTranslation()`.
+To build your own chrome, use `usePptxEditor()`, `useEditorState(selector)`, and `useEditorCommand(slotId)`. As in DOCX Editor, `useEditorCommand(slotId).execute()` returns `true` when the engine ran the command and `false` on a refusal. `disabledReason` is readable text in the locale of `PptxEditor.Root`: the hook translates catalog keys and keeps the engine's own text.
 
 ## Slides and layouts
 
@@ -77,7 +77,7 @@ Each slot takes the customization ladder: `className`, `icon`, `asChild`, `hidde
 | `onChange` | `(layoutId: string) => void` | required | Called with the picked layout's id |
 | `layouts` | `readonly SlideLayoutSummary[]` | every layout of the deck | The layouts to show |
 | `disabled` | `boolean` | `true` in viewing mode | Shows the tiles but takes no pick |
-| `disabledReason` | `string \| null` | the viewing reason | Why the gallery takes no pick, in the tiles' tooltips: a catalog key, such as `useEditorCommand(slotId).disabledReason`, or text |
+| `disabledReason` | `string \| null` | the viewing reason | Why the gallery takes no pick, in the tiles' tooltips: a catalog key or text, such as `useEditorCommand(slotId).disabledReason` |
 | `className` | `string` | none | A class name added to the gallery |
 
 ```tsx

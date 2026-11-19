@@ -26,21 +26,25 @@ import {
   colorPickOf,
   nextChartCategoryLabel,
   renderedColorOf,
+  sameFormatNumber,
   type ChartData,
   type ChartFormatChange,
   type ChartType,
   type ChartPaneChange,
   type EditorCommand,
+  type EditorExecOptions,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton } from './chrome.tsx';
 import { ColorField } from './dialog-color.tsx';
 import { SelectField } from './dialog-form.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { useLiveField } from './live-field.ts';
 
 /**
- * A text field that applies on Enter or blur and shows the chart's value otherwise. Text that
- * the tab or the editor refuses stays in the field with its reason; Escape restores the value.
+ * A text field that applies each keystroke at once and shows the chart's value otherwise. Enter
+ * or blur ends the edit, and Escape restores the start value. Text that the tab or the editor
+ * refuses stays in the field; Enter or blur shows its reason.
  */
 function ChartField({
   draftKey,
@@ -59,28 +63,23 @@ function ChartField({
   numeric?: boolean;
   disabled: boolean;
   /** Applies the text: null when it applied, else the reason to show. */
-  onCommit: (text: string) => string | null;
+  onCommit: (text: string, options: EditorExecOptions) => string | null;
 }) {
   const errorId = useId();
-  const [draft, setDraft] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [scope, setScope] = useState(draftKey);
-  if (scope !== draftKey) {
-    setScope(draftKey);
-    setDraft(null);
-    setError(null);
-  }
-  const reset = (): void => {
-    setDraft(null);
-    setError(null);
-  };
-  const commit = (): void => {
-    if (draft === null) return;
-    if (draft === value) return reset();
-    const refused = onCommit(draft);
-    if (refused === null) reset();
-    else setError(refused);
-  };
+  const editor = usePptxEditor();
+  const field = useLiveField(
+    {
+      editor,
+      value: () => value,
+      ...(numeric ? { same: sameFormatNumber } : {}),
+      write: (text, options, final) => {
+        const refused = onCommit(text, options);
+        return refused === null || final ? refused : undefined;
+      },
+    },
+    `${draftKey}\u0000${value}`
+  );
+  const error = field.error;
   return (
     <label className="pptx-field pptx-chart-pane__field">
       {visibleLabel ? <span className="pptx-chart-pane__label">{visibleLabel}</span> : null}
@@ -89,15 +88,18 @@ function ChartField({
         inputMode={numeric ? 'decimal' : undefined}
         aria-invalid={error !== null}
         aria-describedby={error !== null ? errorId : undefined}
-        value={draft ?? value}
+        value={field.draft ?? value}
         disabled={disabled}
         // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
-        data-draft={draft !== null}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        data-draft={field.draft !== null}
+        onChange={(e) =>
+          field.input(e.target.value, (e.nativeEvent as InputEvent).isComposing === true)
+        }
+        onCompositionEnd={(e) => field.input(e.currentTarget.value)}
+        onBlur={() => field.commit()}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') reset();
+          if (e.key === 'Enter') field.commit();
+          if (e.key === 'Escape') field.cancel();
         }}
       />
       {error !== null ? (
@@ -126,7 +128,7 @@ function SeriesCard({
   open: boolean;
   disabled: boolean;
   onToggle: (open: boolean) => void;
-  apply: (change: ChartPaneChange) => string | null;
+  apply: (change: ChartPaneChange, options?: EditorExecOptions) => string | null;
   run: (change: ChartPaneChange) => boolean;
 }) {
   const { t } = useTranslation();
@@ -149,7 +151,7 @@ function SeriesCard({
           visibleLabel={t('chartData.name')}
           value={series.name}
           disabled={disabled}
-          onCommit={(text) => apply({ type: 'seriesName', series: index, text })}
+          onCommit={(text, options) => apply({ type: 'seriesName', series: index, text }, options)}
         />
         <div className="pptx-panel__grid">
           {data.categories.map((c, i) => (
@@ -161,7 +163,9 @@ function SeriesCard({
               value={chartValueText(series.values[i])}
               numeric
               disabled={disabled}
-              onCommit={(text) => apply({ type: 'value', series: index, category: i, text })}
+              onCommit={(text, options) =>
+                apply({ type: 'value', series: index, category: i, text }, options)
+              }
             />
           ))}
         </div>
@@ -227,7 +231,7 @@ function ChartFormatSection({
   /** The number of series in the chart's data. */
   seriesCount: number;
   /** Runs a command: null when it ran (or there was none), else the reason. */
-  run: (command: EditorCommand | null) => string | null;
+  run: (command: EditorCommand | null, options?: EditorExecOptions) => string | null;
 }) {
   const { t } = useTranslation();
   const editor = usePptxEditor();
@@ -287,7 +291,7 @@ function ChartFormatSection({
               visibleLabel={t('chartFormat.titleText')}
               value={format.title}
               disabled={disabled}
-              onCommit={(text) => run(chartTitleCommand(format, 'title', text))}
+              onCommit={(text, options) => run(chartTitleCommand(format, 'title', text), options)}
             />
           </div>
         ) : null}
@@ -328,7 +332,9 @@ function ChartFormatSection({
                 visibleLabel={t(axisLabels.category)}
                 value={format.axisTitles?.category ?? ''}
                 disabled={disabled || !format.axes}
-                onCommit={(text) => run(chartTitleCommand(format, 'categoryAxisTitle', text))}
+                onCommit={(text, options) =>
+                  run(chartTitleCommand(format, 'categoryAxisTitle', text), options)
+                }
               />
               <ChartField
                 draftKey={draftKey}
@@ -336,7 +342,9 @@ function ChartFormatSection({
                 visibleLabel={t(axisLabels.value)}
                 value={format.axisTitles?.value ?? ''}
                 disabled={disabled || !format.axes}
-                onCommit={(text) => run(chartTitleCommand(format, 'valueAxisTitle', text))}
+                onCommit={(text, options) =>
+                  run(chartTitleCommand(format, 'valueAxisTitle', text), options)
+                }
               />
             </div>
             <p className="pptx-chart-pane__note">
@@ -406,20 +414,20 @@ export function ChartDataPane() {
   const draftKey = String(nextScope.reset);
   const disabled = readOnly || !chart.editable;
   /** Applies one change: null when it applied, else the reason. */
-  const apply = (change: ChartPaneChange): string | null => {
+  const apply = (change: ChartPaneChange, options?: EditorExecOptions): string | null => {
     const command = chartPaneCommand(data, change);
     if (!command.ok) return t(command.error);
-    const result = editor?.exec(command.command);
+    const result = editor?.exec(command.command, options);
     setRefusal(null);
     return !result || result.ok ? null : t(result.reason as TranslationKey);
   };
   /** Runs a command of the type, elements, or colors; the tab announces a refusal. */
-  const runFormat = (command: EditorCommand | null): string | null => {
+  const runFormat = (command: EditorCommand | null, options?: EditorExecOptions): string | null => {
     if (!command) {
       setRefusal(null);
       return null;
     }
-    const result = editor?.exec(command);
+    const result = editor?.exec(command, options);
     const reason = !result || result.ok ? null : t(result.reason as TranslationKey);
     setRefusal(reason);
     return reason;
@@ -474,7 +482,7 @@ export function ChartDataPane() {
                 value={c.label}
                 numeric={xy}
                 disabled={disabled}
-                onCommit={(text) => apply({ type: 'label', category: i, text })}
+                onCommit={(text, options) => apply({ type: 'label', category: i, text }, options)}
               />
               <ToolButton
                 label={t(xy ? 'chartData.removeXValueNamed' : 'chartData.removeCategoryNamed', {

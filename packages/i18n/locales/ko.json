@@ -1856,6 +1856,7 @@
     "stopLimit": "그라데이션에는 두 개 이상의 중지점이 필요합니다.",
     "addStopLimit": "중지점이 10개 미만일 때 추가할 수 있습니다.",
     "lineWidth": "너비",
+    "noLine": "없음",
     "line": "선",
     "outline": "윤곽선",
     "previewUnavailable": "이 원본 색상의 미리 보기를 사용할 수 없습니다.",

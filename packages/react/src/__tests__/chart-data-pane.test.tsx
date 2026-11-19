@@ -202,6 +202,8 @@ describe('Chart Data tab (React)', () => {
     const field = screen.getByRole('textbox', { name: 'Plan, East' }) as HTMLInputElement;
     field.focus();
     act(() => void fireEvent.change(field, { target: { value: '77' } }));
+    // The typed value applies at once.
+    expect(values(editor).series[0]!.values[2]).toBe(77);
     const before = values(editor);
     act(
       () =>
@@ -219,7 +221,7 @@ describe('Chart Data tab (React)', () => {
     );
     expect(field.value).toBe('77');
     expect(document.activeElement).toBe(field);
-    expect(values(editor).series[0]!.values[2]).toBe(51);
+    expect(values(editor).series[0]!.values[2]).toBe(77);
     const appended = values(editor);
     act(
       () =>

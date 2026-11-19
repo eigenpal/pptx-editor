@@ -225,7 +225,7 @@ Name every approximation in `packages/core/src/layout/approximations.ts`, in `do
 
 Follow the [developer documentation rules](AGENTS.md#developer-documentation) and [site source conventions](docs/site/README.md). Lead with the developer task and a useful code example. Use concise prose for prerequisites, defaults, lifecycle, and limits. Keep shared SDK tasks in the established page structure.
 
-Verify samples against public exports and types. Register pages in both navigation files. Run `bun test docs`, `node scripts/check-public-terminology.mjs`, and Prettier on edited documentation. Source checks do not replace a website build or browser review.
+Verify samples against public exports and types. Register pages in both navigation files. Run `bun test docs` and Prettier on edited documentation. Source checks do not replace a website build or browser review.
 
 ## Releases and canary builds
 
@@ -266,9 +266,7 @@ Use a [GitHub issue](https://github.com/eigenpal/pptx-editor/issues) for reprodu
 
 ## Public terminology
 
-Use PPTX, presentation, or reference PDF in product prose, and follow "Naming" in [Agent instructions](AGENTS.md). Keep technical identifiers, source attribution, and legal notices exact.
-
-Run `node scripts/check-public-terminology.mjs` after you edit public wording. The check covers root consumer docs, package READMEs, site pages, locale catalogs, and demo text sources. It does not cover engine code, generated API snapshots, legal notices, or third-party references, so review those by hand.
+Use PPTX, presentation, or reference PDF in product prose, and follow "Naming" in [Agent instructions](AGENTS.md#naming). Do not use third-party product names in public text. Keep technical identifiers, source attribution, and legal notices exact.
 
 ## Collaboration release compatibility
 

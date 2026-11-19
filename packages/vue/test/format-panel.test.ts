@@ -221,9 +221,12 @@ for (const adapter of ['react', 'vue'] as const)
       });
       expect(field('gradient.angle').value).toBe('45');
     });
-    test('drops drafts on selection changes and edits a custom shadow', async () => {
+    test('writes typed values at once and drops drafts on selection changes', async () => {
       await mount();
       await input('gradient.angle', '90');
+      const typed = editor.shapeFormat();
+      expect(typed.ok && typed.format.gradient?.angle).toBe(90);
+      expect(field('gradient.angle').value).toBe('90');
       await update(() => choose(8, 'Outer shadow'));
       expect(field('gradient.angle')).toBeNull();
       expect(field('shadow.distance').value).toBe('8');
@@ -231,7 +234,42 @@ for (const adapter of ['react', 'vue'] as const)
       await update(() => fireEvent.blur(field('shadow.distance')));
       expect(editor.shapeFormat().ok && field('shadow.distance').value).toBe('12');
       await update(() => choose(6, 'Three stops'));
+      expect(field('gradient.angle').value).toBe('90');
+    });
+    test('makes one undo step of one edit and restores the start value on Escape', async () => {
+      await mount();
+      await input('gradient.angle', '6');
+      await input('gradient.angle', '60');
+      await input('gradient.angle', '600');
+      expect(field('gradient.angle').getAttribute('aria-invalid')).toBe('true');
+      await input('gradient.angle', '60');
+      const typed = editor.shapeFormat();
+      expect(typed.ok && typed.format.gradient?.angle).toBe(60);
+      await update(() => fireEvent.keyDown(field('gradient.angle'), { key: 'Enter' }));
+      await update(() => {
+        editor.exec({ type: 'undo' });
+      });
+      const undone = editor.shapeFormat();
+      expect(undone.ok && undone.format.gradient?.angle).toBe(45);
       expect(field('gradient.angle').value).toBe('45');
+      await input('gradient.angle', '30');
+      const live = editor.shapeFormat();
+      expect(live.ok && live.format.gradient?.angle).toBe(30);
+      await update(() => fireEvent.keyDown(field('gradient.angle'), { key: 'Escape' }));
+      const restored = editor.shapeFormat();
+      expect(restored.ok && restored.format.gradient?.angle).toBe(45);
+      expect(field('gradient.angle').value).toBe('45');
+    });
+    test('steps a value with Arrow Up and Arrow Down', async () => {
+      await mount();
+      await update(() => fireEvent.keyDown(field('gradient.angle'), { key: 'ArrowUp' }));
+      const up = editor.shapeFormat();
+      expect(up.ok && up.format.gradient?.angle).toBe(46);
+      await update(() =>
+        fireEvent.keyDown(field('gradient.angle'), { key: 'ArrowDown', shiftKey: true })
+      );
+      const down = editor.shapeFormat();
+      expect(down.ok && down.format.gradient?.angle).toBe(36);
     });
     test('keeps invalid drafts with errors and respects view mode', async () => {
       await mount();
@@ -335,7 +373,15 @@ for (const adapter of ['react', 'vue'] as const)
     });
     test('keeps numeric drafts during composition', async () => {
       await mount();
-      await input('gradient.angle', '72');
+      await update(() => {
+        const el = field('gradient.angle');
+        if (adapter === 'react')
+          fireEvent.input(el, { target: { value: '72' }, isComposing: true });
+        else {
+          el.value = '72';
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+        }
+      });
       await update(() =>
         fireEvent.keyDown(field('gradient.angle'), { key: 'Enter', isComposing: true })
       );

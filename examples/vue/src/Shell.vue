@@ -3,8 +3,7 @@
 // (brand, file name, menus, Present, mode pill, theme, Open/New/Export, panel toggle) around
 // the adapter's toolbar or ribbon, slide rail or sorter, canvas, notes, panel, and zoom pill.
 // It reads the editor through composables, so it renders inside `PptxEditorRoot`.
-import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
-import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
+import { onBeforeUnmount, shallowRef, watch } from 'vue';
 import {
   Icon,
   PptxEditorContent,
@@ -78,9 +77,7 @@ const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
 const ribbon = ribbonChrome(location.search);
 // Present follows the slot's state: off with a reason in the slide master view, for one.
 const present = useEditorCommand('view.playFromStart');
-const presentOff = computed(() =>
-  present.disabledReason.value ? translateKeyOrText(t, present.disabledReason.value) : null
-);
+const presentOff = present.disabledReason;
 // With no deck to open (its fetch failed), the notice says why in place of the spinner.
 const waiting = useEditorState((s) => s.status === 'empty');
 // The speaker notes start as the user left them, else closed (demo-files.ts).

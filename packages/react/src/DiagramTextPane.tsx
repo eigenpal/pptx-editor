@@ -5,15 +5,20 @@
 // panel. The Vue twin (`packages/vue/src/DiagramTextPane.tsx`) shows the same rows.
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import type { DiagramNodeState, EditorCommand } from '@pptx-editor.dev/core/contracts';
+import type {
+  DiagramNodeState,
+  EditorCommand,
+  EditorExecOptions,
+} from '@pptx-editor.dev/core/contracts';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { useLiveField } from './live-field.ts';
 
 /**
- * The text field of one node: it applies on Enter (Shift+Enter starts a paragraph) or blur and
- * shows the node's text otherwise. Text that the editor refuses stays with its reason; Escape
- * restores the text.
+ * The text field of one node: each keystroke applies at once, and Enter (Shift+Enter starts a
+ * paragraph) or blur ends the edit. Text that the editor refuses stays with its reason; Escape
+ * restores the start text.
  */
 function NodeField({
   label,
@@ -32,22 +37,23 @@ function NodeField({
   /** Shown but not editable: the text stays readable, focusable, and copyable. */
   readOnly: boolean;
   /** Applies the text: null when it applied, else the reason to show. */
-  onCommit: (text: string) => string | null;
+  onCommit: (text: string, options: EditorExecOptions) => string | null;
 }) {
   const errorId = useId();
-  const [draft, setDraft] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const reset = (): void => {
-    setDraft(null);
-    setError(null);
-  };
-  const commit = (): void => {
-    if (draft === null) return;
-    if (draft === value) return reset();
-    const refused = onCommit(draft);
-    if (refused === null) reset();
-    else setError(refused);
-  };
+  const editor = usePptxEditor();
+  const field = useLiveField(
+    {
+      editor,
+      value: () => value,
+      write: (text, options, final) => {
+        const refused = onCommit(text, options);
+        return refused === null || final ? refused : undefined;
+      },
+    },
+    value
+  );
+  const draft = field.draft;
+  const error = field.error;
   const shown = draft ?? value;
   return (
     <label className="pptx-field pptx-diagram-pane__field">
@@ -63,15 +69,18 @@ function NodeField({
         data-node={node}
         // Ctrl/Cmd+Z in a text area is the field's own undo (`panelHistoryKey`).
         data-draft={draft !== null}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onChange={(e) =>
+          field.input(e.target.value, (e.nativeEvent as InputEvent).isComposing === true)
+        }
+        onCompositionEnd={(e) => field.input(e.currentTarget.value)}
+        onBlur={() => field.commit()}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             e.stopPropagation();
-            commit();
+            field.commit();
           }
-          if (e.key === 'Escape') reset();
+          if (e.key === 'Escape') field.cancel();
         }}
       />
       {error !== null ? (
@@ -116,8 +125,8 @@ export function DiagramTextPane() {
     );
   const frame = diagram.nodeId;
   /** Runs one command: null when it applied, else the reason. */
-  const apply = (command: EditorCommand): string | null => {
-    const result = editor?.exec(command);
+  const apply = (command: EditorCommand, options?: EditorExecOptions): string | null => {
+    const result = editor?.exec(command, options);
     return !result || result.ok ? null : t(result.reason as TranslationKey);
   };
   /**
@@ -173,8 +182,8 @@ export function DiagramTextPane() {
                 node={node.node}
                 readOnly={readOnly || !node.editable}
                 {...(node.editable ? {} : { note: `${noteId}-${i}` })}
-                onCommit={(text) =>
-                  apply({ type: 'setDiagramText', nodeId: frame, node: node.node, text })
+                onCommit={(text, options) =>
+                  apply({ type: 'setDiagramText', nodeId: frame, node: node.node, text }, options)
                 }
               />
               <div className="pptx-diagram-pane__actions">

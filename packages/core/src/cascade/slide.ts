@@ -28,10 +28,12 @@ import { contentElements } from './alternate-content.ts';
 import { backgroundFillOf, fillsWithBackground, type SlideBackground } from './background-fill.ts';
 import {
   collectPlaceholders,
+  EMPTY_PLACEHOLDER_PARAGRAPH,
   findLayoutPlaceholder,
   findMasterPlaceholder,
   partElementsOf,
   placeholderOf,
+  textPlaceholderWithoutBody,
   treeOf,
   type PlaceholderEntry,
   type PlaceholderKey,
@@ -225,7 +227,8 @@ function resolveText(
   fontRef: FontRef | undefined
 ): ResolvedTextBody | undefined {
   const txBody = ownChild(el, 'txBody');
-  if (!txBody) return undefined;
+  // A text placeholder without a body reads as an empty one: a click places the caret in it.
+  if (!txBody && !textPlaceholderWithoutBody(el)) return undefined;
   const bodyChain: Element[] = [];
   const lstChain: Element[] = [];
   // Each list style with its part, for the relationships of picture bullets.
@@ -279,26 +282,26 @@ function resolveText(
     resolvedParagraphs.set(p, { key, value });
     return value;
   };
-  const paragraphs = elements(txBody)
-    .filter((p) => p.kind === 'paragraph')
-    .map(
-      (p) =>
-        cached(p) ??
-        remember(
-          p,
-          resolveParagraph({
-            paragraph: p,
-            chainFor,
-            ctx: scope.ctx,
-            theme: scope.theme,
-            ...(fontRef ? { fontRef } : {}),
-            slideNumber: scope.slideNumber,
-            ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
-            pictures,
-          })
-        )
-    );
-  return { nodeId: txBody.id, body: readBodyProps(bodyChain), paragraphs };
+  const paragraphs = (
+    txBody ? elements(txBody).filter((p) => p.kind === 'paragraph') : [EMPTY_PLACEHOLDER_PARAGRAPH]
+  ).map(
+    (p) =>
+      cached(p) ??
+      remember(
+        p,
+        resolveParagraph({
+          paragraph: p,
+          chainFor,
+          ctx: scope.ctx,
+          theme: scope.theme,
+          ...(fontRef ? { fontRef } : {}),
+          slideNumber: scope.slideNumber,
+          ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
+          pictures,
+        })
+      )
+  );
+  return { ...(txBody ? { nodeId: txBody.id } : {}), body: readBodyProps(bodyChain), paragraphs };
 }
 
 function styleFontRef(style: Element | undefined, scope: SlideScope): FontRef | undefined {

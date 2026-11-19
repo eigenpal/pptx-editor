@@ -26,6 +26,12 @@ import type { EditorSelection, TableCellAddress } from '../contracts/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import type { OpBatch } from '../automation/commands/op-batch.ts';
 import { findItem } from '../automation/commands/placement.ts';
+import { addTextBody } from '../automation/commands/shape-commands.ts';
+import { paragraphsOf } from '../automation/commands/text-model.ts';
+import {
+  EMPTY_PLACEHOLDER_PARAGRAPH,
+  textPlaceholderWithoutBody,
+} from '../cascade/placeholders.ts';
 import {
   emptyBodySpec,
   joinTextBodies,
@@ -418,4 +424,40 @@ export function selectionBody(
   }
   const body = el.children.find((c) => c.type === 'element' && c.kind === 'txBody');
   return body?.type === 'element' ? body : undefined;
+}
+
+/**
+ * The text body an edit at a text selection writes to: `selectionBody`, or for a text
+ * placeholder without one (`p:txBody` is optional, 19.3.1.43) a new empty body that inherits
+ * its body properties. Only an edit that adds content calls it, so a press, a read, or a
+ * delete leaves the file as it was.
+ */
+export function editBody(
+  batch: OpBatch,
+  part: string,
+  sel: Extract<EditorSelection, { kind: 'text' }>
+): Element | undefined {
+  const body = selectionBody(batch, part, sel);
+  if (body || sel.cell) return body;
+  const el = batch.element(part, sel.nodeId);
+  return textPlaceholderWithoutBody(el)
+    ? batch.element(part, addTextBody(batch, part, el))
+    : undefined;
+}
+
+/**
+ * The paragraphs a text selection reads: those of `selectionBody`, or for a text placeholder
+ * without a body the one empty paragraph that the cascade reads it as, with one id on every
+ * read (`EMPTY_PLACEHOLDER_PARAGRAPH`). Reads only.
+ */
+export function selectionParagraphs(
+  batch: OpBatch,
+  part: string,
+  sel: Extract<EditorSelection, { kind: 'text' }>
+): Element[] {
+  const body = selectionBody(batch, part, sel);
+  if (body) return paragraphsOf(body);
+  return !sel.cell && textPlaceholderWithoutBody(batch.element(part, sel.nodeId))
+    ? [EMPTY_PLACEHOLDER_PARAGRAPH]
+    : [];
 }

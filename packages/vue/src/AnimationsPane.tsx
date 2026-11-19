@@ -12,19 +12,23 @@ import {
   animationListParts,
   animationStartLabel,
   parseSeconds,
+  sameFormatNumber,
   secondsText,
   transitionKindLabelKey,
   type AnimationEffect,
   type AnimationPreset,
   type AnimationTrigger,
+  type EditorExecOptions,
   type TransitionKind,
 } from '@pptx-editor.dev/core/editor';
 import { ToolButton } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import { useLiveField } from './live-field.ts';
 
 /**
- * A seconds field that commits on Enter or blur and shows the document value otherwise. A value
- * that is not a number of seconds, or that the editor refuses, stays in the field with an error.
+ * A seconds field. Each valid keystroke writes at once; Enter or blur ends the edit, and Escape
+ * restores the start value. A value that is not a number of seconds, or that the editor
+ * refuses, stays in the field with an error.
  */
 const SecondsField = defineComponent({
   name: 'PptxAnimationSecondsField',
@@ -32,55 +36,67 @@ const SecondsField = defineComponent({
     label: { type: String, required: true },
     ms: { type: Number, required: true },
     disabled: { type: Boolean, required: true },
-    onCommit: { type: Function as PropType<(ms: number) => boolean>, required: true },
+    onCommit: {
+      type: Function as PropType<(ms: number, options: EditorExecOptions) => boolean>,
+      required: true,
+    },
   },
   setup(props) {
     const { t } = useTranslation();
+    const editor = usePptxEditor();
     const errorId = useId();
-    const draft = ref<string | null>(null);
-    const invalid = ref(false);
-    const reset = (): void => {
-      draft.value = null;
-      invalid.value = false;
-    };
-    const commit = (): void => {
-      const d = draft.value;
-      if (d === null) return;
-      const shown = secondsText(props.ms);
-      const value = d === shown ? null : parseSeconds(d);
-      if (d === shown || (value !== null && props.onCommit(value))) reset();
-      else invalid.value = true;
-    };
-    return () => (
-      <label class="pptx-field">
-        {props.label}
-        <span class="pptx-field__control">
-          <input
-            inputmode="decimal"
-            aria-label={props.label}
-            aria-invalid={invalid.value}
-            aria-describedby={invalid.value ? errorId : undefined}
-            value={draft.value ?? secondsText(props.ms)}
-            disabled={props.disabled}
-            data-draft={draft.value !== null}
-            onInput={(e: Event) => {
-              draft.value = (e.target as HTMLInputElement).value;
-            }}
-            onBlur={commit}
-            onKeydown={(e: KeyboardEvent) => {
-              if (e.key === 'Enter') commit();
-              if (e.key === 'Escape') reset();
-            }}
-          />
-          <span class="pptx-field__unit">{t('panel.animations.secondsUnit')}</span>
-        </span>
-        {invalid.value ? (
-          <span id={errorId} class="pptx-animations__error" role="alert">
-            {t('panel.animations.invalidTime')}
-          </span>
-        ) : null}
-      </label>
+    const field = useLiveField(
+      () => ({
+        editor: editor.value,
+        value: () => secondsText(props.ms),
+        same: sameFormatNumber,
+        write(text, options, final) {
+          const value = parseSeconds(text);
+          if (value !== null && props.onCommit(value, options)) return null;
+          return final ? t('panel.animations.invalidTime') : undefined;
+        },
+      }),
+      () => props.ms
     );
+    return () => {
+      const invalid = field.error !== null;
+      return (
+        <label class="pptx-field">
+          {props.label}
+          <span class="pptx-field__control">
+            <input
+              inputmode="decimal"
+              aria-label={props.label}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? errorId : undefined}
+              value={field.draft ?? secondsText(props.ms)}
+              disabled={props.disabled}
+              data-draft={field.draft !== null}
+              onInput={(e: Event) =>
+                field.input(
+                  (e.target as HTMLInputElement).value,
+                  (e as InputEvent).isComposing === true
+                )
+              }
+              onCompositionend={(e: CompositionEvent) =>
+                field.input((e.target as HTMLInputElement).value)
+              }
+              onBlur={() => field.commit()}
+              onKeydown={(e: KeyboardEvent) => {
+                if (e.key === 'Enter') field.commit();
+                if (e.key === 'Escape') field.cancel();
+              }}
+            />
+            <span class="pptx-field__unit">{t('panel.animations.secondsUnit')}</span>
+          </span>
+          {invalid ? (
+            <span id={errorId} class="pptx-animations__error" role="alert">
+              {field.error}
+            </span>
+          ) : null}
+        </label>
+      );
+    };
   },
 });
 
@@ -94,12 +110,15 @@ const TransitionSection = defineComponent({
     const transition = useEditorState((s) => s.animations?.transition);
     const slideCount = useEditorState((s) => s.slides.length);
     const kindId = useId();
-    const set = (change: {
-      kind?: TransitionKind | 'none';
-      durationMs?: number;
-      advanceOnClick?: boolean;
-      advanceAfterMs?: number | null;
-    }) => editor.value?.exec({ type: 'setTransition', ...change }).ok === true;
+    const set = (
+      change: {
+        kind?: TransitionKind | 'none';
+        durationMs?: number;
+        advanceOnClick?: boolean;
+        advanceAfterMs?: number | null;
+      },
+      options?: EditorExecOptions
+    ) => editor.value?.exec({ type: 'setTransition', ...change }, options).ok === true;
     return () => {
       const tr = transition.value;
       if (!tr) return null;
@@ -135,13 +154,17 @@ const TransitionSection = defineComponent({
               label={t('panel.animations.duration')}
               ms={tr.durationMs}
               disabled={disabled || tr.kind === 'none'}
-              onCommit={(ms: number) => set({ durationMs: ms })}
+              onCommit={(ms: number, options: EditorExecOptions) =>
+                set({ durationMs: ms }, options)
+              }
             />
             <SecondsField
               label={t('panel.animations.advanceAfter')}
               ms={tr.advanceAfterMs ?? 0}
               disabled={disabled || tr.advanceAfterMs === null}
-              onCommit={(ms: number) => set({ advanceAfterMs: ms })}
+              onCommit={(ms: number, options: EditorExecOptions) =>
+                set({ advanceAfterMs: ms }, options)
+              }
             />
           </div>
           <div class="pptx-radios">
@@ -258,13 +281,12 @@ const EffectFields = defineComponent({
     return () => {
       const effect = props.effect;
       const off = props.disabled || !effect.editable;
-      const timing = (change: {
-        trigger?: AnimationTrigger;
-        delayMs?: number;
-        durationMs?: number;
-      }) =>
-        editor.value?.exec({ type: 'setAnimationTiming', effectId: effect.id, ...change }).ok ===
-        true;
+      const timing = (
+        change: { trigger?: AnimationTrigger; delayMs?: number; durationMs?: number },
+        options?: EditorExecOptions
+      ) =>
+        editor.value?.exec({ type: 'setAnimationTiming', effectId: effect.id, ...change }, options)
+          .ok === true;
       const move = (to: number) =>
         editor.value?.exec({ type: 'moveAnimation', effectId: effect.id, to });
       return (
@@ -292,13 +314,17 @@ const EffectFields = defineComponent({
               label={t('panel.animations.delay')}
               ms={effect.delayMs}
               disabled={off}
-              onCommit={(ms: number) => timing({ delayMs: ms })}
+              onCommit={(ms: number, options: EditorExecOptions) =>
+                timing({ delayMs: ms }, options)
+              }
             />
             <SecondsField
               label={t('panel.animations.duration')}
               ms={effect.durationMs ?? 0}
               disabled={off || effect.durationMs === null}
-              onCommit={(ms: number) => timing({ durationMs: ms })}
+              onCommit={(ms: number, options: EditorExecOptions) =>
+                timing({ durationMs: ms }, options)
+              }
             />
           </div>
           <div class="pptx-animations__actions">

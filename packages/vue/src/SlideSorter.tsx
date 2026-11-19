@@ -32,7 +32,6 @@ import {
   slideSorterMounted,
   sorterKeyDown,
   trackNotesInset,
-  translateKeyOrText,
   warnSlideSorterUnmounted,
   type NotesInsetTracker,
   type SlideSummary,
@@ -288,9 +287,7 @@ export const ViewSwitch = defineComponent({
     const cmd = useEditorCommand('view.presentationView');
     const options = STATUS_BAR_VIEW_OPTIONS;
     const off = computed(() => !cmd.isEnabled.value);
-    const reason = computed(() =>
-      cmd.disabledReason.value ? translateKeyOrText(t, cmd.disabledReason.value) : null
-    );
+    const reason = cmd.disabledReason;
     // Off stays focusable, with the reason as its description.
     const offAttrs = useAriaDisabled(off, reason);
     const pick = (e: KeyboardEvent, step: number): void => {
