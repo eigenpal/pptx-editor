@@ -46,9 +46,10 @@ import {
   type ReplicaTextSpec,
   type XmlPart,
 } from '@pptx-editor.dev/core/store';
-import { ATTR_SEP, F, MAX_MINT_COUNTER, ROOM_LIMITS, partEntryOf, type Room } from './schema.ts';
+import { F, MAX_MINT_COUNTER, ROOM_LIMITS, partEntryOf, type Room } from './schema.ts';
 import {
   SEED_MARK,
+  attrKey,
   clientOf,
   groupOf,
   inSchemaOrder,
@@ -85,10 +86,13 @@ import {
 } from './removed-content.ts';
 import { noteTidiedListings, UNDONE_KEY, UndoneListings } from './undo-unlisted.ts';
 import {
+  attrOrderOf,
   indexTree,
   inRoomOrder,
+  orderedAttrs,
   rescuedParents,
   type RescuedIn,
+  shellOf,
   shownParentsOnly,
   shownParentKey,
   shownPlaceKept,
@@ -115,13 +119,6 @@ export type RebuildResult =
 
 const attrOfElement = (el: Element, local: string): string | undefined =>
   el.attrs.find((a) => a.ns === '' && a.local === local)?.value;
-
-const shellOf = (el: Element) => ({
-  ns: el.ns,
-  local: el.local,
-  ...(el.prefix ? { prefix: el.prefix } : {}),
-  nsDecls: el.nsDecls.map((d) => ({ prefix: d.prefix, uri: d.uri })),
-});
 
 /** The last minted key number of one client on one Y.Doc, shared by its mirrors. */
 export interface MintCounter {
@@ -526,6 +523,11 @@ export class PackageMirror {
     }
     const shell = shellOf(node);
     if (JSON.stringify(rec.get(F.shell)) !== JSON.stringify(shell)) rec.set(F.shell, shell);
+    // A field of its own, not the shell: an undo that drops it leaves the sorted order.
+    const order = attrOrderOf(node);
+    if (JSON.stringify(rec.get(F.attrOrder)) !== JSON.stringify(order))
+      if (order) rec.set(F.attrOrder, order);
+      else rec.delete(F.attrOrder);
     const view = this.#views.get(key);
     // A merged container: what this replica adds goes to the copy it wrote, when it has one,
     // so its own undo reverts it and a peer's undo does not.
@@ -537,7 +539,7 @@ export class PackageMirror {
     if (attrs instanceof Y.Map) {
       const desired = new Map<string, Record<string, string>>();
       for (const a of node.attrs)
-        desired.set(`${a.ns}${ATTR_SEP}${a.local}`, {
+        desired.set(attrKey(a), {
           ns: a.ns,
           local: a.local,
           value: a.value,
@@ -931,10 +933,9 @@ export class PackageMirror {
       // A limit refuses the whole part (peers are untrusted); a malformed record is skipped.
       else if (this.#readRefusal) return null;
     }
-    // Attribute order does not change the canonical form; sort for one order on every peer.
-    const attrList = [...attrs.entries()]
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([, v]) => v as { ns: string; local: string; prefix?: string; value: string });
+    // Attribute order does not change the canonical form, but it changes the saved bytes: read
+    // the order the record keeps, so every peer saves the bytes of the replica that wrote it.
+    const attrList = orderedAttrs(attrs, rec.get(F.attrOrder));
     const ns = s.ns as string;
     const local = s.local as string;
     // A run or a paragraph that a peer removed while another typed into it comes back.

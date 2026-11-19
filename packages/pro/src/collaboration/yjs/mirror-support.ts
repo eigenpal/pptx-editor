@@ -5,7 +5,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Helpers of the package mirror (`mirror.ts`) that read no mirror state: the text and key-list
 // syncs of a write, the listings a read skipped (`PackageMirror.dropHiddenListings`), and the
-// runs a read showed by the move rescue (`rescuedParents`).
+// runs a read showed by the move rescue (`rescuedParents`), and the shell and attribute order
+// of an element record.
 
 import * as Y from 'yjs';
 import { readText, writeCase } from './text-case.ts';
@@ -17,7 +18,7 @@ import type {
   ReplicaElementSpec,
 } from '@pptx-editor.dev/core/store';
 import { specKeys } from './move-rescue.ts';
-import { inSchemaOrder } from './singleton-children.ts';
+import { attrKey, inSchemaOrder } from './singleton-children.ts';
 import { liveIds, type TextWrite } from './text-identity.ts';
 
 /** One part's write: its key mapping, and its nodes before the change. */
@@ -326,4 +327,47 @@ export function inRoomOrder(
   }
   for (const n of tail) out.push(n);
   return out;
+}
+
+const byKey = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The document order of the attributes of `el`, as the index of each one among the sorted
+ * keys, or undefined when that order is the sorted order a read falls back to. Every peer then
+ * reads the order of the file, so two replicas of one package save the same bytes.
+ */
+export function attrOrderOf(el: Element): number[] | undefined {
+  const keys = el.attrs.map(attrKey);
+  const sorted = [...keys].sort(byKey);
+  if (keys.every((k, i) => k === sorted[i])) return undefined;
+  const rank = new Map(sorted.map((k, i) => [k, i]));
+  return keys.map((k) => rank.get(k)!);
+}
+
+/** The `s` shell of an element record. */
+export const shellOf = (el: Element) => ({
+  ns: el.ns,
+  local: el.local,
+  ...(el.prefix ? { prefix: el.prefix } : {}),
+  nsDecls: el.nsDecls.map((d) => ({ prefix: d.prefix, uri: d.uri })),
+});
+
+type AttrSpec = { ns: string; local: string; prefix?: string; value: string };
+
+/**
+ * The attributes of a record in one order on every peer: the order the record keeps (`ao`), or
+ * the sorted order. The kept order counts only while it is a permutation of the record's
+ * attributes; a concurrent write that added or removed one leaves the sorted order. Room values
+ * are untrusted: a list of another length is not read.
+ */
+export function orderedAttrs(attrs: Y.Map<unknown>, order: unknown): AttrSpec[] {
+  const sorted = [...attrs.keys()].sort(byKey);
+  const n = sorted.length;
+  const valid =
+    Array.isArray(order) &&
+    order.length === n &&
+    order.every((i) => Number.isInteger(i) && i >= 0 && i < n) &&
+    new Set(order).size === n;
+  const keys = valid ? (order as number[]).map((i) => sorted[i]!) : sorted;
+  return keys.map((k) => attrs.get(k) as AttrSpec);
 }

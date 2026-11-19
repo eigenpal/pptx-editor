@@ -101,13 +101,15 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * On 8 November 2026: the new `objects.equations` copy, whose inserted equation box is shorter
  * after the change to equation line heights, no prompt. On 13 November 2026: the
  * `objects.equations` copy after the change to equation line spacing, no prompt. On 16 November
- * 2026: the `objects.equations` copy after the change to equation array rows, no prompt.
+ * 2026: the `objects.equations` copy after the change to equation array rows, no prompt. On 19
+ * November 2026: the `collaboration.realtime` copy, whose room keeps the attribute order of the
+ * file, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
     'sha256:dd9192d0997886b39bf62e39c1b3cabeb08decee94e95d6e5cdda95715ecb911',
   'collaboration.realtime':
-    'sha256:47e811007d57bbb5b9257d1727c1396f4add81546e85417cc8dd61361aa54189',
+    'sha256:ae28c6bbd8cec96063fb681f490278a2bab10d9b924ac4f32008d6c3b2080fdb',
   'effects.3d-and-other': 'sha256:e97f4075d4485c849ef3dba4419a7593ebda6ddeaefcdc1dabb093eb21703f6a',
   'effects.fill-overlay': 'sha256:1ca1da39ba290ed51260330eea20da74df48a1fa2f57d38db01ed46e6ee2a740',
   'effects.glow-reflection':
@@ -272,7 +274,9 @@ export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> 
  * repair prompt, with the fingerprint of that copy (`commentFingerprint`). `bun
  * scripts/fidelity/comment-edits.ts --out <dir>` writes one copy per recipe. The rules of
  * `SAVE_VERIFIED_FEATURE_EDITS` apply. Last checked on 7 November 2026: all 4 copies, and the
- * `slide-structure` copies of `SAVE_VERIFIED_FIXTURES`, no prompt.
+ * `slide-structure` copies of `SAVE_VERIFIED_FIXTURES`, no prompt. On 19 November 2026: the
+ * `review.comments: collaboration` copy, whose room keeps the attribute order of the file, no
+ * prompt.
  */
 export const SAVE_VERIFIED_COMMENT_EDITS: Readonly<Record<string, string>> = {
   'review.comments: legacy':
@@ -282,7 +286,7 @@ export const SAVE_VERIFIED_COMMENT_EDITS: Readonly<Record<string, string>> = {
   'review.comments: duplicate threads':
     'sha256:536faea983a8f5292a63f709167171463ecf7486d38eaf01772618babaf39a2b',
   'review.comments: collaboration':
-    'sha256:bb86cb89a50181a666fac29b3c8f5cafc5c5d14d752b6a04537a8c11c1c70551',
+    'sha256:09bba0500edf0dd1eb434c72aa7f6011560eeb8590b478c1bb72fc0d5970c379',
 };
 
 /**

@@ -114,6 +114,7 @@ function savedEqual(a: PptxEditorInstance, b: PptxEditorInstance, valid = true):
   expect(canonicalPackageFingerprint(b.session!.store.package)).toBe(before);
   const revisions = [a.session!.store.revision, b.session!.store.revision];
   const [bytesA, bytesB] = [a.save()!, b.save()!];
+  expect(Buffer.from(bytesB).equals(Buffer.from(bytesA))).toBe(true);
   expect([a.session!.store.revision, b.session!.store.revision]).toEqual(revisions);
   expect(canonicalPackageFingerprint(a.session!.store.package)).toBe(before);
   const [ra, rb] = [readPptx(bytesA), readPptx(bytesB)];

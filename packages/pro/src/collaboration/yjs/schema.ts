@@ -24,7 +24,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //
 // A node record holds `p` (its part name), `k` (its own key, checked on read), and either an
 // element (`s` shell: name and namespace declarations, `a` Y.Map of attributes, `c` Y.Array of
-// child keys) or a text node (`x` Y.Text). Split and move lineage adds the optional fields of
+// child keys, and `ao`, the document order of the attributes as indexes into their sorted keys
+// when that order is not sorted) or a text node (`x` Y.Text). Split and move lineage adds the optional fields of
 // `LINEAGE` in `text-lineage.ts` (`sf`, `sb`, `sa`, `sl`, `sg`, `se`, `sk`, `cw`, `mf`, `mi`, `mq`,
 // `mt`, `mo`, `rw`), character identity the fields of `IDENTITY` in `text-identity.ts` (`ci`, `cp`, `rr.<key>`), and
 // case choices `cc.<root-client>:<root-clock>:<author>` ([logical order, UTF-16 unit]), and
@@ -84,6 +85,8 @@ export const F = Object.freeze({
   key: 'k',
   shell: 's',
   attrs: 'a',
+  /** The document order of the attributes, when it is not sorted (`orderedAttrs`). */
+  attrOrder: 'ao',
   children: 'c',
   text: 'x',
 });

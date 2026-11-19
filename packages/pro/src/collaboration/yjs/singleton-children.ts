@@ -384,7 +384,8 @@ type Spec = ReplicaElementSpec;
 type ReplicaChild = ReplicaElementSpec | ReplicaTextSpec;
 type Attr = NonNullable<Spec['attrs']>[number];
 
-const attrKey = (a: { readonly ns: string; readonly local: string }): string =>
+/** The key of an attribute in a record's `a` map. */
+export const attrKey = (a: { readonly ns: string; readonly local: string }): string =>
   `${a.ns}${ATTR_SEP}${a.local}`;
 
 /** The client that minted a key: the part before its first `.`. */
@@ -494,8 +495,9 @@ function mergeCopies(
     if (from !== undefined) view.childFrom.set(c.key, from);
   }
   const children = inSchemaOrder(base, merged, (k) => ('text' in k ? undefined : k));
-  const sorted = [...attrs.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return { ...base, attrs: sorted.map(([, a]) => a), children: [...children] };
+  // The base's attributes in its read order (`orderedAttrs`), then those that only a later
+  // copy has, in copy order: one order on every peer.
+  return { ...base, attrs: [...attrs.values()], children: [...children] };
 }
 
 /**
