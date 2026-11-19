@@ -1,5 +1,13 @@
 # @pptx-editor.dev/pro
 
+## 0.7.0
+
+### Patch Changes
+
+- d450255: Two replicas of one package in a Yjs collaboration room save the same bytes. The room keeps the attribute order of each element when that order is not sorted, so every peer saves the order of the file. A replica of an earlier build reads the sorted order, and an element that it writes loses the kept order.
+- 194c9fe: A click in a text placeholder that has no `p:txBody` places the caret, and the placeholder shows its prompt. The first edit that adds text adds the text body, which inherits the body properties of the layout and master placeholders. A click, a read, or a delete key leaves the file unchanged. In a collaboration room, two peers that type into such a placeholder at once both keep their text.
+- Updated dependencies: @pptx-editor.dev/core@0.7.0, @pptx-editor.dev/react@0.7.0, @pptx-editor.dev/vue@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
