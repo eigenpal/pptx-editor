@@ -13,7 +13,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  translateKeyOrText,
   type EditorModule,
   type PptxEditorInstance,
   type SidePanelTab,
@@ -132,7 +131,7 @@ function Shell({
   const ribbon = ribbonChrome(location.search);
   // Present follows the slot's state: off with a reason in the slide master view, for one.
   const present = useEditorCommand('view.playFromStart');
-  const presentOff = present.disabledReason ? translateKeyOrText(t, present.disabledReason) : null;
+  const presentOff = present.disabledReason;
   // A phone sizes the slide area to the slide's shape (shell.css).
   const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
   const show = useSlideshow();

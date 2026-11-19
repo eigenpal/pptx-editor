@@ -15,16 +15,10 @@ This button runs a toolbar command and shows why the command cannot run:
 
 ```vue
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useEditorCommand, useTranslation } from '@pptx-editor.dev/vue';
-import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
 
 const bold = useEditorCommand('text.bold');
 const { t } = useTranslation();
-const title = computed(() => {
-  const reason = bold.disabledReason.value;
-  return reason ? translateKeyOrText(t, reason) : t('toolbar.bold');
-});
 </script>
 
 <template>
@@ -33,7 +27,7 @@ const title = computed(() => {
     :aria-disabled="!bold.isEnabled.value || undefined"
     :aria-pressed="bold.isActive.value"
     :aria-label="t('toolbar.bold')"
-    :title="title"
+    :title="bold.disabledReason.value ?? t('toolbar.bold')"
     @mousedown.prevent
     @click="bold.execute()"
   >

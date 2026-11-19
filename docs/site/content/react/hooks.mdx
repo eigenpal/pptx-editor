@@ -15,19 +15,17 @@ This button runs a toolbar command and shows why the command cannot run:
 
 ```tsx
 import { useEditorCommand, useTranslation } from '@pptx-editor.dev/react';
-import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
 
 export function BoldButton() {
   const bold = useEditorCommand('text.bold');
   const { t } = useTranslation();
-  const reason = bold.disabledReason;
   return (
     <button
       type="button"
       aria-disabled={!bold.isEnabled || undefined}
       aria-pressed={bold.isActive}
       aria-label={t('toolbar.bold')}
-      title={reason ? translateKeyOrText(t, reason) : t('toolbar.bold')}
+      title={bold.disabledReason ?? t('toolbar.bold')}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => bold.execute()}
     >

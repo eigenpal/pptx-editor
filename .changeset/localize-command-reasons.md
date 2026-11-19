@@ -1,6 +1,6 @@
 ---
-'@pptx-editor.dev/react': patch
-'@pptx-editor.dev/vue': patch
+'@pptx-editor.dev/react': minor
+'@pptx-editor.dev/vue': minor
 ---
 
-`useEditorCommand` and `useEditorValueCommand` return `disabledReason` as readable text in the root locale, in React and Vue. The hooks translate catalog keys, keep the engine's own text, and update the text when the `locale` prop changes. You no longer need `translateKeyOrText` to show the reason.
+Breaking: `useEditorCommand` and `useEditorValueCommand` return `disabledReason` as readable text in the root locale, not a catalog key. The text follows the `locale` prop, and the engine's own text stays unchanged. Remove `translateKeyOrText` around the reason, and do not compare it with a key.
