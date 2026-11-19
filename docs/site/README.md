@@ -76,7 +76,6 @@ Run the docs checks from the repository root:
 
 ```bash
 bun test docs
-node scripts/check-public-terminology.mjs
 bunx prettier --check "docs/site/content/**/*.{mdx,json}"
 ```
 
