@@ -6,10 +6,13 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
-import { attr, child, elements, find, xmlPartOf, type Element } from '../../store/index.ts';
+import { attr, child, elements, find, textOf, xmlPartOf, type Element } from '../../store/index.ts';
 import { readPptx } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { PlaceholderPrompts } from '../placeholder-prompts.ts';
+import { placeCaret } from '../paragraph-place.ts';
+import { caretParagraph } from '../replacement-text.ts';
+import { paragraphSpecs } from '../clipboard-rich.ts';
 
 const ph = (id: number, name: string, type: string, body = '') =>
   `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr><a:spLocks noGrp="1"/>` +
@@ -135,6 +138,43 @@ describe('a placeholder without a text body', () => {
     // One undo removes the text and the body that it added.
     expect(e.exec({ type: 'undo' }).ok).toBe(true);
     expect(child(shapeOf(e, 'Title'), 'p:txBody')).toBeUndefined();
+    e.destroy();
+  });
+
+  test('a delete key at the caret writes nothing', async () => {
+    const { e, click } = await attached();
+    click('Title');
+    expect(e.input('deleteBackward').ok).toBe(true);
+    expect(e.input('deleteForward').ok).toBe(true);
+    expect(child(shapeOf(e, 'Title'), 'p:txBody')).toBeUndefined();
+    expect(e.snapshot().canUndo).toBe(false);
+    e.destroy();
+  });
+
+  test('a paste at the caret adds the body', async () => {
+    const { e, click } = await attached();
+    click('Title');
+    const paragraphs = paragraphSpecs([{ runs: [{ text: 'Pasted' }] }]);
+    expect(e.exec({ type: 'pasteText', paragraphs }).ok).toBe(true);
+    const body = child(shapeOf(e, 'Title'), 'p:txBody')!;
+    expect(textOf(body)).toBe('Pasted');
+    e.destroy();
+  });
+
+  test('a composition place holds while the placeholder has no body, and ends when it gets one', async () => {
+    const { e, click } = await attached();
+    click('Title');
+    const part = e.session!.info.slides[0]!.partName;
+    const sel = e.snapshot().selection;
+    // Every read gives the same paragraph id, so the place of a composition holds.
+    const first = caretParagraph(e.session!, part, sel)!;
+    expect(caretParagraph(e.session!, part, sel)!.id).toBe(first.id);
+    const place = { at: sel, paragraph: first.id, before: '' };
+    expect(placeCaret(e.session!.probeBatch(), part, place)).toEqual(sel as never);
+    expect(child(shapeOf(e, 'Title'), 'p:txBody')).toBeUndefined();
+    // Once an edit adds the body, the place no longer holds.
+    expect(e.input('text', 'A').ok).toBe(true);
+    expect(placeCaret(e.session!.probeBatch(), part, place)).toBeNull();
     e.destroy();
   });
 

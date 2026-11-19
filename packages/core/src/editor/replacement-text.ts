@@ -16,9 +16,9 @@
 
 import { segmentGraphemes } from '@eigenpal/ooxml-core';
 import type { EditorSelection } from '../contracts/index.ts';
-import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
+import { paragraphText, slideNumberOf } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
-import { selectionBody } from './table-cells.ts';
+import { selectionParagraphs } from './table-cells.ts';
 import {
   holdsSelection,
   placeCaret,
@@ -115,8 +115,7 @@ export function caretParagraph(
   const { anchor, focus } = sel;
   if (anchor.paragraph !== focus.paragraph || anchor.offset !== focus.offset) return null;
   const batch = session.probeBatch();
-  const body = selectionBody(batch, part, sel);
-  const p = body && paragraphsOf(body)[focus.paragraph];
+  const p = selectionParagraphs(batch, part, sel)[focus.paragraph];
   if (!p) return null;
   return {
     key: paragraphKey(part, sel.nodeId, sel.cell, focus.paragraph),

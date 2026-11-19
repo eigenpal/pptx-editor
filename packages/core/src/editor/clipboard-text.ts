@@ -29,7 +29,7 @@ import { cleanText } from '../automation/commands/text-units.ts';
 import { sanitizeNode } from './clipboard.ts';
 import type { RichParagraph, RichRun } from './clipboard-rich.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
-import { selectionBody } from './table-cells.ts';
+import { editBody, selectionBody } from './table-cells.ts';
 import { refitShape, slidePart } from './text-targets.ts';
 
 /** The clipboard type for formatted text from this editor. */
@@ -348,7 +348,7 @@ export function compilePasteText(
   const part = slidePart(ctx);
   const sel = ctx.selection;
   if (sel.kind === 'text') {
-    const body = selectionBody(batch, part, sel);
+    const body = editBody(batch, part, sel);
     if (!body) throw new CommandRefusal('disabled.noText');
     const at = pasteParagraphs(batch, part, body.id, sel, specs);
     refitShape(batch, ctx, part, sel.nodeId);

@@ -181,6 +181,9 @@ export function relayoutItem(
 
 /** A shape with the autofit its box gives (`fitShape`). */
 function fitted(el: ResolvedShape, measurer: TextMeasurer): ResolvedShape {
+  // A body that no part holds yet (a text placeholder without one) has nothing to fit: the
+  // release writes no fit for it either.
+  if (el.text && el.text.nodeId === undefined) return el;
   const fit = fitShape(el, measurer);
   if (fit?.kind === 'size') return { ...el, xfrm: { ...el.xfrm, cx: fit.cx, cy: fit.cy } };
   if (!fit || !el.text) return el;
