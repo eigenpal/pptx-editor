@@ -64,7 +64,7 @@ const labels: LocaleCatalog = {
 | `LocaleCatalog` | The type of a catalog for the `locale` prop: the English shape, where each value is optional and can be `null`. |
 | `TranslationKey` | Every key, as a dotted path such as `toolbar.bold`. |
 | `createTranslator(locale?)` | A `Translate` function over a catalog, for use outside the editor. |
-| `isTranslationKey(key)` | Whether a string is a key. To show a `disabledReason` from `useEditorCommand`, use `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`. |
+| `isTranslationKey(key)` | Whether a string is a key. To show a string that can be a key or text, such as a dialog draft's `error`, use `translateKeyOrText(t, value)` from `@pptx-editor.dev/core/editor`. The `disabledReason` of `useEditorCommand` is already translated. |
 
 A missing or `null` value falls back to English. A value can hold `{name}` placeholders, such as `Slide {index}`; keep the placeholder names when you translate it.
 

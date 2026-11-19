@@ -335,18 +335,15 @@ Build a control from `useEditorCommand` when `Toolbar.Action` does not fit. Keep
 <Framework value="react">
 
 ```tsx
-import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
-import { useEditorCommand, useTranslation } from '@pptx-editor.dev/react';
+import { useEditorCommand } from '@pptx-editor.dev/react';
 
 export function PresentButton() {
-  const { t } = useTranslation();
   const present = useEditorCommand('view.playFromStart');
-  const reason = present.disabledReason;
   return (
     <button
       type="button"
       aria-disabled={!present.isEnabled || undefined}
-      title={reason ? translateKeyOrText(t, reason) : undefined}
+      title={present.disabledReason ?? undefined}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => {
         if (present.isEnabled) present.execute();
@@ -363,16 +360,9 @@ export function PresentButton() {
 
 ```vue
 <script setup lang="ts">
-import { computed } from 'vue';
-import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
-import { useEditorCommand, useTranslation } from '@pptx-editor.dev/vue';
+import { useEditorCommand } from '@pptx-editor.dev/vue';
 
-const { t } = useTranslation();
 const present = useEditorCommand('view.playFromStart');
-const reason = computed(() => {
-  const value = present.disabledReason.value;
-  return value ? translateKeyOrText(t, value) : undefined;
-});
 function run() {
   if (present.isEnabled.value) present.execute();
 }
@@ -382,7 +372,7 @@ function run() {
   <button
     type="button"
     :aria-disabled="!present.isEnabled.value || undefined"
-    :title="reason"
+    :title="present.disabledReason.value ?? undefined"
     @mousedown.prevent
     @click="run"
   >

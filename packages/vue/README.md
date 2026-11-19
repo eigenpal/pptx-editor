@@ -106,7 +106,7 @@ createApp({
 | --- | --- |
 | `usePptxEditor()` | `UsePptxEditorReturn`: the editor, or null before it mounts |
 | `useEditorState(selector, isEqual?)` | `UseEditorStateReturn<T>`: the selected slice, updated only when it changes |
-| `useEditorCommand(slotId)` | `UseEditorCommandReturn`: `execute` (it returns `true` when the engine ran the command, `false` on a refusal), and `isEnabled`, `isActive`, `disabledReason`, `value` as computed refs. `disabledReason` is a catalog key or the engine's own text: show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`. `slotId` may be a ref or a getter |
+| `useEditorCommand(slotId)` | `UseEditorCommandReturn`: `execute` (it returns `true` when the engine ran the command, `false` on a refusal), and `isEnabled`, `isActive`, `disabledReason`, `value` as computed refs. `disabledReason` is readable text in the locale of `PptxEditorRoot`: the composable translates catalog keys and keeps the engine's own text. `slotId` may be a ref or a getter |
 | `useTranslation()` | `UseTranslationReturn`: `t`, with shortcut text for the platform |
 | `useFontFormat()` | `UseFontFormatReturn`: `format` (the `FontFormatRead` of the selected text or of the selected shapes' runs, with `disagrees`), `isEnabled`, and `apply(update)`, which sends one `setFontFormat` and returns whether the engine accepted it |
 | `useBulletFormat()` | `UseBulletFormatReturn`: `format` (the `BulletFormatRead` of the selected paragraphs: `null` when they have no list, `undefined` when they differ or no text is selected), `isEnabled`, and `apply(format)`, which sends one `setBulletFormat` and returns whether the engine accepted it |

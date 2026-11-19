@@ -13,6 +13,10 @@ import { PptxEditorContent, PptxEditorRoot } from '../PptxEditorRoot.tsx';
 import { SlideRail, ZoomPill } from '../panes.tsx';
 import { SlideSorter, ViewSwitch } from '../SlideSorter.tsx';
 import { Toolbar, ToolbarSlot } from '../Toolbar.tsx';
+import { createTranslator } from '@pptx-editor.dev/i18n';
+
+/** The English text of a catalog key, as the command hooks return it. */
+const en = createTranslator();
 
 afterEach(cleanup);
 
@@ -110,7 +114,7 @@ describe('section.rename and section.add outside the toolbar', () => {
       </PptxEditorContext.Provider>
     );
     expect(rename!.isEnabled).toBe(false);
-    expect(rename!.disabledReason).toBe('disabled.noSectionPane');
+    expect(rename!.disabledReason).toBe(en('disabled.noSectionPane'));
     expect(rename!.execute()).toBe(false);
     view.rerender(
       <PptxEditorContext.Provider value={editor}>

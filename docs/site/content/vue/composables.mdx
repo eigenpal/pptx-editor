@@ -49,7 +49,7 @@ const title = computed(() => {
 | `execute(value?)` | `boolean` | Runs the slot's command, with a value for value slots. Returns `true` when the engine ran it, and `false` on a refusal. |
 | `isEnabled` | `ComputedRef<boolean>` | Whether the command can run now. |
 | `isActive` | `ComputedRef<boolean>` | Whether a toggle control shows as pressed. |
-| `disabledReason` | `ComputedRef<string \| null>` | A translation key, or the engine's own text, when the command cannot run. |
+| `disabledReason` | `ComputedRef<string \| null>` | Why the command cannot run, as text in the root locale. The hook translates catalog keys and keeps the engine's own text. |
 | `value` | `ComputedRef<string \| number \| undefined>` | The value a value slot shows, such as a font size or a family. |
 
 The types in these signatures, such as `ChromeSlotId`, `CommandResult`, `EditorSnapshot`, and `PptxEditorInstance`, are exported from `@pptx-editor.dev/vue`. You do not need an import from `@pptx-editor.dev/core` to type your handlers.
@@ -287,7 +287,7 @@ To make the values of one slider drag one undo step, pass `{ historyGroup }` fro
 - Call composables during `setup()` inside `PptxEditorRoot`. Outside it, `usePptxEditor().value` is `null`.
 - `canUndo` reports undo availability, not unsaved changes. Track saves yourself.
 - Dialog draft composables read a draft. They do not open the dialog; use `useEditorDialog(key)` for that.
-- `disabledReason` can be a translation key. Show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`.
+- `disabledReason` is text in the root locale. It changes when the root's `locale` prop changes.
 
 ## See also
 

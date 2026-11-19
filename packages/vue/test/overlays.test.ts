@@ -22,7 +22,7 @@ import {
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../scripts/fixtures/builder.ts';
-import { PptxEditorContext, SlideshowContext } from '../../react/src/context.ts';
+import { PptxEditorContext, SlideshowContext, translatorFor } from '../../react/src/context.ts';
 import { fontBytes } from '../../core/src/editor/__tests__/font-test-helpers.ts';
 import { FindBar as ReactFindBar } from '../../react/src/FindBar.tsx';
 import { EditNotice as ReactEditNotice } from '../../react/src/EditNotice.tsx';
@@ -277,7 +277,7 @@ describe('the root hosts find, the link popup, and the slide show', () => {
     const shown = shallowRef(false);
     await mountRoot(undefined, () => [h(Probe), shown.value ? h(PptxEditorFindBar) : null]);
     expect(find!.isEnabled.value).toBe(false);
-    expect(find!.disabledReason.value).toBe('find.noBar');
+    expect(find!.disabledReason.value).toBe(translatorFor()('find.noBar'));
     shown.value = true;
     await nextTick();
     expect(find!.isEnabled.value).toBe(true);
@@ -328,7 +328,7 @@ describe('the root hosts find, the link popup, and the slide show', () => {
     popups.value = { find: false };
     await nextTick();
     expect(find!.isEnabled.value).toBe(false);
-    expect(find!.disabledReason.value).toBe('find.unavailable');
+    expect(find!.disabledReason.value).toBe(translatorFor()('find.unavailable'));
     expect(document.querySelector('.pptx-find') === null).toBe(true);
   });
 
