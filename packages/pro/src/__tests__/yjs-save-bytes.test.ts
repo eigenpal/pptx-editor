@@ -9,11 +9,13 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // keeps that order for every peer (`ao` in the record shell), in both client orders.
 
 import { describe, expect, test } from 'bun:test';
+import * as Y from 'yjs';
 import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { all, IN, kids, peers, root, TWO_ORDERS } from './lineage-support.ts';
+import { orderedAttrs } from '../collaboration/yjs/mirror-support.ts';
 
-/** One text box whose `a:off` and `a:rPr` keep their attributes out of sorted order. */
+/** One text box whose run properties (`lang`, `dirty`, `sz`) are out of sorted order. */
 const deck = (): Uint8Array =>
   buildPptx({
     slides: [
@@ -67,6 +69,33 @@ describe('two replicas of one package', () => {
       expect(sb === sa).toBe(true);
     });
 
+    test(`save the same bytes after concurrent writes to one run (client ids ${ids.join(', ')})`, async () => {
+      const { editors, sync } = await peers(deck(), ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+      sync.pause();
+      // Both peers add an attribute to the same `a:rPr`, so both write its order at once.
+      for (const [e, type] of [
+        [a, 'toggleBold'],
+        [b, 'toggleItalic'],
+      ] as const) {
+        e.setSelection({
+          kind: 'text',
+          nodeId: box(e),
+          anchor: { paragraph: 0, offset: 0 },
+          focus: { paragraph: 0, offset: 11 },
+        });
+        expect(e.exec({ type }).ok).toBe(true);
+      }
+      sync.flush();
+      const props = (e: PptxEditorInstance) =>
+        all(root(e), 'rPr').map((r) => r.attrs.map((x) => `${x.local}=${x.value}`).join(' '));
+      expect(props(b)).toEqual(props(a));
+      expect(props(a)[0]).toContain('b=1');
+      expect(props(a)[0]).toContain('i=1');
+      const [sa, sb] = saves([a, b]);
+      expect(sb === sa).toBe(true);
+    });
+
     test(`save the same bytes after concurrent attribute writes (client ids ${ids.join(', ')})`, async () => {
       const { editors, sync } = await peers(deck(), ids);
       const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
@@ -80,4 +109,26 @@ describe('two replicas of one package', () => {
       expect(sb === sa).toBe(true);
     });
   }
+});
+
+describe('the attribute order a record keeps', () => {
+  /** A record's attribute map with `val` and `lastClr`, sorted `lastClr`, `val`. */
+  const attrs = () => {
+    const doc = new Y.Doc();
+    const map = doc.getMap<unknown>('a');
+    for (const local of ['val', 'lastClr'])
+      map.set(`\u001f${local}`, { ns: '', local, value: local });
+    return map;
+  };
+  const read = (order: unknown) => orderedAttrs(attrs(), order).map((a) => a.local);
+
+  test('a permutation of the attributes gives their order', () => {
+    expect(read([1, 0])).toEqual(['val', 'lastClr']);
+    expect(read(undefined)).toEqual(['lastClr', 'val']);
+  });
+
+  test('an order of another length, with repeats, or with other values gives the sorted order', () => {
+    for (const order of [[1], [1, 0, 2], [1, 1], [0.5, 1], ['1', '0'], new Array(1e6).fill(0), 'x'])
+      expect(read(order)).toEqual(['lastClr', 'val']);
+  });
 });

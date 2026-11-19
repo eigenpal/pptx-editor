@@ -49,6 +49,7 @@ import {
 import { F, MAX_MINT_COUNTER, ROOM_LIMITS, partEntryOf, type Room } from './schema.ts';
 import {
   SEED_MARK,
+  attrKey,
   clientOf,
   groupOf,
   inSchemaOrder,
@@ -85,7 +86,7 @@ import {
 } from './removed-content.ts';
 import { noteTidiedListings, UNDONE_KEY, UndoneListings } from './undo-unlisted.ts';
 import {
-  attrKeyOf,
+  attrOrderOf,
   indexTree,
   inRoomOrder,
   orderedAttrs,
@@ -522,6 +523,11 @@ export class PackageMirror {
     }
     const shell = shellOf(node);
     if (JSON.stringify(rec.get(F.shell)) !== JSON.stringify(shell)) rec.set(F.shell, shell);
+    // A field of its own, not the shell: an undo that drops it leaves the sorted order.
+    const order = attrOrderOf(node);
+    if (JSON.stringify(rec.get(F.attrOrder)) !== JSON.stringify(order))
+      if (order) rec.set(F.attrOrder, order);
+      else rec.delete(F.attrOrder);
     const view = this.#views.get(key);
     // A merged container: what this replica adds goes to the copy it wrote, when it has one,
     // so its own undo reverts it and a peer's undo does not.
@@ -533,7 +539,7 @@ export class PackageMirror {
     if (attrs instanceof Y.Map) {
       const desired = new Map<string, Record<string, string>>();
       for (const a of node.attrs)
-        desired.set(attrKeyOf(a), {
+        desired.set(attrKey(a), {
           ns: a.ns,
           local: a.local,
           value: a.value,
@@ -928,8 +934,8 @@ export class PackageMirror {
       else if (this.#readRefusal) return null;
     }
     // Attribute order does not change the canonical form, but it changes the saved bytes: read
-    // the order the shell keeps, so every peer saves the bytes of the replica that wrote it.
-    const attrList = orderedAttrs(attrs, s.ao);
+    // the order the record keeps, so every peer saves the bytes of the replica that wrote it.
+    const attrList = orderedAttrs(attrs, rec.get(F.attrOrder));
     const ns = s.ns as string;
     const local = s.local as string;
     // A run or a paragraph that a peer removed while another typed into it comes back.
