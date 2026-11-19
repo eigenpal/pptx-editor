@@ -18,6 +18,10 @@ import {
   useEditorCommand,
 } from '../index.ts';
 import { tooltipText } from './tooltip-text.ts';
+import { createTranslator } from '@pptx-editor.dev/i18n';
+
+/** The English text of a catalog key, as the command hooks return it. */
+const en = createTranslator();
 
 // `PptxEditor.Menu` and `PptxEditor.ContextMenu`, as DOCX Editor's menus
 // (docs/site/content/customization/menus.mdx), and the popups registry entries for the link
@@ -850,7 +854,7 @@ describe('menu review fixes, round 1', () => {
         <Probe />
       </PptxEditorContext.Provider>
     );
-    expect(seen).toEqual({ enabled: false, reason: 'disabled.noRoot' });
+    expect(seen).toEqual({ enabled: false, reason: en('disabled.noRoot') });
     cleanup();
     let link: ReturnType<typeof useEditorCommand> | null = null;
     function Linker() {

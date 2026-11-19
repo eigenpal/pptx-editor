@@ -61,8 +61,8 @@ const layoutGalleryProps = {
   /** Show the tiles but take no pick. Default: true while the deck is open for viewing. */
   disabled: { type: Boolean, default: undefined },
   /**
-   * Why the gallery takes no pick, for the tiles' tooltips: a catalog key (such as
-   * `useEditorCommand(slotId).disabledReason`) or text. Default: the viewing reason.
+   * Why the gallery takes no pick, for the tiles' tooltips: a catalog key or text
+   * (such as `useEditorCommand(slotId).disabledReason`). Default: the viewing reason.
    */
   disabledReason: { type: String as PropType<string | null>, default: undefined },
   /** A class name added to the gallery, as React's `className`. A host `class` also works. */

@@ -65,8 +65,8 @@ export interface LayoutGalleryProps {
   /** Show the tiles but take no pick. Default: true while the deck is open for viewing. */
   readonly disabled?: boolean;
   /**
-   * Why the gallery takes no pick, for the tiles' tooltips: a catalog key (such as
-   * `useEditorCommand(slotId).disabledReason`) or text. Default: the viewing reason.
+   * Why the gallery takes no pick, for the tiles' tooltips: a catalog key or text
+   * (such as `useEditorCommand(slotId).disabledReason`). Default: the viewing reason.
    */
   readonly disabledReason?: string | null;
 }

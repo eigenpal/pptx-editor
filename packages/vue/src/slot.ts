@@ -5,7 +5,6 @@
 import { computed, toValue, type ComputedRef, type MaybeRefOrGetter } from 'vue';
 import {
   tooltipAttributes,
-  translateKeyOrText,
   type ChromeControl,
   type ChromeSlotId,
   type ChromeTooltipAttributes,
@@ -34,9 +33,7 @@ export function useSlot(
   const cmd = useEditorCommand(slot);
   const { t } = useTranslation();
   const label = computed(() => t(toValue(control).labelKey));
-  const reason = computed(() =>
-    cmd.disabledReason.value ? translateKeyOrText(t, cmd.disabledReason.value) : null
-  );
+  const reason = cmd.disabledReason;
   const tip = computed(() => tooltipAttributes(label.value, !cmd.isEnabled.value, reason.value));
   return { cmd, label, reason, tip };
 }

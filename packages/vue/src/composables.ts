@@ -63,6 +63,7 @@ import {
   paneListenersVersion,
   subscribePaneListeners,
   isPaneSlot,
+  translateKeyOrText,
   type ReviewAuthorInfo,
 } from '@pptx-editor.dev/core/editor';
 import { NOTES_SLOTS, useNotesTarget } from './notes-target.ts';
@@ -256,7 +257,10 @@ export interface UseEditorCommandReturn {
   readonly isEnabled: ComputedRef<boolean>;
   /** Whether a toggle control shows as pressed. */
   readonly isActive: ComputedRef<boolean>;
-  /** A translation key, or the engine's own text, when the control is disabled. */
+  /**
+   * Why the command cannot run, as readable text in the locale of `PptxEditorRoot`. A catalog
+   * key is translated; the engine's own text shows as itself.
+   */
   readonly disabledReason: ComputedRef<string | null>;
   /** The value a value control shows (a font size, a family), when it has one. */
   readonly value: ComputedRef<string | number | undefined>;
@@ -275,6 +279,7 @@ export function useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEdito
   // show, and picks pictures, as React's. Outside a root there is no host: those slots show as
   // disabled with the reason.
   const host = inject(chromeActionHostKey, null);
+  const { t } = useTranslation();
   const read = (): ChromeCommandState =>
     editorCommandFor(editorRef.value, toValue(slot), host, 'disabled.noRoot').state;
   // The deps read the slot and the root's `popups` (through the host), so a host that changes
@@ -311,11 +316,18 @@ export function useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEdito
       const n = notesFormat.value;
       return n ? n.target.formats[n.format] : state.value.isActive;
     }),
+    // Readable text in the root locale, as React's: a catalog key is translated, and the
+    // engine's own text shows as itself. The translator follows the root's `locale` prop.
     disabledReason: computed(() => {
       const n = notesFormat.value;
-      if (!n) return state.value.disabledReason;
-      if (n.target.readOnly) return 'disabled.viewing';
-      return n.target.canFormat ? null : 'disabled.selectNotesText';
+      const reason = !n
+        ? state.value.disabledReason
+        : n.target.readOnly
+          ? 'disabled.viewing'
+          : n.target.canFormat
+            ? null
+            : 'disabled.selectNotesText';
+      return reason ? translateKeyOrText(t, reason) : null;
     }),
     value: computed(() => state.value.value),
   };
@@ -439,7 +451,7 @@ export interface UseEditorValueCommandReturn<V, S = V> {
   readonly options: ComputedRef<readonly V[]>;
   /** Whether the command can run now. */
   readonly isEnabled: ComputedRef<boolean>;
-  /** Why the command cannot run: a catalog key, or the engine's own text. */
+  /** Why the command cannot run, as readable text in the locale of `PptxEditorRoot`. */
   readonly disabledReason: ComputedRef<string | null>;
 }
 

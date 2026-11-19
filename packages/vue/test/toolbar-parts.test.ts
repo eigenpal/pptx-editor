@@ -20,6 +20,10 @@ import { buildPptx, para, run, shape } from '../../../scripts/fixtures/builder.t
 import { PptxEditorToolbar } from '../src/index.ts';
 import { providePptxEditor, useEditorCommand } from '../src/composables.ts';
 import { tooltipText } from './tooltip-text.ts';
+import { createTranslator } from '@pptx-editor.dev/i18n';
+
+/** The English text of a catalog key, as the command hooks return it. */
+const en = createTranslator();
 
 // The Vue twin of the toolbar parts (packages/react/src/__tests__/toolbar-parts.test.tsx).
 
@@ -373,7 +377,7 @@ describe('Vue useEditorCommand for adapter slots', () => {
       return h('span');
     });
     expect(states).toEqual({ dialog: false, selectAll: true });
-    expect(reason).toBe('disabled.noRoot');
+    expect(reason).toBe(en('disabled.noRoot'));
   });
 });
 

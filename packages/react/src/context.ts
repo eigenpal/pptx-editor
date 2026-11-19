@@ -19,6 +19,7 @@ import {
   platformShortcuts,
   runToolbarCommand,
   sameChromeCommandState,
+  translateKeyOrText,
   valueSlotOptions,
   valueSlotShown,
   type ChromeActionHost,
@@ -156,8 +157,8 @@ export interface UseEditorCommandReturn {
   /** Whether a toggle control shows as pressed. */
   readonly isActive: boolean;
   /**
-   * Why the command cannot run: a catalog key, or the engine's own text. Show it with
-   * `translateKeyOrText(t, reason)`.
+   * Why the command cannot run, as readable text in the locale of `PptxEditor.Root`. A
+   * catalog key is translated; the engine's own text shows as itself.
    */
   readonly disabledReason: string | null;
   /** The value a value control shows (a font size, a family), when it has one. */
@@ -219,8 +220,9 @@ export function useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn {
   );
   const notes = useNotesTarget(editor);
   const format = NOTES_SLOTS[slot];
-  return useMemo(
-    () =>
+  const { t } = useTranslation();
+  return useMemo(() => {
+    const state =
       notes && format
         ? {
             execute: () => notes.apply(format),
@@ -232,9 +234,12 @@ export function useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn {
                 ? null
                 : 'disabled.selectNotesText',
           }
-        : engine,
-    [notes, format, engine]
-  );
+        : engine;
+    // The public hook returns readable text in the root locale, not a catalog key. The engine's
+    // own text reasons pass through unchanged.
+    const reason = state.disabledReason ? translateKeyOrText(t, state.disabledReason) : null;
+    return reason === state.disabledReason ? state : { ...state, disabledReason: reason };
+  }, [notes, format, engine, t]);
 }
 
 /** A typed value slot's state and runner, after DOCX Editor's `useEditorValueCommand`. @public */
@@ -257,7 +262,7 @@ export interface UseEditorValueCommandReturn<V, S = V> {
   readonly options: readonly V[];
   /** Whether the command can run now. */
   readonly isEnabled: boolean;
-  /** Why the command cannot run: a catalog key, or the engine's own text. */
+  /** Why the command cannot run, as readable text in the locale of `PptxEditor.Root`. */
   readonly disabledReason: string | null;
 }
 

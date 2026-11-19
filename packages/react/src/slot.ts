@@ -1,7 +1,7 @@
 // One chrome slot as a control sees it: the engine's command state, the registry's label, and
 // the tooltip that names the engine's reason when the control is disabled.
 
-import { tooltipAttributes, translateKeyOrText } from '@pptx-editor.dev/core/editor';
+import { tooltipAttributes } from '@pptx-editor.dev/core/editor';
 import type {
   ChromeControl,
   ChromeSlotId,
@@ -32,6 +32,6 @@ export function useSlot(
   const cmd = useEditorCommand(slot);
   const { t } = useTranslation();
   const label = t(control.labelKey);
-  const reason = cmd.disabledReason ? translateKeyOrText(t, cmd.disabledReason) : null;
+  const reason = cmd.disabledReason;
   return { cmd, label, reason, tip: tooltipAttributes(label, !cmd.isEnabled, reason) };
 }

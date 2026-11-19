@@ -25,6 +25,10 @@ import {
   PptxEditorSidePanel,
   PptxEditorViewport,
 } from '../src/index.ts';
+import { createTranslator } from '@pptx-editor.dev/i18n';
+
+/** The English text of a catalog key, as the command hooks return it. */
+const en = createTranslator();
 
 const IN = 914_400;
 const group =
@@ -232,13 +236,13 @@ describe('PptxEditorSelectionPane', () => {
     });
     const editor = await mount(() => h(Probe));
     const probe = () => document.getElementById('probe')!.textContent;
-    expect(probe()).toBe('false disabled.noSidePanel');
+    expect(probe()).toBe(`false ${en('disabled.noSidePanel')}`);
     const stop = listenPaneRequests(editor, () => {});
     await nextTick();
     expect(probe()).toBe('true null');
     stop();
     await nextTick();
-    expect(probe()).toBe('false disabled.noSidePanel');
+    expect(probe()).toBe(`false ${en('disabled.noSidePanel')}`);
   });
 
   test('a host that opens a closed panel for a request lands the focus on the tab', async () => {
