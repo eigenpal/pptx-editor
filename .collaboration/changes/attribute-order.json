@@ -1,0 +1,12 @@
+{
+  "impact": "compatible",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "An element record keeps the document order of its attributes in an optional field (ao) when that order is not sorted, and a read uses it only while it matches the record's attributes. Every peer then saves the same bytes. A replica of an earlier build ignores the field and reads the sorted order, as before, so the content that peers show does not change. Room metadata, repair rules, and the format fields remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-save-bytes.test.ts",
+    "packages/pro/src/__tests__/yjs-table-merge-row-delete.test.ts",
+    "packages/pro/src/__tests__/yjs-text-body.test.ts"
+  ]
+}
