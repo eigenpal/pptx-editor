@@ -21,6 +21,7 @@ import {
   slideRefAt,
 } from '../store/index.ts';
 import { layoutPlaceholderOf, resolveSlide } from '../cascade/index.ts';
+import { textPlaceholderWithoutBody } from '../cascade/placeholders.ts';
 import {
   layoutSlide,
   type LayoutItem,
@@ -34,6 +35,7 @@ import { insertText, paragraphsOf, splitParagraph } from '../automation/commands
 import { addSlide, FOOTER_PLACEHOLDERS } from '../automation/commands/slide-commands.ts';
 import { deckLayouts } from '../automation/commands/slide-layouts.ts';
 import { emptyText } from '../automation/commands/placeholder-fill.ts';
+import { addTextBody } from '../automation/commands/shape-commands.ts';
 import { warnUnknownLayout } from './dev-warnings.ts';
 
 /** The prompt key of each placeholder type (§19.7.10 `ST_PlaceholderType`). */
@@ -179,7 +181,10 @@ export function withPrompts(
   try {
     for (const el of elements(shapeTreeOf(pkg, part))) {
       const ph = path(el, 'p:nvSpPr', 'p:nvPr', 'p:ph');
-      const txBody = child(el, 'p:txBody');
+      // A text placeholder without a body shows its prompt in the body a first edit adds.
+      const txBody = textPlaceholderWithoutBody(el)
+        ? batch.element(part, addTextBody(batch, part, el))
+        : child(el, 'p:txBody');
       const type = attr(ph, 'type') ?? 'obj';
       if (el.kind !== 'sp' || !ph || !txBody || el.id === editing) continue;
       if (FOOTER_PLACEHOLDERS.has(type) || !emptyText(txBody)) continue;

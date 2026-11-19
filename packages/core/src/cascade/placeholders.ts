@@ -4,6 +4,7 @@
 
 import {
   attr,
+  child,
   elements,
   isTemplateRef,
   NS,
@@ -35,6 +36,51 @@ export function placeholderOf(el: Element): PlaceholderKey | undefined {
   const idx = attr(ph, 'idx');
   return { type: attr(ph, 'type') ?? 'obj', ...(idx !== undefined ? { idx } : {}) };
 }
+
+/**
+ * Placeholder types whose content is not text (ECMA-376 Part 1, 19.7.10 ST_PlaceholderType):
+ * their prompt asks for a picture, table, chart, diagram, or media object.
+ */
+const NON_TEXT_PLACEHOLDERS: ReadonlySet<string> = new Set([
+  'pic',
+  'clipArt',
+  'tbl',
+  'chart',
+  'dgm',
+  'media',
+  'sldImg',
+]);
+
+/** Whether a placeholder of `type` holds text. @internal */
+export function placeholderTakesText(type: string | undefined): boolean {
+  return type !== undefined && !NON_TEXT_PLACEHOLDERS.has(type);
+}
+
+/**
+ * Whether `el` is a text placeholder shape (`p:sp`) with no `p:txBody`. The text body is
+ * optional in CT_Shape (ECMA-376 Part 1, 19.3.1.43): the placeholder reads as an empty body
+ * that inherits its body properties, and the first edit adds the body. @internal
+ */
+export function textPlaceholderWithoutBody(el: Element): boolean {
+  if (el.ns !== NS.p || el.local !== 'sp' || child(el, 'p:txBody')) return false;
+  return placeholderTakesText(placeholderOf(el)?.type);
+}
+
+/**
+ * The empty paragraph that a placeholder without a text body reads as. It is in no part: no
+ * edit addresses it, and the first edit adds a real body. @internal
+ */
+export const EMPTY_PLACEHOLDER_PARAGRAPH: Element = Object.freeze({
+  type: 'element',
+  id: 'placeholder-paragraph',
+  kind: 'paragraph',
+  ns: NS.a,
+  local: 'p',
+  prefix: 'a',
+  nsDecls: [],
+  attrs: [],
+  children: [],
+});
 
 /** The shape tree of a part and the part root, where `mc:Choice` prefixes may be declared. */
 export function treeOf(

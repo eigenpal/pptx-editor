@@ -26,6 +26,8 @@ import type { EditorSelection, TableCellAddress } from '../contracts/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import type { OpBatch } from '../automation/commands/op-batch.ts';
 import { findItem } from '../automation/commands/placement.ts';
+import { addTextBody } from '../automation/commands/shape-commands.ts';
+import { textPlaceholderWithoutBody } from '../cascade/placeholders.ts';
 import {
   emptyBodySpec,
   joinTextBodies,
@@ -384,7 +386,11 @@ function addSavedCells(
   return batch.element(part, id);
 }
 
-/** The text body a text selection edits: the shape's `p:txBody`, or the cell's `a:txBody`. */
+/**
+ * The text body a text selection edits: the shape's `p:txBody`, or the cell's `a:txBody`. A
+ * text placeholder without a body (`p:txBody` is optional, 19.3.1.43) gets an empty one that
+ * inherits its body properties, as a cell without one does.
+ */
 export function selectionBody(
   batch: OpBatch,
   part: string,
@@ -417,5 +423,7 @@ export function selectionBody(
     return batch.element(part, id);
   }
   const body = el.children.find((c) => c.type === 'element' && c.kind === 'txBody');
-  return body?.type === 'element' ? body : undefined;
+  if (body?.type === 'element') return body;
+  if (!textPlaceholderWithoutBody(el)) return undefined;
+  return batch.element(part, addTextBody(batch, part, el));
 }
