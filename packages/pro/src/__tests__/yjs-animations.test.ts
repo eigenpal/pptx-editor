@@ -102,8 +102,13 @@ describe('animations in a collaboration room', () => {
       link.flush();
       expect(effects(a).map((x) => x.preset)).toEqual(['appear', 'appear', 'pulse', 'spin']);
       const saved = await savedXml(a);
-      const groups = [...saved.matchAll(/<p:cTn [^>]*grpId="(\d+)"[^>]*presetClass="emph"/g)];
-      expect(new Set(groups.map((m) => m[1])).size).toBe(2);
+      // Attribute order has no meaning: read each emphasis time node's group in any order.
+      const groups = (saved.match(/<p:cTn [^>]*presetClass="emph"[^>]*>/g) ?? []).map(
+        (tag) => /grpId="(\d+)"/.exec(tag)?.[1]
+      );
+      expect(groups.length).toBeGreaterThan(1);
+      expect(groups.every((g) => g !== undefined)).toBe(true);
+      expect(new Set(groups).size).toBe(2);
       const builds = saved.match(/<p:bldP [^>]*>/g) ?? [];
       const keys = builds.map((x) => /spid="\d+"/.exec(x)![0] + /grpId="\d+"/.exec(x)![0]);
       expect(keys.filter((k) => k.startsWith('spid="2"'))).toHaveLength(3);

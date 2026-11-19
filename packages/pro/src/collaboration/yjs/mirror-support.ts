@@ -5,7 +5,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Helpers of the package mirror (`mirror.ts`) that read no mirror state: the text and key-list
 // syncs of a write, the listings a read skipped (`PackageMirror.dropHiddenListings`), and the
-// runs a read showed by the move rescue (`rescuedParents`).
+// runs a read showed by the move rescue (`rescuedParents`), and the shell and attribute order
+// of an element record.
 
 import * as Y from 'yjs';
 import { readText, writeCase } from './text-case.ts';
@@ -19,6 +20,7 @@ import type {
 import { specKeys } from './move-rescue.ts';
 import { inSchemaOrder } from './singleton-children.ts';
 import { liveIds, type TextWrite } from './text-identity.ts';
+import { ATTR_SEP } from './schema.ts';
 
 /** One part's write: its key mapping, and its nodes before the change. */
 export interface PartWrite {
@@ -325,5 +327,57 @@ export function inRoomOrder(
     out.push(k);
   }
   for (const n of tail) out.push(n);
+  return out;
+}
+
+/** The key of an attribute in a record's `a` map. */
+export const attrKeyOf = (a: { readonly ns: string; readonly local: string }): string =>
+  `${a.ns}${ATTR_SEP}${a.local}`;
+
+const byKey = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The attribute keys of `el` in document order, or undefined when that order is the sorted
+ * order a read falls back to. Every peer then reads the order of the file, so two replicas of
+ * one package save the same bytes.
+ */
+function attrOrderOf(el: Element): string[] | undefined {
+  const keys = el.attrs.map(attrKeyOf);
+  for (let i = 1; i < keys.length; i += 1) if (byKey(keys[i - 1], keys[i]) > 0) return keys;
+  return undefined;
+}
+
+/** The `s` shell of an element record. */
+export const shellOf = (el: Element) => {
+  const order = attrOrderOf(el);
+  return {
+    ns: el.ns,
+    local: el.local,
+    ...(el.prefix ? { prefix: el.prefix } : {}),
+    nsDecls: el.nsDecls.map((d) => ({ prefix: d.prefix, uri: d.uri })),
+    ...(order ? { ao: order } : {}),
+  };
+};
+
+type AttrSpec = { ns: string; local: string; prefix?: string; value: string };
+
+/**
+ * The attributes of a record in one order on every peer: the keys that the shell lists (`ao`)
+ * first, then the others sorted. A key the shell lists twice, or that the record does not
+ * hold (a concurrent removal), is passed over. Room values are untrusted: the list is read up
+ * to the record's own attribute count plus the keys it passes over, never past its length.
+ */
+export function orderedAttrs(attrs: Y.Map<unknown>, order: unknown): AttrSpec[] {
+  const out: AttrSpec[] = [];
+  const seen = new Set<string>();
+  if (Array.isArray(order))
+    for (const k of order) {
+      if (seen.size === attrs.size) break;
+      if (typeof k !== 'string' || seen.has(k) || !attrs.has(k)) continue;
+      seen.add(k);
+      out.push(attrs.get(k) as AttrSpec);
+    }
+  const rest = [...attrs.keys()].filter((k) => !seen.has(k)).sort(byKey);
+  for (const k of rest) out.push(attrs.get(k) as AttrSpec);
   return out;
 }

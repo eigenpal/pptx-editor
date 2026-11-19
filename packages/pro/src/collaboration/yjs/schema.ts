@@ -23,8 +23,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   pptx-delete-clock-v1    Y.Map   participant → clock of its latest explicit deletion
 //
 // A node record holds `p` (its part name), `k` (its own key, checked on read), and either an
-// element (`s` shell: name and namespace declarations, `a` Y.Map of attributes, `c` Y.Array of
-// child keys) or a text node (`x` Y.Text). Split and move lineage adds the optional fields of
+// element (`s` shell: name, namespace declarations, and `ao`, the attribute keys in document
+// order when that order is not sorted; `a` Y.Map of attributes; `c` Y.Array of child keys) or a
+// text node (`x` Y.Text). Split and move lineage adds the optional fields of
 // `LINEAGE` in `text-lineage.ts` (`sf`, `sb`, `sa`, `sl`, `sg`, `se`, `sk`, `cw`, `mf`, `mi`, `mq`,
 // `mt`, `mo`, `rw`), character identity the fields of `IDENTITY` in `text-identity.ts` (`ci`, `cp`, `rr.<key>`), and
 // case choices `cc.<root-client>:<root-clock>:<author>` ([logical order, UTF-16 unit]), and
