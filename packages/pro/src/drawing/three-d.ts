@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Bevels, contours, and extrusion as flat polygons (ECMA-376 Part 1, 20.1.5.1 bevelT,
+// Bevels, contours, and extrusion as flat polygons (ECMA-376 Part 1, 20.1.5.4 bevelT,
 // 20.1.5.12 sp3d). Pure math: no DOM. The SVG paint and the PDF writer fill the same polygons.
 //
 // A bevel is a band along the outline, cut into strips. Each strip is tilted by the slope of

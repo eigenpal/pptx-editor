@@ -265,7 +265,7 @@ describe('fonts', () => {
 });
 
 describe('pictures', () => {
-  test('an OLE object draws its picture (ECMA-376 Part 1, 19.3.1.36), and a chart draws', async () => {
+  test('an OLE object draws its picture (ECMA-376 Part 1, 19.3.1.37), and a chart draws', async () => {
     const result = await exportPdf(deck('slide-structure'), BEST);
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).not.toContain('frame.chart');

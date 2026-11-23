@@ -86,7 +86,7 @@ export interface RunProps {
   readonly latin: string;
   /**
    * The theme font `latin` comes from (`+mj-lt` is `major`, `+mn-lt` is `minor`); absent when a
-   * level names a literal family. ECMA-376 Part 1, 20.1.4.1.17 `latin`.
+   * level names a literal family. ECMA-376 Part 1, 21.1.2.3.7 `latin`.
    */
   readonly latinTheme?: 'major' | 'minor';
   readonly ea: string;
@@ -230,7 +230,7 @@ interface ResolvedBase {
   readonly drawingId?: string;
 }
 
-/** One end of a connector glued to a shape (`CT_Connection`, ECMA-376 Part 1, 20.1.2.2.4). */
+/** One end of a connector glued to a shape (`CT_Connection`, ECMA-376 Part 1, 20.1.2.2.36). */
 export interface ConnectionRef {
   /** The drawing id (`p:cNvPr/@id`) of the shape. */
   readonly id: string;
@@ -345,7 +345,7 @@ export interface ResolvedGraphicFrame extends ResolvedBase {
   /** @deprecated Never set. An OLE object's picture is {@link ResolvedGraphicFrame.poster}. */
   readonly fallbackRId?: string;
   /**
-   * The picture that shows an OLE object (`p:oleObj/p:pic`; ECMA-376 Part 1, 19.3.1.36), placed
+   * The picture that shows an OLE object (`p:oleObj/p:pic`; ECMA-376 Part 1, 19.3.1.37), placed
    * in the frame's box. It carries the frame's node id. Absent for other frames, and when the
    * picture is not an internal PNG, JPEG, GIF, or BMP part (the frame then shows a placeholder).
    */

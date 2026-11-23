@@ -41,7 +41,7 @@ export interface ResolvedChartPart {
   readonly chartSpace: Element;
   /**
    * The slide's color context, with the chart's own color map override
-   * (`c:clrMapOvr`, ECMA-376 Part 1, 21.2.2.28) applied.
+   * (`c:clrMapOvr`, ECMA-376 Part 1, 21.2.2.30) applied.
    */
   readonly colors: ColorContext;
   /** The theme, for the `+mj-lt` and `+mn-lt` fonts of chart text. */

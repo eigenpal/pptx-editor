@@ -492,7 +492,7 @@ export function readMathZone(
       case 'bar':
         return {
           kind: 'bar',
-          // ECMA-376 Part 1, 22.1.2.80 pos: the bar is at the bottom unless stated.
+          // ECMA-376 Part 1, 22.1.2.84 pos: the bar is at the bottom unless stated.
           pos: mval(mchild(pr, 'pos')) === 'top' ? 'top' : 'bot',
           base: arg(el, 'e') ?? [],
           props: ctrlProps(pr),

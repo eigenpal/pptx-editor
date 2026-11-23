@@ -2,9 +2,9 @@
 // `editor-api` both check every package they save with it, so one list of rules covers both.
 //
 // The rules: the package reads back with the bounded reader; every internal relationship names
-// a part (ECMA-376 Part 2, 9.3); every part has a content type (Part 2, 10.1.2); every `r:`
+// a part (ECMA-376 Part 2, 6.5.3.4); every part has a content type (Part 2, 6.2.3); every `r:`
 // reference of a slide, layout, master, or notes part names a relationship of its part; master
-// and layout ids are unique and at least 2^31 (ECMA-376 Part 1, 19.2.1.27 and 19.3.1.42);
+// and layout ids are unique and at least 2^31 (ECMA-376 Part 1, 19.2.1.36 and 19.3.1.40);
 // slide ids are unique (19.2.1.33); each slide has a layout, a master, and a theme; and the
 // shape ids (`p:cNvPr/@id`) of each slide are unique (19.3.1.12).
 

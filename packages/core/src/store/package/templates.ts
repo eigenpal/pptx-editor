@@ -1,6 +1,6 @@
 // The slide masters and slide layouts of a presentation, as the slide master view shows them:
 // each master in `p:sldMasterIdLst` order, then its layouts in `p:sldLayoutIdLst` order
-// (ECMA-376 Part 1, 19.3.1.41 and 19.3.1.42). A template has an index past the slides
+// (ECMA-376 Part 1, 19.2.1.37 and 19.3.1.41). A template has an index past the slides
 // (`TEMPLATE_BASE`), so the code that reads a slide by index reads a layout or a master the
 // same way (`slideRefAt`). Every lookup follows relationships, never file-name conventions.
 

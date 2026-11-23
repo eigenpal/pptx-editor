@@ -14,11 +14,14 @@ This guide covers setup, checks, and pull requests for the monorepo.
 git clone https://github.com/eigenpal/pptx-editor.git
 cd pptx-editor
 bun install
+bun run reference:fetch
 bun run dev
 # Open http://localhost:5274
 ```
 
 The demo builds against workspace source, so it needs no package build.
+
+`bun run reference:fetch` downloads ECMA-376 Parts 1 to 4 and writes a text copy and a subclause index of each part (`reference/README.md`). Git ignores these files, so run it in each new clone and each new git worktree. It needs Poppler (`pdftotext`).
 
 ## TypeScript tooling
 

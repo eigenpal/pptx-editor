@@ -83,6 +83,8 @@
     "fidelity:census": "bun scripts/fidelity/census.ts",
     "fidelity:calibrate": "bun scripts/fidelity/calibrate.ts",
     "fidelity:record-reference": "bun scripts/fidelity/record-reference.ts",
+    "reference:fetch": "bun scripts/reference/fetch.ts",
+    "reference:check-citations": "bun scripts/reference/check-citations.ts",
     "fidelity:roundtrip": "bun scripts/fidelity/roundtrip.ts",
     "fixtures:build": "bun scripts/fixtures/build.ts",
     "sample:build": "bun scripts/sample-deck/build.ts",

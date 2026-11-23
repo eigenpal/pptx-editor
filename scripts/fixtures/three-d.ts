@@ -1,4 +1,4 @@
-// The 3-D fixture: shape bevels (`a:sp3d/a:bevelT`, ECMA-376 Part 1, 20.1.5.9), contours,
+// The 3-D fixture: shape bevels (`a:sp3d/a:bevelT`, ECMA-376 Part 1, 20.1.5.4), contours,
 // materials, and light rigs under the front cameras, camera presets with an extrusion
 // (`a:scene3d/a:camera`, 20.1.5.5), preset shadows (`a:prstShdw`, 20.1.8.49), and blur
 // (`a:blur`, 20.1.8.15). The second deck has turned faces with an outer shadow and a glow, and

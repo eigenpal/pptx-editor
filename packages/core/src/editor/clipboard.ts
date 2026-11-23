@@ -613,7 +613,7 @@ function decodeXml(bytes: Uint8Array): string {
 
 /**
  * Whether an untrusted `mc:AlternateContent` is one this editor pastes (ECMA-376 Part 3,
- * 10.2.1): only `mc:Choice` branches, then at most one `mc:Fallback`, each holding shapes. Each
+ * 7.5): only `mc:Choice` branches, then at most one `mc:Fallback`, each holding shapes. Each
  * prefix that a Choice requires is declared on the Choice or the wrapper.
  */
 function validAlternate(spec: NodeSpec): boolean {

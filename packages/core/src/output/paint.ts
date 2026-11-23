@@ -634,7 +634,7 @@ export function paintItem(
             showsIn(opts.view, item.matrix)
           )
         );
-      // An OLE object shows its picture (ECMA-376 Part 1, 19.3.1.36); the frame holds the hit id.
+      // An OLE object shows its picture (ECMA-376 Part 1, 19.3.1.37); the frame holds the hit id.
       if (item.poster) {
         const picture = paintItem(
           doc,
@@ -734,7 +734,7 @@ export function paintItem(
       const faceItem = threeDFaceItem(item, threeD);
       for (const node of paintGeometry(doc, faceItem, local, parentScale, front))
         body.appendChild(node);
-      // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.1).
+      // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.4).
       if (threeD) for (const node of facetElements(doc, threeD.over, SEAM)) body.appendChild(node);
       const bodyFx =
         pro && effects && (effects.softEdge || effects.innerShadow)

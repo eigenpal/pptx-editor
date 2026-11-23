@@ -5,7 +5,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 
 // Two replicas edit a shape in `mc:AlternateContent` whose drawn copy is a `mc:Choice`
-// (ECMA-376 Part 3, 10.2.1). Each edit removes the out-of-date copy in `mc:Fallback` in its own
+// (ECMA-376 Part 3, 7.5). Each edit removes the out-of-date copy in `mc:Fallback` in its own
 // transaction (`editor/alternate-copies.ts`). Both replicas must converge on one slide, and each
 // save must hold no stale `mc:Fallback` copy.
 

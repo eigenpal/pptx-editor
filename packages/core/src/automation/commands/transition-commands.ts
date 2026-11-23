@@ -2,7 +2,7 @@
 // clear it.
 //
 // A presentation application writes a transition with a duration as markup-compatibility
-// content (ECMA-376 Part 3, §10.2.1): an `mc:Choice` that requires the 2010 extension namespace
+// content (ECMA-376 Part 3, 7.5): an `mc:Choice` that requires the 2010 extension namespace
 // (`p14`) holds `p:transition` with `p14:dur`, and the `mc:Fallback` holds the same transition
 // with only the speed (`spd`). A later kind can add another `mc:Choice` (`p159`). The read takes
 // the duration from the `p14` branch and the kind from the first branch whose kind it knows.

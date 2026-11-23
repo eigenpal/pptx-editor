@@ -1,4 +1,4 @@
-// An OLE frame that shows its `p:oleObj/p:pic` picture (ECMA-376 Part 1, 19.3.1.36) edits as
+// An OLE frame that shows its `p:oleObj/p:pic` picture (ECMA-376 Part 1, 19.3.1.37) edits as
 // one frame: move, resize, copy, delete, and undo act on the frame, and the picture follows its
 // box. The picture is read-only: nothing writes to `p:oleObj`, so it saves as it was read.
 

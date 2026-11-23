@@ -650,7 +650,7 @@ export function layoutTextOn(
     const avail = (first: boolean): number => colW - lineLeft(first) - p.marR;
 
     /**
-     * The advance of the tab at unit `i`, which starts at `x` (ECMA-376 Part 1, 21.1.2.1.36
+     * The advance of the tab at unit `i`, which starts at `x` (ECMA-376 Part 1, 21.1.2.2.13
      * tab). The text after a tab runs to the next tab or line end. A left stop starts that
      * text at the stop, a right stop ends it there, a centered stop centers it on the stop,
      * and a decimal stop puts its first full stop there (or ends it there, with no full stop).

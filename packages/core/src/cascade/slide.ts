@@ -474,7 +474,7 @@ function drawableImage(pkg: PptxPackage, sourcePart: string, rId: string): boole
 }
 
 /**
- * The picture that shows an OLE object: `p:oleObj/p:pic` (ECMA-376 Part 1, 19.3.1.36; required
+ * The picture that shows an OLE object: `p:oleObj/p:pic` (ECMA-376 Part 1, 19.3.1.37; required
  * by `CT_OleObject`). The object is never run. An `mc:AlternateContent` picks its branch as
  * the shape tree does (`contentElements`). The picture fills the frame's box and carries the
  * frame's node id, so a hit on the picture selects the frame. A picture that cannot be drawn
@@ -653,7 +653,7 @@ function boundGroupEffects(
 }
 
 /**
- * The effects of a group (`p:grpSpPr` or `dsp:grpSpPr`, ECMA-376 Part 1, 19.3.1.22): an effect
+ * The effects of a group (`p:grpSpPr` or `dsp:grpSpPr`, ECMA-376 Part 1, 19.3.1.23): an effect
  * list applies to the group's content as one picture. A group has no style, so it has no theme
  * effect. A group's inner shadow draws nothing, so it is left out; it stays in the file. A
  * group's turned 3-D scene (`a:scene3d`) is reported unsupported.

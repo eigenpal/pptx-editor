@@ -1,4 +1,4 @@
-// Slide size: `p:sldSz` of the presentation part (ECMA-376 Part 1, 19.2.1.36), and the boxes
+// Slide size: `p:sldSz` of the presentation part (ECMA-376 Part 1, 19.2.1.39), and the boxes
 // of the content that sits on the slides, layouts, and masters.
 //
 // With `content: 'scale'`, the content scales by one factor, the smaller of the width and
@@ -44,7 +44,7 @@ const MAX_DEPTH = 256;
 /**
  * The DrawingML text attributes that scale with the content, by element, with the range of
  * their type: `ST_TextFontSize`, `ST_TextPoint`, `ST_TextSpacingPoint`, `ST_TextMargin`,
- * `ST_TextIndent`, and `ST_Coordinate32` (ECMA-376 Part 1, 20.1.10 and 21.1.10).
+ * `ST_TextIndent`, and `ST_Coordinate32` (ECMA-376 Part 1, 20.1.10).
  */
 const FONT_SIZE = [100, 400_000] as const;
 const TEXT_POINT = [-400_000, 400_000] as const;

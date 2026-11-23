@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "Comments in core and pro now cite the ECMA-376 5th edition subclause numbers. No value or code path changes. Shared operations, room metadata, repair rules, and the canonical document model remain unchanged.",
+  "tests": [
+    "packages/core/src/cascade/__tests__/alternate-content.test.ts",
+    "packages/pro/src/__tests__/yjs-alternate-content.test.ts"
+  ]
+}

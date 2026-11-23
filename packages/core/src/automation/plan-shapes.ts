@@ -500,7 +500,7 @@ export function setFill(
   return { kind: 'applied' };
 }
 
-/** `ST_PresetLineDashVal` (ECMA-376 Part 1, 20.1.10.48). */
+/** `ST_PresetLineDashVal` (ECMA-376 Part 1, 20.1.10.49). */
 export const DASHES = new Set([
   'solid',
   'dot',

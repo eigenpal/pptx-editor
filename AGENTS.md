@@ -5,6 +5,10 @@ One engine parses, edits, lays out, renders, and saves. React and Vue are adapte
 
 ## Start here
 
+**Before any work, have the standard in your checkout.** Check that `reference/ecma-376/part1/text/index.tsv` exists. If it does not, run `bun run reference:fetch` first. Git ignores these files, so each new clone and each new git worktree starts without them. Do not start a task, a review, or an investigation without them.
+
+When you start work on an issue, find the ECMA-376 subclauses and schema types that it touches, and read them in the local text. Post them in a comment on the issue before you change code, and cite them in the code comments and the pull request.
+
 1. [Repository map](docs/repo-map.md): package locations and task-specific reading.
 2. [Contribution guide](CONTRIBUTING.md): setup, verification, and pull requests.
 3. [Engine architecture](docs/architecture/engine-lanes.md): read before changing dependencies or data flow.
@@ -28,6 +32,8 @@ Use `EigenPal Pro License` in user-facing text. Preserve legal license files and
 - Use only open fonts in fixtures.
 - Never loosen thresholds to pass a check. Treat missing references and skipped checks as gaps.
 - Read the [OOXML references](reference/README.md) before changing parsing, cascade, or layout.
+- Cite ECMA-376 for each behavior that you add or change: the element, its schema type (`CT_*`, `ST_*`), and the subclause, in the code comment and in the pull request body.
+- Never cite a subclause number from memory. Find it in the local index, and run `bun run reference:check-citations` before you push. A wrong citation is worse than none.
 - Keep React and Vue behavior aligned. Put shared logic in `core`, and keep `core` external to its adapters.
 - Follow DOCX Editor's API patterns for shared concepts and customization.
 - State the source of every measured or adopted value. Preserve attribution and license notices.
@@ -59,6 +65,7 @@ Follow the [Google developer documentation style guide](https://developers.googl
 ## Verification and release
 
 Run the checks in [the contribution guide](CONTRIBUTING.md) that apply to the change. Report failures and skipped checks accurately.
+Run `bun run reference:check-citations` when you add or change a citation. It reads the local index, so CI does not run it.
 Build packages before checking API snapshots or generated notices.
 Update API snapshots, feature evidence, and translations when the change affects them.
 Add a changeset for code changes. Documentation-only changes do not need one.

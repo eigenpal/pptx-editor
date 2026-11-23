@@ -98,7 +98,7 @@ const MAX_MASTER_ID = 4_294_967_295;
 
 type Role = 'slide' | 'notes' | 'layout' | 'master' | 'notesMaster' | 'other';
 
-/** A relationships part name (ECMA-376 Part 2, 9.3.1). */
+/** A relationships part name (ECMA-376 Part 2, 6.5.2.3). */
 const RELS_PART = /\/_rels\/[^/]*\.rels$/i;
 
 /** Parts that a package has once: the main document part, its properties, and the like. */
@@ -345,7 +345,7 @@ class Importer {
 
   /** Where a relationship of a copied part points now, or null to drop it. */
   #decide(from: string, role: Role, type: string, target: string | undefined): string | null {
-    // A relationships part is never a relationship target (ECMA-376 Part 2, 9.3).
+    // A relationships part is never a relationship target (ECMA-376 Part 2, 6.5.2.1).
     if (!target || RELS_PART.test(target) || !this.source.parts.has(target)) return null;
     if (REFUSED.has(type))
       throw new CommandRefusal(

@@ -1,4 +1,4 @@
-// Connectors glued to shapes (ECMA-376 Part 1, 19.3.1.13 `p:cxnSp`, 20.1.2.2.4
+// Connectors glued to shapes (ECMA-376 Part 1, 19.3.1.19 `p:cxnSp`, 20.1.2.2.36
 // `CT_Connection`, and 20.1.9.10 `a:cxnLst`).
 //
 // A connector end glues to a connection site of a shape: `a:stCxn` or `a:endCxn` names the

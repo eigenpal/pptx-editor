@@ -1,8 +1,8 @@
 // The ascent and descent that place a face's lines, and a table of them for common deck faces
 // whose font is unavailable.
 //
-// Which `OS/2` values place a line (OpenType, "OS/2 table"), measured on 2,231 lines in 10 fonts
-// exported to reference PDFs: when fsSelection bit 7 (USE_TYPO_METRICS) is set,
+// Which `OS/2` values place a line (OpenType, "OS/2 table"), checked against the lines of
+// the reference PDFs: when fsSelection bit 7 (USE_TYPO_METRICS) is set,
 // sTypoAscender and sTypoDescender; otherwise usWinAscent and usWinDescent, never `hhea`. The
 // rule predicts every line within a rounding step: Aptos (typo 1923 and 577; win misses 68 of
 // 178 lines), Consolas (win; `hhea` misses 109), Yu Gothic (win 2017 and 619; `hhea` misses 64
