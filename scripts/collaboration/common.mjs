@@ -28,8 +28,31 @@ export function run(command, args, cwd = root, trim = true) {
   if (result.status !== 0) throw new Error(`${command} failed: ${result.stderr || result.error}`);
   return trim ? result.stdout.trim() : result.stdout;
 }
-export const registry = (name, version) =>
-  JSON.parse(run('npm', ['view', `${name}@${version}`, '--json', '--prefer-online']));
+/** Pauses between `npm view` retries after a 404. */
+export const REGISTRY_RETRY_DELAYS_MS = [10_000, 20_000, 30_000];
+/**
+ * Exact version metadata from the registry. `waitForPublishedPackages` runs first, but a registry
+ * edge can still serve an older packument for a short time, so a 404 is retried a few times.
+ */
+export function registry(
+  name,
+  version,
+  {
+    view = (spec) => run('npm', ['view', spec, '--json', '--prefer-online']),
+    pause = (ms) => Atomics.wait(sleeper, 0, 0, ms),
+  } = {}
+) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return JSON.parse(view(`${name}@${version}`));
+    } catch (error) {
+      if (attempt >= REGISTRY_RETRY_DELAYS_MS.length || !/\bE404\b/.test(error.message))
+        throw error;
+      pause(REGISTRY_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+const sleeper = new Int32Array(new SharedArrayBuffer(4));
 export function install(directory, locked = false) {
   run('npm', [locked ? 'ci' : 'install', '--ignore-scripts', '--no-audit', '--no-fund'], directory);
   const lock = read(resolve(directory, 'package-lock.json'));
