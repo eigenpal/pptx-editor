@@ -15,7 +15,7 @@
 //
 //   node scripts/test/run-parallel.mjs [--jobs N] [--shard INDEX/TOTAL] [--fail-fast]
 //     [--exclude PATH_PREFIX]... [--balance] [--durations-out FILE] [--retry-failed]
-//     [--only LIST_FILE]
+//     [--only LIST_FILE] [--file-timeout SECONDS]
 //     [-- <args passed to every `bun test`>]
 //
 // `--exclude` drops files whose repository-relative path starts with the prefix, before shards
@@ -29,6 +29,8 @@
 // `--durations-out` writes this run's own measurements, which CI merges into the shared cache.
 // `--retry-failed` runs a failed file once more before reporting it. A file that passes on the
 // retry is listed as FLAKY at the end, so the timing problem stays visible without stopping CI.
+// `--file-timeout` stops a file that runs longer than SECONDS (default 300) and fails it with its
+// name and output, so a hung file is reported instead of running until the CI job is cancelled.
 // `--only` runs just the test files named in LIST_FILE, one repository-relative path per line;
 // `bun run test:changed` uses it. Paths are never passed to `bun test`, which would forward them
 // to every file instead of selecting files.
@@ -83,6 +85,16 @@ const TEST_FILE = /\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$/;
  * for everything else, generous enough to survive contention and short enough to catch a hang.
  */
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * A budget for one whole file. The per-test timeout cannot stop a synchronous loop, an open handle
+ * that keeps the process alive after its last test, or a hang outside a test. Without this budget
+ * such a file runs until the CI job's own timeout, which cancels the job and keeps no log, so the
+ * hung file stays unknown. The slowest file measured in CI takes about 140 s
+ * (`demo-shell.test.tsx`, CI run 45214261053), so five minutes leaves room for a loaded runner.
+ * `--file-timeout SECONDS` changes it.
+ */
+const DEFAULT_FILE_TIMEOUT_MS = 5 * 60 * 1000;
 
 const GiB = 1024 ** 3;
 
@@ -288,6 +300,7 @@ function parseArguments(argv) {
   let retryFailed = false;
   let only = '';
   let durationsOut = '';
+  let fileTimeoutMs = DEFAULT_FILE_TIMEOUT_MS;
   const exclude = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -316,6 +329,10 @@ function parseArguments(argv) {
       durationsOut = argv[++index] ?? '';
     } else if (argument.startsWith('--durations-out=')) {
       durationsOut = argument.slice('--durations-out='.length);
+    } else if (argument === '--file-timeout') {
+      fileTimeoutMs = Number(argv[++index]) * 1000;
+    } else if (argument.startsWith('--file-timeout=')) {
+      fileTimeoutMs = Number(argument.slice('--file-timeout='.length)) * 1000;
     } else if (argument === '--exclude') {
       exclude.push(argv[++index] ?? '');
     } else if (argument.startsWith('--exclude=')) {
@@ -333,7 +350,22 @@ function parseArguments(argv) {
     console.error('--only needs a file that lists test paths');
     process.exit(1);
   }
-  return { jobs, passthrough, shard, failFast, exclude, balance, durationsOut, retryFailed, only };
+  if (!Number.isFinite(fileTimeoutMs) || fileTimeoutMs <= 0) {
+    console.error('--file-timeout needs a positive number of seconds');
+    process.exit(1);
+  }
+  return {
+    jobs,
+    passthrough,
+    shard,
+    failFast,
+    exclude,
+    balance,
+    durationsOut,
+    retryFailed,
+    only,
+    fileTimeoutMs,
+  };
 }
 
 /** The child's current resident set in bytes, or 0 when it cannot be read. */
@@ -368,7 +400,7 @@ process.on('exit', () => {
 process.on('SIGINT', () => process.exit(130));
 process.on('SIGTERM', () => process.exit(143));
 
-function runFile(file, passthrough, failFast, onRss) {
+function runFile(file, passthrough, failFast, onRss, fileTimeoutMs) {
   return new Promise((settle) => {
     const started = Date.now();
     let peak = 0;
@@ -400,6 +432,11 @@ function runFile(file, passthrough, failFast, onRss) {
     // loop would otherwise run until the CI job's own timeout.
     const output = createOutputCapture();
     let stopped = false;
+    let timedOut = false;
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      stopWorker(child);
+    }, fileTimeoutMs);
     const capture = (chunk) => {
       output.write(chunk);
       if (output.overLimit && !stopped) {
@@ -412,6 +449,7 @@ function runFile(file, passthrough, failFast, onRss) {
     child.on('error', (error) => {
       children.delete(child);
       clearInterval(sampler);
+      clearTimeout(deadline);
       settle({
         file,
         output: `failed to spawn ${node ? 'node' : 'bun'}: ${error.message}`,
@@ -428,18 +466,33 @@ function runFile(file, passthrough, failFast, onRss) {
     child.on('close', (code) => {
       children.delete(child);
       clearInterval(sampler);
+      clearTimeout(deadline);
       const ms = Date.now() - started;
       // A file that finished before the sampler ever fired cannot have grown large; record the
       // floor so it is charged as small next time instead of falling back to "unknown" forever.
       if (peak === 0 && code !== null && ms <= PEAK_SAMPLE_INTERVAL_MS * 2) peak = PEAK_FLOOR_BYTES;
-      settle({ file, output: output.text(), code: output.overLimit ? 1 : (code ?? 1), ms, peak });
+      const text = timedOut
+        ? `${output.text()}\n${file} ran longer than the ${fileTimeoutMs / 1000}-second file timeout, and was stopped\n`
+        : output.text();
+      const failed = output.overLimit || timedOut;
+      settle({ file, output: text, code: failed ? 1 : (code ?? 1), ms, peak });
     });
   });
 }
 
 async function main() {
-  const { jobs, passthrough, shard, failFast, exclude, balance, durationsOut, retryFailed, only } =
-    parseArguments(process.argv.slice(2));
+  const {
+    jobs,
+    passthrough,
+    shard,
+    failFast,
+    exclude,
+    balance,
+    durationsOut,
+    retryFailed,
+    only,
+    fileTimeoutMs,
+  } = parseArguments(process.argv.slice(2));
   const selected = only
     ? new Set(
         readFileSync(only, 'utf8')
@@ -588,14 +641,15 @@ async function main() {
         continue;
       }
       const { file, entry } = picked;
-      let result = await runFile(file, passthrough, failFast, (rss) => (entry.rss = rss));
+      const onRss = (rss) => (entry.rss = rss);
+      let result = await runFile(file, passthrough, failFast, onRss, fileTimeoutMs);
       let counts = tally(result.output);
       const failed = (run, runCounts) =>
         (run.code !== 0 || runCounts.fail > 0) &&
         !(runCounts.fail === 0 && NO_MATCHES.test(run.output));
       if (retryFailed && failed(result, counts)) {
         const first = result;
-        result = await runFile(file, passthrough, failFast, (rss) => (entry.rss = rss));
+        result = await runFile(file, passthrough, failFast, onRss, fileTimeoutMs);
         counts = tally(result.output);
         if (!failed(result, counts)) flaky.push(first);
       }

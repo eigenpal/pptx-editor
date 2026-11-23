@@ -141,6 +141,30 @@ test('fail-fast stops dispatch after the first failure; normal mode reports both
     expect(floodReport.length).toBeLessThan(8 * 1024 * 1024);
     rmSync(join(root, 'packages', 'flood.test.ts'));
 
+    // A file that never finishes is stopped at the file timeout and fails with its name; the
+    // per-test timeout cannot interrupt a synchronous loop. The runner still runs the other files.
+    writeFileSync(
+      join(root, 'packages', 'hang.test.ts'),
+      `import { test } from 'bun:test';
+       test('hangs', () => {
+         console.log('HANG_START');
+         for (;;) {}
+       });`
+    );
+    const hung = run('--file-timeout', '2', '--exclude', 'packages/first');
+    expect(hung.status).toBe(1);
+    expect(hung.stdout).toContain('FAIL packages/hang.test.ts');
+    expect(hung.stdout).toContain('FAIL packages/second.test.ts');
+    expect(hung.stdout).toContain('HANG_START');
+    expect(hung.stdout).toContain(
+      'packages/hang.test.ts ran longer than the 2-second file timeout, and was stopped'
+    );
+    rmSync(join(root, 'packages', 'hang.test.ts'));
+
+    const badTimeout = run('--file-timeout', '0');
+    expect(badTimeout.status).toBe(1);
+    expect(badTimeout.stderr).toContain('--file-timeout needs a positive number of seconds');
+
     const emptyExclude = run('--exclude=');
     expect(emptyExclude.status).toBe(1);
     expect(emptyExclude.stderr).toContain('non-empty path prefix');
