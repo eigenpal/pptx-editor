@@ -1,5 +1,11 @@
 # @pptx-editor.dev/pptx-to-pdf
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies: @pptx-editor.dev/core@0.7.0, @pptx-editor.dev/pro@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
