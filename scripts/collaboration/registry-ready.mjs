@@ -14,7 +14,14 @@ function retryAfter(response, now) {
   return Math.max(0, Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - now) || 0;
 }
 
-/** Wait for every exact package version under one deadline before capture changes files. */
+/**
+ * Wait for every exact package version under one deadline before capture changes files.
+ *
+ * Read the packument (`/<name>`), not the version document (`/<name>/<version>`). `npm view` and
+ * `npm install` read the packument, and the registry updates the two documents separately. For
+ * 0.7.0 the version document showed `@pptx-editor.dev/core@0.7.0`, and one second later
+ * `npm view` still got a 404 (Post-release updates run 45246799486).
+ */
 export async function waitForPublishedPackages(
   version,
   {
@@ -38,19 +45,16 @@ export async function waitForPublishedPackages(
         [...pending].map(async (name) => {
           let response, metadata;
           try {
-            response = await request(
-              `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`,
-              {
-                signal: AbortSignal.any([
-                  controller.signal,
-                  AbortSignal.timeout(Math.max(1, Math.min(30_000, deadline - now()))),
-                ]),
-                headers: { 'cache-control': 'no-cache', accept: 'application/json' },
-                cache: 'no-store',
-              }
-            );
+            response = await request(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
+              signal: AbortSignal.any([
+                controller.signal,
+                AbortSignal.timeout(Math.max(1, Math.min(30_000, deadline - now()))),
+              ]),
+              headers: { 'cache-control': 'no-cache', accept: 'application/json' },
+              cache: 'no-store',
+            });
             // Reading the body can fail after headers arrive. It shares the request timeout.
-            if (response.ok) metadata = await response.json();
+            if (response.ok) metadata = (await response.json())?.versions?.[version];
           } catch {
             return;
           }
@@ -61,6 +65,8 @@ export async function waitForPublishedPackages(
             if (TRANSIENT.has(response.status)) return;
             throw new Error(`Registry refused ${name}@${version}: HTTP ${response.status}`);
           }
+          // The packument exists, but this version has not reached it yet.
+          if (!metadata) return;
           // Invalid release data is permanent, not a network failure.
           if (
             metadata?.version !== version ||

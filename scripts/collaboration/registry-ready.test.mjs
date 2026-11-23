@@ -6,7 +6,7 @@ const metadata = {
   gitHead: 'commit',
   dist: { integrity: 'sha512-value', tarball: 'https://registry.npmjs.org/package.tgz' },
 };
-const ready = () => Response.json(metadata);
+const ready = () => Response.json({ versions: { '0.4.0': metadata } });
 function clock() {
   let time = 0;
   const pauses = [];
@@ -28,9 +28,9 @@ test('waits for every exact version, including propagation beyond five minutes',
   await waitForPublishedPackages('0.4.0', {
     ...time,
     request: async (url, options) => {
-      expect(url.endsWith('/0.4.0')).toBe(true);
-      expect(options.cache).toBe('no-store');
       const name = decodeURIComponent(new URL(url).pathname.split('/')[1]);
+      expect(url).toBe(`https://registry.npmjs.org/${encodeURIComponent(name)}`);
+      expect(options.cache).toBe('no-store');
       calls.set(name, (calls.get(name) ?? 0) + 1);
       return name === names[1] && time.now() < 360_000
         ? new Response('', { status: 404 })
@@ -126,7 +126,8 @@ test('invalid metadata cancels other pending requests without retry', async () =
       ...time,
       request: async (_url, { signal }) => {
         signals.push(signal);
-        if (signals.length === 1) return Response.json({ version: '99.0.0' });
+        if (signals.length === 1)
+          return Response.json({ versions: { '0.4.0': { version: '0.4.0' } } });
         return new Promise((_resolve, reject) =>
           signal.addEventListener('abort', () => reject(signal.reason), { once: true })
         );
@@ -135,4 +136,18 @@ test('invalid metadata cancels other pending requests without retry', async () =
   ).rejects.toThrow('Incomplete registry metadata');
   expect(signals.every((signal) => signal.aborted)).toBe(true);
   expect(time.pauses).toEqual([]);
+});
+
+// Post-release updates run 45246799486: the version document was ready, but the packument that
+// `npm view` reads did not list the version yet.
+test('waits until the packument lists the exact version', async () => {
+  const time = clock();
+  await waitForPublishedPackages('0.4.0', {
+    ...time,
+    request: async () =>
+      time.now() < 30_000
+        ? Response.json({ versions: { '0.3.1': { ...metadata, version: '0.3.1' } } })
+        : ready(),
+  });
+  expect(time.now()).toBeGreaterThanOrEqual(30_000);
 });
