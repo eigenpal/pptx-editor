@@ -1,5 +1,5 @@
-// The branch of `mc:AlternateContent` that the engine reads (ECMA-376 Part 3, 10.2.1
-// AlternateContent, 10.2.2 Choice, 10.2.3 Fallback). The cascade, find, the selection pane, the
+// The branch of `mc:AlternateContent` that the engine reads (ECMA-376 Part 3, 7.5
+// AlternateContent, 7.6 Choice, 7.7 Fallback). The cascade, find, the selection pane, the
 // layout commands, and the edit rule (`automation/commands/alternate-copies.ts`) all call `alternateBranch`,
 // so they see the same shapes.
 
@@ -126,7 +126,7 @@ function isDrawable(branch: Element): boolean {
  * The branch of `ac` that the engine reads: the first `mc:Choice` whose `Requires` prefixes all
  * name an understood namespace and whose content the cascade draws (an `a14` choice: equations
  * that the layout draws), else `mc:Fallback`
- * (ECMA-376 Part 3, 10.2.1). A prefix resolves in the scope of the `mc:Choice`: on it, on `ac`,
+ * (ECMA-376 Part 3, 7.5 and 7.6). A prefix resolves in the scope of the `mc:Choice`: on it, on `ac`,
  * then on each element above `ac` up to `root` (the part root). A prefix that none of them
  * declares is not understood. Without `root`, only the `mc:Choice` and `ac` count.
  *

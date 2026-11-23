@@ -189,7 +189,7 @@ const CASES: readonly Case[] = [
     expected: ['AH', 'x', 'y'],
   },
   {
-    // The drawn copy of a shape in `mc:AlternateContent` (ECMA-376 Part 3, 10.2.1). An edit
+    // The drawn copy of a shape in `mc:AlternateContent` (ECMA-376 Part 3, 7.5). An edit
     // removes the stale `mc:Fallback` copy, and an undo of the edit puts it back.
     name: 'a delete across paragraphs in a shape in mc:AlternateContent keeps typed text',
     deck: () =>

@@ -1,6 +1,6 @@
 // The copies of a shape that an edit leaves out of date in `mc:AlternateContent`.
 //
-// A writer puts one object in several branches (ECMA-376 Part 3, 10.2.1): each `mc:Choice` is
+// A writer puts one object in several branches (ECMA-376 Part 3, 7.5): each `mc:Choice` is
 // for a reader that understands the namespaces it requires, and `mc:Fallback` is for any other
 // reader. The editor draws and edits one copy, the branch of `alternateBranch`. When that copy is
 // in a `mc:Choice`, a reader that selects another branch would show the object as it was before

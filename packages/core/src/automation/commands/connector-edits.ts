@@ -2,7 +2,7 @@
 //
 // A transform with a `connector` route writes its preset and adjust values
 // (`a:prstGeom/a:avLst`) and its glued ends (`p:cNvCxnSpPr/a:stCxn` and `a:endCxn`,
-// ECMA-376 Part 1, 19.3.1.13 and 20.1.2.2.4). A connector that moves with no route keeps each
+// ECMA-376 Part 1, 19.3.1.8 and 20.1.2.2.36). A connector that moves with no route keeps each
 // end whose shape moves with it and lets the other ends go: it no longer sits on their sites.
 // The connectors glued to the moved shapes follow them in the same transaction, so a move and
 // the connectors it reroutes are one undo step and one set of ops for collaboration.

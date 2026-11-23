@@ -1,6 +1,6 @@
 // Equation commands: insert an equation from its linear form, and replace the math of an
 // equation with a new linear form. An equation is Office Math (`a14:m`, ECMA-376 Part 1, 22.1)
-// in a text box, in `mc:AlternateContent` (ECMA-376 Part 3, 10.2.1): a `mc:Choice` that
+// in a text box, in `mc:AlternateContent` (ECMA-376 Part 3, 7.5): a `mc:Choice` that
 // requires `a14` holds the math, and the `mc:Fallback` holds the same text box with the
 // equation as plain text, for a reader that does not understand Office Math. An edit of the
 // math removes the fallback copy, as every edit of a drawn `mc:Choice` copy does

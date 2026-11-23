@@ -14,7 +14,7 @@
 // columns or rows leave a marked table with no grid column or no row: the save leaves that frame
 // out, the cascade does not draw it, and the selection pane does not list it (`isEmptiedTable`).
 //
-// A mark is an `a:ext` element (ECMA-376 Part 1, 20.1.2.2.15 ext) with the editor's `uri`, a
+// A mark is an `a:ext` element (ECMA-376 Part 1, 20.1.2.2.14 ext) with the editor's `uri`, a
 // direct child of the frame's `p:cNvPr`. It lives only in the room: open, copy, paste, and save
 // remove every mark. A mark in a room is attacker-controlled like the rest of the room; a forged
 // one makes a table read and save by `editedTableGrid`, which only ever writes valid markup.

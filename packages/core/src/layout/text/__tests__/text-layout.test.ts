@@ -253,7 +253,7 @@ describe('symbol font bullets', () => {
   });
 });
 
-describe('tab stops (ECMA-376 Part 1, 21.1.2.1.36 tab)', () => {
+describe('tab stops (ECMA-376 Part 1, 21.1.2.2.13 tab)', () => {
   const LEFT_INSET = 91_440;
   const tabbed = (tabs: string, text: string): readonly number[] => {
     const t = lay(

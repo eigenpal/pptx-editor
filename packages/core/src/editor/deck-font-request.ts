@@ -161,7 +161,7 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
 
 /**
  * The family a run naming no font measures with: the minor Latin font of the first slide
- * master's theme (ECMA-376 Part 1, 20.1.4.1.24 `minorFont`). `DEFAULT_FONT.family` when the
+ * master's theme (ECMA-376 Part 1, 20.1.4.1.25 `minorFont`). `DEFAULT_FONT.family` when the
  * theme names none.
  */
 export function deckDefaultFamily(pkg: PptxPackage): string {

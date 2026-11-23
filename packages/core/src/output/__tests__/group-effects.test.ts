@@ -1,4 +1,4 @@
-// Group effects (`p:grpSpPr/a:effectLst`, ECMA-376 Part 1, 19.3.1.22): the effects apply to the
+// Group effects (`p:grpSpPr/a:effectLst`, ECMA-376 Part 1, 19.3.1.23): the effects apply to the
 // group's content as one picture. The outer shadow is one copy of all children together, placed
 // by the group's box under its turn, flips, and child space, and it paints without the Pro
 // drawing renderers.

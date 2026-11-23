@@ -2,7 +2,7 @@
 // slide layouts.
 // Declaration-only, DOM-free, re-exported by `neutral.ts`.
 
-/** A custom show of the deck (`p:custShow`, ECMA-376 Part 1, 19.2.1.7), for links. @public */
+/** A custom show of the deck (`p:custShow`, ECMA-376 Part 1, 19.2.1.5), for links. @public */
 export interface CustomShowSummary {
   /** The show's `id` in the file. */
   readonly id: number;

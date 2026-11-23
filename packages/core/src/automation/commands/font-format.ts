@@ -98,7 +98,7 @@ export const FONT_NAME = /^[\p{L}\p{N}\p{M} \-.+_]{1,64}$/u;
 
 /**
  * The Latin theme font references a run can name: the theme's major (headings) and minor (body)
- * font. ECMA-376 Part 1, 20.1.4.1.17 `latin`; the text follows a later theme change. @internal
+ * font. ECMA-376 Part 1, 21.1.2.3.7 `latin`; the text follows a later theme change. @internal
  */
 export const LATIN_THEME_FONTS = { major: '+mj-lt', minor: '+mn-lt' } as const;
 
@@ -114,7 +114,7 @@ export function isLatinTypeface(typeface: string): boolean {
 
 /**
  * Write one family to the Latin, East Asian, and complex script faces of a run
- * (ECMA-376 Part 1, 21.1.2.3.7 `ea`, 21.1.2.3.1 `cs`), so text in every script takes the
+ * (ECMA-376 Part 1, 21.1.2.3.3 `ea`, 21.1.2.3.1 `cs`), so text in every script takes the
  * family. A Latin theme font reference maps to the reference of the same slot
  * (`+mj-lt` to `+mj-ea` and `+mj-cs`). It refuses a typeface that `isLatinTypeface` refuses.
  * @internal

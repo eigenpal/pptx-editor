@@ -12,6 +12,34 @@ All files come from the free downloads at [ECMA-376 on the Ecma International si
 | `ecma-376/part4/transitional-schemas/` | `ECMA-376-4_5th_edition_december_2016.zip` | `OfficeOpenXML-XMLSchema-Transitional.zip` | None. Byte-identical. |
 | `ecma-376/part1/schemas/` | Copied from DOCX Editor's `reference/ecma-376/part1/schemas/` at adf0e178 | Part 1 Strict schemas | None. The seven files are byte-identical to the 5th edition `OfficeOpenXML-XMLSchema-Strict.zip`. DOCX Editor's modified `dml-main.xsd` is not copied: use `part4/transitional-schemas/dml-main.xsd`. |
 
+## Full text of the standard
+
+The PDFs of Parts 1 to 4 are large, so git ignores them. Fetch them, with a text copy and a subclause index for each part:
+
+```bash
+bun run reference:fetch
+```
+
+The command needs Poppler (`pdftotext`). It writes, for each part N:
+
+| File | Holds |
+| --- | --- |
+| `ecma-376/partN/ECMA-376-N.pdf` | The standard, as Ecma publishes it |
+| `ecma-376/partN/*.zip` | The supplementary archives: Strict and Transitional schemas, RELAX NG, the DrawingML preset geometries, the SpreadsheetML styles, and the WordprocessingML art borders |
+| `ecma-376/partN/text/full.txt` | The text of the PDF, with its layout |
+| `ecma-376/partN/text/index.tsv` | One row for each subclause: number, title, PDF page, and line in `full.txt` |
+
+To read a subclause, find its row in the index, and then read `full.txt` from that line:
+
+```bash
+grep -P '^19\.3\.1\.43\t' reference/ecma-376/part1/text/index.tsv
+sed -n '127727,127800p' reference/ecma-376/part1/text/full.txt
+```
+
+The parts are Part 1 (fundamentals and the markup languages, 5th edition, 2016), Part 2 (Open Packaging Conventions, 5th edition, 2021), Part 3 (Markup Compatibility and Extensibility, 5th edition, 2015), and Part 4 (transitional migration features, 5th edition, 2016). Cite these editions.
+
+`bun run reference:check-citations` checks each citation of the form "ECMA-376 Part 1, 19.3.1.43" in the tracked files against the index, and fails on a number that is not a subclause. Add `--list` to print each citation with the title of its subclause. The check needs the local index, so CI does not run it.
+
 ## Use
 
 | Files | Used by |

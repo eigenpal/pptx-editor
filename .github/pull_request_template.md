@@ -1,6 +1,6 @@
 ## Change
 
-Describe the problem and resulting behavior. State any rendering or save limits.
+Describe the problem and resulting behavior. Cite the ECMA-376 elements and subclauses that the change implements. State any rendering or save limits.
 
 ## Verification
 

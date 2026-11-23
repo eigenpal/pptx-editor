@@ -1,5 +1,5 @@
 // An edit of the copy that the editor draws in `mc:AlternateContent` leaves no out-of-date copy
-// in another branch (`automation/commands/alternate-copies.ts`, ECMA-376 Part 3, 10.2.1). A reader that reads
+// in another branch (`automation/commands/alternate-copies.ts`, ECMA-376 Part 3, 7.5). A reader that reads
 // only `mc:Fallback` then never shows the object as it was before the edit.
 
 import { describe, expect, test } from 'bun:test';

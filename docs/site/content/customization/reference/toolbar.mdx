@@ -247,7 +247,7 @@ In Vue, `useEditorCommand` follows the same rules through `PptxEditorRoot`. It s
 
 ### Theme fonts
 
-To apply a theme font, pass its reference: `execute('+mj-lt')` for the headings font, and `execute('+mn-lt')` for the body font. The text then keeps the theme reference and follows a theme change (ECMA-376 Part 1, 20.1.4.1.17 `latin`). To mark the theme row as current, read `snapshot().format?.fontFamilyTheme` (a `SelectionFormat` field). It is `major` for the headings font, `minor` for the body font, and absent for a literal family. `value` is the theme's family name in both cases.
+To apply a theme font, pass its reference: `execute('+mj-lt')` for the headings font, and `execute('+mn-lt')` for the body font. The text then keeps the theme reference and follows a theme change (ECMA-376 Part 1, 21.1.2.3.7 `latin`). To mark the theme row as current, read `snapshot().format?.fontFamilyTheme` (a `SelectionFormat` field). It is `major` for the headings font, `minor` for the body font, and absent for a literal family. `value` is the theme's family name in both cases.
 
 ## React and Vue reference
 

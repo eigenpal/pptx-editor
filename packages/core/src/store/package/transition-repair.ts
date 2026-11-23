@@ -2,7 +2,7 @@
 //
 // `CT_Slide` holds at most one transition, before the timing: cSld, clrMapOvr, transition,
 // timing, extLst. A transition is a `p:transition`, or an `mc:AlternateContent` whose branches
-// hold one (ECMA-376 Part 3, §10.2.1). Two collaborators who each set the transition of one
+// hold one (ECMA-376 Part 3, 7.5). Two collaborators who each set the transition of one
 // slide at the same time both insert one, so the merge can hold two, and one after the timing.
 // The save keeps the first in document order, before the timing, and drops the others. A slide
 // with one transition in its place saves unchanged, and so does a slide whose transitions are

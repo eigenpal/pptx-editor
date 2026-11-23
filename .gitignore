@@ -58,3 +58,8 @@ packages/editor-api/compat/reports/
 
 # Track OpenSpec changes. Keep review and investigation records local.
 openspec/changes/*/*review*.md
+
+# ECMA-376 PDFs, supplementary ZIPs, and the text copy; run `bun run reference:fetch`.
+reference/ecma-376/**/*.pdf
+reference/ecma-376/**/*.zip
+reference/ecma-376/*/text/

@@ -111,7 +111,7 @@ Each directory is a lane with allowed imports (`src/__tests__/core-lane-graph.ts
 | `placeholders.ts` | A part's placeholders, and the layout and master placeholder that a placeholder inherits from (`inheritedPlaceholders`, `layoutPlaceholderOf`) |
 | `shape-xfrm.ts` | `readXfrm` and `readGeometry`: the transform and geometry of a shape's properties, and `XFRM_BOUND` |
 | `resolve-keys.ts` | The cache keys of the slide resolve: what an element reads outside its own XML, compared by identity, so an edit resolves only the elements it changed |
-| `alternate-content.ts` | The `mc:AlternateContent` branch that the cascade, find, the selection pane, the layout commands, and the edit rule of `automation/commands/alternate-copies.ts` read (ECMA-376 Part 3, 10.2.1) |
+| `alternate-content.ts` | The `mc:AlternateContent` branch that the cascade, find, the selection pane, the layout commands, and the edit rule of `automation/commands/alternate-copies.ts` read (ECMA-376 Part 3, 7.5) |
 | `text-style.ts` | List styles, paragraph and run properties, fields |
 | `picture-bullet.ts` | Picture bullets (`a:buBlip`): the part of each list level, whose relationships name the picture, and the picture's aspect from its header |
 | `theme.ts`, `color.ts` | Theme colors and fonts; color resolution through the color map (`p:clrMap`) and `phClr`. The color math is in `@eigenpal/ooxml-core` (`drawingml-color.ts`) |

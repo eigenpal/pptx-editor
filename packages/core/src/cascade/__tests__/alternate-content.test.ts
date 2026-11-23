@@ -1,4 +1,4 @@
-// The branch of `mc:AlternateContent` that the engine reads (ECMA-376 Part 3, 10.2.1): the first
+// The branch of `mc:AlternateContent` that the engine reads (ECMA-376 Part 3, 7.5): the first
 // `mc:Choice` whose `Requires` namespaces it understands and whose content it draws, else
 // `mc:Fallback`. Both branches survive save unchanged.
 

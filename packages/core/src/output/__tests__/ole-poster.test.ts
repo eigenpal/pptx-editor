@@ -1,4 +1,4 @@
-// An OLE object shows the picture of its `p:oleObj/p:pic` (ECMA-376 Part 1, 19.3.1.36) in the
+// An OLE object shows the picture of its `p:oleObj/p:pic` (ECMA-376 Part 1, 19.3.1.37) in the
 // frame's box. The object is never run. With no picture, the frame keeps its labeled placeholder.
 
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -107,7 +107,7 @@ function frameOf(layout: SlideLayout): ResolvedGraphicFrame {
   return item.element;
 }
 
-describe('OLE poster picture (ECMA-376 Part 1, 19.3.1.36)', () => {
+describe('OLE poster picture (ECMA-376 Part 1, 19.3.1.37)', () => {
   test('the slide-structure fixture paints the poster, not a placeholder', () => {
     const layout = layoutOf(buildSlideStructureDeck(), 3);
     const frame = frameOf(layout);

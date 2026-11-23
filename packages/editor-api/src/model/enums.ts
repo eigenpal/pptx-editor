@@ -504,7 +504,7 @@ function enumMap<O extends string>(
   };
 }
 
-/** `ST_TextAnchoringType` with `anchorCtr` (ECMA-376 Part 1, 21.1.2.1.1). */
+/** `ST_TextAnchoringType` with `anchorCtr` (ECMA-376 Part 1, 20.1.10.60). */
 export const VERTICAL_ALIGNMENT = enumMap<`${TextVerticalAlignment}`>([
   ['Top', 't'],
   ['Middle', 'ctr'],
@@ -555,7 +555,7 @@ export const UNDERLINE = enumMap<`${ShapeFontUnderlineStyle}`>([
 ]);
 
 /**
- * `ST_PresetLineDashVal` (ECMA-376 Part 1, 20.1.10.48). The file has eleven dash presets and
+ * `ST_PresetLineDashVal` (ECMA-376 Part 1, 20.1.10.49). The file has eleven dash presets and
  * the object model twelve: `SquareDot` writes `sysDot`, which reads back as `SystemDot`.
  */
 export const DASH_STYLE = enumMap<`${ShapeLineDashStyle}`>(

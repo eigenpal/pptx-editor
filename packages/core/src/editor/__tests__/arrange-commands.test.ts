@@ -348,7 +348,7 @@ describe('round 1 review fixes', () => {
     );
     const e = await open(bytes);
     const drawn = e.snapshot().shapes!.find((s) => s.kind === 'shape')!;
-    // The `Requires="p14"` Choice is the branch the slide draws (ECMA-376 Part 3, 10.2.1).
+    // The `Requires="p14"` Choice is the branch the slide draws (ECMA-376 Part 3, 7.5).
     const part = xmlPartOf(e.session!.store.package, e.session!.info.slides[0].partName)!;
     const choiceSp = find(find(part.root, 'mc:Choice'), 'p:sp')!;
     expect(drawn.nodeId).toBe(choiceSp.id);

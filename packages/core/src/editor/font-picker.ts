@@ -26,7 +26,7 @@ export interface FontPickerRow {
   readonly family: string;
   /**
    * What the row applies: the theme font reference (`+mj-lt`, `+mn-lt`) on a theme row, so the
-   * text follows a later theme change (ECMA-376 Part 1, 20.1.4.1.17 `latin`), else the family.
+   * text follows a later theme change (ECMA-376 Part 1, 21.1.2.3.7 `latin`), else the family.
    */
   readonly value: string;
   /** The theme font of a theme row, or null on a row that names a literal family. */

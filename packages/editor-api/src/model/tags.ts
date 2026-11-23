@@ -4,7 +4,7 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Office.js `Tag` and `TagCollection`: the customer data tags of a presentation, slide, or shape
-// (`p:custDataLst/p:tags`, a `p:tagLst` part; ECMA-376 Part 1, 19.3.3.3). Keys are stored in
+// (`p:custDataLst/p:tags`, a `p:tagLst` part; ECMA-376 Part 1, 19.3.1.47 and 19.3.3.2). Keys are stored in
 // upper case, as the object model gives them.
 
 import type { AutomationTag } from '@pptx-editor.dev/core/automation';

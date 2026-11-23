@@ -24,7 +24,7 @@
 //   effects (`p:cTn` with the same `grpId`) that target its `spid`.
 // - `p:tnLst` and `p:bldLst` once empty (each needs one child), and the whole `p:timing` once
 //   neither is left: a `p:extLst` alone describes nothing.
-// - In a top-level `mc:AlternateContent` (ECMA-376 Part 3, §10.2.1), each branch's `p:timing`
+// - In a top-level `mc:AlternateContent` (ECMA-376 Part 3, 7.5), each branch's `p:timing`
 //   by the same rules, and the whole `mc:AlternateContent` once every branch is empty.
 //
 // The timing is attacker-controlled: one pass over it builds the time nodes, their lists, and an
@@ -141,7 +141,7 @@ function sameTree(a: Node, b: Node, depth: number): boolean {
 /**
  * The `p:cNvPr/@id` values that a slide's animations name (§19.5.72 `spTgt`, §19.5.12 `bldP`):
  * in `p:timing`, and in a `p:timing` inside top-level `mc:AlternateContent` (every `mc:Choice`
- * and the `mc:Fallback`, ECMA-376 Part 3, §10.2.1), where a writer puts animations that need an
+ * and the `mc:Fallback`, ECMA-376 Part 3, 7.5), where a writer puts animations that need an
  * extension. @internal
  */
 export function animatedShapeIds(root: Element | undefined): Set<string> {

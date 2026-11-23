@@ -641,7 +641,7 @@ export interface SelectionFormat {
   readonly fontFamily?: string;
   /**
    * The theme font the family comes from: `major` for `+mj-lt` (headings), `minor` for `+mn-lt`
-   * (body). Absent when the text names a literal family. ECMA-376 Part 1, 20.1.4.1.17 `latin`.
+   * (body). Absent when the text names a literal family. ECMA-376 Part 1, 21.1.2.3.7 `latin`.
    */
   readonly fontFamilyTheme?: 'major' | 'minor';
   readonly color?: string;
