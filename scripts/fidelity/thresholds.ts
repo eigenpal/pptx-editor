@@ -153,7 +153,7 @@ export interface KnownGapList {
  */
 export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '6.5.438',
-  chromium: 'chromium-headless-shell 1254',
+  chromium: 'chromium-headless-shell 1255',
   fonts:
     '@docx-editor.dev/fonts 2.38.0, @docx-editor.dev/fonts-cjk 2.38.0, fixtures/fonts f68672445aef',
   deckLines: {
@@ -240,7 +240,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
  */
 export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
   pdfjs: '6.5.438',
-  chromium: 'chromium-headless-shell 1254',
+  chromium: 'chromium-headless-shell 1255',
   fonts:
     '@docx-editor.dev/fonts 2.38.0, @docx-editor.dev/fonts-cjk 2.38.0, fixtures/fonts f68672445aef',
   deckLines: {
