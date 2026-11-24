@@ -112,7 +112,7 @@
     "@docx-editor.dev/fonts-cjk": "^2.38.0",
     "@happy-dom/global-registrator": "21.0.4",
     "@microsoft/api-extractor": "^7.60.1",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@testing-library/react": "^16.0.0",
     "@types/bun": "^1.4.3",
     "@types/pngjs": "^6.0.5",
