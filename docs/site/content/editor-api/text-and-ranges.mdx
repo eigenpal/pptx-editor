@@ -170,7 +170,7 @@ These targets refuse the read with `NotSupported`:
 - A shape with no text frame: a picture, a connector, a group, or a table (diagnostic `edit.no-text-frame`). The API has no fit read for a table cell. A table row grows to fit the horizontal text of its cells.
 - A shape of a slide layout or a slide master (diagnostic `text-fit.not-on-slide`).
 - A hidden shape, or a shape in a hidden group (diagnostic `text-fit.not-drawn`).
-- Any shape while the runtime has no exact font measurement (diagnostic `host.no-font-measurement`). A runtime over a live editor measures with approximate metrics while its fonts load. It also does so when its text engine or all of its fonts do not load.
+- Any shape while the runtime has no exact font measurement (diagnostic `host.no-font-measurement`). A runtime has none when it has no font at all. For example, a server runtime with `substitutes: false`, no `fonts`, and no embedded fonts has none. A runtime over a live editor can also have none while its fonts load, or when its text engine does not load.
 
 A text frame from `getTextFrameOrNullObject()` that is a null object skips the read, and the result stays not loaded. `getTextFit()` is an SDK extension. The pinned Office.js reference has no such member.
 

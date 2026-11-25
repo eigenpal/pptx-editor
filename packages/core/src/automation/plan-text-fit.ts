@@ -12,10 +12,11 @@
 // Refused: a shape with no text frame (a picture, a connector, a group, a table: the table
 // layout grows each row to its cells' text, `table-layout.ts`), a shape of a layout or a master
 // (it has no slide to lay out on), a hidden shape (the slide does not draw it), and a host with
-// no measurer, with the fixed measurer (its heights model no font), or with a measurer that
-// stands in until the fonts load (an editor's canvas measurer).
+// no measurer, with a measurer that models no font (the fixed measurer, or a shaping measurer
+// with no face: `isApproximateMeasurer`), or with a measurer that stands in for the fonts (an
+// editor's canvas measurer).
 
-import { isFixedMeasurer, layoutSlide, type LayoutItem } from '../layout/index.ts';
+import { isApproximateMeasurer, layoutSlide, type LayoutItem } from '../layout/index.ts';
 import { textFitOf } from '../layout/autofit.ts';
 import type { AutomationRef, AutomationValue } from './protocol.ts';
 import { resolvedSlide } from './plan-reads.ts';
@@ -41,7 +42,7 @@ function itemOf(
 
 export function readTextFit(context: TextPlanContext, ref: AutomationRef): AutomationValue {
   const measurer = context.measurer;
-  if (!measurer || context.standInMeasurer || isFixedMeasurer(measurer))
+  if (!measurer || context.standInMeasurer || isApproximateMeasurer(measurer))
     throw new AutomationFailure(
       'unsupported-capability',
       'this host has no font measurement',

@@ -222,15 +222,21 @@ export function eastAsianFallbackFamilies(lang?: string): readonly string[] {
   return (script && FALLBACKS_BY_SCRIPT[script]) || EAST_ASIAN_FALLBACK_FAMILIES;
 }
 
-/** The measurers that `createFixedMeasurer` made. */
-const fixedMeasurers = new WeakSet<TextMeasurer>();
+/** The measurers whose heights model no font (`isApproximateMeasurer`). */
+const approximateMeasurers = new WeakSet<TextMeasurer>();
+
+/** Record that `measurer` models no font: the fixed measurer, or one with no face. @internal */
+export function markApproximateMeasurer(measurer: TextMeasurer): void {
+  approximateMeasurers.add(measurer);
+}
 
 /**
- * Whether `measurer` is a fixed measurer (`createFixedMeasurer`): its heights model no font, so
- * a read that reports measured text refuses with it. @internal
+ * Whether `measurer` models no font: a fixed measurer (`createFixedMeasurer`), or a shaping
+ * measurer with no face, whose families all take stand-in metrics. A read that reports measured
+ * text refuses with it. @internal
  */
-export function isFixedMeasurer(measurer: TextMeasurer): boolean {
-  return fixedMeasurers.has(measurer);
+export function isApproximateMeasurer(measurer: TextMeasurer): boolean {
+  return approximateMeasurers.has(measurer);
 }
 
 /**
@@ -239,7 +245,7 @@ export function isFixedMeasurer(measurer: TextMeasurer): boolean {
  */
 export function createFixedMeasurer(): TextMeasurer {
   const measurer = fixedMeasurer();
-  fixedMeasurers.add(measurer);
+  markApproximateMeasurer(measurer);
   return measurer;
 }
 

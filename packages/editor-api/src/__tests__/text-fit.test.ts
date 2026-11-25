@@ -22,7 +22,24 @@ import {
   table,
 } from '../../../../scripts/fixtures/builder.ts';
 import { isPptxEditorError, PptxEditor, type RequestContext, type TextFrameFit } from '../index.ts';
-import { IN, open, rejection } from './support.ts';
+import { IN, rejection } from './support.ts';
+
+/**
+ * An open face from `fixtures/fonts`. A runtime with no face at all has no exact measurement and
+ * refuses the read, so these runtimes measure with this face (and no substitutes, for speed).
+ */
+const FONT: FontSource = {
+  family: 'STIX Two Math',
+  bold: false,
+  italic: false,
+  bytes: new Uint8Array(
+    readFileSync(join(import.meta.dir, '../../../../fixtures/fonts/STIXTwoMath-Regular.otf'))
+  ),
+  origin: 'system',
+};
+
+const open = (bytes: Uint8Array) =>
+  PptxEditor.createServer(bytes, { substitutes: false, fonts: FONT });
 
 const LONG = 'The quick brown fox jumps over the lazy dog. '.repeat(12);
 // Text that overflows the box at full size and fits at a shrink step.
@@ -276,20 +293,11 @@ describe('TextFrame.getTextFit', () => {
   });
 
   test('a face that the runtime has is not listed', async () => {
-    const path = join(import.meta.dir, '../../../../fixtures/fonts/STIXTwoMath-Regular.otf');
-    const font: FontSource = {
-      family: 'STIX Two Math',
-      bold: false,
-      italic: false,
-      bytes: new Uint8Array(readFileSync(path)),
-      origin: 'system',
-    };
-    const runtime = await PptxEditor.createServer(
+    const runtime = await open(
       deckOf({
         text: para(run('Named', 'sz="1800"', '<a:latin typeface="STIX Two Math"/>')),
         bodyPr: NO_AUTOFIT,
-      }),
-      { substitutes: false, fonts: font }
+      })
     );
     const fit = await runtime.run(async (context) => {
       const result = context.presentation.slides
@@ -370,7 +378,10 @@ describe('TextFrame.getTextFit', () => {
   });
 
   test('a runtime over a live editor reads the fit and records no undo step', async () => {
-    const live = createPptxEditor({ substitutes: false });
+    // The legacy array form of `fonts`: faces tried first.
+    const live = createPptxEditor({ substitutes: false, fonts: [FONT] } as unknown as Parameters<
+      typeof createPptxEditor
+    >[0]);
     expect((await live.load(deckOf({ text: para(run(LONG)), bodyPr: NO_AUTOFIT }))).ok).toBe(true);
     const runtime = BrowserEditor.createBrowser(live);
     const fit = await runtime.run(async (context) => {
@@ -396,6 +407,21 @@ describe('TextFrame.getTextFit', () => {
       })
     );
     expect(failure(error)).toEqual(['NotSupported', 'host.no-font-measurement']);
+  });
+
+  test('a server runtime with no face at all refuses the read', async () => {
+    const runtime = await PptxEditor.createServer(
+      deckOf({ text: para(run('a')), bodyPr: NO_AUTOFIT }),
+      { substitutes: false }
+    );
+    const error = await rejection(
+      runtime.run(async (context) => {
+        context.presentation.slides.getItemAt(0).shapes.getItem('2').textFrame.getTextFit();
+        await context.sync();
+      })
+    );
+    expect(failure(error)).toEqual(['NotSupported', 'host.no-font-measurement']);
+    runtime.dispose();
   });
 
   test('columns: text that flows into the second column reports the column height', async () => {

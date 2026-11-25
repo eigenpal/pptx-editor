@@ -12,12 +12,23 @@ import {
   type AutomationOperation,
   type AutomationValue,
 } from '../../automation/index.ts';
-import { createFixedMeasurer, type LayoutItem } from '../../layout/index.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createFixedMeasurer, type FontSource, type LayoutItem } from '../../layout/index.ts';
 import { DocumentSession, NO_HOST_FACES } from '../document-session.ts';
-import { openPresentation } from '../index.ts';
+import { createBrowserAutomationHost, createPptxEditor, openPresentation } from '../index.ts';
 
 const IN = 914_400;
 const EMU_PER_PT = 12_700;
+const FONT: FontSource = {
+  family: 'STIX Two Math',
+  bold: false,
+  italic: false,
+  bytes: new Uint8Array(
+    readFileSync(join(import.meta.dir, '../../../../../fixtures/fonts/STIXTwoMath-Regular.otf'))
+  ),
+  origin: 'system',
+};
 const LONG = 'The quick brown fox jumps over the lazy dog. '.repeat(12);
 // Text that overflows the box at full size and fits at a shrink step.
 const SHRINKS = 'The quick brown fox jumps over the lazy dog. '.repeat(3);
@@ -49,7 +60,8 @@ async function open(): Promise<DocumentSession> {
         },
       ],
     }),
-    { substitutes: false }
+    // An open face from `fixtures/fonts`: a measurer with no face models no font.
+    { substitutes: false, fonts: [FONT] }
   );
   if (!opened.ok) throw new Error('fixture');
   return opened.session;
@@ -183,6 +195,23 @@ describe('DocumentSession.standInMeasurer', () => {
     expect(session.standInMeasurer).toBe(true);
     // The shaped measurer of the opened session is not a stand-in.
     expect(opened.standInMeasurer).toBe(false);
+
+    // The editor's automation port reports the stand-in, so the read refuses.
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const editor = Object.create(live, { session: { get: () => session } }) as typeof live;
+    const host = createBrowserAutomationHost(editor);
+    const response = host.execute({
+      operations: [
+        { op: 'getSlide', key: { index: 0 } },
+        shapeOp('2'),
+        { op: 'readTextFit', shape: { result: 1 } },
+      ],
+    });
+    expect(response.results[2]).toMatchObject({
+      status: 'error',
+      error: { code: 'unsupported-capability', detail: 'text-fit-measurer' },
+    });
+    host.dispose();
     session.dispose();
     opened.dispose();
   });

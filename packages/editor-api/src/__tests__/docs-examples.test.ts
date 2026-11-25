@@ -245,7 +245,8 @@ test('the duplicate example copies the slide after its source and tags the copy'
 });
 
 test('the text fit example keeps text that fits and shortens text that overflows', async () => {
-  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  // The default substitutes: a runtime with no face at all refuses the read.
+  const runtime = await PptxEditor.createServer(deck());
   try {
     // From text-and-ranges.mdx, "Check whether text fits its shape".
     const writeIfItFits = (shapeId: string, text: string, shorterText: string) =>

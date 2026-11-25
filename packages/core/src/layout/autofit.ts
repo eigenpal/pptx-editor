@@ -322,8 +322,9 @@ export interface TextFit {
  * the column height when the text flows into a second column (`contentHeight`). Empty
  * paragraphs at the end do not count, as for the shrink steps (`fittedText`): they draw nothing
  * below the text. One case differs: single-column text with `ctr` or `b` anchoring
- * (ST_TextAnchoringType, 20.1.10.60). There they count, because they move the text that draws
- * up, past the top of the text area, once the whole body is taller than it. The overflow test
+ * (ST_TextAnchoringType, 20.1.10.60) and a paragraph that is not empty. There they count,
+ * because they move the text that draws up, past the top of the text area, once the whole body
+ * is taller than it. The overflow test
  * is the one the shrink steps use (`fits`).
  *
  * `item` is a slide shape, whose text lays out in its geometry's text rectangle; a diagram
@@ -337,8 +338,12 @@ export function textFitOf(
   if (!full) return null;
   const drawn = item.text;
   // Anchoring moves single-column text only: with columns, the anchor height stops at the box.
+  // A body of empty paragraphs alone has no text to move.
   const { anchor, numCol } = full.body;
-  const moves = (anchor === 'ctr' || anchor === 'b') && numCol <= 1;
+  const moves =
+    (anchor === 'ctr' || anchor === 'b') &&
+    numCol <= 1 &&
+    full.paragraphs.some((p) => !isEmptyParagraph(p));
   const text = moves ? full : fittedText(full);
   let laid = drawn;
   if (!laid || text !== full) {

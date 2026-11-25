@@ -21,6 +21,7 @@ import {
   DEFAULT_FALLBACK_FAMILY,
   eastAsianFallbackFamilies,
   fontSubstitutes,
+  markApproximateMeasurer,
   type FaceMetrics,
   type FontRequest,
   type MathScriptLevel,
@@ -569,5 +570,8 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return out ?? undefined;
   };
 
-  return { resolve, advances, shape, fallbackFace, glyphOutline, faces };
+  const measurer = { resolve, advances, shape, fallbackFace, glyphOutline, faces };
+  // With no face, every family takes stand-in metrics, as the fixed measurer's.
+  if (faces.length === 0) markApproximateMeasurer(measurer);
+  return measurer;
 }
