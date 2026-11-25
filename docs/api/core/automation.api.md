@@ -332,12 +332,9 @@ export type AutomationHandleRef = string & {
 export interface AutomationHeaderFooterRead {
     readonly dateFixed: boolean;
     readonly dateText: string;
-    // (undocumented)
     readonly dateVisible: boolean;
     readonly footerText: string;
-    // (undocumented)
     readonly footerVisible: boolean;
-    // (undocumented)
     readonly slideNumberVisible: boolean;
 }
 
@@ -349,7 +346,6 @@ export interface AutomationHeaderFooterWrite {
     readonly footerText?: string;
     readonly footerVisible?: boolean;
     readonly hideOnTitleSlides?: boolean;
-    // (undocumented)
     readonly slideNumberVisible?: boolean;
 }
 

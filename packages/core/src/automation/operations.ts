@@ -256,6 +256,7 @@ export interface AutomationTransitionWrite {
  * 19.3.1.36 and 19.7.10). A field the write leaves out stays as it is.
  */
 export interface AutomationHeaderFooterWrite {
+  /** Show or hide the slide number: a `sldNum` placeholder with a `slidenum` field. */
   readonly slideNumberVisible?: boolean;
   /** False hides the footer. True without `footerText` keeps or spreads the deck's footer. */
   readonly footerVisible?: boolean;

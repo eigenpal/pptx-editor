@@ -166,9 +166,10 @@ export function setHeaderFooter(
       setFooter(batch, true, s.footerText, options);
     else if (s.footerVisible === false) hide(() => setFooter(batch, false, undefined, options));
     if (s.dateVisible === false) hide(() => setDateTime(batch, false, undefined, false, options));
-    // With `dateFixed: false`, the text is the current text of an automatic date field.
+    // With `dateFixed: false`, the text is the current text of an automatic date field, and a
+    // slide's own field keeps its type, so a slide's read written back keeps its format.
     else if (s.dateText !== undefined)
-      setDateTime(batch, true, s.dateText, s.dateFixed !== false, options);
+      setDateTime(batch, true, s.dateText, s.dateFixed !== false, options, s.dateFixed === false);
     else if (s.dateVisible !== undefined || s.dateFixed !== undefined)
       setDateTime(batch, true, undefined, s.dateFixed === true, options, s.dateFixed === false);
   });

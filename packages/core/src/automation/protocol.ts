@@ -505,10 +505,13 @@ export interface AutomationTransitionRead extends SlideTransitionState {
  * placeholder with no text shows nothing, so it reads as not visible.
  */
 export interface AutomationHeaderFooterRead {
+  /** The slide has a `sldNum` placeholder, with or without text. */
   readonly slideNumberVisible: boolean;
+  /** The slide has an `ftr` placeholder with text. */
   readonly footerVisible: boolean;
   /** The footer text; empty when the footer is not visible. */
   readonly footerText: string;
+  /** The slide has a `dt` placeholder with text. */
   readonly dateVisible: boolean;
   /** The text the date shows; empty when the date is not visible. */
   readonly dateText: string;

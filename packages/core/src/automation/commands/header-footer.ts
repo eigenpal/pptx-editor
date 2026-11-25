@@ -299,6 +299,8 @@ interface Showing {
   readonly toFixed?: boolean;
   /** Without text: turn the fixed dates that slides keep into today's date as a field. */
   readonly toField?: boolean;
+  /** With text for a field: a slide's own date field keeps its field type. */
+  readonly keepFieldType?: boolean;
 }
 
 /**
@@ -377,7 +379,14 @@ function applyKind(
         continue;
       }
       for (const shape of existing)
-        replaceText(batch, slide.partName, shape, what, showing.text, showing.field);
+        replaceText(
+          batch,
+          slide.partName,
+          shape,
+          what,
+          showing.text,
+          (showing.keepFieldType && shownBy(shape)?.fieldType) || showing.field
+        );
       changed += 1;
       continue;
     }
@@ -433,7 +442,8 @@ export function setFooter(
  * today's date as a field; `fixed` then turns the dates into fixed text. With `automatic`
  * (and no `text` or `fixed`), a slide's fixed text becomes today's date as a `datetime1` field
  * (`a:fld`, `CT_TextField`, ECMA-376 Part 1, 21.1.2.2.4), a date field keeps its type, and a
- * slide without a date takes the deck's date field, else today's.
+ * slide without a date takes the deck's date field, else today's. With `automatic` and `text`
+ * (not `fixed`), a slide's own date field keeps its type and takes `text`.
  */
 export function setDateTime(
   batch: OpBatch,
@@ -450,6 +460,7 @@ export function setDateTime(
     fallback: () => ({ text: shortDate(), fieldType: 'datetime1' }),
     toFixed: fixed && text === undefined,
     toField: automatic && !fixed && text === undefined,
+    keepFieldType: automatic && !fixed && text !== undefined,
   });
 }
 

@@ -119,6 +119,17 @@ describe('setHeaderFooter: automatic date', () => {
     expect(read(host, 0)).toMatchObject({ dateText: 'Draft', dateFixed: true });
   });
 
+  test('a read written back to all slides keeps the field type of a date field', () => {
+    const { host, store } = setup(
+      DATE_PH(
+        '<a:fld id="{0C7D2C8B-1A6B-4B7E-9C3D-5E6F7A8B9C0D}" type="datetime4"><a:t>May 1, 2026</a:t></a:fld>'
+      )
+    );
+    expect(write(host, read(host, 0)).ok).toBe(true);
+    expect(slideXml(store, 0)).toContain('type="datetime4"');
+    expect(read(host, 0)).toEqual(read(host, 1));
+  });
+
   test('dateFixed true turns a field into its text', () => {
     const { host } = setup(
       DATE_PH(

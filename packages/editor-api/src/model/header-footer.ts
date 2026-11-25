@@ -132,8 +132,9 @@ export class SlideHeaderFooter extends ModelObject {
   }
 
   /**
-   * Whether the slide shows its number. The number is a `slidenum` field, and the slide shows
-   * its position in the presentation, from 1.
+   * Whether the slide has a slide number placeholder. Unlike the footer and the date, a
+   * placeholder with no text reads as `true`. A new number is a `slidenum` field, and the engine
+   * shows the position of the slide in the presentation.
    */
   get slideNumberVisible(): boolean {
     return this.loadedProperty('slideNumberVisible');
