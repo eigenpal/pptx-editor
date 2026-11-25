@@ -213,3 +213,109 @@ describe('slides an import cannot copy', () => {
     });
   });
 });
+
+/** Base64 of bytes. */
+function base64(bytes: Uint8Array): string {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+/**
+ * A deck with two `obj` layouts, `Content A` and `Content B` (`p:sldLayout/@type`, ECMA-376
+ * Part 1, 19.3.1.39), and one titled slide on `layoutName`.
+ */
+function twoObjLayouts(layoutName: string, themeName?: string, text = 'S'): Uint8Array {
+  return buildPptx({
+    themeName,
+    layouts: [
+      { name: 'Content A', type: 'obj', shapes: '' },
+      { name: 'Content B', type: 'obj', shapes: '' },
+    ],
+    slides: [{ layoutName, shapes: titled(text) }],
+  });
+}
+
+/** The layout id, layout name, and master id of each slide, in order. */
+async function layoutsOf(context: RequestContext): Promise<string[][]> {
+  const slides = context.presentation.slides;
+  slides.load('items');
+  await context.sync();
+  const parts = slides.items.map((slide) => ({
+    layout: slide.layout.load('id,name'),
+    master: slide.slideMaster.load('id'),
+  }));
+  await context.sync();
+  return parts.map((p) => [p.layout.id, p.layout.name, p.master.id]);
+}
+
+/** Insert `base64` first, with the destination theme. */
+async function insertWithDestinationTheme(context: RequestContext, base64: string): Promise<void> {
+  context.presentation.insertSlidesFromBase64(base64, {
+    formatting: InsertSlideFormatting.useDestinationTheme,
+  });
+  await context.sync();
+}
+
+describe('the destination theme picks the layout of the same type, name, and master', () => {
+  test('a slide exported and inserted into the same presentation keeps its layout', async () => {
+    const runtime = await open(twoObjLayouts('Content B'));
+    await runtime.run(async (context) => {
+      const exported = context.presentation.slides.getItemAt(0).exportAsBase64();
+      await context.sync();
+      await insertWithDestinationTheme(context, exported.value);
+      const [inserted, original] = await layoutsOf(context);
+      expect(inserted![1]).toBe('Content B');
+      expect(inserted).toEqual(original!);
+    });
+    await reopen(runtime);
+  });
+
+  test('a layout of the same type and name wins over the first of that type', async () => {
+    const runtime = await open(twoObjLayouts('Content A'));
+    await runtime.run(async (context) => {
+      await insertWithDestinationTheme(context, base64(twoObjLayouts('Content B')));
+      expect((await layoutsOf(context)).map((l) => l[1])).toEqual(['Content B', 'Content A']);
+    });
+    await reopen(runtime);
+  });
+
+  test('two masters with a layout of that type: the slide keeps its master', async () => {
+    // Both masters have one theme name and the same layouts, and both slides are on `Content A`:
+    // only the parts tell the two layouts apart.
+    const runtime = await open(twoObjLayouts('Content A'));
+    await runtime.run(async (context) => {
+      context.presentation.insertSlidesFromBase64(base64(twoObjLayouts('Content A')), {
+        formatting: InsertSlideFormatting.keepSourceFormatting,
+      });
+      await context.sync();
+      const masters = context.presentation.slideMasters.load('items');
+      const slides = context.presentation.slides;
+      const exported = [0, 1].map((at) => slides.getItemAt(at).exportAsBase64());
+      await context.sync();
+      expect(masters.items).toHaveLength(2);
+      const before = await layoutsOf(context);
+      expect(before[0]![2]).not.toBe(before[1]![2]);
+      for (const at of [0, 1]) {
+        await insertWithDestinationTheme(context, exported[at]!.value);
+        const all = await layoutsOf(context);
+        expect(all[0]).toEqual(before[at]!);
+      }
+    });
+    await reopen(runtime);
+  });
+
+  test('from another presentation, the master of the same name wins', async () => {
+    const runtime = await open(twoObjLayouts('Content A', 'First'));
+    await runtime.run(async (context) => {
+      context.presentation.insertSlidesFromBase64(base64(twoObjLayouts('Content B', 'Second')), {
+        formatting: InsertSlideFormatting.keepSourceFormatting,
+      });
+      await context.sync();
+      await insertWithDestinationTheme(context, base64(twoObjLayouts('Content B', 'Second', 'N')));
+      const [inserted, kept] = await layoutsOf(context);
+      expect(inserted).toEqual(kept!);
+    });
+    await reopen(runtime);
+  });
+});
