@@ -152,7 +152,7 @@ function textTarget(
  * connector, a graphic frame, a group) has no text frame: the read refuses, or with `orNull`
  * answers null, so a load through a collection's items skips it instead of failing the sync.
  */
-function readTarget(
+export function readTarget(
   ctx: TextPlanContext,
   ref: AutomationRef,
   cell: AutomationCellAddress | undefined,

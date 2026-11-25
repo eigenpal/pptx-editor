@@ -36,6 +36,7 @@ import { frameInsets } from './text/anchor.ts';
 import { evaluateGeometry } from './geometry/geometry.ts';
 import { layoutText, layoutTextOn } from './text/text-layout.ts';
 import type { TextMeasurer } from './text/measurer.ts';
+import type { LayoutItem } from './slide-layout.ts';
 
 /** `ST_PositiveCoordinate`'s maximum (`MAX_COORDINATE` in package-edits.ts). */
 const MAX_COORDINATE = 27_273_042_316_900;
@@ -290,4 +291,62 @@ export function chooseNormAutofit(
     if (fits({ ...text, body }, rect, measurer)) return { scale, reduction };
   }
   return steps[steps.length - 1] ?? AUTOFIT_STEPS[0]!;
+}
+
+/** The laid-out text of a shape against its text area (`textFitOf`). Lengths in EMU. */
+export interface TextFit {
+  /** The text needs more height than its text area has. */
+  readonly overflows: boolean;
+  /** The height that the lines need, insets excluded. */
+  readonly textHeight: number;
+  /** The height of the text area: the text rectangle less the top and bottom insets. */
+  readonly availableHeight: number;
+  /** The families that were not available, so that another face measured them. */
+  readonly substitutions: readonly string[];
+}
+
+/**
+ * Whether the text of a laid-out shape fits its text area, read from the layout that paint
+ * draws (`item.text`): there is no second layout rule. The text area is the geometry's text
+ * rectangle less the `tIns` and `bIns` insets of `a:bodyPr` (CT_TextBodyProperties, ECMA-376
+ * Part 1, 21.1.2.1.1). The text lays out at its stored autofit: `a:normAutofit`
+ * (CT_TextNormalAutofit, 21.1.2.1.3) at its `fontScale` and `lnSpcReduction`, `a:spAutoFit`
+ * (CT_TextShapeAutofit, 21.1.2.1.4) at the shape size that the last refit wrote, and
+ * `a:noAutofit` (CT_TextNoAutofit, 21.1.2.1.2) as it is. Vertical text (`vert`,
+ * ST_TextVerticalType, 20.1.10.83) measures across its lines, in its own turned frame, as
+ * autofit does. With columns, the text height is the bottom of the lowest line. Empty
+ * paragraphs at the end do not count, as for the shrink steps (`fittedText`): they draw
+ * nothing. The overflow test is the one the shrink steps use (`fits`). Null for a shape with
+ * no text body.
+ */
+export function textFitOf(
+  item: Extract<LayoutItem, { kind: 'shape' }>,
+  measurer: TextMeasurer
+): TextFit | null {
+  const full = item.element.text;
+  if (!full) return null;
+  const drawn = item.text;
+  const text = fittedText(full);
+  let laid = drawn;
+  if (!laid || text !== full) {
+    // The layout call of `layoutPlaced`, with the empty paragraphs at the end left out. A body
+    // with no paragraph draws nothing; its layout gives the text area alone.
+    const tx = item.element.textXfrm;
+    const r = item.geometry.textRect;
+    laid = tx
+      ? layoutTextOn(text, { x: 0, y: 0, width: tx.cx, height: tx.cy }, measurer, 'face')
+      : layoutTextOn(
+          text,
+          { x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t },
+          measurer,
+          'size'
+        );
+  }
+  const { tIns, bIns } = frameInsets(text.body);
+  return {
+    overflows: laid.contentHeight > laid.box.height + 1,
+    textHeight: Math.max(0, laid.contentHeight - tIns - bIns),
+    availableHeight: Math.max(0, laid.box.height - tIns - bIns),
+    substitutions: (drawn ?? laid).substitutions,
+  };
 }

@@ -443,6 +443,8 @@ export type AutomationOperation =
       /** Answer null, not a refusal, when the shape cannot hold text (a picture, a group). */
       readonly orNull?: boolean;
     }
+  // Whether the text fits its text area, from the layout that the shape's picture draws.
+  | { readonly op: 'readTextFit'; readonly shape: AutomationRef }
   | {
       readonly op: 'setTextFrame';
       readonly shape: AutomationRef;

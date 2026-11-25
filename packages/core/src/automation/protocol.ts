@@ -224,6 +224,21 @@ export interface AutomationTextFrameRead {
   readonly hasText: boolean;
 }
 
+/**
+ * Whether a slide shape's text fits its text area, from the layout that its picture draws
+ * (`readTextFit`). Heights in points.
+ */
+export interface AutomationTextFitRead {
+  /** The text needs more height than its text area has. */
+  readonly overflows: boolean;
+  /** The height that the laid-out lines need, insets excluded. */
+  readonly textHeight: number;
+  /** The height of the text area: the text rectangle less the top and bottom insets. */
+  readonly availableHeight: number;
+  /** The families that the presentation names but that another face measured. */
+  readonly substitutedFonts: readonly string[];
+}
+
 /** The effective font of a text range. A field the runs disagree on is null. */
 export interface AutomationFontRead {
   readonly name: string | null;
@@ -462,6 +477,7 @@ export type AutomationValue =
   | { readonly kind: 'background'; readonly background: AutomationBackgroundRead }
   | { readonly kind: 'line'; readonly line: AutomationLineRead }
   | { readonly kind: 'textFrame'; readonly textFrame: AutomationTextFrameRead }
+  | { readonly kind: 'textFit'; readonly textFit: AutomationTextFitRead }
   | { readonly kind: 'font'; readonly font: AutomationFontRead }
   | { readonly kind: 'textRuns'; readonly runs: readonly AutomationTextRunRead[] }
   | { readonly kind: 'paragraph'; readonly paragraph: AutomationParagraphRead }

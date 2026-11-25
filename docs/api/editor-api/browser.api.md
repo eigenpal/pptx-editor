@@ -2464,6 +2464,7 @@ export class TextFrame extends ModelObject {
     set bottomMargin(value: number);
     deleteText(): void;
     getParentShape(): Shape;
+    getTextFit(): ClientResult<TextFrameFit>;
     get hasText(): boolean;
     get leftMargin(): number;
     set leftMargin(value: number);
@@ -2478,6 +2479,14 @@ export class TextFrame extends ModelObject {
     set verticalAlignment(value: TextVerticalAlignment | `${TextVerticalAlignment}`);
     get wordWrap(): boolean;
     set wordWrap(value: boolean);
+}
+
+// @public
+export interface TextFrameFit {
+    readonly availableHeight: number;
+    readonly overflows: boolean;
+    readonly substitutedFonts: readonly string[];
+    readonly textHeight: number;
 }
 
 // @public

@@ -715,6 +715,9 @@ export type AutomationOperation = {
     readonly shape: AutomationRef;
     readonly orNull?: boolean;
 } | {
+    readonly op: 'readTextFit';
+    readonly shape: AutomationRef;
+} | {
     readonly op: 'setTextFrame';
     readonly shape: AutomationRef;
     readonly props: AutomationTextFrameWrite;
@@ -1197,6 +1200,14 @@ export interface AutomationTag {
 }
 
 // @public
+export interface AutomationTextFitRead {
+    readonly availableHeight: number;
+    readonly overflows: boolean;
+    readonly substitutedFonts: readonly string[];
+    readonly textHeight: number;
+}
+
+// @public
 export interface AutomationTextFrameRead {
     readonly autoSize: 'none' | 'normal' | 'shape';
     // (undocumented)
@@ -1301,6 +1312,9 @@ export type AutomationValue = {
 } | {
     readonly kind: 'textFrame';
     readonly textFrame: AutomationTextFrameRead;
+} | {
+    readonly kind: 'textFit';
+    readonly textFit: AutomationTextFitRead;
 } | {
     readonly kind: 'font';
     readonly font: AutomationFontRead;

@@ -244,6 +244,37 @@ test('the duplicate example copies the slide after its source and tags the copy'
   }
 });
 
+test('the text fit example keeps text that fits and shortens text that overflows', async () => {
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  try {
+    // From text-and-ranges.mdx, "Check whether text fits its shape".
+    const writeIfItFits = (shapeId: string, text: string, shorterText: string) =>
+      runtime.run(async (context) => {
+        const frame = context.presentation.slides.getItemAt(0).shapes.getItem(shapeId).textFrame;
+        frame.textRange.text = text;
+        const fit = frame.getTextFit();
+        await context.sync();
+        if (!fit.value.overflows) return true;
+        frame.textRange.text = shorterText;
+        await context.sync();
+        return false;
+      });
+    // Shape 3 is one inch square, and a write gives it a text body with no autofit.
+    expect(await writeIfItFits('3', 'Fits', 'Short')).toBe(true);
+    expect(await writeIfItFits('3', 'Too long for the box. '.repeat(20), 'Short')).toBe(false);
+    const text = await runtime.run(async (context) => {
+      const range = context.presentation.slides.getItemAt(0).shapes.getItem('3')
+        .textFrame.textRange;
+      range.load('text');
+      await context.sync();
+      return range.text;
+    });
+    expect(text).toBe('Short');
+  } finally {
+    runtime.dispose();
+  }
+});
+
 test('the text-and-ranges Replace All example replaces whole words and counts them', async () => {
   const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
   try {

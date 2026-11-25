@@ -43,6 +43,7 @@ export type {
   AutomationTableCellRead,
   AutomationTableRead,
   AutomationTag,
+  AutomationTextFitRead,
   AutomationTextFrameRead,
   AutomationTextRunRead,
   AutomationUnsubscribe,
