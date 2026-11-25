@@ -8,6 +8,7 @@ import {
   child,
   elements,
   imageSize,
+  imageSizeEmu,
   isValidXmlText,
   presentationInfo,
   REL,
@@ -468,6 +469,10 @@ export function imageRelationship(ctx: PlanContext, part: string, base64: unknow
 interface DecodedImage {
   readonly bytes: Uint8Array;
   readonly mime: string;
+  /**
+   * The size at the resolution the header states (96 pixels per inch when it states none), in
+   * pixels at 96 per inch, as `insertImage` takes it. Replace Picture sizes the same way.
+   */
   readonly width: number;
   readonly height: number;
 }
@@ -485,12 +490,13 @@ function decodeImage(base64: unknown): DecodedImage {
   const mime = bytes ? imageType(bytes) : undefined;
   const size = bytes && mime ? imageSize(bytes) : null;
   if (!bytes || !mime || !size || bytes.length > MAX_IMAGE_BYTES) badArgument('base64');
-  return { bytes, mime, width: size.width, height: size.height };
+  const emu = imageSizeEmu(size);
+  return { bytes, mime, width: emu.cx / 9525, height: emu.cy / 9525 };
 }
 
 /**
  * The box of a new picture from the caller's `box`, in points. A missing width or height keeps
- * the pixel aspect ratio of the image. When the caller sets a size but no position, the picture
+ * the aspect ratio of the image. When the caller sets a size but no position, the picture
  * is centered on the slide (`w` × `h` EMU), as the default size is. The caller's values are
  * checked first, so a refusal names the value the caller gave; a computed dimension out of range
  * refuses with `picture-size`.

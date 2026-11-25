@@ -659,13 +659,13 @@ export class ShapeCollection extends ShapeList {
    * The bytes go into a new image part of the package. Other bytes, SVG among them, refuse with
    * `InvalidArgument` at the sync, and nothing is written. Send the bytes alone, with no
    * `data:` URL prefix.
-   * @param options - The box in points. With no size, the picture keeps the pixel aspect ratio
-   * of the image and fits 60% of the slide, centered, never larger than its size at 96 pixels
-   * per inch. With only `width` or only `height`, the other keeps the aspect ratio. With a size
+   * @param options - The box in points. With no size, the picture keeps the aspect ratio of the
+   * image and fits 60% of the slide, centered. It is never larger than its own size at the
+   * resolution that the image states, or at 96 pixels per inch when it states none. With only `width` or only `height`, the other keeps the aspect ratio. With a size
    * but no `left` or `top`, the picture is centered on the slide.
    *
    * @remarks
-   * The new shape reads `type` `Image`. It has no alt text: set `altTextDescription` in the same
+   * `Shape.type` reads `Image`. It has no alt text: set `altTextDescription` in the same
    * batch. The picture never fills an empty placeholder. The call and the writes queued with it
    * apply as one undo step at the sync.
    */

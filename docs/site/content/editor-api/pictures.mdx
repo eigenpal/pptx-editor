@@ -25,15 +25,15 @@ export async function addLogo(runtime: PptxEditorRuntime, logoBase64: string) {
 }
 ```
 
-`addPicture` is an SDK extension. Pass the Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB, with no `data:` URL prefix. The bytes go into a new image part of the presentation. Other bytes, SVG among them, refuse with `InvalidArgument` at the sync, and nothing is written.
+`addPicture` is an SDK extension. Pass the Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB, with no `data:` URL prefix. The bytes go into a new image part of the presentation. Other bytes, SVG among them, refuse with `InvalidArgument` at the sync. The refused call writes nothing.
 
 The options give the box in points:
 
-- With no size, the picture keeps the aspect ratio of its pixels and fits 60% of the slide, centered. It is never larger than its size at 96 pixels per inch.
+- With no size, the picture keeps its aspect ratio and fits 60% of the slide, centered. It is never larger than its own size. The image states its resolution, or the engine uses 96 pixels per inch.
 - With only `width` or only `height`, the other keeps the aspect ratio.
-- With a size but no `left` or `top`, the picture is centered on the slide.
+- With a size but no `left` or `top`, the engine centers the picture on the slide.
 
-The new shape reads `type` as `Image` and has no alt text. Set `altTextDescription` in the same batch. The picture never fills an empty placeholder. One sync is one undo step. You can also add a picture to `slideLayout.shapes` or `slideMaster.shapes`.
+`Shape.type` reads `Image`. The new shape has no alt text. Set `altTextDescription` in the same batch. The picture never fills an empty placeholder. One sync is one undo step. You can also add a picture to `slideLayout.shapes` or `slideMaster.shapes`.
 
 ## Render a slide preview
 

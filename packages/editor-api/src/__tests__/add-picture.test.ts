@@ -68,6 +68,19 @@ function png(width: number, height: number): string {
   return toBase64(b);
 }
 
+/** A PNG header of `width` × `height` pixels with a `pHYs` chunk of `dpi` pixels per inch. */
+function pngAt(width: number, height: number, dpi: number): string {
+  const head = Buffer.from(png(width, height), 'base64');
+  const phys = new Uint8Array(21);
+  const view = new DataView(phys.buffer);
+  view.setUint32(0, 9);
+  phys.set([0x70, 0x48, 0x59, 0x73], 4);
+  view.setUint32(8, Math.round(dpi / 0.0254));
+  view.setUint32(12, Math.round(dpi / 0.0254));
+  phys[16] = 1;
+  return toBase64(new Uint8Array([...head, ...phys]));
+}
+
 /** A GIF header of `width` × `height` pixels. */
 function gif(width: number, height: number): string {
   const b = new Uint8Array(13);
@@ -259,6 +272,15 @@ describe('ShapeCollection.addPicture', () => {
     runtime.dispose();
   });
 
+  test('the default size follows the resolution the image states', async () => {
+    const runtime = await open(deck());
+    // 600 × 300 px at 192 pixels per inch is 225 × 112.5 pt, as Replace Picture sizes it.
+    const added = await addOne(runtime, pngAt(600, 300, 192));
+    expect(added.width).toBeCloseTo(225, 1);
+    expect(added.height).toBeCloseTo(112.5, 1);
+    runtime.dispose();
+  });
+
   test('takes a JPEG', async () => {
     const runtime = await open(deck());
     expect(await addOne(runtime, jpeg(200, 400))).toMatchObject({ width: 150, height: 300 });
@@ -288,6 +310,20 @@ describe('ShapeCollection.addPicture', () => {
     runtime.dispose();
   });
 
+  test('a picture fill over 50 MiB refuses with InvalidArgument too', async () => {
+    // `ShapeFill.setImage` shares the check of the bytes with `addPicture`.
+    const runtime = await open(deck());
+    const big = new Uint8Array(50 * 1024 * 1024 + 1);
+    big.set(Buffer.from(png(10, 10), 'base64'));
+    const error = await runtime.run((context) =>
+      refusedAtSync(context, () =>
+        context.presentation.slides.getItemAt(0).shapes.getItemAt(0).fill.setImage(toBase64(big))
+      )
+    );
+    expect(code(error)).toBe('InvalidArgument');
+    runtime.dispose();
+  });
+
   test('a computed side out of range refuses with picture-size, not with a value never given', async () => {
     const runtime = await open(deck());
     // 1 × 60000 px at a width of 100 pt makes a height of 6 000 000 pt.
@@ -310,16 +346,18 @@ describe('ShapeCollection.addPicture', () => {
     runtime.dispose();
   });
 
-  test('adds to a slide layout', async () => {
+  test('adds to a slide layout and to a slide master', async () => {
     const runtime = await open(deck());
-    const type = await runtime.run(async (context) => {
-      const layout = context.presentation.slides.getItemAt(0).layout;
-      const picture = layout.shapes.addPicture(png(20, 20));
-      picture.load('type');
+    const types = await runtime.run(async (context) => {
+      const slide = context.presentation.slides.getItemAt(0);
+      const onLayout = slide.layout.shapes.addPicture(png(20, 20));
+      const onMaster = slide.slideMaster.shapes.addPicture(png(20, 20));
+      onLayout.load('type');
+      onMaster.load('type');
       await context.sync();
-      return picture.type;
+      return [onLayout.type, onMaster.type];
     });
-    expect(type).toBe('Image');
+    expect(types).toEqual(['Image', 'Image']);
     runtime.dispose();
   });
 
