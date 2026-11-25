@@ -23,7 +23,9 @@ import { flag, ModelObject, text } from './model-object.ts';
  * each slide has it. Pass at least one of the slide number, footer, or date settings. The
  * `toJSON()` result of a loaded `SlideHeaderFooter` is valid settings. Written back, it also
  * removes a footer or date placeholder that holds no text, because such a placeholder reads as
- * not visible.
+ * not visible. A footer or date of several lines reads as their text run together. A placeholder
+ * that shows the written text already stays as it is, so a slide keeps its own lines. Text of
+ * more than 1024 characters refuses.
  *
  * @public
  */

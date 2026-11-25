@@ -378,16 +378,22 @@ function applyKind(
         changed += edited ? 1 : 0;
         continue;
       }
-      for (const shape of existing)
-        replaceText(
-          batch,
-          slide.partName,
-          shape,
-          what,
-          showing.text,
-          (showing.keepFieldType && shownBy(shape)?.fieldType) || showing.field
-        );
-      changed += 1;
+      let edited = false;
+      for (const shape of existing) {
+        const own = shownBy(shape);
+        const field = (showing.keepFieldType && own?.fieldType) || showing.field;
+        // A placeholder that shows this text already, as a field or as fixed text as asked, keeps
+        // its paragraphs and line breaks: a read of the slide written back changes nothing.
+        const same =
+          own?.text === showing.text &&
+          (field === undefined
+            ? own.fieldType === undefined
+            : own.fieldType !== undefined && (own.fieldType === field || !!showing.keepFieldType));
+        if (same) continue;
+        replaceText(batch, slide.partName, shape, what, showing.text, field);
+        edited = true;
+      }
+      changed += edited ? 1 : 0;
       continue;
     }
     const text = showing.text ?? deck?.text;

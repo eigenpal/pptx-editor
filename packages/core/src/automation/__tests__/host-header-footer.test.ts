@@ -186,3 +186,17 @@ test('a footer keeps the unknown content of its placeholder through a write, sav
   expect(xml).toContain('<a:t>New</a:t>');
   expect(xml).not.toContain('Old');
 });
+
+test('a read written back keeps a footer of two paragraphs as it is', () => {
+  const footer =
+    '<p:sp><p:nvSpPr><p:cNvPr id="7" name="Footer 6"/><p:cNvSpPr/>' +
+    '<p:nvPr><p:ph type="ftr" sz="quarter" idx="11"/></p:nvPr></p:nvSpPr><p:spPr/>' +
+    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Confidential</a:t></a:r></a:p>' +
+    '<a:p><a:r><a:t>Acme</a:t></a:r></a:p></p:txBody></p:sp>';
+  const { host, store } = setup('', footer);
+  const before = slideXml(store, 1);
+  const own = read(host, 1);
+  expect(own).toMatchObject({ footerVisible: true, footerText: 'ConfidentialAcme' });
+  expect(write(host, own, 1).ok).toBe(true);
+  expect(slideXml(store, 1)).toBe(before);
+});
