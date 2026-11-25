@@ -156,6 +156,41 @@ export class Slide extends ModelObject {
     this.command('delete', (ref) => ({ op: 'deleteSlide', slide: ref(this.path) }));
   }
 
+  /**
+   * SDK extension: copy the slide inside this presentation and answer the copy. The copy goes
+   * directly after this slide, in its section. It keeps the layout, the master, and the
+   * pictures of this slide, and gets its own notes, charts, diagrams, comments, embedded
+   * objects, and tags, so an edit to one slide never changes the other. A slide that holds
+   * embedded controls refuses with `NotSupported`.
+   *
+   * The copy is usable at once: a load, a write, or a call on it in the same batch applies to
+   * the new slide. Each `sync()` that writes is one undo step in a live editor.
+   *
+   * The copy is a new `p:sldId` (`CT_SlideIdListEntry`) in `p:sldIdLst` (`CT_SlideIdList`),
+   * with a new Slide part: ECMA-376 Part 1, 19.2.1.33, 19.2.1.34, and 13.3.8.
+   *
+   * @example
+   * ```ts
+   * const copy = context.presentation.slides.getItemAt(0).duplicate();
+   * copy.load('id,index');
+   * await context.sync();
+   * console.log(copy.id, copy.index); // a new id, at index 1
+   * ```
+   */
+  duplicate(): Slide {
+    const path = ObjectPath.pending(`${this.path.label}.duplicate()`);
+    const copy = new Slide(this.context, path);
+    const label = path.label;
+    this.enqueue(
+      'write',
+      'duplicate',
+      (ref) => ({ op: 'duplicateSlide', slide: ref(this.path) }),
+      (value) => path.resolveTo(hydrated(value, 'handle', label).handle),
+      path
+    );
+    return copy;
+  }
+
   /** Move the slide to a zero-based position. */
   moveTo(slideIndex: number): void {
     if (typeof slideIndex !== 'number' || !Number.isInteger(slideIndex) || slideIndex < 0)

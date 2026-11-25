@@ -26,6 +26,7 @@ const EXTENSIONS: ReadonlySet<string> = new Set([
   'patchFormat',
   'beginArrowheadStyle',
   'endArrowheadStyle',
+  'duplicate',
 ]);
 
 /** The members of `proto` and the classes above it that check their arguments at the sync. */

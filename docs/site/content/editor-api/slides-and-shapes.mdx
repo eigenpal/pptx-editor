@@ -56,6 +56,26 @@ export async function appendSlide(runtime: PptxEditorRuntime) {
 
 Pass `layoutId` and `slideMasterId` to choose a layout and master explicitly. Use identifiers returned from the same presentation.
 
+## Duplicate a slide
+
+Use `slide.duplicate()` to copy a slide inside the same presentation. It returns the copy. Use the copy in the same batch, with no load first:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function duplicateFirstSlide(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const copy = context.presentation.slides.getItemAt(0).duplicate();
+    copy.tags.add('VARIANT', 'B');
+    copy.load('id,index');
+    await context.sync();
+    return { id: copy.id, index: copy.index };
+  });
+}
+```
+
+The copy goes directly after the source slide, in the same section, with a new slide id. It keeps the layout, the master, and the pictures of the source. It gets its own notes, charts, diagrams, comments, embedded objects, and tags. A change to one slide does not change the other. A slide with an embedded control is refused with `NotSupported` and diagnostic `edit.slide-has-controls`. In a live editor, the sync that copies the slide is one undo step. This method works with browser and server runtimes. It is an SDK extension, not a member of the pinned Office.js reference.
+
 ## Move and remove content
 
 Use `slide.moveTo(index)` to reorder slides. Set a shape’s `left`, `top`, `width`, or `height` to reposition it. Use `shape.delete()` or `slide.delete()`, then synchronize. Deleting the last slide is refused with diagnostic `edit.last-slide`.

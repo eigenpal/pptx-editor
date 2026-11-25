@@ -11,13 +11,14 @@ import {
   type Element,
 } from '../store/index.ts';
 import { toBase64 } from './commands/base64.ts';
-import { OpBatch } from './commands/op-batch.ts';
+import { CommandRefusal, OpBatch } from './commands/op-batch.ts';
 import {
   addSlide as addSlideEdit,
   deleteSlide as deleteSlideEdit,
   moveSlide as moveSlideEdit,
 } from './commands/slide-commands.ts';
 import { applyLayout as applyLayoutEdit } from './commands/slide-layouts.ts';
+import { duplicateSlides } from './commands/slide-multi.ts';
 import { normalizePresentation } from './commands/slide-sections.ts';
 import { packageForSave } from './commands/save-repair.ts';
 import { slideNumberOf } from './commands/text-model.ts';
@@ -116,6 +117,39 @@ export function deleteSlide(ctx: PlanContext, ref: AutomationRef): AutomationVal
   const { index } = slideOf(ctx.batch.pkg, sldId);
   edit(() => deleteSlideEdit(ctx.batch, index));
   return { kind: 'applied' };
+}
+
+/**
+ * Copy a slide right after it, as the slide pane's Duplicate does (`duplicateSlides`), and
+ * answer the copy.
+ * - The slide list: a new `p:sldId` (`CT_SlideIdListEntry`) with a new `ST_SlideId`, next to
+ *   its source in `p:sldIdLst` (`CT_SlideIdList`).
+ *   ECMA-376 Part 1, 19.2.1.33, 19.7.13, and 19.2.1.34.
+ * - The parts: a new Slide part, which keeps the Slide Layout part and shares the Image parts,
+ *   with its own Notes Slide part, Chart parts, and User Defined Tags parts.
+ *   ECMA-376 Part 1, 13.3.8, 13.3.9, 15.2.14, 13.3.5, 14.2.1, and 13.3.12.
+ */
+export function duplicateSlide(ctx: PlanContext, ref: AutomationRef): AutomationValue {
+  const { sldId } = targetOf(ctx, ref, 'slide');
+  normalized(ctx);
+  const { index } = slideOf(ctx.batch.pkg, sldId);
+  const [at] = edit(() => {
+    try {
+      return duplicateSlides(ctx.batch, [index]);
+    } catch (e) {
+      // An embedded control (`p:control`) carries binary state that a copy cannot share.
+      if (e instanceof CommandRefusal && e.reason === 'disabled.slideNotCopyable')
+        throw new AutomationFailure(
+          'unsupported-content',
+          'the slide holds a part that cannot be copied',
+          'disabled.slideNotCopyable:duplicate'
+        );
+      throw e;
+    }
+  });
+  const copy = at === undefined ? undefined : presentationInfo(ctx.batch.pkg).slides[at];
+  if (!copy) throw new AutomationFailure('transaction-refused', 'the slide was not copied');
+  return { kind: 'handle', handle: ctx.handles.mint({ kind: 'slide', sldId: copy.sldId }) };
 }
 
 export function moveSlide(ctx: PlanContext, ref: AutomationRef, to: number): AutomationValue {

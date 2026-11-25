@@ -189,6 +189,38 @@ describe('automation host: slides, layouts, and masters', () => {
     });
   });
 
+  test('a copy of a slide follows it, keeps its layout and shapes, and survives a save', () => {
+    const host = open();
+    const [source, copy] = ok(host, [
+      { op: 'getSlide', key: { index: 0 } },
+      { op: 'duplicateSlide', slide: { result: 0 } },
+    ]);
+    const [from, to, fromLayout, toLayout, shapes] = ok(host, [
+      { op: 'readSlide', slide: handle(source) },
+      { op: 'readSlide', slide: handle(copy) },
+      { op: 'getSlideLayout', slide: handle(source) },
+      { op: 'getSlideLayout', slide: handle(copy) },
+      { op: 'listShapes', container: handle(copy) },
+    ]);
+    expect(to).toMatchObject({ kind: 'slide', slide: { index: 1 } });
+    if (from?.kind !== 'slide' || to?.kind !== 'slide') throw new Error('not slides');
+    expect(to.slide.id).not.toBe(from.slide.id);
+    const [a, b] = ok(host, [
+      { op: 'readLayout', layout: handle(fromLayout) },
+      { op: 'readLayout', layout: handle(toLayout) },
+    ]);
+    expect(b).toEqual(a!);
+    expect(handles(shapes)).toHaveLength(2);
+    const slides = handles(ok(reopen(host), [{ op: 'listSlides' }])[0]);
+    expect(slides).toHaveLength(3);
+    // A stale handle refuses, and the refused batch writes nothing.
+    ok(host, [{ op: 'deleteSlide', slide: handle(copy) }]);
+    expect(exec(host, [{ op: 'duplicateSlide', slide: handle(copy) }]).results[0]).toMatchObject({
+      error: { code: 'invalid-handle' },
+    });
+    expect(handles(ok(host, [{ op: 'listSlides' }])[0])).toHaveLength(2);
+  });
+
   test('masters and layouts list in file order, and a slide takes a chosen layout', () => {
     const host = open();
     const [masters] = ok(host, [{ op: 'listMasters' }]);
