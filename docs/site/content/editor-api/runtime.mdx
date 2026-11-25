@@ -23,7 +23,7 @@ A browser runtime draws `getImageAsBase64` pictures on a canvas. A server has no
 
 The function gets `svg`, `width`, `height`, and `fonts`, and must answer a PNG of exactly `width` by `height` pixels. The SVG holds its pictures as data URLs and its fonts as `@font-face` rules. Each entry of `fonts` gives the `family` name that the SVG uses and the font bytes, for a rasterizer that does not read CSS fonts. Use the font bytes for that picture only: do not store them, cache them, or write them to disk. A rasterizer with a process-wide font registry must remove the faces before it returns, as the example does. Each `family` name is unique for each open presentation, so the faces of two presentations never collide.
 
-Install `@napi-rs/canvas` before using this example. The function returns a caller-owned server runtime:
+Install `@napi-rs/canvas` 1.0.12 or a later 1.x release before you use this example. Earlier releases ignore the `<image>` elements of the SVG. The slide pictures are then missing, and the rasterizer reports no error. For an earlier release, some package managers stop the install and others only warn. To see the installed release, use the list command of your package manager, for example `npm ls @napi-rs/canvas`. The function returns a caller-owned server runtime:
 
 ```ts
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';

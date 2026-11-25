@@ -177,11 +177,16 @@
       "name": "@pptx-editor.dev/editor-api",
       "version": "0.7.0",
       "devDependencies": {
+        "@napi-rs/canvas": "^1.0.12",
         "@pptx-editor.dev/core": "workspace:*",
       },
       "peerDependencies": {
+        "@napi-rs/canvas": "^1.0.12",
         "@pptx-editor.dev/core": "~0.7.0",
       },
+      "optionalPeers": [
+        "@napi-rs/canvas",
+      ],
     },
     "packages/i18n": {
       "name": "@pptx-editor.dev/i18n",

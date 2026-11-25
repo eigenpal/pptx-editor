@@ -26,7 +26,7 @@ try {
 }
 ```
 
-`createServer` takes the font options of the engine: `fonts` (faces to measure text with) and `substitutes` (load the metric-compatible substitute fonts, default `true`). It also takes `rasterize`, a function that turns the SVG of a slide or shape picture into PNG bytes, so `getImageAsBase64` works on a server. The engine paints the SVG with the editor's own renderer, and your function must answer a PNG of exactly the asked size. The package ships no rasterizer.
+`createServer` takes the font options of the engine: `fonts` (faces to measure text with) and `substitutes` (load the metric-compatible substitute fonts, default `true`). It also takes `rasterize`, a function that turns the SVG of a slide or shape picture into PNG bytes, so `getImageAsBase64` works on a server. The engine paints the SVG with the editor's own renderer, and your function must answer a PNG of exactly the asked size. The package ships no rasterizer. With `@napi-rs/canvas`, use 1.0.12 or a later 1.x release: earlier releases leave the pictures out.
 
 ## Drive an open editor
 
