@@ -190,6 +190,8 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return slides.duplicateSlide(ctx, op.slide);
     case 'moveSlide':
       return slides.moveSlide(ctx, op.slide, op.index);
+    case 'setSlideHidden':
+      return slides.setSlideHidden(ctx, op.slide, op.hidden);
     case 'applyLayout':
       return slides.applyLayout(ctx, op.slide, op.layout);
     case 'exportSlides':

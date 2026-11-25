@@ -23,7 +23,7 @@ import { ItemCollection } from './collection.ts';
 import { LAYOUT_TYPE, type SlideLayoutType } from './enums.ts';
 import { HyperlinkCollection } from './hyperlinks.ts';
 import { imageBox, settleImage, type SlideGetImageOptions } from './images.ts';
-import { ModelObject, pathOf, text, type RefOf } from './model-object.ts';
+import { flag, ModelObject, pathOf, text, type RefOf } from './model-object.ts';
 import { ShapeCollection } from './shapes.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
 import { TagCollection } from './tags.ts';
@@ -69,6 +69,32 @@ export class Slide extends ModelObject {
   /** The zero-based position of the slide. */
   get index(): number {
     return this.loadedProperty('index');
+  }
+
+  /**
+   * Whether the slide is hidden: `p:sld/@show` is false (ECMA-376 Part 1, §19.3.1.38;
+   * `CT_Slide/@show`, an `xsd:boolean` with default `true`). A slide show skips a hidden slide.
+   * A write of `true` saves `show="0"`, and a write of `false` removes the attribute.
+   *
+   * This property is an SDK extension. The pinned Office.js reference has no such member.
+   *
+   * A hidden slide stays in `presentation.slides`, and `getImageAsBase64()` draws it. A PDF
+   * from `pptx-to-pdf` leaves it out unless the export sets `includeHiddenSlides`.
+   *
+   * @example
+   * ```ts
+   * const slide = context.presentation.slides.getItemAt(1).load('hidden');
+   * await context.sync();
+   * slide.hidden = !slide.hidden;
+   * await context.sync();
+   * ```
+   */
+  get hidden(): boolean {
+    return this.loadedProperty('hidden');
+  }
+  set hidden(value: boolean) {
+    const hidden = flag(value, this.at('hidden'));
+    this.command('hidden', (ref) => ({ op: 'setSlideHidden', slide: ref(this.path), hidden }));
   }
 
   /** The shapes of the slide, in z-order. */
@@ -254,7 +280,7 @@ export class Slide extends ModelObject {
 
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
-    const names = this.selection(request, ['id', 'index'], {
+    const names = this.selection(request, ['id', 'index', 'hidden'], {
       shapes: () => this.shapes,
       tags: () => this.tags,
       hyperlinks: () => this.hyperlinks,
@@ -268,7 +294,7 @@ export class Slide extends ModelObject {
       names,
       'slide',
       (ref) => ({ op: 'readSlide', slide: ref(this.path) }),
-      (v) => ({ id: v.slide.id, index: v.slide.index })
+      (v) => ({ id: v.slide.id, index: v.slide.index, hidden: v.slide.hidden })
     );
   }
 }

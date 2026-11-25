@@ -549,6 +549,10 @@ export type AutomationOperation = {
     readonly slide: AutomationRef;
     readonly index: number;
 } | {
+    readonly op: 'setSlideHidden';
+    readonly slide: AutomationRef;
+    readonly hidden: boolean;
+} | {
     readonly op: 'applyLayout';
     readonly slide: AutomationRef;
     readonly layout: AutomationRef;

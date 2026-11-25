@@ -1,8 +1,8 @@
 // Commands over several selected slides, as the slide pane runs them: delete them,
-// duplicate them (the copies follow the last selected slide, in order), or move them as one
-// block. Each command is one transaction, so one undo step.
+// duplicate them (the copies follow the last selected slide, in order), move them as one
+// block, or hide and show them. Each command is one transaction, so one undo step.
 
-import { path, presentationInfo, xmlPartOf } from '../../store/index.ts';
+import { path, presentationInfo, xmlPartOf, type SlideRef } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { deleteSlidesAt, duplicateSlidesAt } from './slide-commands.ts';
 import { blockIsInSection, placeBlock } from './slide-structure.ts';
@@ -80,4 +80,23 @@ export function moveSlides(
   if (moved || (section !== undefined && !blockIsInSection(batch, moving, section)))
     placeBlock(batch, moving, section);
   return moving.map((_, i) => at + i);
+}
+
+/**
+ * Hide or show one slide: `p:sld/@show` (ECMA-376 Part 1, §19.3.1.38; `CT_Slide` declares
+ * `show` as an optional `xsd:boolean` with default `true`) is `0` for a hidden slide, and a
+ * shown slide drops the attribute. A slide already in that state writes nothing. The editor's
+ * `setSlidesHidden` command and the automation `setSlideHidden` operation both write here.
+ */
+export function setSlideHidden(batch: OpBatch, ref: SlideRef | undefined, hidden: boolean): void {
+  const root = xmlPartOf(batch.pkg, ref?.partName)?.root;
+  if (!ref || !root) throw new CommandRefusal('errors.malformed');
+  if (ref.hidden === hidden) return;
+  batch.push({
+    op: 'setAttribute',
+    part: ref.partName,
+    node: root.id,
+    name: { ns: '', local: 'show' },
+    value: hidden ? '0' : null,
+  });
 }

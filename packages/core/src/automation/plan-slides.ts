@@ -17,6 +17,7 @@ import {
   deleteSlide as deleteSlideEdit,
   moveSlide as moveSlideEdit,
 } from './commands/slide-commands.ts';
+import { setSlideHidden as setSlideHiddenEdit } from './commands/slide-multi.ts';
 import { applyLayout as applyLayoutEdit } from './commands/slide-layouts.ts';
 import { duplicateSlides } from './commands/slide-multi.ts';
 import { normalizePresentation } from './commands/slide-sections.ts';
@@ -159,6 +160,19 @@ export function moveSlide(ctx: PlanContext, ref: AutomationRef, to: number): Aut
   normalized(ctx);
   const { index } = slideOf(ctx.batch.pkg, sldId);
   edit(() => moveSlideEdit(ctx.batch, index, target));
+  return { kind: 'applied' };
+}
+
+/** Hide or show a slide (`p:sld/@show`), as the editor's `setSlidesHidden` command does. */
+export function setSlideHidden(
+  ctx: PlanContext,
+  ref: AutomationRef,
+  hidden: boolean
+): AutomationValue {
+  const { sldId } = targetOf(ctx, ref, 'slide');
+  if (typeof hidden !== 'boolean') badArgument('hidden');
+  const { ref: slide } = slideOf(ctx.batch.pkg, sldId);
+  edit(() => setSlideHiddenEdit(ctx.batch, slide, hidden));
   return { kind: 'applied' };
 }
 

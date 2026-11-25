@@ -221,6 +221,24 @@ describe('automation host: slides, layouts, and masters', () => {
     expect(handles(ok(host, [{ op: 'listSlides' }])[0])).toHaveLength(2);
   });
 
+  test('hide and show a slide through p:sld/@show, and refuse a value that is not a boolean', () => {
+    const host = open();
+    const slide = handles(ok(host, [{ op: 'listSlides' }])[0])[1]!;
+    const hidden = () =>
+      (ok(host, [{ op: 'readSlide', slide }])[0] as { slide: { hidden: boolean } }).slide.hidden;
+    expect(hidden()).toBe(false);
+    ok(host, [{ op: 'setSlideHidden', slide, hidden: true }]);
+    expect(hidden()).toBe(true);
+    ok(host, [{ op: 'setSlideHidden', slide, hidden: false }]);
+    expect(hidden()).toBe(false);
+    const refused = exec(host, [
+      { op: 'setSlideHidden', slide, hidden: 'yes' } as unknown as AutomationOperation,
+    ]);
+    expect(refused.results[0]).toMatchObject({
+      error: { code: 'invalid-argument', detail: 'hidden' },
+    });
+  });
+
   test('masters and layouts list in file order, and a slide takes a chosen layout', () => {
     const host = open();
     const [masters] = ok(host, [{ op: 'listMasters' }]);

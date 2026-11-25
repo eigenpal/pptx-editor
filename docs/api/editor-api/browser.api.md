@@ -1588,6 +1588,8 @@ export class Slide extends ModelObject {
     duplicate(): Slide;
     exportAsBase64(): ClientResult<string>;
     getImageAsBase64(options?: SlideGetImageOptions): ClientResult<string>;
+    get hidden(): boolean;
+    set hidden(value: boolean);
     get hyperlinks(): HyperlinkCollection;
     get id(): string;
     get index(): number;

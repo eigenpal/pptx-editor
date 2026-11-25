@@ -27,6 +27,7 @@ const EXTENSIONS: ReadonlySet<string> = new Set([
   'beginArrowheadStyle',
   'endArrowheadStyle',
   'duplicate',
+  'hidden',
 ]);
 
 /** The members of `proto` and the classes above it that check their arguments at the sync. */

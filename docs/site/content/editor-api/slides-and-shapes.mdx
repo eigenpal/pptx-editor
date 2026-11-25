@@ -82,6 +82,29 @@ Use `slide.moveTo(index)` to reorder slides. Set a shape’s `left`, `top`, `wid
 
 A shape identifier belongs to its slide. Keep the slide identifier with stored shape identifiers. A duplicate shape identifier in one slide prevents writes to that shape.
 
+## Hide and show slides
+
+Use `slide.hidden` to read or change whether a slide is hidden. A slide show skips a hidden slide. This example hides the slides at the given positions and returns the identifiers of all hidden slides:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function hideSlides(runtime: PptxEditorRuntime, positions: number[]) {
+  return runtime.run(async (context) => {
+    const slides = context.presentation.slides;
+    for (const position of positions) slides.getItemAt(position).hidden = true;
+    await context.sync();
+    slides.load('items/id,items/hidden');
+    await context.sync();
+    return slides.items.filter((slide) => slide.hidden).map((slide) => slide.id);
+  });
+}
+```
+
+The write applies at the next `context.sync()`. Load `hidden` after that synchronization to read the new value. Setting `true` saves `show="0"` on the `p:sld` element, and setting `false` removes the attribute. Setting the current value writes nothing. A value that is not a boolean is refused with `InvalidArgument`. Browser and server runtimes behave the same, and a browser runtime records the change as one undo step.
+
+A hidden slide stays in `presentation.slides`. `slide.getImageAsBase64()` draws a hidden slide. A PDF export from `@pptx-editor.dev/pptx-to-pdf` leaves hidden slides out unless you set `includeHiddenSlides: true`. `slide.hidden` is an SDK extension, not a member of the pinned Office.js reference.
+
 ## Edit line width, dashes, and endpoints
 
 Use `shape.lineFormat` to read or change line properties in either runtime. This example formats the first shape, which must be a supported line or connector:
