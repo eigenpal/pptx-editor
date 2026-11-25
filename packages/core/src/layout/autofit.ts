@@ -319,13 +319,15 @@ export interface TextFit {
  * `a:noAutofit` (CT_TextNoAutofit, 21.1.2.1.2) as it is. Vertical text (`vert`,
  * ST_TextVerticalType, 20.1.10.83) measures across its lines, in its own turned frame, as
  * autofit does. With columns, the text height is the bottom of the lowest line, and at least
- * the column height when the text flows into a second column (`contentHeight`). With top
- * anchoring, empty paragraphs at the end do not count, as for the shrink steps (`fittedText`):
- * they draw nothing below the text. With `ctr` or `b` anchoring (ST_TextAnchoringType,
- * 20.1.10.60) they count: they move the text that draws up, past the top of the text area,
- * once the whole body is taller than it. The overflow test is the one the shrink steps use
- * (`fits`). Null for a shape with no text body; a slide shape, whose text lays out in its
- * geometry's text rectangle (no diagram `textXfrm`).
+ * the column height when the text flows into a second column (`contentHeight`). Empty
+ * paragraphs at the end do not count, as for the shrink steps (`fittedText`): they draw nothing
+ * below the text. One case differs: single-column text with `ctr` or `b` anchoring
+ * (ST_TextAnchoringType, 20.1.10.60). There they count, because they move the text that draws
+ * up, past the top of the text area, once the whole body is taller than it. The overflow test
+ * is the one the shrink steps use (`fits`).
+ *
+ * `item` is a slide shape, whose text lays out in its geometry's text rectangle; a diagram
+ * shape's `textXfrm` is not read. Null for a shape with no text body.
  */
 export function textFitOf(
   item: Extract<LayoutItem, { kind: 'shape' }>,
@@ -334,8 +336,10 @@ export function textFitOf(
   const full = item.element.text;
   if (!full) return null;
   const drawn = item.text;
-  const anchor = full.body.anchor;
-  const text = anchor === 'ctr' || anchor === 'b' ? full : fittedText(full);
+  // Anchoring moves single-column text only: with columns, the anchor height stops at the box.
+  const { anchor, numCol } = full.body;
+  const moves = (anchor === 'ctr' || anchor === 'b') && numCol <= 1;
+  const text = moves ? full : fittedText(full);
   let laid = drawn;
   if (!laid || text !== full) {
     // The layout call of `layoutPlaced`, with the empty paragraphs at the end left out. A body

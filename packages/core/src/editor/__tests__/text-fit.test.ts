@@ -13,7 +13,8 @@ import {
   type AutomationValue,
 } from '../../automation/index.ts';
 import { createFixedMeasurer, type LayoutItem } from '../../layout/index.ts';
-import { openPresentation, type DocumentSession } from '../index.ts';
+import { DocumentSession, NO_HOST_FACES } from '../document-session.ts';
+import { openPresentation } from '../index.ts';
 
 const IN = 914_400;
 const EMU_PER_PT = 12_700;
@@ -156,5 +157,33 @@ describe('readTextFit', () => {
       host.dispose();
     }
     session.dispose();
+  });
+});
+
+describe('DocumentSession.standInMeasurer', () => {
+  test('holds while the stand-in measures because no font loaded', async () => {
+    const opened = await open();
+    const store = opened.store;
+    const standIn = { ...createFixedMeasurer() };
+    // The font set of an open whose fonts all failed: no source, and the stand-in measures.
+    const session = new DocumentSession(store, {
+      host: [],
+      embedded: [],
+      refused: [],
+      configured: NO_HOST_FACES,
+      substitutes: [],
+      substituteFailures: [],
+      substituteFamilies: null,
+      substituteFaces: [],
+      fixed: false,
+      standIn,
+    });
+    expect(session.fixedMeasurer).toBe(false);
+    expect(session.measurer).toBe(standIn);
+    expect(session.standInMeasurer).toBe(true);
+    // The shaped measurer of the opened session is not a stand-in.
+    expect(opened.standInMeasurer).toBe(false);
+    session.dispose();
+    opened.dispose();
   });
 });

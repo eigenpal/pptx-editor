@@ -133,15 +133,21 @@ describe('TextFrame.getTextFit', () => {
     const empty = '<a:p><a:endParaRPr lang="en-US" sz="4000"/></a:p>';
     const anchored = (anchor: string) =>
       `<a:bodyPr wrap="square" anchor="${anchor}"><a:noAutofit/></a:bodyPr>`;
-    const [plain, top, bottom, middle] = await fitsOf(
+    const [plain, top, bottom, middle, columns] = await fitsOf(
       deckOf(
         { text: lines, bodyPr: NO_AUTOFIT },
         { text: lines + empty + empty, bodyPr: NO_AUTOFIT },
         { text: lines + empty + empty, bodyPr: anchored('b') },
-        { text: lines + empty + empty, bodyPr: anchored('ctr') }
+        { text: lines + empty + empty, bodyPr: anchored('ctr') },
+        {
+          text: lines + empty + empty,
+          bodyPr: '<a:bodyPr wrap="square" anchor="b" numCol="2"><a:noAutofit/></a:bodyPr>',
+        }
       ),
-      ['2', '3', '4', '5']
+      ['2', '3', '4', '5', '6']
     );
+    // With columns, anchoring does not move the text: the empty paragraphs do not count.
+    expect(columns!.overflows).toBe(false);
     expect(plain!.overflows).toBe(false);
     // Below top-anchored text, the empty paragraphs draw nothing.
     expect(top).toEqual(plain!);
@@ -162,6 +168,27 @@ describe('TextFrame.getTextFit', () => {
     });
     expect(fit.overflows).toBe(false);
     expect(fit.availableHeight).toBeGreaterThan(64.8);
+    runtime.dispose();
+  });
+
+  test('shrunk bottom-anchored text with empty paragraphs at the end can overflow', async () => {
+    const empty = '<a:p><a:endParaRPr lang="en-US" sz="4000"/></a:p>';
+    const runtime = await open(
+      deckOf({
+        text: para(run(SHRINKS)) + empty + empty,
+        bodyPr: '<a:bodyPr wrap="square"><a:normAutofit/></a:bodyPr>',
+      })
+    );
+    const fit = await runtime.run(async (context) => {
+      const frame = context.presentation.slides.getItemAt(0).shapes.getItem('2').textFrame;
+      // The frame write re-fits: the shrink step fits the text without the empty paragraphs,
+      // and the picture draws them below it, which pushes the text above the shape.
+      frame.verticalAlignment = 'Bottom';
+      const result = frame.getTextFit();
+      await context.sync();
+      return result.value;
+    });
+    expect(fit.overflows).toBe(true);
     runtime.dispose();
   });
 

@@ -215,8 +215,8 @@ function editorPort(editor: PptxEditorInstance): AutomationDocumentPort {
       return () => listeners.delete(listener);
     },
     measurer: () => follow()?.measurer,
-    // The canvas stand-in or the fixed measurer, until shaping starts (`OpenOptions.standIn`).
-    standInMeasurer: () => follow()?.fixedMeasurer === true,
+    // The canvas stand-in or the fixed measurer (`OpenOptions.standIn`).
+    standInMeasurer: () => follow()?.standInMeasurer === true,
     collaborating: () => isCollaborating(editor),
     selection: selectionPort(editor),
     renderImage(target) {

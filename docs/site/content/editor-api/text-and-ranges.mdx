@@ -139,14 +139,14 @@ The read uses the same text layout that `shape.getImageAsBase64()` draws. It wor
 The answer depends on `autoSizeSetting`:
 
 - `AutoSizeShapeToFitText`: the shape grows to fit its text, so the text does not overflow after a text write.
-- `AutoSizeTextToFitShape`: the text shrinks in steps. `overflows` is `true` only when the smallest step still does not fit.
+- `AutoSizeTextToFitShape`: the text shrinks in steps. `overflows` is `true` only when the smallest step still does not fit. For one exception, see the empty paragraphs rule below.
 - `AutoSizeNone`: `overflows` reports the overflow of the text at its size.
 
 The read uses the shrink step and the shape size that the presentation stores. A write of text, font, paragraph format, or text frame properties in this API re-fits them. A change to the shape size, for example `shape.height`, does not re-fit them. A presentation that you open keeps its stored values until such a write.
 
 These rules apply to the layout:
 
-- With top anchoring, empty paragraphs at the end of the text do not count, because they draw nothing below the text. With middle or bottom anchoring, they count, because they push the visible text up.
+- Empty paragraphs at the end of the text do not count, because they draw nothing below the text. One case differs: text in one column with middle or bottom anchoring. There, they count, because they push the visible text up. The shrink steps do not count them, so such text can overflow at the step that `AutoSizeTextToFitShape` selects.
 - An empty text frame reports the height of one empty line.
 - Vertical text measures across its lines. For this text, `availableHeight` is along the width of the shape, less the side margins.
 - With columns, `textHeight` is the bottom of the lowest line. When the text flows into a second column, `textHeight` is at least `availableHeight`.
@@ -170,7 +170,7 @@ These targets refuse the read with `NotSupported`:
 - A shape with no text frame: a picture, a connector, a group, or a table (diagnostic `edit.no-text-frame`). The API has no fit read for a table cell. A table row grows to fit the horizontal text of its cells.
 - A shape of a slide layout or a slide master (diagnostic `text-fit.not-on-slide`).
 - A hidden shape, or a shape in a hidden group (diagnostic `text-fit.not-drawn`).
-- Any shape while the runtime has no exact font measurement (diagnostic `host.no-font-measurement`). A runtime over a live editor measures with approximate metrics while its fonts load, or when its text engine does not load.
+- Any shape while the runtime has no exact font measurement (diagnostic `host.no-font-measurement`). A runtime over a live editor measures with approximate metrics while its fonts load. It also does so when its text engine or all of its fonts do not load.
 
 A text frame from `getTextFrameOrNullObject()` that is a null object skips the read, and the result stays not loaded. `getTextFit()` is an SDK extension. The pinned Office.js reference has no such member.
 

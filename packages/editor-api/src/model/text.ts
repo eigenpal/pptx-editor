@@ -172,7 +172,8 @@ export class TextFrame extends ModelObject {
    * Whether the text fits the frame, from the layout that `Shape.getImageAsBase64()` draws for
    * the same shape. Read the result after `context.sync()`. The text lays out at its stored
    * `autoSizeSetting`: `AutoSizeShapeToFitText` grows the shape, so its text does not overflow;
-   * `AutoSizeTextToFitShape` overflows only when the smallest shrink step still does not fit;
+   * `AutoSizeTextToFitShape` overflows only when the smallest shrink step still does not fit,
+   * or when empty paragraphs at the end push middle or bottom anchored text up;
    * `AutoSizeNone` reports the raw overflow. Vertical text measures across its lines. A text,
    * font, paragraph, or frame write in this API re-fits the frame first; a size change does not.
    * A runtime with approximate font metrics (an editor whose fonts still load), a shape of a
