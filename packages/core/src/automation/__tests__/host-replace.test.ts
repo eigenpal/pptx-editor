@@ -44,6 +44,35 @@ const replace = (query: unknown, replacement: unknown, options?: unknown): Autom
   }) as AutomationOperation;
 
 describe('replaceText', () => {
+  test('a field never matches, also when the editor searches for U+FFFC', () => {
+    const read = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: IN,
+              y: IN,
+              cx: 3 * IN,
+              cy: IN,
+              text: para(
+                run('page ') +
+                  '<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum"><a:rPr lang="en-US"/><a:t>1</a:t></a:fld>'
+              ),
+            }),
+          },
+        ],
+      })
+    );
+    if (!read.ok) throw new Error('fixture');
+    // The search text shows the field as U+FFFC: a query with it finds nothing.
+    expect(findMatches(read.pkg, '\uFFFC')).toEqual([]);
+    expect(findMatches(read.pkg, 'e \uFFFC')).toEqual([]);
+    expect(findMatches(read.pkg, 'page 1')).toEqual([]);
+    expect(findMatches(read.pkg, 'page ')).toHaveLength(1);
+  });
+
   test('answers the count and writes every match in one commit', () => {
     const { host, store } = setup();
     const before = store.revision;
@@ -79,6 +108,7 @@ describe('replaceText', () => {
       [replace('a\rb', 'x'), 'query'],
       [replace('a'.repeat(1001), 'x'), 'query'],
       [replace('a\u0001', 'x'), 'query'],
+      [replace('\uFFFC', 'x'), 'query'],
       [replace(7, 'x'), 'query'],
       [replace('a', 'x'.repeat(1001)), 'replacement'],
       [replace('a', 'x\u0001'), 'replacement'],

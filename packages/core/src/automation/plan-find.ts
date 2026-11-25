@@ -24,7 +24,13 @@ export function replaceText(
 ): AutomationValue {
   // A match stays inside one paragraph, so a query with a paragraph break never matches. The
   // object model writes a line break as `\v`; the find text model reads it as `\n`.
-  if (typeof query !== 'string' || !query || query.length > MAX_FIND_TEXT || /[\r\n]/.test(query))
+  // U+FFFC stands in for a field in the search text: a query with it could match one.
+  if (
+    typeof query !== 'string' ||
+    !query ||
+    query.length > MAX_FIND_TEXT ||
+    /[\r\n\uFFFC]/.test(query)
+  )
     badArgument('query');
   if (!isValidXmlText(query.replace(/\v/g, ' '))) badArgument('query');
   if (typeof replacement !== 'string' || replacement.length > MAX_FIND_TEXT)

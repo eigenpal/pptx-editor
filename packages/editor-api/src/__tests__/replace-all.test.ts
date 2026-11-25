@@ -260,6 +260,14 @@ describe('Presentation.replaceAll', () => {
         'presentation.replaceAll.options.matchCase',
       ],
     ];
+    // U+FFFC stands for a field in the search text, so it could match one.
+    cases.push(
+      [(c) => c.presentation.replaceAll('\uFFFC', 'x'), 'presentation.replaceAll.searchText'],
+      [(c) => c.presentation.replaceAll('a\u0001', 'x'), 'presentation.replaceAll.searchText'],
+      [(c) => c.presentation.replaceAll('a\uD83D', 'x'), 'presentation.replaceAll.searchText'],
+      [(c) => c.presentation.replaceAll('a', 'x\u0001'), 'presentation.replaceAll.replacementText'],
+      [(c) => c.presentation.replaceAll('a', '\uDE00'), 'presentation.replaceAll.replacementText']
+    );
     for (const [call, target] of cases) {
       const error = await rejection(
         runtime.run(async (context) => {
@@ -272,14 +280,6 @@ describe('Presentation.replaceAll', () => {
         target,
       ]);
     }
-    // A refusal at the engine boundary names the argument too: control characters.
-    const error = await rejection(
-      runtime.run(async (context) => {
-        context.presentation.replaceAll('a', 'x\u0001');
-        await context.sync();
-      })
-    );
-    expect(isPptxEditorError(error) && error.code).toBe('InvalidArgument');
   });
 
   test('sends one replaceText operation for the call', async () => {

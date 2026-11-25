@@ -181,7 +181,8 @@ export function findMatches(
   query: string,
   options: FindOptions = {}
 ): FindMatch[] {
-  if (!query || query.length > MAX_FIND_TEXT) return [];
+  // The search text shows each field as FIELD_CHAR: a query with it could cover a field.
+  if (!query || query.length > MAX_FIND_TEXT || query.includes(FIELD_CHAR)) return [];
   const out: FindMatch[] = [];
   for (const { ref, el } of bodies(pkg)) {
     // A `slidenum` field on a slide shows the slide number; in notes, its stored text.

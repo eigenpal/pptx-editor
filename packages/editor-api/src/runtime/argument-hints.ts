@@ -150,7 +150,7 @@ const ROWS: readonly (readonly [string, string])[] = [
   // Find and replace.
   [
     'query',
-    'Use search text of 1 to 1000 characters, with no paragraph break and no control characters.',
+    'Use search text of 1 to 1000 characters, with no paragraph break, no U+FFFC, and no control characters.',
   ],
   ['replacement', 'Use replacement text of at most 1000 characters, with no control characters.'],
   [

@@ -251,16 +251,20 @@ export class Presentation extends ModelObject {
    *
    * The search reads the text of every shape on each slide (also in groups), every table cell
    * the slide shows, and the speaker notes. Layouts and masters are not searched. A match stays
-   * in one paragraph; search for a line break with `\v`. A field, such as a slide number, is
-   * never part of a match.
+   * in one paragraph; search for a line break with `\v`. A field, such as a slide number, or an
+   * equation is never part of a match.
    *
    * The replacement takes the font of the first character it replaces. It is one line: a line
    * break or a tab in it becomes a space. Matches do not overlap, and the replacement text is not
    * searched again. With no match, nothing changes and the count is 0. In a runtime over a live
    * editor, the sync that writes is one undo step.
    *
+   * Letters match in either case unless `matchCase` is set. With `matchWholeWord`, no letter,
+   * digit, combining mark, or underscore touches either end of a match.
+   *
    * Refused with `InvalidArgument`: empty search text, search text with a paragraph break
-   * (`\r` or `\n`), text longer than 1000 characters, or control characters.
+   * (`\r` or `\n`) or an object replacement character (U+FFFC), text longer than 1000
+   * characters, or characters that XML cannot hold (control characters, unpaired surrogates).
    *
    * @example
    * ```ts
@@ -278,16 +282,22 @@ export class Presentation extends ModelObject {
   ): ClientResult<number> {
     const target = this.at('replaceAll');
     const query = text(searchText, `${target}.searchText`);
-    if (query.length === 0 || query.length > MAX_REPLACE_TEXT || /[\r\n]/.test(query))
+    // U+FFFC is how the search sees a field: a query with it could match one.
+    if (
+      query.length === 0 ||
+      query.length > MAX_REPLACE_TEXT ||
+      /[\r\n\uFFFC]/.test(query) ||
+      !xmlText(query)
+    )
       failArgument(
         `${target}.searchText`,
-        `search text of 1 to ${MAX_REPLACE_TEXT} characters, with no paragraph break`
+        `search text of 1 to ${MAX_REPLACE_TEXT} characters, with no paragraph break, no U+FFFC, and no control characters`
       );
     const replacement = text(replacementText, `${target}.replacementText`);
-    if (replacement.length > MAX_REPLACE_TEXT)
+    if (replacement.length > MAX_REPLACE_TEXT || !xmlText(replacement))
       failArgument(
         `${target}.replacementText`,
-        `replacement text of at most ${MAX_REPLACE_TEXT} characters`
+        `replacement text of at most ${MAX_REPLACE_TEXT} characters, with no control characters`
       );
     const find = searchOptions(options, `${target}.options`);
     const { result, fill } = ClientResult.create<number>(target);
@@ -324,6 +334,16 @@ export class Presentation extends ModelObject {
 }
 
 const SEARCH_OPTIONS: readonly string[] = ['matchCase', 'matchWholeWord'];
+
+/**
+ * Whether XML 1.0 can hold the text as a slide shows it: no control character but tab, line
+ * feed, carriage return, and the line break U+000B, no U+FFFE or U+FFFF, no unpaired surrogate.
+ */
+function xmlText(value: string): boolean {
+  return !/[\u0000-\u0008\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(
+    value
+  );
+}
 
 /** Search options as the engine takes them, or `InvalidArgument` naming `target`. */
 function searchOptions(
