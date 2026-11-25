@@ -196,6 +196,21 @@ describe('Slide.transition on two peers', () => {
     expect(xml.match(/<p:transition /g)).toHaveLength(2);
   });
 
+  test('concurrent direction and through-black writes on one slide converge', async () => {
+    const { sync, a, b } = await pair();
+    setTransition(createBrowserAutomationHost(a), 0, { kind: 'push', durationMs: 800 });
+    sync.pause();
+    setTransition(createBrowserAutomationHost(a), 0, { direction: 'd' });
+    setTransition(createBrowserAutomationHost(b), 0, { kind: 'fade', throughBlack: true });
+    setTransition(createBrowserAutomationHost(b), 1, { kind: 'split', direction: 'horzIn' });
+    sync.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    expect(transitionOf(a, 0)).toEqual(transitionOf(b, 0));
+    expect(transitionOf(a, 1)).toMatchObject({ kind: 'split', direction: 'horzIn' });
+    const xml = slideXml(a, 0);
+    expect(xml.match(/<mc:AlternateContent/g)).toHaveLength(1);
+  });
+
   test('undo of the change on one peer restores the state on both', async () => {
     const { a, b } = await pair();
     setTransition(createBrowserAutomationHost(b), 0, { kind: 'split', durationMs: 1500 });

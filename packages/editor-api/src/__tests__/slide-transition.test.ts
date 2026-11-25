@@ -314,6 +314,44 @@ describe('Slide.transition', () => {
     runtime.dispose();
   });
 
+  test('a new effect keeps the transition sound, and remove drops it', async () => {
+    const SOUND = '<p:sndAc><p:endSnd/></p:sndAc>';
+    const bytes = buildPptx({
+      slides: [
+        { layout: 'blank', shapes: '', ext: `<p:transition><p:fade/>${SOUND}</p:transition>` },
+      ],
+    });
+    const runtime = await open(bytes);
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(0).transition.set({ effect: 'Push', durationMs: 900 });
+      await context.sync();
+    });
+    const again = await reopen(runtime);
+    const xml = slideXml(await again.save())[0]!;
+    // `p:sndAc` follows the effect element in each copy (`CT_SlideTransition`).
+    expect(xml.match(new RegExp(`<p:push dir="u"/>${SOUND}`, 'g'))).toHaveLength(2);
+    await again.run(async (context) => {
+      context.presentation.slides.getItemAt(0).transition.remove();
+      await context.sync();
+    });
+    expect(slideXml(await again.save())[0]).not.toContain('transition');
+    runtime.dispose();
+    again.dispose();
+  });
+
+  test('remove after None leaves no transition', async () => {
+    const runtime = await open(withTransitions());
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(1).transition.effect = 'None';
+      await context.sync();
+      context.presentation.slides.getItemAt(1).transition.remove();
+      await context.sync();
+    });
+    expect(slideXml(await runtime.save())[1]).not.toContain('transition');
+    expect((await runtime.run(transitionsOf))[1]).toEqual(NONE);
+    runtime.dispose();
+  });
+
   test('None removes the effect; with the default advance settings no transition stays', async () => {
     const runtime = await open(withTransitions());
     await runtime.run(async (context) => {

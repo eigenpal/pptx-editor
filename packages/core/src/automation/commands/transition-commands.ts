@@ -10,11 +10,12 @@
 // A change of the advance settings or the duration writes into every copy of the transition,
 // so a kind that the editor does not write (and its extension markup) stays. A plain
 // `p:transition` holds only a speed: a duration that is no speed wraps it in a new
-// `mc:AlternateContent` whose `p14` choice holds the duration. A change of the
-// kind replaces the whole transition markup with a new `mc:AlternateContent`, and `none`
-// removes it. The new markup goes where `CT_Slide` puts the transition: after `p:clrMapOvr`
-// and before `p:timing` and `p:extLst`. A direction (`push`, `wipe`, `split`) or `thruBlk`
-// (`fade`, `cut`) goes into the effect element of every copy that holds that effect.
+// `mc:AlternateContent` whose `p14` choice holds the duration. A change of the kind replaces
+// the whole transition markup with a new `mc:AlternateContent` and keeps its sound (`p:sndAc`,
+// §19.5.69). `none` with the default advance settings removes the transition. The new markup
+// goes where `CT_Slide` puts the transition: after `p:clrMapOvr` and before `p:timing` and
+// `p:extLst`. A direction (`push`, `wipe`, `split`) or `thruBlk` (`fade`, `cut`) goes into the
+// effect element of every copy that holds that effect.
 
 import type { SlideTransitionState, TransitionKind } from '../../contracts/neutral.ts';
 import { attr, elements, NS, specOf, xmlPartOf, type Element } from '../../store/index.ts';
@@ -331,7 +332,17 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     holders.length === 1 &&
     isP(holders[0], 'transition') &&
     SPEEDS.get(speedOf(next.durationMs)) !== next.durationMs;
-  if (sameKind && !plainKeepsDuration) {
+  // No effect and the default advance settings: the transition says nothing, so it goes, with
+  // any sound it holds.
+  const clears =
+    next.kind === 'none' &&
+    next.advanceOnClick &&
+    next.advanceAfterMs === null &&
+    copies.length > 0 &&
+    copies.every((c) => !effectOf(c.el));
+  if (clears) {
+    for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
+  } else if (sameKind && !plainKeepsDuration) {
     // The same kind: write the settings into every copy, and keep the rest of the markup.
     for (const copy of copies) {
       setAttr(
@@ -360,6 +371,8 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     // copy of it with the duration.
     wrapPlain(batch, part, root, copies[0].el, next);
   } else {
+    // The sound of the transition (`p:sndAc`, §19.5.69) stays with a new effect.
+    const sound = copies.map((c) => elements(c.el).find((x) => isP(x, 'sndAc'))).find(Boolean);
     for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
     const xml = newTransitionXml(next);
     if (xml) {
@@ -377,6 +390,15 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
         index: at < 0 ? kids.length : at,
         spec: specFromXml(xml),
       });
+      if (sound)
+        for (const copy of transitionOf(xmlPartOf(batch.pkg, part)?.root).copies)
+          batch.push({
+            op: 'insertNode',
+            part,
+            parent: copy.el.id,
+            index: copy.el.children.length,
+            spec: specOf(sound),
+          });
     }
   }
   applyVariant(batch, part, next.kind, change);
