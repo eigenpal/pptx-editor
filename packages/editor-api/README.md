@@ -65,13 +65,14 @@ Dispose the runtime before the editor. A browser runtime has no `save()`: save t
 
 ## Parallel work
 
-Runs on one runtime do not wait for each other. The presentation has one revision for all of its content, and each commit increments it. Thus writes to two different slides still conflict.
+Runs on one runtime do not wait for each other. The presentation has one revision for all of its content. Each commit increments it, also an edit in the editor or from a collaborator. Thus writes to two different slides still conflict.
 
-- The context records the revision after each sync that succeeds, also after a sync that only reads.
-- A sync that writes requires that recorded revision. The first sync of a run has no recorded revision, so its writes do not check. An adopted tracked object brings the revision of its earlier run.
-- A sync that only reads does not check at its start. When it reads in several host batches, for example a collection and its items, the later batches require the revision of the first.
+- The context records the revision after each host batch that succeeds. Batches that only read also record it.
+- A host batch that writes requires the recorded revision. If the presentation changed, that batch refuses with `StaleDocument` and applies nothing.
+- The first host batch of a run has no recorded revision, so it does not check. When a sync reads in several host batches, for example a collection and its items, its later batches check.
+- An adopted tracked object brings the revision of its earlier run.
 
-Do slow work, such as a model call for each slide, outside `run()`. Then send every run for one presentation through one queue, and keep each run short: read, decide, and write.
+Do slow work, such as a model call for each slide, outside `run()`. Send every run for one presentation through one queue. Keep each queued run short: read, decide, and write.
 
 ```ts
 // Import isPptxEditorError and the PptxEditorRuntime type from @pptx-editor.dev/editor-api.
@@ -79,10 +80,8 @@ const queues = new WeakMap<PptxEditorRuntime, Promise<unknown>>();
 
 function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): Promise<T> {
   const result = (queues.get(runtime) ?? Promise.resolve()).then(task);
-  queues.set(
-    runtime,
-    result.catch(() => undefined)
-  );
+  const settled = result.catch(() => undefined);
+  queues.set(runtime, settled);
   return result;
 }
 
@@ -104,7 +103,9 @@ for (let attempt = 1; ; attempt += 1) {
 }
 ```
 
-`error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. They can be `undefined` when the refusal comes after earlier writes of the same sync applied. The queue prevents conflicts between the runs of one process. An editor user or another runtime can still write between the read and the write, so keep the retry bounded. Do not repeat the slow work in the retry. The [batching and errors guide](https://pptx-editor.dev/docs/editor-api/batching-and-errors#run-parallel-work) has the complete example.
+`error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. They can be `undefined` when the refusal comes after earlier writes of the same sync applied.
+
+The queue prevents conflicts between the runs that use it. An editor user, a collaborator, or a run outside the queue can still write between the read and the write. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime: the two tasks wait for each other. The [batching and errors guide](https://pptx-editor.dev/docs/editor-api/batching-and-errors#run-parallel-work) has the complete example.
 
 ## Common mistakes
 

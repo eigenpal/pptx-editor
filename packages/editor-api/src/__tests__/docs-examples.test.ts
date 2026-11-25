@@ -262,17 +262,18 @@ const queues = new WeakMap<PptxEditorRuntime, Promise<unknown>>();
 
 export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): Promise<T> {
   const result = (queues.get(runtime) ?? Promise.resolve()).then(task);
-  queues.set(
-    runtime,
-    result.catch(() => undefined)
-  );
+  const settled = result.catch(() => undefined);
+  queues.set(runtime, settled);
   return result;
 }
 
+// A target whose slide or shape is gone reads as null after the sync.
 function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
-  return targets.map(({ slideId, shapeId }) => {
-    const shape = context.presentation.slides.getItem(slideId).shapes.getItem(shapeId);
-    return shape.textFrame.textRange.load('text');
+  return targets.map((target) => {
+    const slide = context.presentation.slides.getItemOrNullObject(target.slideId);
+    const shape = slide.shapes.getItemOrNullObject(target.shapeId);
+    const range = shape.textFrame.textRange.load('text');
+    return { target, text: () => (shape.isNullObject ? null : range.text), range };
   });
 }
 
@@ -285,24 +286,26 @@ export async function rewriteTexts(
   // 1. Read every target in one short run.
   const before = await enqueue(runtime, () =>
     runtime.run(async (context) => {
-      const ranges = loadTexts(context, targets);
+      const items = loadTexts(context, targets);
       await context.sync();
-      return ranges.map((range) => range.text);
+      return items.map((item) => item.text());
     })
   );
   // 2. Do the slow work outside run(), in parallel.
-  const after = await Promise.all(before.map((text) => rewrite(text)));
+  const after = await Promise.all(before.map((text) => (text === null ? null : rewrite(text))));
   // 3. Apply every result in one run. Read again, and write only unchanged targets.
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await enqueue(runtime, () =>
         runtime.run(async (context) => {
-          const ranges = loadTexts(context, targets);
+          const items = loadTexts(context, targets);
           await context.sync();
           const skipped: TextTarget[] = [];
-          ranges.forEach((range, index) => {
-            if (range.text === before[index]) range.text = after[index];
-            else skipped.push(targets[index]);
+          items.forEach((item, index) => {
+            const result = after[index];
+            if (typeof result === 'string' && item.text() === before[index])
+              item.range.text = result;
+            else skipped.push(item.target);
           });
           await context.sync();
           return { skipped };
@@ -377,6 +380,31 @@ describe('the parallel work rules', () => {
       await rename(runtime, 'First');
       release();
       await late;
+      await runtime.run(async (context) => {
+        const shape = context.presentation.slides.getItemAt(0).shapes.getItem('2').load('name');
+        await context.sync();
+        expect(shape.name).toBe('Late');
+      });
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a first sync that reads in several host batches checks its writes', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const mine = runtime.run(async (context) => {
+        const shapes = context.presentation.slides.getItemAt(0).shapes;
+        shapes.load('items/name');
+        shapes.getItem('2').name = 'Mine';
+        await context.sync();
+      });
+      const write = rename(runtime, 'Between');
+      const error = await rejection(mine);
+      await write;
+      if (!isPptxEditorError(error)) throw error;
+      expect(error.code).toBe('StaleDocument');
+      expect([error.expectedRevision, error.actualRevision]).toEqual([0, 1]);
     } finally {
       runtime.dispose();
     }
@@ -472,6 +500,31 @@ describe('the parallel work example', () => {
       };
       expect(await rewriteTexts(runtime, targets, rewrite)).toEqual({ skipped: [targets[0]] });
       expect(await texts(runtime, ids)).toEqual(['Edited by a person', 'TWO']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a target deleted during the slow work is skipped, and the others apply', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      const targets = [
+        ...ids.map((slideId) => ({ slideId, shapeId: '2' })),
+        { slideId: ids[0]!, shapeId: '99' },
+      ];
+      const rewrite = async (text: string) => {
+        if (text === 'Two')
+          await runtime.run(async (context) => {
+            context.presentation.slides.getItem(ids[1]!).delete();
+            await context.sync();
+          });
+        return shout(text);
+      };
+      expect(await rewriteTexts(runtime, targets, rewrite)).toEqual({
+        skipped: [targets[1], targets[2]],
+      });
+      expect(await texts(runtime, [ids[0]!])).toEqual(['ONE']);
     } finally {
       runtime.dispose();
     }
