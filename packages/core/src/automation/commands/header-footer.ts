@@ -384,11 +384,15 @@ function applyKind(
         const field = (showing.keepFieldType && own?.fieldType) || showing.field;
         // A placeholder that shows this text already, as a field or as fixed text as asked, keeps
         // its paragraphs and line breaks: a read of the slide written back changes nothing.
+        // A footer asks for no field, so a footer with a field (a slide number) that shows the
+        // text keeps that field too.
         const same =
           own?.text === showing.text &&
-          (field === undefined
-            ? own.fieldType === undefined
-            : own.fieldType !== undefined && (own.fieldType === field || !!showing.keepFieldType));
+          (kind === 'ftr' ||
+            (field === undefined
+              ? own.fieldType === undefined
+              : own.fieldType !== undefined &&
+                (own.fieldType === field || !!showing.keepFieldType)));
         if (same) continue;
         replaceText(batch, slide.partName, shape, what, showing.text, field);
         edited = true;

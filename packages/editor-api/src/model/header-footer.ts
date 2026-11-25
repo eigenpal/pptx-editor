@@ -191,7 +191,8 @@ export class SlideHeaderFooter extends ModelObject {
    * when the presentation opens. A write shows the date as this fixed text: one line of 1 to 1024
    * characters. Each property write is its own change, applied in order. Thus a later write of
    * `dateFixed = false` replaces this text with today's date. For an automatic date that holds
-   * given text, pass `dateText` with `dateFixed: false` to `Presentation.applyHeaderFooter`.
+   * given text, pass `dateText` with `dateFixed: false` to `Presentation.applyHeaderFooter`. A
+   * write of the text that an automatic date shows makes it fixed text.
    */
   get dateText(): string {
     return this.loadedProperty('dateText');
