@@ -134,7 +134,8 @@ export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): 
   return result;
 }
 
-// Run a task again after StaleDocument, at most maxAttempts times in total.
+// Run a task again after StaleDocument, at most maxAttempts times in total. Use it only
+// for a run that applies nothing when it refuses, as in this example.
 async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -181,7 +182,7 @@ export async function rewriteTexts(
     before.map((text) => (text === null ? Promise.resolve(null) : rewrite(text)))
   );
   const after = outcomes.map((outcome) => (outcome.status === 'fulfilled' ? outcome.value : null));
-  // 3. Apply every result in one run. Read again, and write only unchanged targets.
+  // 3. Apply every result in one run. Read again, and write only where the text is unchanged.
   return retryStale(() =>
     enqueue(runtime, () =>
       runtime.run(async (context) => {

@@ -82,7 +82,7 @@ function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): Promise
 
 // 1. Read in one queued run. 2. Do the slow work in parallel, outside run().
 // 3. Apply in one queued run: read again, and write only targets that still hold the text you read.
-// applyResults is the run callback of step 3.
+// applyResults is the run callback of step 3. Step 1 can retry in the same way.
 for (let attempt = 1; ; attempt += 1) {
   try {
     await enqueue(runtime, () => runtime.run(applyResults));
@@ -98,7 +98,7 @@ for (let attempt = 1; ; attempt += 1) {
 }
 ```
 
-The queue prevents conflicts between the runs that use it. An editor user, a collaborator, or a run outside the queue can still write between a read and a write. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime. The inner task then waits forever for the outer task.
+The queue prevents conflicts between the runs that use it. An editor user, a collaborator, another runtime, or a run outside the queue can still write between a read and a write. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime. The inner task then waits forever for the outer task.
 
 `error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. They can be `undefined` when the refusal comes after earlier writes of the same sync applied.
 

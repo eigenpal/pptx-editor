@@ -267,7 +267,8 @@ export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): 
   return result;
 }
 
-// Run a task again after StaleDocument, at most maxAttempts times in total.
+// Run a task again after StaleDocument, at most maxAttempts times in total. Use it only
+// for a run that applies nothing when it refuses, as in this example.
 async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -314,7 +315,7 @@ export async function rewriteTexts(
     before.map((text) => (text === null ? Promise.resolve(null) : rewrite(text)))
   );
   const after = outcomes.map((outcome) => (outcome.status === 'fulfilled' ? outcome.value : null));
-  // 3. Apply every result in one run. Read again, and write only unchanged targets.
+  // 3. Apply every result in one run. Read again, and write only where the text is unchanged.
   return retryStale(() =>
     enqueue(runtime, () =>
       runtime.run(async (context) => {
@@ -469,13 +470,54 @@ describe('the parallel work example', () => {
     }
   });
 
-  test('jobs that fan out and apply through the queue all succeed', async () => {
+  test('jobs that fan out and apply through the queue all succeed, with no retry', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const ids = await slideIds(runtime);
+      // A slow call and an immediate one, so that the runs of the two jobs interleave.
+      const instant = async (text: string) => text.toUpperCase();
+      for (const rewrite of [shout, instant]) {
+        const jobs = ids.map((slideId) =>
+          rewriteTexts(runtime, [{ slideId, shapeId: '2' }], rewrite)
+        );
+        expect(await Promise.all(jobs)).toEqual([{ skipped: [] }, { skipped: [] }]);
+      }
+      expect(await texts(runtime, ids)).toEqual(['ONE', 'TWO']);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      runtime.dispose();
+    }
+  });
+
+  test('without the queue, the same jobs conflict', async () => {
     const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
     try {
       const ids = await slideIds(runtime);
-      const jobs = ids.map((slideId) => rewriteTexts(runtime, [{ slideId, shapeId: '2' }], shout));
-      expect(await Promise.all(jobs)).toEqual([{ skipped: [] }, { skipped: [] }]);
-      expect(await texts(runtime, ids)).toEqual(['ONE', 'TWO']);
+      // The steps of rewriteTexts with no enqueue and no retry.
+      const job = async (slideId: string) => {
+        const targets = [{ slideId, shapeId: '2' }];
+        const before = await runtime.run(async (context) => {
+          const items = loadTexts(context, targets);
+          await context.sync();
+          return items.map((item) => item.text());
+        });
+        const after = before.map((text) => text?.toUpperCase());
+        return runtime.run(async (context) => {
+          const items = loadTexts(context, targets);
+          await context.sync();
+          items.forEach((item, index) => {
+            if (item.text() === before[index]) item.range.text = after[index]!;
+          });
+          await context.sync();
+        });
+      };
+      const outcomes = await Promise.allSettled(ids.map(job));
+      const codes = outcomes.map((o) =>
+        o.status === 'rejected' && isPptxEditorError(o.reason) ? o.reason.code : o.status
+      );
+      expect(codes).toEqual(['fulfilled', 'StaleDocument']);
     } finally {
       runtime.dispose();
     }
