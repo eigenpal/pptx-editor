@@ -6,11 +6,17 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // The examples of docs/site/content/editor-api, run as written against a synthetic deck.
 
 import { readFileSync } from 'node:fs';
-import { expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
-import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
-import { PptxEditor, ShapeZOrder } from '../index.ts';
-import { deck, IN, reopen } from './support.ts';
+import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
+import {
+  isPptxEditorError,
+  PptxEditor,
+  ShapeZOrder,
+  type PptxEditorRuntime,
+  type RequestContext,
+} from '../index.ts';
+import { deck, IN, rejection, reopen } from './support.ts';
 
 test('the overview example edits and saves', async () => {
   const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
@@ -212,4 +218,403 @@ test('the runtime example draws the embedded pictures of a slide', async () => {
   } finally {
     runtime.dispose();
   }
+});
+
+/** Two slides, each with one text box: shape 2 says 'One' on slide 1 and 'Two' on slide 2. */
+function twoSlideDeck(): Uint8Array {
+  const box = (text: string) =>
+    shape({ id: 2, name: 'Title', x: IN, y: IN, cx: 4 * IN, cy: IN, text: para(run(text)) });
+  return buildPptx({
+    slides: [
+      { layout: 'blank', shapes: box('One') },
+      { layout: 'blank', shapes: box('Two') },
+    ],
+  });
+}
+
+async function slideIds(runtime: PptxEditorRuntime): Promise<string[]> {
+  return runtime.run(async (context) => {
+    const slides = context.presentation.slides.load('items/id');
+    await context.sync();
+    return slides.items.map((slide) => slide.id);
+  });
+}
+
+async function texts(runtime: PptxEditorRuntime, ids: readonly string[]): Promise<string[]> {
+  return runtime.run(async (context) => {
+    const ranges = ids.map((id) =>
+      context.presentation.slides.getItem(id).shapes.getItem('2').textFrame.textRange.load('text')
+    );
+    await context.sync();
+    return ranges.map((range) => range.text);
+  });
+}
+
+// The example of batching-and-errors.mdx, "Run parallel work", as written.
+
+export interface TextTarget {
+  readonly slideId: string;
+  readonly shapeId: string;
+}
+
+// One queue for each runtime. A task starts when the task before it settles.
+const queues = new WeakMap<PptxEditorRuntime, Promise<unknown>>();
+
+export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): Promise<T> {
+  const result = (queues.get(runtime) ?? Promise.resolve()).then(task);
+  const settled = result.catch(() => undefined);
+  queues.set(runtime, settled);
+  return result;
+}
+
+// Run a task again after StaleDocument, at most maxAttempts times in total.
+async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
+      // No revisions: earlier writes of that sync applied. Do not run it again.
+      if (error.expectedRevision === undefined) throw error;
+      if (attempt >= maxAttempts) throw error;
+      console.warn('StaleDocument: reading again', {
+        attempt,
+        expectedRevision: error.expectedRevision,
+        actualRevision: error.actualRevision,
+      });
+    }
+  }
+}
+
+// A target whose slide or shape is gone reads as null after the sync.
+function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
+  return targets.map((target) => {
+    const slide = context.presentation.slides.getItemOrNullObject(target.slideId);
+    const shape = slide.shapes.getItemOrNullObject(target.shapeId);
+    const range = shape.textFrame.textRange.load('text');
+    return { target, text: () => (shape.isNullObject ? null : range.text), range };
+  });
+}
+
+export async function rewriteTexts(
+  runtime: PptxEditorRuntime,
+  targets: readonly TextTarget[],
+  rewrite: (text: string) => Promise<string>
+) {
+  // 1. Read every target in one short run.
+  const before = await retryStale(() =>
+    enqueue(runtime, () =>
+      runtime.run(async (context) => {
+        const items = loadTexts(context, targets);
+        await context.sync();
+        return items.map((item) => item.text());
+      })
+    )
+  );
+  // 2. Do the slow work outside run(), in parallel. A failed call gives null.
+  const outcomes = await Promise.allSettled(
+    before.map((text) => (text === null ? Promise.resolve(null) : rewrite(text)))
+  );
+  const after = outcomes.map((outcome) => (outcome.status === 'fulfilled' ? outcome.value : null));
+  // 3. Apply every result in one run. Read again, and write only where the text is unchanged.
+  return retryStale(() =>
+    enqueue(runtime, () =>
+      runtime.run(async (context) => {
+        const items = loadTexts(context, targets);
+        await context.sync();
+        const skipped: TextTarget[] = [];
+        items.forEach((item, index) => {
+          const result = after[index];
+          if (typeof result === 'string' && item.text() === before[index]) item.range.text = result;
+          else skipped.push(item.target);
+        });
+        await context.sync();
+        return { skipped };
+      })
+    )
+  );
+}
+
+// End of the example.
+
+/** Each interfering write uses a new name, so that each one commits. */
+let interferences = 0;
+
+/**
+ * `runtime`, except that after the first sync of each of the `runs` listed (counted from 1), a
+ * separate run renames shape 2 of `slideId`: another writer moves the presentation mid-run.
+ */
+function interfered(runtime: PptxEditorRuntime, slideId: string, runs: readonly number[]) {
+  let count = 0;
+  const run = (callback: (context: RequestContext) => Promise<unknown>) => {
+    count += 1;
+    const interfere = runs.includes(count);
+    return runtime.run(async (context) => {
+      const sync = context.sync.bind(context);
+      let syncs = 0;
+      context.sync = (async () => {
+        await sync();
+        syncs += 1;
+        if (interfere && syncs === 1)
+          await runtime.run(async (other) => {
+            other.presentation.slides.getItem(slideId).shapes.getItem('2').name =
+              `moved ${(interferences += 1)}`;
+            await other.sync();
+          });
+      }) as RequestContext['sync'];
+      return callback(context);
+    });
+  };
+  return { ...runtime, run } as PptxEditorRuntime;
+}
+
+/** A stand-in for a model call: slow, and outside the presentation. */
+const shout = (text: string) =>
+  new Promise<string>((resolve) => setTimeout(() => resolve(text.toUpperCase()), 5));
+
+describe('the parallel work rules', () => {
+  const rename = (runtime: PptxEditorRuntime, name: string) =>
+    runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(1).shapes.getItem('2').name = name;
+      await context.sync();
+    });
+
+  test('the first sync of a run writes without a check', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const late = runtime.run(async (context) => {
+        await gate;
+        context.presentation.slides.getItemAt(0).shapes.getItem('2').name = 'Late';
+        await context.sync();
+      });
+      await rename(runtime, 'First');
+      release();
+      await late;
+      await runtime.run(async (context) => {
+        const shape = context.presentation.slides.getItemAt(0).shapes.getItem('2').load('name');
+        await context.sync();
+        expect(shape.name).toBe('Late');
+      });
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a first sync that reads in several host batches refuses before its writes', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const mine = runtime.run(async (context) => {
+        const shapes = context.presentation.slides.getItemAt(0).shapes;
+        shapes.load('items/name');
+        shapes.getItem('2').name = 'Mine';
+        await context.sync();
+      });
+      const write = rename(runtime, 'Between');
+      const error = await rejection(mine);
+      await write;
+      if (!isPptxEditorError(error)) throw error;
+      expect(error.code).toBe('StaleDocument');
+      expect([error.expectedRevision, error.actualRevision]).toEqual([0, 1]);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a read in several host batches refuses when another run writes between them', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      // A listing and its item reads: two host batches, the second pinned to the first.
+      const read = runtime.run(async (context) => {
+        context.presentation.slides.getItemAt(0).shapes.load('items/name');
+        await context.sync();
+      });
+      // A write from another run, sent after the listing and before the item reads.
+      const write = rename(runtime, 'Between');
+      const error = await rejection(read);
+      await write;
+      expect(isPptxEditorError(error) && error.code).toBe('StaleDocument');
+    } finally {
+      runtime.dispose();
+    }
+  });
+});
+
+describe('the parallel work example', () => {
+  test('runs that hold a read across slow work conflict, even on different slides', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      const edit = (slideId: string) =>
+        runtime.run(async (context) => {
+          const range = context.presentation.slides
+            .getItem(slideId)
+            .shapes.getItem('2')
+            .textFrame.textRange.load('text');
+          await context.sync();
+          range.text = await shout(range.text); // The slow work inside run(): the mistake.
+          await context.sync();
+        });
+      const outcomes = await Promise.allSettled(ids.map(edit));
+      expect(outcomes[0]!.status).toBe('fulfilled');
+      const failure = outcomes[1]!;
+      expect(failure.status).toBe('rejected');
+      const error = (failure as PromiseRejectedResult).reason as unknown;
+      if (!isPptxEditorError(error)) throw error;
+      expect(error.code).toBe('StaleDocument');
+      expect(error.expectedRevision).toBe(0);
+      expect(error.actualRevision).toBe(1);
+      expect(await texts(runtime, ids)).toEqual(['ONE', 'Two']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('jobs that fan out and apply through the queue all succeed, with no retry', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const ids = await slideIds(runtime);
+      // A slow call and an immediate one, so that the runs of the two jobs interleave.
+      const instant = async (text: string) => text.toUpperCase();
+      for (const rewrite of [shout, instant]) {
+        const jobs = ids.map((slideId) =>
+          rewriteTexts(runtime, [{ slideId, shapeId: '2' }], rewrite)
+        );
+        expect(await Promise.all(jobs)).toEqual([{ skipped: [] }, { skipped: [] }]);
+      }
+      expect(await texts(runtime, ids)).toEqual(['ONE', 'TWO']);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      runtime.dispose();
+    }
+  });
+
+  test('without the queue, the same jobs conflict', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      // The steps of rewriteTexts with no enqueue and no retry.
+      const job = async (slideId: string) => {
+        const targets = [{ slideId, shapeId: '2' }];
+        const before = await runtime.run(async (context) => {
+          const items = loadTexts(context, targets);
+          await context.sync();
+          return items.map((item) => item.text());
+        });
+        const after = before.map((text) => text?.toUpperCase());
+        return runtime.run(async (context) => {
+          const items = loadTexts(context, targets);
+          await context.sync();
+          items.forEach((item, index) => {
+            if (item.text() === before[index]) item.range.text = after[index]!;
+          });
+          await context.sync();
+        });
+      };
+      const outcomes = await Promise.allSettled(ids.map(job));
+      const codes = outcomes.map((o) =>
+        o.status === 'rejected' && isPptxEditorError(o.reason) ? o.reason.code : o.status
+      );
+      expect(codes).toEqual(['fulfilled', 'StaleDocument']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a target that changed during the slow work is skipped, not overwritten', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      const targets = ids.map((slideId) => ({ slideId, shapeId: '2' }));
+      const rewrite = async (text: string) => {
+        if (text === 'One')
+          await runtime.run(async (context) => {
+            context.presentation.slides
+              .getItem(ids[0]!)
+              .shapes.getItem('2').textFrame.textRange.text = 'Edited by a person';
+            await context.sync();
+          });
+        return shout(text);
+      };
+      expect(await rewriteTexts(runtime, targets, rewrite)).toEqual({ skipped: [targets[0]] });
+      expect(await texts(runtime, ids)).toEqual(['Edited by a person', 'TWO']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a target deleted during the slow work is skipped, and the others apply', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      const targets = [
+        ...ids.map((slideId) => ({ slideId, shapeId: '2' })),
+        { slideId: ids[0]!, shapeId: '99' },
+      ];
+      const rewrite = async (text: string) => {
+        if (text === 'Two')
+          await runtime.run(async (context) => {
+            context.presentation.slides.getItem(ids[1]!).delete();
+            await context.sync();
+          });
+        return shout(text);
+      };
+      expect(await rewriteTexts(runtime, targets, rewrite)).toEqual({
+        skipped: [targets[1], targets[2]],
+      });
+      expect(await texts(runtime, [ids[0]!])).toEqual(['ONE']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a failed model call skips its target, and the others apply', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      const targets = ids.map((slideId) => ({ slideId, shapeId: '2' }));
+      const rewrite = async (text: string) => {
+        if (text === 'One') throw new Error('the model call failed');
+        return shout(text);
+      };
+      expect(await rewriteTexts(runtime, targets, rewrite)).toEqual({ skipped: [targets[0]] });
+      expect(await texts(runtime, ids)).toEqual(['One', 'TWO']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a stale apply is logged with its revisions and retried, within the bound', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const ids = await slideIds(runtime);
+      const targets = [{ slideId: ids[0]!, shapeId: '2' }];
+      // Run 1 reads; run 2, the first apply, is interfered with; run 3 applies.
+      const once = interfered(runtime, ids[1]!, [2]);
+      expect(await rewriteTexts(once, targets, shout)).toEqual({ skipped: [] });
+      expect(await texts(runtime, ids)).toEqual(['ONE', 'Two']);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]).toEqual([
+        'StaleDocument: reading again',
+        { attempt: 1, expectedRevision: 0, actualRevision: 1 },
+      ]);
+
+      // Every apply is interfered with: the third refusal is thrown, and nothing applies.
+      warn.mockClear();
+      const always = interfered(runtime, ids[1]!, [2, 3, 4]);
+      const error = await rejection(
+        rewriteTexts(always, [{ slideId: ids[1]!, shapeId: '2' }], shout)
+      );
+      expect(isPptxEditorError(error) && error.code).toBe('StaleDocument');
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(await texts(runtime, ids)).toEqual(['ONE', 'Two']);
+    } finally {
+      warn.mockRestore();
+      runtime.dispose();
+    }
+  });
 });
