@@ -87,6 +87,7 @@
     "editor-api/runtime",
     "editor-api/batching-and-errors",
     "editor-api/slides-and-shapes",
+    "editor-api/sections",
     "editor-api/text-and-ranges",
     "editor-api/tables",
     "editor-api/pictures",

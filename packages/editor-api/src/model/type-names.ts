@@ -30,6 +30,7 @@ import {
 import { ShapeFill, ShapeLineFormat } from './fill-line.ts';
 import { Hyperlink, HyperlinkCollection, HyperlinkScopedCollection } from './hyperlinks.ts';
 import { DocumentProperties, PageSetup, Presentation } from './presentation.ts';
+import { Section, SectionCollection } from './sections.ts';
 import {
   PlaceholderFormat,
   Shape,
@@ -83,6 +84,8 @@ const CLASSES: readonly (readonly [unknown, string])[] = [
   [ParagraphFormat, 'ParagraphFormat'],
   [PlaceholderFormat, 'PlaceholderFormat'],
   [Presentation, 'Presentation'],
+  [Section, 'Section'],
+  [SectionCollection, 'SectionCollection'],
   [Shape, 'Shape'],
   [ShapeCollection, 'ShapeCollection'],
   [ShapeFill, 'ShapeFill'],

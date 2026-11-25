@@ -155,3 +155,7 @@ Automatic adoption with `--adopt` requires both checks:
 ### Text layout extensions
 
 `TextFrame.getTextFit()` and `TextFrameFit` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. The read reports the engine's own text layout: whether the text overflows its text area, the laid-out text height, and the available height, in points.
+
+### Section extensions
+
+`Presentation.sections`, `Section`, `SectionCollection`, and `SectionDeleteOptions` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest, because the pinned reference has no sections. They read and change the section list in the presentation's extension list (`p:extLst`, ECMA-376 Part 1, 19.2.1.12). The collection keeps the Office.js collection shape: `items`, `getCount()`, `getItem()`, `getItemAt()`, and `getItemOrNullObject()`.

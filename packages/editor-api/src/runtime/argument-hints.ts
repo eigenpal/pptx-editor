@@ -35,6 +35,8 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['areBackgroundGraphicsHidden', BOOLEAN],
   // Slides.
   ['hidden', BOOLEAN],
+  // Sections.
+  ['deleteSlides', BOOLEAN],
   // Lines and borders.
   ['line', 'Use a line object with color, weight, dashStyle, style, transparency, or visible.'],
   ['weight', 'Use a line weight from 0 to 1584 points.'],

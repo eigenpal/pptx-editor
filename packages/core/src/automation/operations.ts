@@ -675,6 +675,40 @@ export type AutomationOperation =
       readonly op: 'setSlideNotes';
       readonly slide: AutomationRef;
       readonly text: string;
+    }
+  // Sections: the `p14:sectionLst` in the presentation's `p:extLst` (ECMA-376 Part 1, 19.2.1.12).
+  | { readonly op: 'listSections' }
+  | { readonly op: 'getSection'; readonly key: AutomationItemKey; readonly orNull?: boolean }
+  | { readonly op: 'readSection'; readonly section: AutomationRef }
+  | {
+      /**
+       * Add a section that starts at `slide` and runs to the end of the section that holds it.
+       * In a presentation without sections, the slides before `slide` go into a first section
+       * named "Default Section". Answers the handle of the new section.
+       */
+      readonly op: 'addSection';
+      readonly name: string;
+      readonly slide: AutomationRef;
+    }
+  | { readonly op: 'renameSection'; readonly section: AutomationRef; readonly name: string }
+  | {
+      /** Move a section with its slides to a zero-based position in the section list. */
+      readonly op: 'moveSection';
+      readonly section: AutomationRef;
+      readonly index: number;
+    }
+  | {
+      /**
+       * Remove a section. Its slides join the section before it (after it, for the first
+       * section), or are deleted with `deleteSlides`.
+       */
+      readonly op: 'deleteSection';
+      readonly section: AutomationRef;
+      readonly deleteSlides?: boolean;
+    }
+  | {
+      /** Remove every section. The slides stay. */
+      readonly op: 'deleteAllSections';
     };
 
 /** The operations that write. Every other operation only reads. */
@@ -733,6 +767,11 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'setTableStyle',
   'setAdjustment',
   'setSlideNotes',
+  'addSection',
+  'renameSection',
+  'moveSection',
+  'deleteSection',
+  'deleteAllSections',
 ]);
 
 /** The operations that need a reader's selection. */

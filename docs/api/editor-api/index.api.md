@@ -1143,6 +1143,7 @@ export class Presentation extends ModelObject {
     get pageSetup(): PageSetup;
     get properties(): DocumentProperties;
     replaceAll(searchText: string, replacementText: string, options?: SearchOptions): ClientResult<number>;
+    get sections(): SectionCollection;
     setSelectedSlides(slideIds: string[]): void;
     get slideMasters(): SlideMasterCollection;
     get slides(): SlideCollection;
@@ -1198,6 +1199,43 @@ export type RunCallback<T> = (context: RequestContext) => Promise<T>;
 export interface SearchOptions {
     matchCase?: boolean;
     matchWholeWord?: boolean;
+}
+
+// @public
+export class Section extends ModelObject {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, nullable?: boolean);
+    delete(options?: SectionDeleteOptions): void;
+    get id(): string;
+    get index(): number;
+    moveTo(index: number): void;
+    get name(): string;
+    set name(value: string);
+    // @internal (undocumented)
+    protected onLoad(request: ResolvedLoadOptions): void;
+    get slideIds(): string[];
+}
+
+// @public
+export class SectionCollection extends ItemCollection<Section> {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slides: SlideCollection);
+    add(name: string, firstSlide: string | Slide): Section;
+    deleteAll(): void;
+    getItem(key: string): Section;
+    getItemAt(index: number): Section;
+    getItemOrNullObject(id: string): Section;
+    // @internal (undocumented)
+    protected itemOf(path: ObjectPath, nullable: boolean): Section;
+    // @internal (undocumented)
+    protected listing(): AutomationOperation;
+    // @internal (undocumented)
+    protected lookup(_ref: RefOf, key: AutomationItemKey, orNull: boolean): AutomationOperation;
+}
+
+// @public
+export interface SectionDeleteOptions {
+    deleteSlides?: boolean;
 }
 
 export { ShadowDetail }

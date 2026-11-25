@@ -788,7 +788,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Add, rename, remove, move, and collapse sections through section headers or custom toolbar controls. The default editor has no Section menu. Sections cannot be dragged.',
+      'Add, rename, remove, move, and collapse sections through section headers or custom toolbar controls. The default editor has no Section menu. Sections cannot be dragged. The editing API reads and changes sections through `presentation.sections`.',
   },
   {
     id: 'slides.sorter',

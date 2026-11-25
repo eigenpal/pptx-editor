@@ -695,3 +695,59 @@ describe('the parallel work example', () => {
     }
   });
 });
+
+test('the section examples group, list, move, and rename sections as written', async () => {
+  // docs/site/content/editor-api/sections.mdx.
+  async function listSections(runtime: PptxEditorRuntime) {
+    return runtime.run(async (context) => {
+      const sections = context.presentation.sections.load('items/name,items/slideIds');
+      await context.sync();
+      return sections.items.map((section) => ({ name: section.name, slideIds: section.slideIds }));
+    });
+  }
+  async function groupSlides(
+    runtime: PptxEditorRuntime,
+    groups: { name: string; firstSlideId: string }[]
+  ) {
+    return runtime.run(async (context) => {
+      const sections = context.presentation.sections;
+      const added = groups.map((group) => sections.add(group.name, group.firstSlideId));
+      for (const section of added) section.load('id');
+      await context.sync();
+      return added.map((section) => section.id);
+    });
+  }
+  async function moveToEnd(runtime: PptxEditorRuntime, sectionId: string, name: string) {
+    await runtime.run(async (context) => {
+      const sections = context.presentation.sections;
+      const count = sections.getCount();
+      await context.sync();
+      const section = sections.getItem(sectionId);
+      section.moveTo(count.value - 1);
+      section.name = name;
+      await context.sync();
+    });
+  }
+  const bytes = buildPptx({
+    slides: [1, 2, 3, 4].map(() => ({ layout: 'blank' as const, shapes: '' })),
+  });
+  const runtime = await PptxEditor.createServer(bytes, { substitutes: false });
+  try {
+    expect(await listSections(runtime)).toEqual([]);
+    const [intro] = await groupSlides(runtime, [
+      { name: 'Intro', firstSlideId: '256' },
+      { name: 'Results', firstSlideId: '258' },
+    ]);
+    expect(await listSections(runtime)).toEqual([
+      { name: 'Intro', slideIds: ['256', '257'] },
+      { name: 'Results', slideIds: ['258', '259'] },
+    ]);
+    await moveToEnd(runtime, intro!, 'Appendix');
+    expect(await listSections(runtime)).toEqual([
+      { name: 'Results', slideIds: ['258', '259'] },
+      { name: 'Appendix', slideIds: ['256', '257'] },
+    ]);
+  } finally {
+    runtime.dispose();
+  }
+});

@@ -19,6 +19,7 @@ import { CustomPropertyCollection } from './custom-properties.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
 import { finite, ModelObject, pathOf, text } from './model-object.ts';
 import { replaceOperation, type SearchOptions } from './search.ts';
+import { SectionCollection } from './sections.ts';
 import { ShapeScopedCollection } from './shapes.ts';
 import {
   SlideCollection,
@@ -66,6 +67,7 @@ export class Presentation extends ModelObject {
   #properties: DocumentProperties | undefined;
   #pageSetup: PageSetup | undefined;
   #bindings: BindingCollection | undefined;
+  #sections: SectionCollection | undefined;
 
   /** @internal */
   private constructor(context: RequestContext, path: ObjectPath) {
@@ -136,6 +138,32 @@ export class Presentation extends ModelObject {
     return (this.#bindings ??= new BindingCollection(
       this.context,
       ObjectPath.derived('presentation.bindings', this.path)
+    ));
+  }
+
+  /**
+   * The sections of the presentation, in order: named runs of slides. A presentation without
+   * sections has an empty collection. An SDK extension: the pinned Office.js reference has no
+   * sections.
+   *
+   * The section list is a `p14:sectionLst` in a `p:ext` (`CT_Extension`) of the presentation's
+   * extension list (`p:extLst`, `CT_ExtensionList`): ECMA-376 Part 1, 19.2.1.11 and 19.2.1.12.
+   * Each section names its slides by `p:sldId/@id` (`ST_SlideId`, 19.7.13). An edit changes only
+   * the section list. Other extensions stay as they are.
+   *
+   * @example
+   * ```ts
+   * const sections = context.presentation.sections;
+   * const appendix = sections.add('Appendix', slideId);
+   * appendix.load('id,slideIds');
+   * await context.sync();
+   * ```
+   */
+  get sections(): SectionCollection {
+    return (this.#sections ??= new SectionCollection(
+      this.context,
+      ObjectPath.derived('presentation.sections', this.path),
+      this.slides
     ));
   }
 
@@ -292,6 +320,7 @@ export class Presentation extends ModelObject {
       customXmlParts: () => this.customXmlParts,
       properties: () => this.properties,
       pageSetup: () => this.pageSetup,
+      sections: () => this.sections,
     });
     this.loadScalars(
       names,

@@ -1,0 +1,114 @@
+---
+title: 'Slide sections'
+description: 'Group slides into named sections, and rename, move, and delete sections with the editing API.'
+category: 'Editing API'
+---
+
+Use `context.presentation.sections` to group slides into named sections. A section is a run of slides that follow each other. The slide pane of the editor shows each section as a group. `Presentation.sections`, `Section`, `SectionCollection`, and `SectionDeleteOptions` are SDK extensions, not members of the pinned Office.js reference.
+
+The examples accept a runtime from [Runtime and lifecycle](/docs/editor-api/runtime). The methods work with browser and server runtimes, with the same result.
+
+## List the sections
+
+Load the collection to read each section:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function listSections(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const sections = context.presentation.sections.load('items/name,items/slideIds');
+    await context.sync();
+    return sections.items.map((section) => ({ name: section.name, slideIds: section.slideIds }));
+  });
+}
+```
+
+A section has these properties:
+
+- `id`: a GUID in braces, such as `{6E1B33A1-4C0F-4B53-9C2B-0D4A4B3E8A11}`. It stays the same when you rename or move the section.
+- `name`: the name of the section.
+- `index`: the zero-based position of the section.
+- `slideIds`: the `Slide.id` of each slide in the section, in slide order. An empty section has an empty array.
+
+A presentation without sections has an empty collection. Use `getItem(id)`, `getItemAt(index)`, or `getItemOrNullObject(id)` to find one section. An id matches in either case.
+
+## Group slides into sections
+
+Use `sections.add(name, firstSlide)` to start a section at a slide. Pass a slide id or a `Slide`. The new section takes that slide and the slides after it in the same section. The method returns the new section, which works in the same batch with no load first. This example starts a section at each given slide:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function groupSlides(
+  runtime: PptxEditorRuntime,
+  groups: { name: string; firstSlideId: string }[]
+) {
+  return runtime.run(async (context) => {
+    const sections = context.presentation.sections;
+    const added = groups.map((group) => sections.add(group.name, group.firstSlideId));
+    for (const section of added) section.load('id');
+    await context.sync();
+    return added.map((section) => section.id);
+  });
+}
+```
+
+In a presentation without sections, the first call also puts the slides before `firstSlide` into a first section named `Default Section`. A slide that already starts a section leaves that section empty, and the new section takes its slides.
+
+## Rename, move, and delete sections
+
+Set `name` to rename a section. Call `moveTo(index)` to move a section with its slides to a new position among the sections. The slides keep their order. This example moves a section to the end and renames it:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function moveToEnd(runtime: PptxEditorRuntime, sectionId: string, name: string) {
+  await runtime.run(async (context) => {
+    const sections = context.presentation.sections;
+    const count = sections.getCount();
+    await context.sync();
+    const section = sections.getItem(sectionId);
+    section.moveTo(count.value - 1);
+    section.name = name;
+    await context.sync();
+  });
+}
+```
+
+Call `delete()` to remove a section. Its slides stay, and they join the section before it. The slides of the first section join the section after it. Call `delete({ deleteSlides: true })` to delete the slides too. Deleting the last section removes the section list. Call `sections.deleteAll()` to remove every section and keep every slide.
+
+A name has 1 to 255 characters on one line. A line break in a name becomes a space. Setting the current name, moving a section to its current position, and `deleteAll()` with no sections write nothing.
+
+## Edit slides in a presentation with sections
+
+The slide methods keep every slide in one section:
+
+- `slides.add()` puts the new slide at the end of the last section.
+- `slide.moveTo(index)` puts the slide into the section of the slide before its new position. At position 0, the slide goes into the first section.
+- `slide.duplicate()` puts the copy into the section of its source slide.
+- `slide.delete()` takes the slide out of its section. The section stays, also when it becomes empty.
+- `presentation.insertSlidesFromBase64()` puts the new slides into the section of `targetSlideId`. Without `targetSlideId`, they go into the first section. The sections of the source presentation do not come with the slides.
+
+## Handle refusals
+
+A refused call changes nothing in its batch.
+
+| Call | Error code | Diagnostic |
+| --- | --- | --- |
+| A name that is empty, longer than 255 characters, or not a string | `InvalidArgument` | `edit.section-name` for the length |
+| `moveTo(index)` with a position past the last section | `InvalidArgument` | |
+| `delete(options)` with an option other than `deleteSlides`, or a value that is not a boolean | `InvalidArgument` | |
+| `add(name, firstSlide)` with an unknown slide id, or `getItem(id)` with an unknown section id | `ItemNotFound` | |
+| `delete({ deleteSlides: true })` on a section that holds every slide | `NotSupported` | `edit.last-slide` |
+| A call on a section that an earlier synchronization deleted | `InvalidObjectPath` | |
+
+## Storage and undo
+
+The section list is saved in the extension list of the presentation part (`p:extLst`, ECMA-376 Part 1, 19.2.1.12). A section edit changes only the section list. Other extensions in the same list stay as they are. In a browser runtime, each synchronization that writes is one undo step. In a collaboration session, which needs the EigenPal Pro License, section edits from two collaborators converge to the same sections.
+
+## See also
+
+- [Slides and shapes](/docs/editor-api/slides-and-shapes)
+- [Batching and errors](/docs/editor-api/batching-and-errors)
+- [Office.js compatibility](/docs/editor-api/office-js-api)
