@@ -1144,6 +1144,7 @@ export class Presentation extends ModelObject {
     static open(context: RequestContext): Presentation;
     get pageSetup(): PageSetup;
     get properties(): DocumentProperties;
+    replaceAll(searchText: string, replacementText: string, options?: SearchOptions): ClientResult<number>;
     setSelectedSlides(slideIds: string[]): void;
     get slideMasters(): SlideMasterCollection;
     get slides(): SlideCollection;
@@ -1194,6 +1195,12 @@ export interface RequestContextDebugInfo {
 
 // @public
 export type RunCallback<T> = (context: RequestContext) => Promise<T>;
+
+// @public
+export interface SearchOptions {
+    matchCase?: boolean;
+    matchWholeWord?: boolean;
+}
 
 export { ShadowDetail }
 

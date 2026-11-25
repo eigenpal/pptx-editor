@@ -572,6 +572,11 @@ export type AutomationOperation = {
     readonly op: 'listHyperlinks';
     readonly slide: AutomationRef;
 } | {
+    readonly op: 'replaceText';
+    readonly query: string;
+    readonly replacement: string;
+    readonly options?: FindOptions;
+} | {
     readonly op: 'listBindings';
     readonly owner: AutomationRef;
 } | {

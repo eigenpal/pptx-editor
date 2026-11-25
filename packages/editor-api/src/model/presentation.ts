@@ -7,6 +7,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `PageSetup`.
 
 import type { AutomationInsertSlidesOptions } from '@pptx-editor.dev/core/automation';
+import type { FindOptions } from '@pptx-editor.dev/core/contracts';
+import { ClientResult } from '../runtime/client-result.ts';
 import { failArgument, nearest, oneOf } from '../runtime/errors.ts';
 import { hydrated } from '../runtime/hydrate.ts';
 import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
@@ -40,6 +42,21 @@ export interface InsertSlideOptions {
   /** The slide the new slides follow, by id. */
   targetSlideId?: string;
 }
+
+/**
+ * How `Presentation.replaceAll` compares text. Both options are off by default.
+ *
+ * @public
+ */
+export interface SearchOptions {
+  /** Match upper and lower case exactly. */
+  matchCase?: boolean;
+  /** Match whole words only: no letter, digit, or underscore touches either end of a match. */
+  matchWholeWord?: boolean;
+}
+
+/** The longest search text and replacement text that `replaceAll` takes. */
+const MAX_REPLACE_TEXT = 1000;
 
 /**
  * The presentation: its slides, masters, tags, properties, and page setup.
@@ -228,6 +245,61 @@ export class Presentation extends ModelObject {
     }));
   }
 
+  /**
+   * Replace each match of `searchText` with `replacementText`, and answer the number of matches
+   * after the next `sync()`. An SDK extension: Office.js has no such member.
+   *
+   * The search reads the text of every shape on each slide (also in groups), every table cell
+   * the slide shows, and the speaker notes. Layouts and masters are not searched. A match stays
+   * in one paragraph; search for a line break with `\v`. A field, such as a slide number, is
+   * never part of a match.
+   *
+   * The replacement takes the font of the first character it replaces. It is one line: a line
+   * break or a tab in it becomes a space. Matches do not overlap, and the replacement text is not
+   * searched again. With no match, nothing changes and the count is 0. In a runtime over a live
+   * editor, the sync that writes is one undo step.
+   *
+   * Refused with `InvalidArgument`: empty search text, search text with a paragraph break
+   * (`\r` or `\n`), text longer than 1000 characters, or control characters.
+   *
+   * @example
+   * ```ts
+   * await runtime.run(async (context) => {
+   *   const count = context.presentation.replaceAll('FY25', 'FY26', { matchWholeWord: true });
+   *   await context.sync();
+   *   console.log(`${count.value} replaced`);
+   * });
+   * ```
+   */
+  replaceAll(
+    searchText: string,
+    replacementText: string,
+    options?: SearchOptions
+  ): ClientResult<number> {
+    const target = this.at('replaceAll');
+    const query = text(searchText, `${target}.searchText`);
+    if (query.length === 0 || query.length > MAX_REPLACE_TEXT || /[\r\n]/.test(query))
+      failArgument(
+        `${target}.searchText`,
+        `search text of 1 to ${MAX_REPLACE_TEXT} characters, with no paragraph break`
+      );
+    const replacement = text(replacementText, `${target}.replacementText`);
+    if (replacement.length > MAX_REPLACE_TEXT)
+      failArgument(
+        `${target}.replacementText`,
+        `replacement text of at most ${MAX_REPLACE_TEXT} characters`
+      );
+    const find = searchOptions(options, `${target}.options`);
+    const { result, fill } = ClientResult.create<number>(target);
+    this.enqueue(
+      'write',
+      'replaceAll',
+      () => ({ op: 'replaceText', query, replacement, ...(find ? { options: find } : {}) }),
+      (value) => fill(hydrated(value, 'number', target).value)
+    );
+    return result;
+  }
+
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
     const names = this.selection(request, ['id', 'title'], {
@@ -249,6 +321,34 @@ export class Presentation extends ModelObject {
       })
     );
   }
+}
+
+const SEARCH_OPTIONS: readonly string[] = ['matchCase', 'matchWholeWord'];
+
+/** Search options as the engine takes them, or `InvalidArgument` naming `target`. */
+function searchOptions(
+  options: SearchOptions | undefined,
+  target: string
+): FindOptions | undefined {
+  if (options === undefined) return undefined;
+  if (typeof options !== 'object' || options === null)
+    failArgument(target, 'a SearchOptions object');
+  // A name this API does not have is refused, not dropped: a search that ignored it would
+  // replace matches the caller did not ask for.
+  for (const name of Object.keys(options))
+    if (!SEARCH_OPTIONS.includes(name))
+      failArgument(`${target}.${name}`, oneOf(SEARCH_OPTIONS), nearest(name, SEARCH_OPTIONS));
+  const { matchCase, matchWholeWord } = options;
+  for (const [name, value] of [
+    ['matchCase', matchCase],
+    ['matchWholeWord', matchWholeWord],
+  ] as const)
+    if (value !== undefined && typeof value !== 'boolean')
+      failArgument(`${target}.${name}`, 'true or false');
+  return {
+    ...(matchCase === undefined ? {} : { matchCase }),
+    ...(matchWholeWord === undefined ? {} : { wholeWord: matchWholeWord }),
+  };
 }
 
 /** Import options as the protocol takes them, or `InvalidArgument` naming `target`. */
