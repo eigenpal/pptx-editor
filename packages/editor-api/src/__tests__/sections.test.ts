@@ -588,4 +588,90 @@ describe('Presentation.sections: runtimes', () => {
       ],
     ]);
   });
+
+  test('a name that trims to the current name writes nothing and adds no undo step', async () => {
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await live.load(sectioned())).ok).toBe(true);
+    await BrowserEditor.createBrowser(live).run(async (context) => {
+      context.presentation.sections.getItem(INTRO).name = '  Intro  ';
+      await context.sync();
+    });
+    expect(live.snapshot().canUndo).toBe(false);
+  });
+});
+
+describe('Presentation.sections: unusual section lists', () => {
+  /** A deck of `count` slides whose section list is `sections` (raw `p14:section` XML). */
+  function withList(count: number, sections: string): Uint8Array {
+    return buildPptx({
+      slides: slides(count),
+      presentationExt: `<p:extLst><p:ext uri="${SECTIONS_URI}"><p14:sectionLst xmlns:p14="${P14}">${sections}</p14:sectionLst></p:ext></p:extLst>`,
+    });
+  }
+  const section = (name: string, id: string, ids: number[]) =>
+    `<p14:section name="${name}" id="${id}"><p14:sldIdLst>${ids
+      .map((n) => `<p14:sldId id="${n}"/>`)
+      .join('')}</p14:sldIdLst></p14:section>`;
+  const ID = (n: number) => `{00000000-0000-4000-8000-00000000000${n}}`;
+
+  test('moveTo steps past empty sections in both directions, and the order survives a save', async () => {
+    const runtime = await open(
+      withList(
+        3,
+        section('A', ID(1), [256]) +
+          section('Empty1', ID(2), []) +
+          section('B', ID(3), [257]) +
+          section('Empty2', ID(4), []) +
+          section('C', ID(5), [258])
+      )
+    );
+    await runtime.run(async (context) => {
+      context.presentation.sections.getItem(ID(1)).moveTo(4);
+      await context.sync();
+      expect(await sectionsOf(context)).toEqual([
+        { name: 'Empty1', slideIds: [] },
+        { name: 'B', slideIds: ['257'] },
+        { name: 'Empty2', slideIds: [] },
+        { name: 'C', slideIds: ['258'] },
+        { name: 'A', slideIds: ['256'] },
+      ]);
+      context.presentation.sections.getItem(ID(4)).moveTo(0);
+      await context.sync();
+    });
+    const expected = [
+      { name: 'Empty2', slideIds: [] },
+      { name: 'Empty1', slideIds: [] },
+      { name: 'B', slideIds: ['257'] },
+      { name: 'C', slideIds: ['258'] },
+      { name: 'A', slideIds: ['256'] },
+    ];
+    expect(await runtime.run(sectionsOf)).toEqual(expected);
+    expect(await runtime.run(slideIdsOf)).toEqual(['257', '258', '256']);
+    const again = await reopen(runtime);
+    expect(await again.run(sectionsOf)).toEqual(expected);
+    runtime.dispose();
+    again.dispose();
+  });
+
+  test('a repeated section id, an unknown slide id, and a slide in no section read as the writer saves them', async () => {
+    const runtime = await open(
+      withList(
+        4,
+        section('A', ID(1), [256, 999]) + section('Twin', ID(1), [257]) + section('B', ID(2), [258])
+      )
+    );
+    const read = await runtime.run(sectionsOf);
+    // Each slide is in one section once, and the read matches the saved section list.
+    expect(read.flatMap((s) => s.slideIds).sort()).toEqual(['256', '257', '258', '259']);
+    expect(read).toEqual(savedSections(await runtime.save()).sections);
+    // A write repairs the list first, then edits it.
+    await runtime.run(async (context) => {
+      context.presentation.sections.getItemAt(0).name = 'First';
+      await context.sync();
+    });
+    const after = await runtime.run(sectionsOf);
+    expect(after[0]!.name).toBe('First');
+    expect(after).toEqual(savedSections(await runtime.save()).sections);
+    runtime.dispose();
+  });
 });

@@ -50,7 +50,10 @@ export class Section extends ModelObject {
     super(context, path, { nullable });
   }
 
-  /** The section id (`p14:section/@id`): a GUID in braces. Stable across moves and renames. */
+  /**
+   * The section id (`p14:section/@id`): a GUID in braces. Stable across moves and renames. A
+   * section of a file that has no id reads as an empty string; find it with `getItemAt`.
+   */
   get id(): string {
     return this.loadedProperty('id');
   }
@@ -167,7 +170,7 @@ export class SectionCollection extends ItemCollection<Section> {
    */
   add(name: string, firstSlide: string | Slide): Section {
     const target = this.at('add');
-    const label = text(name, target);
+    const label = text(name, `${target}.name`);
     const slide =
       typeof firstSlide === 'string'
         ? this.#slides.getItem(firstSlide)

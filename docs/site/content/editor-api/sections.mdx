@@ -26,7 +26,7 @@ export async function listSections(runtime: PptxEditorRuntime) {
 
 A section has these properties:
 
-- `id`: a GUID in braces, such as `{6E1B33A1-4C0F-4B53-9C2B-0D4A4B3E8A11}`. It stays the same when you rename or move the section.
+- `id`: a GUID in braces, such as `{6E1B33A1-4C0F-4B53-9C2B-0D4A4B3E8A11}`. It stays the same when you rename or move the section. A section of a file that has no id reads as an empty string. Find it with `getItemAt(index)`.
 - `name`: the name of the section.
 - `index`: the zero-based position of the section.
 - `slideIds`: the `Slide.id` of each slide in the section, in slide order. An empty section has an empty array.
@@ -78,7 +78,7 @@ export async function moveToEnd(runtime: PptxEditorRuntime, sectionId: string, n
 
 Call `delete()` to remove a section. Its slides stay, and they join the section before it. The slides of the first section join the section after it. Call `delete({ deleteSlides: true })` to delete the slides too. Deleting the last section removes the section list. Call `sections.deleteAll()` to remove every section and keep every slide.
 
-A name has 1 to 255 characters on one line. A line break in a name becomes a space. Setting the current name, moving a section to its current position, and `deleteAll()` with no sections write nothing.
+A name has 1 to 255 characters on one line. A line break in a name becomes a space. Setting the current name, also with extra spaces at the ends, moving a section to its current position, and `deleteAll()` with no sections write nothing.
 
 ## Edit slides in a presentation with sections
 

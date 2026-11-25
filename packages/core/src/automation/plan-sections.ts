@@ -19,6 +19,7 @@ import {
   removeAllSections,
   removeSection,
   renameSection as renameSectionEdit,
+  sectionName,
 } from './commands/slide-sections.ts';
 import type { AutomationItemKey } from './operations.ts';
 import type { AutomationRef, AutomationSectionRead, AutomationValue } from './protocol.ts';
@@ -141,7 +142,10 @@ export function addSection(
   return handleOf(ctx, id);
 }
 
-/** Rename a section (`p14:section/@name`). The current name writes nothing. */
+/**
+ * Rename a section (`p14:section/@name`). A name that is the current name, after the engine
+ * trims it and turns line breaks into spaces, writes nothing.
+ */
 export function renameSection(
   ctx: PlanContext,
   ref: AutomationRef,
@@ -149,7 +153,8 @@ export function renameSection(
 ): AutomationValue {
   const label = nameArg(name);
   const section = sectionAt(ctx, ref);
-  if (label === section.name) return { kind: 'applied' };
+  // The name as the engine keeps it: a name that cleans to the current one writes nothing.
+  if (sectionEdit(() => sectionName(label)) === section.name) return { kind: 'applied' };
   normalized(ctx);
   sectionEdit(() => renameSectionEdit(ctx.batch, section.id, label));
   return { kind: 'applied' };
