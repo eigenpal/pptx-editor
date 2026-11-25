@@ -83,7 +83,7 @@ export function replaceOperation(
   if (
     query.length === 0 ||
     query.length > MAX_REPLACE_TEXT ||
-    /[\r\n￼]/.test(query) ||
+    /[\r\n\uFFFC]/.test(query) ||
     !xmlText(query)
   )
     failArgument(

@@ -42,8 +42,13 @@ export function replaceText(
   if (!isValidXmlText(replacement.replace(/\v/g, ' '))) badArgument('replacement');
   if (options !== undefined && (typeof options !== 'object' || options === null))
     badArgument('find-options');
-  for (const name of ['matchCase', 'wholeWord'] as const)
-    if (options?.[name] !== undefined && typeof options[name] !== 'boolean')
+  // An option name the search does not know is refused, not dropped: a search that ignored
+  // it would replace matches the caller did not ask for.
+  for (const [name, value] of Object.entries(options ?? {}))
+    if (
+      (name !== 'matchCase' && name !== 'wholeWord') ||
+      (value !== undefined && typeof value !== 'boolean')
+    )
       badArgument('find-options');
   const only =
     slide === undefined

@@ -152,6 +152,7 @@ describe('replaceText', () => {
       [replace('a', 'x', null), 'find-options'],
       [replace('a', 'x', { matchCase: 'yes' }), 'find-options'],
       [replace('a', 'x', { wholeWord: 1 }), 'find-options'],
+      [replace('a', 'x', { matchWholeWord: true }), 'find-options'],
     ];
     for (const [op, detail] of cases) {
       const { host, store } = setup();

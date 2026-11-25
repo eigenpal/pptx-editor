@@ -51,7 +51,7 @@ await runtime.run(async (context) => {
 });
 ```
 
-The search reads the shapes on each slide, also in groups. It also reads the table cells that the slide shows and the speaker notes. It does not read layouts or masters. To replace on one slide, call `replaceAll` on that `Slide`. It reads the shapes, the table cells, and the speaker notes of that slide.
+The search reads the shapes on each slide, also in groups. It also reads the table cells that the slide shows and the speaker notes. It does not read charts, diagrams, layouts, or masters. To replace on one slide, call `replaceAll` on that `Slide`. It reads the shapes, the table cells, and the speaker notes of that slide.
 
 ```ts
 const slide = context.presentation.slides.getItemAt(0);
