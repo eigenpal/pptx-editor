@@ -101,7 +101,7 @@ export async function hideSlides(runtime: PptxEditorRuntime, positions: number[]
 }
 ```
 
-The write applies at the next `context.sync()`. Load `hidden` after that synchronization to read the new value. Setting `true` saves `show="0"` on the `p:sld` element, and setting `false` removes the attribute. Setting the current value writes nothing. A value that is not a boolean is refused with `InvalidArgument`. Browser and server runtimes behave the same, and a browser runtime records the change as one undo step.
+The write applies at the next `context.sync()`. A load of `hidden` queued after the write, in the same or a later synchronization, reads the new value. Setting `true` saves `show="0"` on the `p:sld` element, and setting `false` removes the attribute. Setting the current value writes nothing. A value that is not a boolean is refused with `InvalidArgument`. Browser and server runtimes behave the same, and a browser runtime records the change as one undo step.
 
 A hidden slide stays in `presentation.slides`. `slide.getImageAsBase64()` draws a hidden slide. A PDF export from `@pptx-editor.dev/pptx-to-pdf` leaves hidden slides out unless you set `includeHiddenSlides: true`. `slide.hidden` is an SDK extension, not a member of the pinned Office.js reference.
 

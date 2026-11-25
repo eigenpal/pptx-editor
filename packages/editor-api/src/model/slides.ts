@@ -72,9 +72,10 @@ export class Slide extends ModelObject {
   }
 
   /**
-   * Whether the slide is hidden: `p:sld/@show` is false (ECMA-376 Part 1, §19.3.1.38;
-   * `CT_Slide/@show`, an `xsd:boolean` with default `true`). A slide show skips a hidden slide.
-   * A write of `true` saves `show="0"`, and a write of `false` removes the attribute.
+   * Whether the slide is hidden: `p:sld/@show` is false. The slide element is ECMA-376 Part 1,
+   * §19.3.1.38, and the schema declares `CT_Slide/@show` as an `xsd:boolean` with default
+   * `true`. The editor's slide show skips a hidden slide. A write of `true` saves `show="0"`, and
+   * a write of `false` removes the attribute. A write of the current value writes nothing.
    *
    * This property is an SDK extension. The pinned Office.js reference has no such member.
    *
@@ -231,7 +232,8 @@ export class Slide extends ModelObject {
   /**
    * A PNG picture of the slide as base64, drawn by the editor's own renderer. A runtime over a
    * live editor in a browser draws pictures, and so does a server runtime created with a
-   * `rasterize` option; any other runtime refuses with `NotSupported`.
+   * `rasterize` option; any other runtime refuses with `NotSupported`. A hidden slide
+   * (`hidden`) draws as any other slide.
    *
    * @example
    * ```ts

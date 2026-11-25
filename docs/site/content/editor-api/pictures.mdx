@@ -26,7 +26,7 @@ export async function renderPreview(runtime: PptxEditorRuntime) {
 }
 ```
 
-Read `ClientResult.value` only after synchronization. To render one shape, call `shape.getImageAsBase64({ width: 320 })`. A shape preview is clipped to its box.
+Read `ClientResult.value` only after synchronization. To render one shape, call `shape.getImageAsBase64({ width: 320 })`. A shape preview is clipped to its box. A hidden slide (`slide.hidden`) renders as any other slide.
 
 The output preserves the aspect ratio and fits the requested pixel dimensions. Without dimensions, the output uses the source size at 96 pixels per inch. Shape previews accept only the `Png` format.
 

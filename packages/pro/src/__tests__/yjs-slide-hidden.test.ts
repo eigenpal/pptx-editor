@@ -55,11 +55,15 @@ async function replica(doc: Y.Doc, actorId: string): Promise<PptxEditorInstance>
   return editor;
 }
 
-/** Hide or show the slide at `index`, as `Slide.hidden` does: a lookup, then the write. */
+/**
+ * Hide or show the slide at `index` with the operations `Slide.hidden` sends: the lookups, then
+ * the write. `packages/editor-api/src/__tests__/slide-hidden.test.ts` checks that it sends these.
+ */
 function setHidden(host: AutomationHost, index: number, hidden: boolean): void {
   const operations: AutomationOperation[] = [
+    { op: 'getPresentation' },
     { op: 'getSlide', key: { index } },
-    { op: 'setSlideHidden', slide: { result: 0 }, hidden },
+    { op: 'setSlideHidden', slide: { result: 1 }, hidden },
   ];
   const response = host.execute({ operations });
   if (!response.ok) throw new Error(JSON.stringify(response.results));

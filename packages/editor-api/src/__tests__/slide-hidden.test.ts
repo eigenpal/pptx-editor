@@ -7,7 +7,12 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // declares `show` as an optional `xsd:boolean` with default `true`).
 
 import { describe, expect, test } from 'bun:test';
-import { createPptxEditor, type ImageRasterRequest } from '@pptx-editor.dev/core/editor';
+import type { AutomationHost, AutomationOperation } from '@pptx-editor.dev/core/automation';
+import {
+  createBrowserAutomationHost,
+  createPptxEditor,
+  type ImageRasterRequest,
+} from '@pptx-editor.dev/core/editor';
 import { attr, presentationInfo, readPptx, xmlPartOf } from '@pptx-editor.dev/core/store';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditor as BrowserEditor } from '../browser.ts';
@@ -17,6 +22,7 @@ import {
   type PptxEditorRuntime,
   type RequestContext,
 } from '../index.ts';
+import { createRuntime } from '../runtime/runtime.ts';
 import { open, refusedAtSync, reopen } from './support.ts';
 
 /** Three slides; the second is hidden in the file. */
@@ -155,6 +161,33 @@ describe('Slide.hidden', () => {
     expect(live.exec({ type: 'undo' }).ok).toBe(true);
     expect(live.snapshot().slides.map((s) => s.hidden)).toEqual([false, true, false]);
     expect(live.snapshot().canUndo).toBe(false);
+  });
+
+  test('a write sends the lookups and one setSlideHidden operation', async () => {
+    // The collaboration test (`packages/pro/src/__tests__/yjs-slide-hidden.test.ts`) sends these
+    // operations to two linked editors; this test keeps them equal to what `Slide.hidden` sends.
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await live.load(withHidden())).ok).toBe(true);
+    const inner = createBrowserAutomationHost(live);
+    const batches: AutomationOperation[][] = [];
+    const host: AutomationHost = {
+      ...inner,
+      execute: (request) => {
+        batches.push([...request.operations]);
+        return inner.execute(request);
+      },
+    };
+    await createRuntime({ host, save: false }).run(async (context) => {
+      context.presentation.slides.getItemAt(0).hidden = true;
+      await context.sync();
+    });
+    expect(batches).toEqual([
+      [
+        { op: 'getPresentation' },
+        { op: 'getSlide', key: { index: 0 } },
+        { op: 'setSlideHidden', slide: { result: 1 }, hidden: true },
+      ],
+    ]);
   });
 
   test('getImageAsBase64 draws a hidden slide', async () => {
