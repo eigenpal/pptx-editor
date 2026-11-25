@@ -553,6 +553,17 @@ export function failArgument(target: string | undefined, accepted: string, guess
   });
 }
 
+/**
+ * The `author` option of a runtime: absent, or a name of 1 to 255 characters after its spaces
+ * are trimmed. Anything else refuses with `InvalidArgument` at creation.
+ */
+export function authorOption(value: unknown, target: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !value.trim() || value.trim().length > 255)
+    failArgument(`${target}.author`, 'an author name of 1 to 255 characters');
+  return value;
+}
+
 /** Longer values get no suggestion: they are no typo of a name. */
 const MAX_GUESSED = 64;
 

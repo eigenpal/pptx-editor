@@ -1,0 +1,98 @@
+---
+title: 'Comments'
+description: 'Read, add, reply to, resolve, and delete slide comments through the editing API.'
+category: 'Editing API'
+---
+
+Use `slide.comments` to read the comment threads of a slide and to write new ones. A review agent can leave a comment on a slide, a shape, or a stretch of text, and answer the comments that people leave. `slide.comments` is an SDK extension: the pinned Office.js reference has no comment members. The member names follow the comment API of DOCX Editor.
+
+## Review the comments of a slide
+
+This function replies to each open thread of the first slide, resolves it, and returns what each thread said:
+
+```ts
+import type { Comment, PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function answerOpenComments(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const comments = context.presentation.slides.getItemAt(0).comments;
+    comments.load('items/authorName,items/content,items/resolved');
+    await context.sync();
+    const open: Comment[] = comments.items.filter((comment) => !comment.resolved);
+    for (const comment of open) {
+      comment.reply('Fixed in the next draft.', { authorName: 'Review Agent' });
+      comment.resolved = true;
+    }
+    await context.sync();
+    return open.map((comment) => `${comment.authorName}: ${comment.content}`);
+  });
+}
+```
+
+A thread is a `Comment`. It has `id`, `authorName`, `authorInitials`, `content`, `creationDate`, `resolved`, `anchor`, and `replies`. A reply is a `CommentReply`, with the same members except `resolved`, `anchor`, and `replies`. `comments.items` lists the threads in file order. Comment text and author names come from the file: show them as text, never as markup.
+
+`creationDate` is a `Date`, or `null` when the file has no valid date. A stored date with no time zone counts as UTC.
+
+## Add a comment
+
+Call `comments.add(content, options)`. With no options, the thread points at the slide. Pass `shape` to point at a shape on the top level of the slide, as a `Shape` or as its id. Add `textRange` to point at a stretch of the shape's text, with the `start` and `length` that `TextRange` uses:
+
+```ts
+const slide = context.presentation.slides.getItemAt(0);
+const title = slide.shapes.getItemAt(0);
+slide.comments.add('Shorten this title.', { shape: title });
+slide.comments.add('Say "Q3".', { shape: title, textRange: { start: 0, length: 9 } });
+await context.sync();
+```
+
+`anchor` reads the place back: `{ type: 'slide' }`, `{ type: 'shape', shapeId }`, `{ type: 'text', shapeId, start, length }`, or `{ type: 'point', left, top }` in points for a legacy comment. A thread whose shape is gone points at the slide.
+
+The text takes 1 to 10,000 characters. A line feed starts a new paragraph. `add` and `reply` return the new comment. Call its members after the `context.sync()` that adds it.
+
+## Choose the author
+
+A new comment or reply needs an author name. The runtime takes the first of these that is present:
+
+1. `authorName` (and `authorInitials`) in the options of `add` or `reply`.
+2. The `author` option of the runtime: `PptxEditor.createServer(bytes, { author })` or `PptxEditor.createBrowser(editor, { author })`.
+3. In a browser runtime, the name that signs the editor's own comments: the editor's `author` option, else the collaboration identity.
+
+A server has no signed-in user. Without an author, a write refuses with `NotSupported` and the diagnostic `edit.no-comment-author`, so the runtime never signs a comment with a placeholder name. An author name has 1 to 255 characters. Initials have up to 8 characters; the default is the first letters of the first two words of the name.
+
+## Reply, edit, resolve, and delete
+
+```ts
+const comment = context.presentation.slides.getItemAt(0).comments.getItem(id);
+comment.reply('Done.');
+comment.content = 'Check the numbers, please.';
+comment.resolved = true;
+await context.sync();
+```
+
+- `comment.reply(content, options)` adds a reply to the thread.
+- `comment.content = text` replaces the text of a thread or a reply.
+- `comment.resolved = true` resolves the thread, and `false` reopens it.
+- `comment.delete()` deletes a thread with its replies. `reply.delete()` deletes one reply.
+
+Each write applies at the next `context.sync()`. All the writes of one sync are one transaction. A refusal applies none of them, and a browser runtime records them as one undo step. Browser and server runtimes give the same result.
+
+## Comment formats
+
+A presentation stores comments in one of two formats. The legacy format is the comment list of ECMA-376 Part 1, 19.4. The threaded format is newer, and supports resolved threads and text anchors. `slide.comments` reads both. A new thread uses the format that the deck uses: threaded, unless the deck has only legacy comments. A reply keeps the format of its thread.
+
+The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-0305E82C3301}`. The `id` of a legacy comment is `cm-<author>-<index>`. An `id` stays the same through save and reopen.
+
+## Refusals
+
+| Cause | Code | Diagnostic |
+| --- | --- | --- |
+| No author for a new comment or reply | `NotSupported` | `edit.no-comment-author` |
+| Text that is empty or longer than 10,000 characters | `InvalidArgument` | `edit.comment-text` |
+| An author name longer than 255 characters | `InvalidArgument` | `edit.comment-author` |
+| No comment with the id on this slide | `ItemNotFound` | `edit.comment-not-found` |
+| A shape in a group or on another slide, or a `textRange` outside the text | `InvalidArgument` | `argument.not-accepted` |
+| `resolved` on a legacy comment | `NotSupported` | `edit.comment-no-status` |
+| `textRange` on a deck with only legacy comments | `NotSupported` | `edit.comment-no-text-range` |
+| A comment body with more than plain text, such as a mention, on a `content` write | `NotSupported` | `edit.comment-not-editable` |
+
+To show and edit comments in the editor UI, see [Comments](/docs/pro/comments).

@@ -247,6 +247,16 @@ export interface AutomationTableStyleWrite {
   readonly styleName?: string | null;
 }
 
+/**
+ * What a caller read of a comment, for a write to it. The host refuses the write when the
+ * comment at the id has another author or date, so a write never reaches another comment.
+ */
+export interface AutomationCommentExpect {
+  readonly author: string;
+  readonly date?: string;
+  readonly text: string;
+}
+
 /** `ShapeZOrder` moves. */
 export type AutomationZOrder = 'bringForward' | 'bringToFront' | 'sendBackward' | 'sendToBack';
 
@@ -742,6 +752,57 @@ export type AutomationOperation =
       readonly index: number;
       readonly size: number;
     }
+  // Comments of a slide: both formats (`plan-comments.ts`). `comment` is an id key that
+  // `readComments` answered.
+  | { readonly op: 'readComments'; readonly slide: AutomationRef }
+  | {
+      /**
+       * Add a thread in the format the deck uses: threaded, unless the deck has only legacy
+       * comments (`p:cmLst`, ECMA-376 Part 1, 19.4.4). Answers the new comment's id key.
+       */
+      readonly op: 'addComment';
+      readonly slide: AutomationRef;
+      readonly text: string;
+      /** A shape on the top level of the slide that the thread points at. */
+      readonly shape?: AutomationRef;
+      /** With `shape`: the stretch of its text the thread points at (threaded format only). */
+      readonly span?: AutomationTextSpan;
+      /** The author's name. Absent: the host's author. */
+      readonly author?: string;
+      readonly initials?: string;
+    }
+  | {
+      /** Reply to the thread of `comment`. Answers the reply's id key. */
+      readonly op: 'replyToComment';
+      readonly slide: AutomationRef;
+      readonly comment: string;
+      readonly text: string;
+      readonly author?: string;
+      readonly initials?: string;
+      readonly expect?: AutomationCommentExpect;
+    }
+  | {
+      readonly op: 'setCommentText';
+      readonly slide: AutomationRef;
+      readonly comment: string;
+      readonly text: string;
+      readonly expect?: AutomationCommentExpect;
+    }
+  | {
+      /** Resolve or reopen a thread. The legacy format has no state and refuses. */
+      readonly op: 'setCommentResolved';
+      readonly slide: AutomationRef;
+      readonly comment: string;
+      readonly resolved: boolean;
+      readonly expect?: AutomationCommentExpect;
+    }
+  | {
+      /** Delete a reply, or a thread with its replies. */
+      readonly op: 'deleteComment';
+      readonly slide: AutomationRef;
+      readonly comment: string;
+      readonly expect?: AutomationCommentExpect;
+    }
   // Selection (browser host only)
   | { readonly op: 'readSelection' }
   | { readonly op: 'selectSlides'; readonly slides: readonly AutomationRef[] }
@@ -876,6 +937,11 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'deleteAllSections',
   'setTransition',
   'setHeaderFooter',
+  'addComment',
+  'replyToComment',
+  'setCommentText',
+  'setCommentResolved',
+  'deleteComment',
 ]);
 
 /** The operations that need a reader's selection. */

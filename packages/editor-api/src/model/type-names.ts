@@ -21,6 +21,7 @@ import {
   SlideMasterBackground,
 } from './backgrounds.ts';
 import { Binding, BindingCollection } from './bindings.ts';
+import { Comment, CommentCollection, CommentReply, CommentReplyCollection } from './comments.ts';
 import { CustomProperty, CustomPropertyCollection } from './custom-properties.ts';
 import {
   CustomXmlPart,
@@ -72,6 +73,10 @@ const CLASSES: readonly (readonly [unknown, string])[] = [
   [Border, 'Border'],
   [Borders, 'Borders'],
   [BulletFormat, 'BulletFormat'],
+  [Comment, 'Comment'],
+  [CommentCollection, 'CommentCollection'],
+  [CommentReply, 'CommentReply'],
+  [CommentReplyCollection, 'CommentReplyCollection'],
   [CustomProperty, 'CustomProperty'],
   [CustomPropertyCollection, 'CustomPropertyCollection'],
   [CustomXmlPart, 'CustomXmlPart'],

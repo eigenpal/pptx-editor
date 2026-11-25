@@ -146,6 +146,51 @@ export interface AutomationChangeEvent {
 }
 
 // @public
+export type AutomationCommentAnchor = {
+    readonly kind: 'slide';
+} | {
+    readonly kind: 'point';
+    readonly left: number;
+    readonly top: number;
+} | {
+    readonly kind: 'shape';
+    readonly shapeId: string;
+} | {
+    readonly kind: 'text';
+    readonly shapeId: string;
+    readonly start: number;
+    readonly length: number;
+};
+
+// @public
+export interface AutomationCommentExpect {
+    // (undocumented)
+    readonly author: string;
+    // (undocumented)
+    readonly date?: string;
+    // (undocumented)
+    readonly text: string;
+}
+
+// @public
+export interface AutomationCommentRead {
+    readonly author: string;
+    readonly date?: string;
+    readonly id: string;
+    readonly initials: string;
+    readonly text: string;
+}
+
+// @public
+export interface AutomationCommentThreadRead extends AutomationCommentRead {
+    // (undocumented)
+    readonly anchor: AutomationCommentAnchor;
+    readonly format: 'legacy' | 'modern';
+    readonly replies: readonly AutomationCommentRead[];
+    readonly resolved: boolean;
+}
+
+// @public
 export interface AutomationCustomPropertyRead {
     // (undocumented)
     readonly key: string;
@@ -187,6 +232,7 @@ export interface AutomationDocumentPort {
     };
     batch(pkg: PptxPackage): OpBatch;
     collaborating?(): boolean;
+    commentAuthor?(): string | undefined;
     committed?(): void;
     currentPackage(): PptxPackage | null;
     dispose(): void;
@@ -914,6 +960,42 @@ export type AutomationOperation = {
     readonly index: number;
     readonly size: number;
 } | {
+    readonly op: 'readComments';
+    readonly slide: AutomationRef;
+} | {
+    readonly op: 'addComment';
+    readonly slide: AutomationRef;
+    readonly text: string;
+    readonly shape?: AutomationRef;
+    readonly span?: AutomationTextSpan;
+    readonly author?: string;
+    readonly initials?: string;
+} | {
+    readonly op: 'replyToComment';
+    readonly slide: AutomationRef;
+    readonly comment: string;
+    readonly text: string;
+    readonly author?: string;
+    readonly initials?: string;
+    readonly expect?: AutomationCommentExpect;
+} | {
+    readonly op: 'setCommentText';
+    readonly slide: AutomationRef;
+    readonly comment: string;
+    readonly text: string;
+    readonly expect?: AutomationCommentExpect;
+} | {
+    readonly op: 'setCommentResolved';
+    readonly slide: AutomationRef;
+    readonly comment: string;
+    readonly resolved: boolean;
+    readonly expect?: AutomationCommentExpect;
+} | {
+    readonly op: 'deleteComment';
+    readonly slide: AutomationRef;
+    readonly comment: string;
+    readonly expect?: AutomationCommentExpect;
+} | {
     readonly op: 'readSelection';
 } | {
     readonly op: 'selectSlides';
@@ -1486,6 +1568,9 @@ export type AutomationValue = {
 } | {
     readonly kind: 'headerFooter';
     readonly headerFooter: AutomationHeaderFooterRead;
+} | {
+    readonly kind: 'comments';
+    readonly comments: readonly AutomationCommentThreadRead[];
 }
 /** A command that committed. The effect is the response's revision. */
 | {
@@ -1566,6 +1651,7 @@ export type ShapeFormatProperties = Omit<ShapeFormatDetail, 'target'>;
 
 // @public
 export interface StoreAutomationOptions {
+    readonly author?: string;
     readonly collaborating?: boolean;
     readonly label?: string;
     readonly measurer?: TextMeasurer;

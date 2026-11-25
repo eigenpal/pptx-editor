@@ -871,7 +871,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Add, edit, reply to, and resolve comments with @pptx-editor.dev/pro under the EigenPal Pro License. Legacy comments cannot resolve, and unsupported thread content remains preserved but read-only. Concurrent edits can shift text anchors, and importing slides with threaded comments is refused.',
+      'Add, edit, reply to, and resolve comments with @pptx-editor.dev/pro or `slide.comments` of the editing API, under the EigenPal Pro License. Legacy comments cannot resolve, and unsupported thread content remains preserved but read-only. Concurrent edits can shift text anchors, and importing slides with threaded comments is refused.',
     docsLink: '/docs/pro/comments',
   },
   {

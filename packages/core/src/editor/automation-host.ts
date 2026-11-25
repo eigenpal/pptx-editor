@@ -144,7 +144,10 @@ function markOf(editor: PptxEditorInstance, pkg: PptxPackage): HistoryMark {
 }
 
 /** A document port over whichever session the editor holds now. */
-function editorPort(editor: PptxEditorInstance): AutomationDocumentPort {
+function editorPort(
+  editor: PptxEditorInstance,
+  options: BrowserAutomationOptions
+): AutomationDocumentPort {
   let seen: DocumentSession | null = editor.session;
   let base = 0;
   let generation = 0;
@@ -218,6 +221,8 @@ function editorPort(editor: PptxEditorInstance): AutomationDocumentPort {
     // The canvas stand-in or the fixed measurer (`OpenOptions.standIn`).
     standInMeasurer: () => follow()?.standInMeasurer === true,
     collaborating: () => isCollaborating(editor),
+    // The host's author, else the name that signs the editor's own new comments.
+    commentAuthor: () => options.author ?? editor.snapshot().commentAuthor ?? undefined,
     selection: selectionPort(editor),
     renderImage(target) {
       const session = follow();
@@ -237,15 +242,32 @@ function editorPort(editor: PptxEditorInstance): AutomationDocumentPort {
 }
 
 /**
+ * Options of `createBrowserAutomationHost`.
+ *
+ * @public
+ */
+export interface BrowserAutomationOptions {
+  /**
+   * The author of a comment or reply that a write adds without naming one. Default: the name
+   * that signs the editor's own new comments (`CommentSnapshot.commentAuthor`: the editor's
+   * `author` option, else the collaboration identity). With neither, such a write refuses.
+   */
+  readonly author?: string;
+}
+
+/**
  * An automation host over a live editor. Each batch writes to the editor's store as one undo
  * step; selection operations read and move the reader's selection. The host does not save: the
  * editor owns its document.
  *
  * @public
  */
-export function createBrowserAutomationHost(editor: PptxEditorInstance): AutomationHost {
+export function createBrowserAutomationHost(
+  editor: PptxEditorInstance,
+  options: BrowserAutomationOptions = {}
+): AutomationHost {
   return createAutomationHost({
-    port: editorPort(editor),
+    port: editorPort(editor, options),
     capabilities: {
       document: true,
       save: false,

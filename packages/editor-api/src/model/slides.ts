@@ -20,6 +20,7 @@ import { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
 import { SlideBackground, SlideLayoutBackground, SlideMasterBackground } from './backgrounds.ts';
 import { ItemCollection } from './collection.ts';
+import { CommentCollection } from './comments.ts';
 import { LAYOUT_TYPE, type SlideLayoutType } from './enums.ts';
 import { SlideHeaderFooter } from './header-footer.ts';
 import { HyperlinkCollection } from './hyperlinks.ts';
@@ -54,6 +55,7 @@ export class Slide extends ModelObject {
   #tags: TagCollection | undefined;
   #customXml: CustomXmlPartCollection | undefined;
   #hyperlinks: HyperlinkCollection | undefined;
+  #comments: CommentCollection | undefined;
   #layout: SlideLayout | undefined;
   #master: SlideMaster | undefined;
   #background: SlideBackground | undefined;
@@ -171,6 +173,21 @@ export class Slide extends ModelObject {
     return (this.#customXml ??= new CustomXmlPartCollection(
       this.context,
       ObjectPath.derived(`${this.path.label}.customXmlParts`, this.path)
+    ));
+  }
+
+  /**
+   * The comment threads of the slide, in both comment formats: the legacy comments of ECMA-376
+   * Part 1, 19.4 and the threaded comments. Read, add, reply to, resolve, and delete them.
+   *
+   * This property is an SDK extension. The pinned Office.js reference has no comment members.
+   */
+  get comments(): CommentCollection {
+    return (this.#comments ??= new CommentCollection(
+      this.context,
+      ObjectPath.derived(`${this.path.label}.comments`, this.path),
+      this.path,
+      (id) => this.shapes.getItem(id)
     ));
   }
 

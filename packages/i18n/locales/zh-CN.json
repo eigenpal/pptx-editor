@@ -849,6 +849,7 @@
     "mixedSize": "所选文本包含多种字号",
     "noCommentAuthor": "请先设置作者再添加批注",
     "commentNoStatus": "旧格式批注无法标记为已解决",
+    "commentNoTextRange": "旧格式批注无法指向文本",
     "commentNotEditable": "此批注包含无法在此编辑的内容",
     "noCommentTarget": "批注只能指向幻灯片顶层的元素",
     "animationsReadOnly": "此幻灯片的效果使用了编辑器不会更改的标记",

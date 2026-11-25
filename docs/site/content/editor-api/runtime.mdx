@@ -13,6 +13,8 @@ category: 'Editing API'
 
 `createServer` takes the font options of the engine: `fonts` adds faces to measure text with, and `substitutes` loads the metric-compatible substitute fonts (default `true`). Text writes re-fit each text body by its autofit rule, so the saved layout matches the editor.
 
+Both factories take an `author` option, an SDK extension: the name that signs the comments and replies the runtime adds. A server has no signed-in user, so a comment write on a server needs this option or an `authorName` on the call. A browser runtime falls back to the editor's own author. See [Comments](/docs/editor-api/comments#choose-the-author).
+
 `createBrowser` borrows a `PptxEditorInstance`. Each `sync()` that writes is one undo step in that editor. Undo goes back to the slide and the selection that the reader had before the sync. A browser runtime has no `save()`, and it refuses writes while the editor is open for viewing. Dispose the runtime before the editor.
 
 Read `runtime.capabilities` to check a host before you call a member that needs it, for example `capabilities.selection` before `getSelectedShapes()`, or `capabilities.images` before `getImageAsBase64()`.

@@ -93,6 +93,11 @@ export interface AutomationDocumentPort {
   /** The reader's selection, for a browser host. */
   readonly selection?: AutomationSelectionPort;
   /**
+   * The author of a new comment or reply that names none: the host's `author` option, or the
+   * editor's author (`setAuthor`, then the collaboration identity) in a browser host.
+   */
+  commentAuthor?(): string | undefined;
+  /**
    * A PNG picture of a slide or of one shape of it, from the committed package, for a host with
    * the `images` capability. Rejects with a `CommandRefusal` when it cannot draw.
    */
@@ -230,6 +235,7 @@ export function createAutomationHost(composition: AutomationHostComposition): Au
       ...(port.standInMeasurer?.() ? { standInMeasurer: true } : {}),
       ...(port.collaborating?.() ? { collaborating: true } : {}),
       ...(capabilities.selection && port.selection ? { selection: port.selection } : {}),
+      ...(port.commentAuthor?.() ? { commentAuthor: port.commentAuthor()! } : {}),
     };
     let firstCommand = -1;
     for (let index = 0; index < count; index += 1) {

@@ -849,6 +849,7 @@
     "mixedSize": "選択したテキストには複数のサイズが含まれています",
     "noCommentAuthor": "コメントするには作成者を設定してください",
     "commentNoStatus": "従来形式のコメントは解決済みにできません",
+    "commentNoTextRange": "従来形式のコメントはテキストを指定できません",
     "commentNotEditable": "このコメントにはここで編集できない内容が含まれています",
     "noCommentTarget": "コメントはスライドの最上位にある要素にのみ付けられます",
     "animationsReadOnly": "このスライドの効果は、エディターが変更しないマークアップを使っています",

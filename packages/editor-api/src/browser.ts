@@ -28,7 +28,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  */
 
 import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
-import { createBrowser } from './runtime/browser.ts';
+import { createBrowser, type CreateBrowserOptions } from './runtime/browser.ts';
 import type { PptxEditorRuntime, PptxEditorServerRuntime } from './runtime/runtime.ts';
 import { createServer, type CreateServerOptions } from './runtime/server.ts';
 
@@ -44,7 +44,7 @@ export interface PptxEditorBrowserNamespace {
    * A runtime over an editor that is already open. The editor keeps its own lifetime: dispose
    * the runtime before the editor. Each `sync()` that writes is one undo step.
    */
-  createBrowser(editor: PptxEditorInstance): PptxEditorRuntime;
+  createBrowser(editor: PptxEditorInstance, options?: CreateBrowserOptions): PptxEditorRuntime;
   /** A runtime over PPTX bytes. It also offers `save()`. */
   createServer(bytes: Uint8Array, options?: CreateServerOptions): Promise<PptxEditorServerRuntime>;
 }

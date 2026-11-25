@@ -16,7 +16,7 @@ import {
   type ImageRasterizer,
 } from '@pptx-editor.dev/core/editor';
 import type { FontSource } from '@pptx-editor.dev/core/layout';
-import { fail, failArgument } from './errors.ts';
+import { authorOption, fail, failArgument } from './errors.ts';
 import { createRuntime, type PptxEditorServerRuntime } from './runtime.ts';
 
 /**
@@ -46,6 +46,14 @@ export interface CreateServerOptions {
    * `NotSupported`.
    */
   readonly rasterize?: ImageRasterizer;
+  /**
+   * The author of the comments and replies this runtime adds when a call names none
+   * (`authorName`). A server has no signed-in user, so without this option and without
+   * `authorName`, a comment write refuses with `NotSupported` and the diagnostic
+   * `edit.no-comment-author`, rather than sign the comment with a placeholder name. A name has
+   * 1 to 255 characters. This is an SDK extension.
+   */
+  readonly author?: string;
 }
 
 export async function createServer(
@@ -59,6 +67,7 @@ export async function createServer(
   const rasterize = options.rasterize;
   if (rasterize !== undefined && typeof rasterize !== 'function')
     failArgument('createServer', 'a rasterize function');
+  const author = authorOption(options.author, 'createServer');
   const fonts =
     options.fonts === undefined
       ? undefined
@@ -81,6 +90,7 @@ export async function createServer(
   const session = opened.session;
   const host = createStoreAutomationHost(session.store, {
     measurer: session.measurer,
+    ...(author === undefined ? {} : { author }),
     ...(rasterize
       ? {
           renderImage: (target) =>
