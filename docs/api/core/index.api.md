@@ -1978,6 +1978,8 @@ export class DocumentSession {
     shapingError: unknown;
     // @internal
     slidePending(index: number): boolean;
+    // @internal
+    get standInMeasurer(): boolean;
     // (undocumented)
     readonly store: PptxDocumentStore;
     substitutedFamilies(): FontSubstitution[];

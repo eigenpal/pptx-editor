@@ -5,6 +5,7 @@
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import { eastAsianScriptOf } from '../../cascade/script-fonts.ts';
+import { markApproximateMeasurer } from './approximate.ts';
 
 /** A font request from a run. */
 export interface FontRequest {
@@ -227,6 +228,12 @@ export function eastAsianFallbackFamilies(lang?: string): readonly string[] {
  * spaces 0.25 em, and every glyph outline is a box. Never use it for fidelity work.
  */
 export function createFixedMeasurer(): TextMeasurer {
+  const measurer = fixedMeasurer();
+  markApproximateMeasurer(measurer);
+  return measurer;
+}
+
+function fixedMeasurer(): TextMeasurer {
   const metrics: FaceMetrics = {
     ascent: 0.9,
     descent: 0.25,

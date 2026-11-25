@@ -22,6 +22,7 @@ import type {
   AutomationTextFrameWrite,
   AutomationTextSpan,
 } from '@pptx-editor.dev/core/automation';
+import { ClientResult } from '../runtime/client-result.ts';
 import { fail, failArgument } from '../runtime/errors.ts';
 import { hydrated } from '../runtime/hydrate.ts';
 import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
@@ -55,6 +56,29 @@ const FRAME_NAMES = [
   'wordWrap',
   'hasText',
 ] as const;
+
+/**
+ * Whether the text of a shape fits its text area, as `TextFrame.getTextFit()` reports it. The
+ * text area is the shape's text rectangle less the margins before and after the lines:
+ * `topMargin` and `bottomMargin` for horizontal text, the side margins for vertical text.
+ * Heights are in points. An SDK extension: the pinned Office.js reference has no such type.
+ *
+ * @public
+ */
+export interface TextFrameFit {
+  /** The laid-out text needs more height than the text area has. */
+  readonly overflows: boolean;
+  /** The height that the laid-out lines need, in points, margins excluded. */
+  readonly textHeight: number;
+  /** The height of the text area, in points. */
+  readonly availableHeight: number;
+  /**
+   * The font families that the text names but that the runtime does not have, and that a face
+   * with other advance widths measured. Line breaks and heights can differ where the named font
+   * is present. A metric-compatible substitute keeps the line breaks, so it is not listed.
+   */
+  readonly substitutedFonts: readonly string[];
+}
 
 /**
  * The text frame of a shape (`p:txBody` and its `a:bodyPr`).
@@ -142,6 +166,48 @@ export class TextFrame extends ModelObject {
   deleteText(): void {
     const shape = this.#shape;
     this.command('deleteText', (ref) => ({ op: 'setText', shape: ref(shape), text: '' }));
+  }
+
+  /**
+   * Whether the text fits the frame, from the layout that `Shape.getImageAsBase64()` draws for
+   * the same shape. Read the result after `context.sync()`. The text lays out at its stored
+   * `autoSizeSetting`: `AutoSizeShapeToFitText` grows the shape, so its text does not overflow;
+   * `AutoSizeTextToFitShape` overflows only when the smallest shrink step still does not fit,
+   * or when empty paragraphs at the end push middle or bottom anchored text up;
+   * `AutoSizeNone` reports the raw overflow. Vertical text measures across its lines. A text,
+   * font, paragraph, or frame write in this API re-fits the frame first; a size change does not.
+   * A runtime with approximate font metrics (an editor whose fonts still load), a shape of a
+   * layout or a master, and a hidden shape refuse with `NotSupported`. An SDK extension: the
+   * pinned Office.js reference has no such member.
+   *
+   * @example
+   * ```ts
+   * const fit = shape.textFrame.getTextFit();
+   * await context.sync();
+   * if (fit.value.overflows) shape.textFrame.textRange.text = shorterText;
+   * ```
+   */
+  getTextFit(): ClientResult<TextFrameFit> {
+    const target = this.at('getTextFit');
+    const { result, fill } = ClientResult.create<TextFrameFit>(target);
+    const shape = this.#shape;
+    this.enqueue(
+      'read',
+      'getTextFit',
+      (ref) => ({ op: 'readTextFit', shape: ref(shape) }),
+      (value) => {
+        const fit = hydrated(value, 'textFit', target).textFit;
+        fill(
+          Object.freeze({
+            overflows: fit.overflows,
+            textHeight: fit.textHeight,
+            availableHeight: fit.availableHeight,
+            substitutedFonts: Object.freeze([...fit.substitutedFonts]),
+          })
+        );
+      }
+    );
+    return result;
   }
 
   /** The shape that holds the frame. */

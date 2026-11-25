@@ -232,6 +232,25 @@ const DIAGNOSTICS: ReadonlyMap<string, PptxEditorDiagnostic> = new Map(
           'layout or a master.',
       ],
       [
+        'text-fit-measurer',
+        'host.no-font-measurement',
+        'The runtime measures text with approximate metrics. Its fonts are still loading, no ' +
+          'font loaded, or its text engine did not load. Try again after the fonts load, or ' +
+          'give the runtime fonts.',
+      ],
+      [
+        'text-fit-owner',
+        'text-fit.not-on-slide',
+        'Only a shape on a slide has a text layout. Use a shape of a slide, not of a layout or ' +
+          'a master.',
+      ],
+      [
+        'text-fit-hidden',
+        'text-fit.not-drawn',
+        'The slide does not draw the shape, for example because the shape or its group is ' +
+          'hidden. Show the shape first.',
+      ],
+      [
         'image-size',
         'image.invalid-size',
         'The width and the height of a picture must be positive numbers of pixels.',

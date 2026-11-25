@@ -35,7 +35,8 @@ import { XFRM_BOUND, type ResolvedShape } from '../cascade/index.ts';
 import { frameInsets } from './text/anchor.ts';
 import { evaluateGeometry } from './geometry/geometry.ts';
 import { layoutText, layoutTextOn } from './text/text-layout.ts';
-import type { TextMeasurer } from './text/measurer.ts';
+import { isMetricCompatible, type TextMeasurer } from './text/measurer.ts';
+import type { LayoutItem } from './slide-layout.ts';
 
 /** `ST_PositiveCoordinate`'s maximum (`MAX_COORDINATE` in package-edits.ts). */
 const MAX_COORDINATE = 27_273_042_316_900;
@@ -290,4 +291,82 @@ export function chooseNormAutofit(
     if (fits({ ...text, body }, rect, measurer)) return { scale, reduction };
   }
   return steps[steps.length - 1] ?? AUTOFIT_STEPS[0]!;
+}
+
+/** The laid-out text of a shape against its text area (`textFitOf`). Lengths in EMU. */
+export interface TextFit {
+  /** The text needs more height than its text area has. */
+  readonly overflows: boolean;
+  /** The height that the lines need, insets excluded. */
+  readonly textHeight: number;
+  /** The height of the text area: the text rectangle less the insets across the lines. */
+  readonly availableHeight: number;
+  /**
+   * The families that were not available, so that a face with other advance widths measured
+   * them. A metric-compatible substitute (`isMetricCompatible`) is not listed.
+   */
+  readonly substitutions: readonly string[];
+}
+
+/**
+ * Whether the text of a laid-out shape fits its text area, read from the layout that paint
+ * draws (`item.text`): there is no second layout rule. The text area is the geometry's text
+ * rectangle less the insets of `a:bodyPr` before and after the lines (CT_TextBodyProperties,
+ * ECMA-376 Part 1, 21.1.2.1.1): `tIns` and `bIns` for horizontal text, and the turned insets of
+ * `frameInsets` for vertical text. The text lays out at its stored autofit: `a:normAutofit`
+ * (CT_TextNormalAutofit, 21.1.2.1.3) at its `fontScale` and `lnSpcReduction`, `a:spAutoFit`
+ * (CT_TextShapeAutofit, 21.1.2.1.4) at the shape size that the last refit wrote, and
+ * `a:noAutofit` (CT_TextNoAutofit, 21.1.2.1.2) as it is. Vertical text (`vert`,
+ * ST_TextVerticalType, 20.1.10.83) measures across its lines, in its own turned frame, as
+ * autofit does. With columns, the text height is the bottom of the lowest line, and at least
+ * the column height when the text flows into a second column (`contentHeight`). Empty
+ * paragraphs at the end do not count, as for the shrink steps (`fittedText`): they draw nothing
+ * below the text. One case differs: single-column text with `ctr` or `b` anchoring
+ * (ST_TextAnchoringType, 20.1.10.60) and a paragraph that is not empty. There they count,
+ * because they move the text that draws up, past the top of the text area, once the whole body
+ * is taller than it. The overflow test is the one the shrink steps use (`fits`).
+ *
+ * `item` is a slide shape, whose text lays out in its geometry's text rectangle; a diagram
+ * shape's `textXfrm` is not read. Null for a shape with no text body.
+ */
+export function textFitOf(
+  item: Extract<LayoutItem, { kind: 'shape' }>,
+  measurer: TextMeasurer
+): TextFit | null {
+  const full = item.element.text;
+  if (!full) return null;
+  const drawn = item.text;
+  // Anchoring moves single-column text only: with columns, the anchor height stops at the box.
+  // A body of empty paragraphs alone has no text to move.
+  const { anchor, numCol } = full.body;
+  const moves =
+    (anchor === 'ctr' || anchor === 'b') &&
+    numCol <= 1 &&
+    full.paragraphs.some((p) => !isEmptyParagraph(p));
+  const text = moves ? full : fittedText(full);
+  let laid = drawn;
+  if (!laid || text !== full) {
+    // The layout call of `layoutPlaced`, with the empty paragraphs at the end left out. A body
+    // with no paragraph draws nothing; its layout gives the text area alone.
+    const r = item.geometry.textRect;
+    laid = layoutTextOn(
+      text,
+      { x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t },
+      measurer,
+      'size'
+    );
+  }
+  const { tIns, bIns } = frameInsets(text.body);
+  // A metric-compatible substitute keeps the advance widths, so the lines break as with the
+  // named font: only the other substitutes can change the answer.
+  const substitutions = (drawn ?? laid).substitutions.filter(
+    (family) =>
+      !isMetricCompatible(family, measurer.resolve({ family, bold: false, italic: false }).family)
+  );
+  return {
+    overflows: laid.contentHeight > laid.box.height + 1,
+    textHeight: Math.max(0, laid.contentHeight - tIns - bIns),
+    availableHeight: Math.max(0, laid.box.height - tIns - bIns),
+    substitutions,
+  };
 }

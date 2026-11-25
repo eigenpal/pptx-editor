@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation readTextFit reads the laid-out text height and the text area. It writes nothing. A text write re-fits autofit text through the existing operations. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/core/src/editor/__tests__/text-fit.test.ts",
+    "packages/editor-api/src/__tests__/text-fit.test.ts"
+  ]
+}

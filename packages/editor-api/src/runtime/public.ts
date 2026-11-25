@@ -139,7 +139,14 @@ export { TableCell, type FontProperties, type TextRun } from '../model/table-cel
 export { Border, Borders, Margins, TableStyleSettings } from '../model/table-format.ts';
 export { Tag, TagCollection } from '../model/tags.ts';
 export { ThemeColorScheme } from '../model/theme.ts';
-export { BulletFormat, ParagraphFormat, ShapeFont, TextFrame, TextRange } from '../model/text.ts';
+export {
+  BulletFormat,
+  ParagraphFormat,
+  ShapeFont,
+  TextFrame,
+  TextRange,
+  type TextFrameFit,
+} from '../model/text.ts';
 
 export type {
   LineEndType,

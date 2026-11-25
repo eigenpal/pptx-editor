@@ -21,6 +21,7 @@ import * as slides from './plan-slides.ts';
 import * as tableFormat from './plan-table-format.ts';
 import * as tables from './plan-tables.ts';
 import * as text from './plan-text.ts';
+import * as textFit from './plan-text-fit.ts';
 import * as theme from './plan-theme.ts';
 import { AUTOMATION_COMMANDS } from './operations.ts';
 import {
@@ -308,6 +309,8 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return theme.setThemeColor(ctx, op.owner, op.slot, op.color);
     case 'readTextFrame':
       return text.readTextFrame(ctx, op.shape, op.orNull);
+    case 'readTextFit':
+      return textFit.readTextFit(ctx, op.shape);
     case 'setTextFrame':
       return text.setTextFrame(ctx, op.shape, op.props);
     case 'readText':

@@ -8,6 +8,7 @@
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import { AdvanceCache } from './advance-cache.ts';
+import { markApproximateMeasurer } from './approximate.ts';
 import { os2LineExtents, withFaceLineMetrics } from './face-line-metrics.ts';
 import { isIdeographic } from './line-break.ts';
 import { unkernedTextRanges } from './run-kerning.ts';
@@ -569,5 +570,8 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return out ?? undefined;
   };
 
-  return { resolve, advances, shape, fallbackFace, glyphOutline, faces };
+  const measurer = { resolve, advances, shape, fallbackFace, glyphOutline, faces };
+  // With no face, every family takes stand-in metrics, as the fixed measurer's.
+  if (faces.length === 0) markApproximateMeasurer(measurer);
+  return measurer;
 }

@@ -78,6 +78,8 @@ import type { TextPoint } from '../contracts/neutral.ts';
 export interface TextPlanContext extends PlanContext {
   /** Present when the host can re-fit text bodies by their autofit rules. */
   readonly measurer?: TextMeasurer;
+  /** Set while `measurer` stands in for the fonts (`AutomationDocumentPort.standInMeasurer`). */
+  readonly standInMeasurer?: boolean;
   /** Set in a collaboration room: a table structure edit marks the table. */
   readonly collaborating?: boolean;
 }
@@ -152,7 +154,7 @@ function textTarget(
  * connector, a graphic frame, a group) has no text frame: the read refuses, or with `orNull`
  * answers null, so a load through a collection's items skips it instead of failing the sync.
  */
-function readTarget(
+export function readTarget(
   ctx: TextPlanContext,
   ref: AutomationRef,
   cell: AutomationCellAddress | undefined,

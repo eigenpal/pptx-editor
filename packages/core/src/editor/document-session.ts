@@ -653,6 +653,15 @@ export class DocumentSession {
   }
 
   /**
+   * Whether the measurer stands in for the fonts: the fixed measurer or the stand-in of
+   * `OpenOptions.standIn`, while `fixedMeasurer` holds or after every font failed to load
+   * (`buildMeasurer`). Its heights are not those of the fonts. @internal
+   */
+  get standInMeasurer(): boolean {
+    return this.#fonts.fixed || (!!this.#fonts.standIn && this.#measurer === this.#fonts.standIn);
+  }
+
+  /**
    * Families the deck names that measure with a different family. Fixed-measurer sessions
    * report none (they model no fonts).
    */
