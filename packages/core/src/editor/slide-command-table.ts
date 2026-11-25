@@ -3,7 +3,7 @@
 // transaction, so one undo step.
 
 import { createTranslator } from '@pptx-editor.dev/i18n';
-import { presentationInfo, readPptx, xmlPartOf, type SlideRef } from '../store/index.ts';
+import { presentationInfo, readPptx } from '../store/index.ts';
 import { importSlides } from '../automation/commands/slide-import.ts';
 import { normalizePresentation } from '../automation/commands/slide-sections.ts';
 import { MAX_IMPORT_BYTES } from '../automation/plan-import.ts';
@@ -13,7 +13,7 @@ import type { CommandContext, CommandEffect } from './commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
 import { formatNotes } from '../automation/commands/notes-commands.ts';
 import { applyLayout, deckLayout } from '../automation/commands/slide-layouts.ts';
-import { slideIndices } from '../automation/commands/slide-multi.ts';
+import { setSlideHidden, slideIndices } from '../automation/commands/slide-multi.ts';
 import { setSlideSize } from '../automation/commands/slide-size.ts';
 import { setSlideBackground } from '../automation/commands/slide-commands.ts';
 import {
@@ -70,23 +70,6 @@ function textOf(ctx: CommandContext, key: 'sections.untitled' | 'sections.defaul
 
 export function isSlideCommand(command: EditorCommand): command is SlideCommand {
   return TYPES.has(command.type);
-}
-
-/**
- * Hide or show slide `index`: `p:sld/@show` (ECMA-376 Part 1, §19.3.1.38) is `0` for a hidden
- * slide; a shown slide drops the attribute, whose default is true.
- */
-function setHidden(batch: OpBatch, ref: SlideRef | undefined, hidden: boolean): void {
-  const root = xmlPartOf(batch.pkg, ref?.partName)?.root;
-  if (!ref || !root) throw new CommandRefusal('errors.malformed');
-  if (ref.hidden === hidden) return;
-  batch.push({
-    op: 'setAttribute',
-    part: ref.partName,
-    node: root.id,
-    name: { ns: '', local: 'show' },
-    value: hidden ? '0' : null,
-  });
 }
 
 /**
@@ -207,7 +190,7 @@ export function compileSlideCommand(
       const hidden = command.hidden ?? !indices.every((i) => slides[i]?.hidden);
       // The slide list as the command found it: a hidden slide changes no part name, so the
       // deck is read once, not again after each slide.
-      for (const i of indices) setHidden(batch, slides[i], hidden);
+      for (const i of indices) setSlideHidden(batch, slides[i], hidden);
       return { label: hidden ? 'hideSlides' : 'showSlides' };
     }
   }

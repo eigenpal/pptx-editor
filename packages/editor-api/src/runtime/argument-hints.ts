@@ -29,6 +29,8 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['image-size', 'Use a width and a height greater than 0, at most 8192 pixels.'],
   ['background', 'Use a fill write that this slide can take; a layout or master cannot inherit.'],
   ['areBackgroundGraphicsHidden', BOOLEAN],
+  // Slides.
+  ['hidden', BOOLEAN],
   // Lines and borders.
   ['line', 'Use a line object with color, weight, dashStyle, style, transparency, or visible.'],
   ['weight', 'Use a line weight from 0 to 1584 points.'],

@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation setSlideHidden writes the show attribute of a slide through the existing attribute operations that setSlidesHidden uses. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-slide-hidden.test.ts",
+    "packages/core/src/automation/__tests__/host.test.ts",
+    "packages/editor-api/src/__tests__/slide-hidden.test.ts"
+  ]
+}

@@ -732,7 +732,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Hide slide works from the rail and the menus, and the slide show skips hidden slides. The PDF export leaves hidden slides out.',
+      'Hide slide works from the rail and the menus, and the slide show skips hidden slides. The editing API reads and writes `slide.hidden`. The PDF export leaves hidden slides out.',
   },
   {
     id: 'slides.placeholder-prompts',

@@ -277,6 +277,12 @@ export type AutomationOperation =
       readonly slide: AutomationRef;
     }
   | { readonly op: 'moveSlide'; readonly slide: AutomationRef; readonly index: number }
+  | {
+      /** Hide or show a slide: `p:sld/@show` (ECMA-376 Part 1, §19.3.1.38). */
+      readonly op: 'setSlideHidden';
+      readonly slide: AutomationRef;
+      readonly hidden: boolean;
+    }
   | { readonly op: 'applyLayout'; readonly slide: AutomationRef; readonly layout: AutomationRef }
   | { readonly op: 'exportSlides'; readonly slides: readonly AutomationRef[] }
   | {
@@ -653,6 +659,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'deleteSlide',
   'duplicateSlide',
   'moveSlide',
+  'setSlideHidden',
   'applyLayout',
   'insertSlides',
   'addBinding',
