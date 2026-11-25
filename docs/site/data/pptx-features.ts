@@ -261,7 +261,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Set line spacing and paragraph spacing in the Paragraph dialog. Line heights, baselines, and glyph advances are approximate.',
+      'Set line spacing and paragraph spacing in the Paragraph dialog. The editing API reads and sets them through ParagraphFormat. Line heights, baselines, and glyph advances are approximate.',
   },
   {
     id: 'paragraphs.indent-tabs',
@@ -272,7 +272,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Set first-line and hanging indents, or change list levels. Existing tab stops align text, but you cannot edit them. The editor has no ruler.',
+      'Set first-line and hanging indents, or change list levels. The editing API reads and sets indents through ParagraphFormat. Existing tab stops align text, but you cannot edit them. The editor has no ruler.',
   },
   {
     id: 'paragraphs.autofit',

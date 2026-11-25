@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operations setParagraph and readParagraph carry line spacing, paragraph spacing, and indents. A write sets the spacing children and the margin attributes of paragraph properties through the existing tree operations that the Paragraph dialog uses. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-automation-paragraph-spacing.test.ts",
+    "packages/editor-api/src/__tests__/paragraph-spacing.test.ts"
+  ]
+}

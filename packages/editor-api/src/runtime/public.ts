@@ -57,6 +57,7 @@ export {
   TableStyle,
   TextVerticalAlignment,
   ThemeColor,
+  ParagraphLineSpacingRule,
 } from '../model/enums.ts';
 export { Adjustments } from '../model/adjustments.ts';
 export { Application } from '../model/application.ts';

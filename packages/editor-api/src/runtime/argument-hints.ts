@@ -203,6 +203,15 @@ const ROWS: readonly (readonly [string, string])[] = [
   ],
   ['dateFixed', BOOLEAN],
   ['hideOnTitleSlides', BOOLEAN],
+  // Paragraph spacing and indents.
+  ['lineSpacing', 'Use a line spacing from 0.01 to 1584 points. Under Multiple, 12 is one line.'],
+  ['lineSpacingRule', 'Use a value of ParagraphLineSpacingRule.'],
+  ['spaceBefore', 'Use a number of points from 0 to 1584.'],
+  ['spaceAfter', 'Use a number of points from 0 to 1584.'],
+  ['lineUnitBefore', 'Use a number of lines from 0 to 132.'],
+  ['lineUnitAfter', 'Use a number of lines from 0 to 132.'],
+  ['leftIndent', 'Use a number of points from 0 to 4032.'],
+  ['firstLineIndent', 'Use a number of points from -4032 to 4032.'],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */

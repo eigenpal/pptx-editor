@@ -993,7 +993,15 @@ export interface AutomationParagraphRead {
     readonly bulletType: string | null;
     // (undocumented)
     readonly bulletVisible: boolean | null;
+    readonly firstLineIndent?: number | null;
     readonly indentLevel: number | null;
+    readonly leftIndent?: number | null;
+    readonly lineSpacing?: number | null;
+    readonly lineSpacingRule?: 'multiple' | 'exactly' | null;
+    readonly lineUnitAfter?: number | null;
+    readonly lineUnitBefore?: number | null;
+    readonly spaceAfter?: number | null;
+    readonly spaceBefore?: number | null;
 }
 
 // @public
@@ -1004,7 +1012,15 @@ export interface AutomationParagraphWrite {
     readonly bulletType?: 'none' | 'char' | 'autonum';
     // (undocumented)
     readonly bulletVisible?: boolean;
+    readonly firstLineIndent?: number;
     readonly indentLevel?: number;
+    readonly leftIndent?: number;
+    readonly lineSpacing?: number;
+    readonly lineSpacingRule?: 'multiple' | 'exactly';
+    readonly lineUnitAfter?: number;
+    readonly lineUnitBefore?: number;
+    readonly spaceAfter?: number;
+    readonly spaceBefore?: number;
 }
 
 // @public

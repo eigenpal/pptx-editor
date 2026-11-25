@@ -837,6 +837,9 @@ export function tableStyleList(pkg: PptxPackage): readonly {
     builtIn?: true;
 }[];
 
+// @internal
+export function textSpacing(el: Element_2 | undefined): Spacing | undefined;
+
 // @public
 export interface TextWarp {
     // (undocumented)

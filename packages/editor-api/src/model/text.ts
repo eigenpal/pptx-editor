@@ -33,11 +33,13 @@ import {
   BULLET_STYLE,
   BULLET_TYPE,
   HORIZONTAL_ALIGNMENT,
+  LINE_SPACING_RULE,
   UNDERLINE,
   VERTICAL_ALIGNMENT,
   type BulletStyle,
   type BulletType,
   type ParagraphHorizontalAlignment,
+  type ParagraphLineSpacingRule,
   type ShapeAutoSize,
   type ShapeFontUnderlineStyle,
   type TextVerticalAlignment,
@@ -659,9 +661,24 @@ export class ShapeFont extends ModelObject {
   }
 }
 
+const PARAGRAPH_NAMES = [
+  'horizontalAlignment',
+  'indentLevel',
+  'lineSpacing',
+  'lineSpacingRule',
+  'spaceBefore',
+  'spaceAfter',
+  'lineUnitBefore',
+  'lineUnitAfter',
+  'leftIndent',
+  'firstLineIndent',
+] as const;
+
 /**
  * The paragraph formatting of the paragraphs a text range touches. A property reads `null` when
- * they differ.
+ * they differ. A shape can be on a slide layout or a slide master. There, the spacing and indent
+ * members read only the paragraphs' own values. They read `null` for a value that the paragraphs
+ * do not set.
  *
  * @public
  */
@@ -707,6 +724,122 @@ export class ParagraphFormat extends ModelObject {
   set indentLevel(value: number) {
     this.#write('indentLevel', { indentLevel: finite(value, this.at('indentLevel')) });
   }
+  /**
+   * The line spacing in points. A write takes 0.01 to 1584. A read returns 0 for a file value of
+   * 0, and `null` when the paragraphs differ.
+   *
+   * A read returns the spacing in force, including spacing that the list style, the layout, or
+   * the master gives. It pairs with {@link ParagraphFormat.lineSpacingRule}: under `Exactly` the
+   * value is the line height. Under `Multiple` it is nominal: 12 points is one line, so 18 is 1.5
+   * lines, at any text size. For the height of the text, use `TextFrame.getTextFit()`. A write
+   * keeps each paragraph's rule. On a slide layout or a slide master, a read returns only the
+   * paragraph's own value. There, a write treats a paragraph with no line spacing of its own as
+   * single spacing.
+   *
+   * SDK extension: the pinned Office.js reference has no line spacing member. It maps to
+   * `a:lnSpc` (`CT_TextSpacing`, ECMA-376 Part 1, 21.1.2.2.5) in `a:pPr`
+   * (`CT_TextParagraphProperties`, ECMA-376 Part 1, 21.1.2.2.7).
+   */
+  get lineSpacing(): number | null {
+    return this.loadedProperty('lineSpacing');
+  }
+  set lineSpacing(value: number) {
+    this.#write('lineSpacing', { lineSpacing: finite(value, this.at('lineSpacing')) });
+  }
+  /**
+   * How the line spacing is measured: `Multiple` (`a:spcPct`) or `Exactly` (`a:spcPts`). `null`
+   * when the paragraphs differ.
+   *
+   * A write keeps the nominal points, so `Exactly` on a 1.5-line paragraph gives exactly 18
+   * points. Writing the rule a paragraph already has adds no formatting. A rule write and a
+   * {@link ParagraphFormat.lineSpacing} write give the same result in either order.
+   *
+   * SDK extension: the pinned Office.js reference has no line spacing member.
+   */
+  get lineSpacingRule(): ParagraphLineSpacingRule | `${ParagraphLineSpacingRule}` | null {
+    return this.loadedProperty('lineSpacingRule');
+  }
+  set lineSpacingRule(value: ParagraphLineSpacingRule | `${ParagraphLineSpacingRule}`) {
+    const rule = LINE_SPACING_RULE.toFile(value, this.at('lineSpacingRule'));
+    this.#write('lineSpacingRule', { lineSpacingRule: rule as 'multiple' | 'exactly' });
+  }
+  /**
+   * The space before the paragraphs in points (`a:spcBef/a:spcPts`), from 0 to 1584. `null`
+   * when the paragraphs differ, or when the space is in lines: read
+   * {@link ParagraphFormat.lineUnitBefore} then.
+   *
+   * SDK extension. It maps to `a:spcBef` (ECMA-376 Part 1, 21.1.2.2.10).
+   */
+  get spaceBefore(): number | null {
+    return this.loadedProperty('spaceBefore');
+  }
+  set spaceBefore(value: number) {
+    this.#write('spaceBefore', { spaceBefore: finite(value, this.at('spaceBefore')) });
+  }
+  /**
+   * The space after the paragraphs in points (`a:spcAft/a:spcPts`), from 0 to 1584. `null`
+   * when the paragraphs differ, or when the space is in lines: read
+   * {@link ParagraphFormat.lineUnitAfter} then.
+   *
+   * SDK extension. It maps to `a:spcAft` (ECMA-376 Part 1, 21.1.2.2.9).
+   */
+  get spaceAfter(): number | null {
+    return this.loadedProperty('spaceAfter');
+  }
+  set spaceAfter(value: number) {
+    this.#write('spaceAfter', { spaceAfter: finite(value, this.at('spaceAfter')) });
+  }
+  /**
+   * The space before the paragraphs in lines of their text (`a:spcBef/a:spcPct`), from 0 to
+   * 132. `null` when the paragraphs differ, or when the space is in points. A space of 0 reads
+   * 0 here and in {@link ParagraphFormat.spaceBefore}.
+   *
+   * SDK extension. It maps to `a:spcPct` (ECMA-376 Part 1, 21.1.2.2.11) in `a:spcBef`.
+   */
+  get lineUnitBefore(): number | null {
+    return this.loadedProperty('lineUnitBefore');
+  }
+  set lineUnitBefore(value: number) {
+    this.#write('lineUnitBefore', { lineUnitBefore: finite(value, this.at('lineUnitBefore')) });
+  }
+  /**
+   * The space after the paragraphs in lines of their text (`a:spcAft/a:spcPct`), from 0 to 132.
+   * `null` when the paragraphs differ, or when the space is in points. A space of 0 reads 0
+   * here and in {@link ParagraphFormat.spaceAfter}.
+   *
+   * SDK extension. It maps to `a:spcPct` (ECMA-376 Part 1, 21.1.2.2.11) in `a:spcAft`.
+   */
+  get lineUnitAfter(): number | null {
+    return this.loadedProperty('lineUnitAfter');
+  }
+  set lineUnitAfter(value: number) {
+    this.#write('lineUnitAfter', { lineUnitAfter: finite(value, this.at('lineUnitAfter')) });
+  }
+  /**
+   * The left indent of the paragraphs in points (`a:pPr/@marL`, `ST_TextMargin`), from 0 to
+   * 4032. It adds to the left inset of the text frame. `null` when the paragraphs differ.
+   *
+   * SDK extension. It maps to `marL` of `a:pPr` (ECMA-376 Part 1, 21.1.2.2.7).
+   */
+  get leftIndent(): number | null {
+    return this.loadedProperty('leftIndent');
+  }
+  set leftIndent(value: number) {
+    this.#write('leftIndent', { leftIndent: finite(value, this.at('leftIndent')) });
+  }
+  /**
+   * The indent of the first line from {@link ParagraphFormat.leftIndent} in points
+   * (`a:pPr/@indent`, `ST_TextIndent`), from -4032 to 4032. A negative value is a hanging indent,
+   * as a bulleted paragraph has. `null` when the paragraphs differ.
+   *
+   * SDK extension. It maps to `indent` of `a:pPr` (ECMA-376 Part 1, 21.1.2.2.7).
+   */
+  get firstLineIndent(): number | null {
+    return this.loadedProperty('firstLineIndent');
+  }
+  set firstLineIndent(value: number) {
+    this.#write('firstLineIndent', { firstLineIndent: finite(value, this.at('firstLineIndent')) });
+  }
   /** The bullets of the paragraphs. */
   get bulletFormat(): BulletFormat {
     return (this.#bullets ??= new BulletFormat(
@@ -741,13 +874,24 @@ export class ParagraphFormat extends ModelObject {
 
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
-    const names = this.selection(request, ['horizontalAlignment', 'indentLevel'], {
+    const names = this.selection(request, PARAGRAPH_NAMES, {
       bulletFormat: () => this.bulletFormat,
     });
-    this.loadScalars(names, 'paragraph', this.#plan(), (v) => ({
-      horizontalAlignment: HORIZONTAL_ALIGNMENT.fromFile(v.paragraph.alignment),
-      indentLevel: v.paragraph.indentLevel,
-    }));
+    this.loadScalars(names, 'paragraph', this.#plan(), (v) => {
+      const p = v.paragraph;
+      return {
+        horizontalAlignment: HORIZONTAL_ALIGNMENT.fromFile(p.alignment),
+        indentLevel: p.indentLevel,
+        lineSpacing: p.lineSpacing ?? null,
+        lineSpacingRule: LINE_SPACING_RULE.fromFile(p.lineSpacingRule),
+        spaceBefore: p.spaceBefore ?? null,
+        spaceAfter: p.spaceAfter ?? null,
+        lineUnitBefore: p.lineUnitBefore ?? null,
+        lineUnitAfter: p.lineUnitAfter ?? null,
+        leftIndent: p.leftIndent ?? null,
+        firstLineIndent: p.firstLineIndent ?? null,
+      };
+    });
   }
 }
 
