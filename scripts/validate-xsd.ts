@@ -283,6 +283,35 @@ async function edited(bytes: Uint8Array): Promise<PptxPackage | null> {
     editor.exec({ type: 'removeAnimation', effectId: effects[3].id });
   }
   editor.exec({ type: 'setTransition', kind: 'split', durationMs: 1250, advanceAfterMs: 4000 });
+  // The editing API's transition writes (`Slide.transition`): a direction on every copy, and a
+  // transition with no effect that keeps only an advance time.
+  const api = createBrowserAutomationHost(editor);
+  const slideAt = (index: number) => [
+    { op: 'getPresentation' as const },
+    { op: 'getSlide' as const, key: { index } },
+  ];
+  api.execute({
+    operations: [
+      ...slideAt(0),
+      { op: 'setTransition', slide: { result: 1 }, transition: { direction: 'vertIn' } },
+    ],
+  });
+  if (editor.snapshot().slides.length > 1)
+    api.execute({
+      operations: [
+        ...slideAt(1),
+        {
+          op: 'setTransition',
+          slide: { result: 1 },
+          transition: { kind: 'fade', durationMs: 600, throughBlack: true },
+        },
+        {
+          op: 'setTransition',
+          slide: { result: 1 },
+          transition: { kind: 'none', advanceAfterMs: 2000 },
+        },
+      ],
+    });
   editor.exec({ type: 'nudge', dx: 9525, dy: 9525 });
   editor.exec({ type: 'duplicateSlide', index: 0 });
   editor.exec({ type: 'setNotes', index: 0, text: 'Edited notes' });

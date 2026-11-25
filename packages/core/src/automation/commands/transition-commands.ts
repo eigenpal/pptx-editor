@@ -13,7 +13,8 @@
 // `mc:AlternateContent` whose `p14` choice holds the duration. A change of the
 // kind replaces the whole transition markup with a new `mc:AlternateContent`, and `none`
 // removes it. The new markup goes where `CT_Slide` puts the transition: after `p:clrMapOvr`
-// and before `p:timing` and `p:extLst`.
+// and before `p:timing` and `p:extLst`. A direction (`push`, `wipe`, `split`) or `thruBlk`
+// (`fade`, `cut`) goes into the effect element of every copy that holds that effect.
 
 import type { SlideTransitionState, TransitionKind } from '../../contracts/neutral.ts';
 import { attr, elements, NS, specOf, xmlPartOf, type Element } from '../../store/index.ts';
@@ -122,12 +123,140 @@ export function readTransition(root: Element | undefined): SlideTransitionState 
   };
 }
 
+/**
+ * The direction of an effect: `dir` of `p:push` and `p:wipe` (`CT_SideDirectionTransition`,
+ * `ST_TransitionSideDirectionType`, ECMA-376 Part 1, §19.7.53: `l`, `u`, `r`, `d`, default `l`),
+ * or `orient` (`ST_Direction`, §19.7.2, default `horz`) with `dir`
+ * (`ST_TransitionInOutDirectionType`, §19.7.52, default `out`) of `p:split`
+ * (`CT_SplitTransition`).
+ */
+export type TransitionDirection =
+  'l' | 'u' | 'r' | 'd' | 'horzIn' | 'horzOut' | 'vertIn' | 'vertOut';
+
+/** The effect element and its options, as the first copy of the transition holds them. */
+export interface TransitionVariant {
+  /**
+   * The local name of the effect element when it is one of the `CT_SlideTransition` choices
+   * (§19.3.1.50) in the PresentationML namespace, else null (no effect, or an extension effect).
+   */
+  readonly element: string | null;
+  /** The direction of `push`, `wipe`, and `split`; null for any other effect. */
+  readonly direction: TransitionDirection | null;
+  /** `thruBlk` of `fade` and `cut` (`CT_OptionalBlackTransition`, default false). */
+  readonly throughBlack: boolean;
+}
+
+/** The effect elements of `CT_SlideTransition` (§19.3.1.50), in schema order. */
+const ELEMENTS: ReadonlySet<string> = new Set([
+  'blinds',
+  'checker',
+  'circle',
+  'dissolve',
+  'comb',
+  'cover',
+  'cut',
+  'diamond',
+  'fade',
+  'newsflash',
+  'plus',
+  'pull',
+  'push',
+  'random',
+  'randomBar',
+  'split',
+  'strips',
+  'wedge',
+  'wheel',
+  'wipe',
+  'zoom',
+]);
+const SIDES: ReadonlySet<string> = new Set(['l', 'u', 'r', 'd']);
+const SPLITS: ReadonlySet<string> = new Set(['horzIn', 'horzOut', 'vertIn', 'vertOut']);
+
+/** The effect element of one copy, or undefined. */
+function effectOf(el: Element): Element | undefined {
+  return elements(el).find((c) => !(isP(c, 'sndAc') || isP(c, 'extLst')));
+}
+
+const isTrue = (v: string | undefined): boolean => v === '1' || v === 'true';
+
+/** The effect element and its options of a slide root. */
+export function readTransitionVariant(root: Element | undefined): TransitionVariant {
+  const first = transitionOf(root).copies[0];
+  const effect = first && effectOf(first.el);
+  if (!effect || effect.ns !== NS.p || !ELEMENTS.has(effect.local))
+    return { element: null, direction: null, throughBlack: false };
+  const local = effect.local;
+  let direction: TransitionDirection | null = null;
+  if (local === 'push' || local === 'wipe') {
+    const dir = attr(effect, 'dir') ?? 'l';
+    direction = SIDES.has(dir) ? (dir as TransitionDirection) : null;
+  } else if (local === 'split') {
+    const value = `${attr(effect, 'orient') ?? 'horz'}${(attr(effect, 'dir') ?? 'out') === 'in' ? 'In' : 'Out'}`;
+    direction = SPLITS.has(value) ? (value as TransitionDirection) : null;
+  }
+  const throughBlack = (local === 'fade' || local === 'cut') && isTrue(attr(effect, 'thruBlk'));
+  return { element: local, direction, throughBlack };
+}
+
 /** What `setTransition` changes; absent fields keep their values. */
 export interface TransitionChange {
   readonly kind?: TransitionKind | 'none';
   readonly durationMs?: number;
   readonly advanceOnClick?: boolean;
   readonly advanceAfterMs?: number | null;
+  /** For `push` and `wipe`, a side; for `split`, an orientation and a direction. */
+  readonly direction?: TransitionDirection;
+  /** For `fade` and `cut`. */
+  readonly throughBlack?: boolean;
+}
+
+/** Whether `kind` takes `direction` and `throughBlack` as `change` names them. */
+export function variantFits(kind: SlideTransitionState['kind'], change: TransitionChange): boolean {
+  const { direction, throughBlack } = change;
+  if (direction !== undefined) {
+    if (kind === 'push' || kind === 'wipe') {
+      if (!SIDES.has(direction)) return false;
+    } else if (kind !== 'split' || !SPLITS.has(direction)) return false;
+  }
+  return throughBlack === undefined || kind === 'fade' || kind === 'cut';
+}
+
+/**
+ * Write `direction` and `throughBlack` into the effect element of every copy that holds the
+ * effect `kind`. An attribute at its schema default is removed, so the markup stays minimal.
+ */
+function applyVariant(batch: OpBatch, part: string, kind: string, change: TransitionChange): void {
+  if (change.direction === undefined && change.throughBlack === undefined) return;
+  const root = xmlPartOf(batch.pkg, part)?.root;
+  for (const copy of transitionOf(root).copies) {
+    const effect = effectOf(copy.el);
+    if (!effect || !isP(effect, kind)) continue;
+    const at = (local: string, value: string | null, fallback: string): void => {
+      const current = attr(effect, local) ?? fallback;
+      if (current === (value ?? fallback)) return;
+      batch.push({ op: 'setAttribute', part, node: effect.id, name: { ns: '', local }, value });
+    };
+    const { direction, throughBlack } = change;
+    if (direction !== undefined && SIDES.has(direction))
+      at('dir', direction === 'l' ? null : direction, 'l');
+    if (direction !== undefined && SPLITS.has(direction)) {
+      const orient = direction.startsWith('horz') ? 'horz' : 'vert';
+      at('orient', orient === 'horz' ? null : orient, 'horz');
+      at('dir', direction.endsWith('In') ? 'in' : null, 'out');
+    }
+    if (throughBlack !== undefined) {
+      const current = isTrue(attr(effect, 'thruBlk'));
+      if (current !== throughBlack)
+        batch.push({
+          op: 'setAttribute',
+          part,
+          node: effect.id,
+          name: { ns: '', local: 'thruBlk' },
+          value: throughBlack ? '1' : null,
+        });
+    }
+  }
 }
 
 const speedOf = (ms: number): string => (ms <= 500 ? 'fast' : ms <= 750 ? 'med' : 'slow');
@@ -191,6 +320,7 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
           : checkMs(change.advanceAfterMs, 0, MAX_ADVANCE_MS),
   };
   if (typeof next.advanceOnClick !== 'boolean') throw new CommandRefusal('errors.unsupported');
+  if (!variantFits(next.kind, change)) throw new CommandRefusal('errors.unsupported', 'variant');
   const { holders, copies } = transitionOf(root);
   const before = batch.ops.length;
   const sameKind = next.kind === current.kind && copies.length > 0;
@@ -249,6 +379,7 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
       });
     }
   }
+  applyVariant(batch, part, next.kind, change);
   if (batch.ops.length === before) throw new CommandRefusal('disabled.noAnimationChange');
 }
 

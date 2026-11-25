@@ -17,7 +17,12 @@ import {
 } from '@pptx-editor.dev/core/store';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditor as BrowserEditor } from '../browser.ts';
-import { isPptxEditorError, SlideTransitionEffect, type RequestContext } from '../index.ts';
+import {
+  isPptxEditorError,
+  SlideTransitionDirection,
+  SlideTransitionEffect,
+  type RequestContext,
+} from '../index.ts';
 import { createRuntime } from '../runtime/runtime.ts';
 import { open, refusedAtSync, reopen } from './support.ts';
 
@@ -89,6 +94,15 @@ async function transitionsOf(context: RequestContext): Promise<Read[]> {
   });
 }
 
+/** Load the direction and the through-black option of every slide. */
+async function variantsOf(context: RequestContext): Promise<[string | null, boolean][]> {
+  const slides = context.presentation.slides.load(
+    'items/transition/direction,items/transition/throughBlack'
+  );
+  await context.sync();
+  return slides.items.map((s) => [s.transition.direction, s.transition.throughBlack]);
+}
+
 const NONE: Read = { effect: 'None', durationMs: 750, advanceOnClick: true, advanceAfterMs: null };
 
 describe('Slide.transition', () => {
@@ -97,7 +111,8 @@ describe('Slide.transition', () => {
     expect(await runtime.run(transitionsOf)).toEqual([
       NONE,
       { effect: 'Fade', durationMs: 1200, advanceOnClick: true, advanceAfterMs: 3000 },
-      { effect: 'Other', durationMs: 1000, advanceOnClick: false, advanceAfterMs: null },
+      // A standard effect reads by its element name; an extension effect reads `Other`.
+      { effect: 'Dissolve', durationMs: 1000, advanceOnClick: false, advanceAfterMs: null },
       { effect: 'Other', durationMs: 1000, advanceOnClick: true, advanceAfterMs: null },
     ]);
     const json = await runtime.run(async (context) => {
@@ -177,11 +192,126 @@ describe('Slide.transition', () => {
     expect(morph.match(/advTm="2000"/g)).toHaveLength(2);
     expect(morph.match(/spd="fast"/g)).toHaveLength(2);
     expect((await again.run(transitionsOf)).slice(2)).toEqual([
-      { effect: 'Other', durationMs: 1000, advanceOnClick: true, advanceAfterMs: null },
+      { effect: 'Dissolve', durationMs: 1000, advanceOnClick: true, advanceAfterMs: null },
       { effect: 'Other', durationMs: 500, advanceOnClick: true, advanceAfterMs: 2000 },
     ]);
     runtime.dispose();
     again.dispose();
+  });
+
+  test('a load reads the direction and the through-black option', async () => {
+    const bytes = buildPptx({
+      slides: [
+        '<p:transition><p:push/></p:transition>',
+        '<p:transition><p:wipe dir="d"/></p:transition>',
+        '<p:transition><p:split orient="vert" dir="in"/></p:transition>',
+        '<p:transition><p:split/></p:transition>',
+        '<p:transition><p:fade thruBlk="1"/></p:transition>',
+        '<p:transition><p:zoom/></p:transition>',
+        '',
+      ].map((ext) => ({ layout: 'blank' as const, ext, shapes: '' })),
+    });
+    const runtime = await open(bytes);
+    // Absent attributes read their schema defaults: `dir="l"`, `orient="horz"`, `dir="out"`.
+    expect(await runtime.run(variantsOf)).toEqual([
+      ['Left', false],
+      ['Down', false],
+      ['VerticalIn', false],
+      ['HorizontalOut', false],
+      [null, true],
+      [null, false],
+      [null, false],
+    ]);
+    expect((await runtime.run(transitionsOf))[5]!.effect).toBe('Zoom');
+    runtime.dispose();
+  });
+
+  test('a direction or through-black write changes every copy, and keeps the timing', async () => {
+    const runtime = await open(withTransitions());
+    await runtime.run(async (context) => {
+      const slides = context.presentation.slides;
+      slides.getItemAt(0).transition.set({ effect: 'Push', direction: 'Left', durationMs: 900 });
+      slides.getItemAt(1).transition.throughBlack = true;
+      await context.sync();
+      slides.getItemAt(0).transition.direction = SlideTransitionDirection.right;
+      slides.getItemAt(3).transition.set({ effect: 'Split', direction: 'HorizontalIn' });
+      await context.sync();
+    });
+    const again = await reopen(runtime);
+    const xml = slideXml(await again.save());
+    expect(xml[0]!.match(/<p:push dir="r"\/>/g)).toHaveLength(2);
+    expect(xml[0]).toContain('p14:dur="900"');
+    expect(xml[1]!.match(/<p:fade thruBlk="1"\/>/g)).toHaveLength(2);
+    expect(xml[1]).toContain('p14:dur="1200"');
+    // `orient="horz"` is the default, so only `dir="in"` is written.
+    expect(xml[3]!.match(/<p:split dir="in"\/>/g)).toHaveLength(2);
+    expect((await again.run(variantsOf)).slice(0, 4)).toEqual([
+      ['Right', false],
+      [null, true],
+      [null, false],
+      ['HorizontalIn', false],
+    ]);
+    runtime.dispose();
+    again.dispose();
+  });
+
+  test('a direction or through-black write to another effect refuses with NotSupported', async () => {
+    const runtime = await open(withTransitions());
+    const before = slideXml(await runtime.save());
+    const cases: ((context: RequestContext) => void)[] = [
+      (c) => (c.presentation.slides.getItemAt(1).transition.direction = 'Left'),
+      (c) => (c.presentation.slides.getItemAt(0).transition.throughBlack = true),
+      (c) =>
+        c.presentation.slides
+          .getItemAt(1)
+          .transition.set({ effect: 'Push', direction: 'VerticalIn' }),
+      (c) => c.presentation.slides.getItemAt(3).transition.set({ direction: 'Up' }),
+    ];
+    for (const call of cases) {
+      const error = await runtime.run((context) => refusedAtSync(context, () => call(context)));
+      expect(isPptxEditorError(error) && error.code).toBe('NotSupported');
+      expect(isPptxEditorError(error) && error.debugInfo.innerError?.code).toBe(
+        'edit.transition-option-not-supported'
+      );
+    }
+    expect(slideXml(await runtime.save())).toEqual(before);
+    runtime.dispose();
+  });
+
+  test('a duration that an extension effect keeps only as a speed refuses', async () => {
+    const runtime = await open(withTransitions());
+    const error = await runtime.run((context) =>
+      refusedAtSync(context, () => {
+        context.presentation.slides.getItemAt(3).transition.durationMs = 700;
+      })
+    );
+    expect(isPptxEditorError(error) && error.code).toBe('NotSupported');
+    expect(isPptxEditorError(error) && error.debugInfo.innerError?.code).toBe(
+      'edit.transition-speed-only'
+    );
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(3).transition.durationMs = 750;
+      // A plain `p:transition` gets a `p14` copy, so it keeps any duration.
+      context.presentation.slides.getItemAt(2).transition.durationMs = 700;
+      await context.sync();
+    });
+    const read = await runtime.run(transitionsOf);
+    expect([read[2]!.durationMs, read[3]!.durationMs]).toEqual([700, 750]);
+    expect(slideXml(await runtime.save())[2]).toContain('<p:dissolve/>');
+    runtime.dispose();
+  });
+
+  test('remove clears the effect and the advance settings', async () => {
+    const runtime = await open(withTransitions());
+    await runtime.run(async (context) => {
+      const slides = context.presentation.slides;
+      for (const i of [0, 1, 2, 3]) slides.getItemAt(i).transition.remove();
+      await context.sync();
+    });
+    const xml = slideXml(await runtime.save());
+    for (const slide of xml) expect(slide).not.toContain('transition');
+    expect(await runtime.run(transitionsOf)).toEqual([NONE, NONE, NONE, NONE]);
+    runtime.dispose();
   });
 
   test('None removes the effect; with the default advance settings no transition stays', async () => {

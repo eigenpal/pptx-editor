@@ -474,7 +474,7 @@ export interface EnumMap<O extends string> {
   fromFile(value: string | null | undefined): O | null;
 }
 
-function enumMap<O extends string>(
+export function enumMap<O extends string>(
   pairs: readonly (readonly [O, string])[],
   options: {
     readonly writeOnly?: readonly (readonly [O, string])[];
@@ -889,45 +889,3 @@ export function tableStyleOf(name: string): `${TableStyle}` | null {
 }
 
 const TABLE_STYLES: ReadonlySet<string> = new Set(Object.values(TableStyle));
-
-/**
- * The effect of a slide transition: the effect element of `p:transition` (`CT_SlideTransition`,
- * ECMA-376 Part 1, §19.3.1.50), in PascalCase. `Other` is a read state only: an effect element
- * that this API does not write, or one from an extension namespace. An SDK extension: the
- * pinned Office.js reference has no such type.
- *
- * @public
- */
-export enum SlideTransitionEffect {
-  /** No effect element. */
-  none = 'None',
-  /** `p:fade`: the previous slide fades into the new slide. */
-  fade = 'Fade',
-  /** `p:push`: the new slide pushes the previous slide off the screen. */
-  push = 'Push',
-  /** `p:wipe`: the new slide wipes over the previous slide from one edge. */
-  wipe = 'Wipe',
-  /** `p:split`: the new slide shows from a split of the previous slide. */
-  split = 'Split',
-  /** `p:cut`: the new slide replaces the previous slide at once. */
-  cut = 'Cut',
-  /** An effect that this API does not write. Read only. */
-  other = 'Other',
-}
-
-/**
- * The effect elements a transition write names (ECMA-376 Part 1): §19.5.41 `fade`, §19.5.59
- * `push`, §19.5.96 `wipe`, §19.5.71 `split`, and §19.5.34 `cut`, or `none` for no effect.
- * `Other` reads only.
- */
-export const TRANSITION_EFFECT = enumMap<`${SlideTransitionEffect}`>(
-  [
-    ['None', 'none'],
-    ['Fade', 'fade'],
-    ['Push', 'push'],
-    ['Wipe', 'wipe'],
-    ['Split', 'split'],
-    ['Cut', 'cut'],
-  ],
-  { readOnly: [['Other', 'other']], fallback: 'Other' }
-);

@@ -11,6 +11,7 @@ import type {
   ShapeFormatPatch,
   TransitionKind,
 } from '../contracts/neutral.ts';
+import type { TransitionDirection } from './commands/transition-commands.ts';
 import type { AutomationRef } from './protocol.ts';
 
 /** How a collection item is found: by position, or by the id the object model shows. */
@@ -238,6 +239,10 @@ export interface AutomationTransitionWrite {
   readonly advanceOnClick?: boolean;
   /** `advTm`: 0 to 3,600,000 ms, or null to remove it. */
   readonly advanceAfterMs?: number | null;
+  /** The side of `push` and `wipe`, or the orientation and direction of `split`. */
+  readonly direction?: TransitionDirection;
+  /** `thruBlk` of `fade` and `cut` (`CT_OptionalBlackTransition`). */
+  readonly throughBlack?: boolean;
 }
 
 /** Every operation a host understands. */

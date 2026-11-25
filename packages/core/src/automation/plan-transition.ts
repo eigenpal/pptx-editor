@@ -6,8 +6,10 @@
 // stay when only the timing changes.
 //
 // This module checks the write before the edit: an argument of the wrong form or out of range
-// refuses with `invalid-argument`, and nothing is written. A write that changes nothing writes
-// nothing, as the other property writes do.
+// refuses with `invalid-argument`, and nothing is written. A write that the slide's effect cannot
+// take (a duration with no effect, a direction of another effect, a duration that the markup
+// keeps only as a speed) refuses with `unsupported-content`, and the batch writes nothing. A
+// write that changes nothing writes nothing, as the other property writes do.
 
 import { xmlPartOf } from '../store/index.ts';
 import { CommandRefusal } from './commands/op-batch.ts';
@@ -16,7 +18,9 @@ import {
   MAX_TRANSITION_MS,
   MIN_TRANSITION_MS,
   readTransition as readTransitionOf,
+  readTransitionVariant,
   setTransition as setTransitionEdit,
+  variantFits,
   type TransitionChange,
 } from './commands/transition-commands.ts';
 import type { AutomationTransitionWrite } from './operations.ts';
@@ -40,6 +44,22 @@ const FIELDS: ReadonlySet<string> = new Set([
   'durationMs',
   'advanceOnClick',
   'advanceAfterMs',
+  'direction',
+  'throughBlack',
+]);
+/**
+ * The directions: `ST_TransitionSideDirectionType` (§19.7.53) for `push` and `wipe`, and
+ * `ST_Direction` (§19.7.2) with `ST_TransitionInOutDirectionType` (§19.7.52) for `split`.
+ */
+const DIRECTIONS: ReadonlySet<string> = new Set([
+  'l',
+  'u',
+  'r',
+  'd',
+  'horzIn',
+  'horzOut',
+  'vertIn',
+  'vertOut',
 ]);
 
 const inRange = (value: unknown, min: number, max: number): value is number =>
@@ -50,7 +70,7 @@ function changeOf(write: AutomationTransitionWrite): TransitionChange {
   if (typeof write !== 'object' || write === null || Array.isArray(write))
     badArgument('transition');
   for (const key of Object.keys(write)) if (!FIELDS.has(key)) badArgument('transition');
-  const { kind, durationMs, advanceOnClick, advanceAfterMs } = write;
+  const { kind, durationMs, advanceOnClick, advanceAfterMs, direction, throughBlack } = write;
   if (kind !== undefined && (typeof kind !== 'string' || !KINDS.has(kind)))
     badArgument('transitionKind');
   if (durationMs !== undefined && !inRange(durationMs, MIN_TRANSITION_MS, MAX_TRANSITION_MS))
@@ -63,19 +83,27 @@ function changeOf(write: AutomationTransitionWrite): TransitionChange {
     !inRange(advanceAfterMs, 0, MAX_ADVANCE_MS)
   )
     badArgument('advanceAfterMs');
+  if (direction !== undefined && (typeof direction !== 'string' || !DIRECTIONS.has(direction)))
+    badArgument('direction');
+  if (throughBlack !== undefined && typeof throughBlack !== 'boolean') badArgument('throughBlack');
   return {
     ...(kind !== undefined ? { kind } : {}),
     ...(durationMs !== undefined ? { durationMs } : {}),
     ...(advanceOnClick !== undefined ? { advanceOnClick } : {}),
     ...(advanceAfterMs !== undefined ? { advanceAfterMs } : {}),
+    ...(direction !== undefined ? { direction } : {}),
+    ...(throughBlack !== undefined ? { throughBlack } : {}),
   };
 }
 
 /** The transition of a slide. A slide with no `p:transition` reads `none`. */
 export function readTransition(ctx: PlanContext, ref: AutomationRef): AutomationValue {
   const { sldId } = targetOf(ctx, ref, 'slide');
-  const part = slidePartOf(ctx.batch.pkg, sldId);
-  return { kind: 'transition', transition: readTransitionOf(xmlPartOf(ctx.batch.pkg, part)?.root) };
+  const root = xmlPartOf(ctx.batch.pkg, slidePartOf(ctx.batch.pkg, sldId))?.root;
+  return {
+    kind: 'transition',
+    transition: { ...readTransitionOf(root), ...readTransitionVariant(root) },
+  };
 }
 
 /** Set or clear the transition of a slide, as the editor's `setTransition` command does. */
@@ -95,6 +123,13 @@ export function setTransition(
       'a slide with no transition effect has no duration',
       'transition-no-effect'
     );
+  // A direction belongs to `push`, `wipe`, and `split`, and `thruBlk` to `fade` and `cut`.
+  if (!variantFits(change.kind ?? current.kind, change))
+    throw new AutomationFailure(
+      'unsupported-content',
+      'the effect has no such direction or option',
+      'transition-variant'
+    );
   edit(() => {
     try {
       setTransitionEdit(ctx.batch, part, change);
@@ -103,5 +138,16 @@ export function setTransition(
       if (!(e instanceof CommandRefusal && e.reason === 'disabled.noAnimationChange')) throw e;
     }
   });
+  // A transition that holds no `p14` copy (an extension effect with only a speed) keeps only a
+  // speed: refuse a duration it cannot keep instead of rounding it.
+  if (change.durationMs !== undefined) {
+    const kept = readTransitionOf(xmlPartOf(ctx.batch.pkg, part)?.root).durationMs;
+    if (kept !== Math.round(change.durationMs))
+      throw new AutomationFailure(
+        'unsupported-content',
+        'the transition keeps only a speed',
+        'transition-speed-only'
+      );
+  }
   return { kind: 'applied' };
 }

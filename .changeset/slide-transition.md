@@ -3,4 +3,4 @@
 '@pptx-editor.dev/core': minor
 ---
 
-Add `Slide.transition` to the editing API, an SDK extension. `SlideTransition` reads and writes the effect (`SlideTransitionEffect`), `durationMs`, `advanceOnClick`, and `advanceAfterMs`, and `set()` writes several in one step. The new automation operations `readTransition` and `setTransition` use the engine's transition edit.
+Add `Slide.transition` to the editing API, an SDK extension. `SlideTransition` reads and writes the effect, `durationMs`, the advance settings, `direction`, and `throughBlack`. `set()` writes several in one step, and `remove()` clears the transition. The new automation operations `readTransition` and `setTransition` use the engine's transition edit.

@@ -1316,14 +1316,20 @@ export interface AutomationTextSpan {
 }
 
 // @public
-export type AutomationTransitionRead = SlideTransitionState;
+export interface AutomationTransitionRead extends SlideTransitionState {
+    readonly direction: TransitionDirection | null;
+    readonly element: string | null;
+    readonly throughBlack: boolean;
+}
 
 // @public
 export interface AutomationTransitionWrite {
     readonly advanceAfterMs?: number | null;
     readonly advanceOnClick?: boolean;
+    readonly direction?: TransitionDirection;
     readonly durationMs?: number;
     readonly kind?: TransitionKind | 'none';
+    readonly throughBlack?: boolean;
 }
 
 // @public
@@ -1520,6 +1526,9 @@ export interface StoreAutomationOptions {
 
 // @public
 export function storeAutomationPort(store: PptxDocumentStore, options?: StoreAutomationOptions): AutomationDocumentPort;
+
+// @public
+export type TransitionDirection = 'l' | 'u' | 'r' | 'd' | 'horzIn' | 'horzOut' | 'vertIn' | 'vertOut';
 
 // (No @packageDocumentation comment for this package)
 

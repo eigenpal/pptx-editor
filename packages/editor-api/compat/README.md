@@ -166,4 +166,4 @@ Automatic adoption with `--adopt` requires both checks:
 
 ### Slide transition extension
 
-`Slide.transition`, `SlideTransition`, `SlideTransitionOptions`, and `SlideTransitionEffect` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest, because the reference has no transition member. They read and write `p:transition` (`CT_SlideTransition`, ECMA-376 Part 1, §19.3.1.50). The effect names are the ECMA-376 effect element names in PascalCase. `Other` reads an effect that the API does not write, and a timing write keeps it.
+`Slide.transition`, `SlideTransition`, `SlideTransitionOptions`, `SlideTransitionEffect`, and `SlideTransitionDirection` are SDK extensions. The pinned Office.js reference has no transition member, so the compatibility manifest has no entry for them. They read and write `p:transition` (`CT_SlideTransition`, ECMA-376 Part 1, §19.3.1.50). The effect names are the ECMA-376 effect element names in PascalCase. `Other` reads an effect from an extension namespace, and a timing write keeps it.

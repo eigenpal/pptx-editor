@@ -2096,32 +2096,67 @@ export class SlideTransition extends ModelObject {
     set advanceAfterMs(value: number | null);
     get advanceOnClick(): boolean;
     set advanceOnClick(value: boolean);
+    get direction(): SlideTransitionDirection | `${SlideTransitionDirection}` | null;
+    set direction(value: SlideTransitionDirection | `${SlideTransitionDirection}`);
     get durationMs(): number;
     set durationMs(value: number);
     get effect(): SlideTransitionEffect | `${SlideTransitionEffect}`;
     set effect(value: SlideTransitionEffect | `${SlideTransitionEffect}`);
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
+    remove(): void;
     set(options: SlideTransitionOptions): void;
+    get throughBlack(): boolean;
+    set throughBlack(value: boolean);
+}
+
+// @public
+export enum SlideTransitionDirection {
+    down = "Down",
+    horizontalIn = "HorizontalIn",
+    horizontalOut = "HorizontalOut",
+    left = "Left",
+    right = "Right",
+    up = "Up",
+    verticalIn = "VerticalIn",
+    verticalOut = "VerticalOut"
 }
 
 // @public
 export enum SlideTransitionEffect {
+    blinds = "Blinds",
+    checker = "Checker",
+    circle = "Circle",
+    comb = "Comb",
+    cover = "Cover",
     cut = "Cut",
+    diamond = "Diamond",
+    dissolve = "Dissolve",
     fade = "Fade",
+    newsflash = "Newsflash",
     none = "None",
     other = "Other",
+    plus = "Plus",
+    pull = "Pull",
     push = "Push",
+    random = "Random",
+    randomBar = "RandomBar",
     split = "Split",
-    wipe = "Wipe"
+    strips = "Strips",
+    wedge = "Wedge",
+    wheel = "Wheel",
+    wipe = "Wipe",
+    zoom = "Zoom"
 }
 
 // @public
 export interface SlideTransitionOptions {
     advanceAfterMs?: number | null | undefined;
     advanceOnClick?: boolean | undefined;
+    direction?: SlideTransitionDirection | `${SlideTransitionDirection}` | undefined;
     durationMs?: number | undefined;
     effect?: SlideTransitionEffect | `${SlideTransitionEffect}` | undefined;
+    throughBlack?: boolean | undefined;
 }
 
 // @public

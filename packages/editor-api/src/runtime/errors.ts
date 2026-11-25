@@ -296,6 +296,18 @@ const DIAGNOSTICS: ReadonlyMap<string, PptxEditorDiagnostic> = new Map(
         'The slide has no transition effect, so it has no duration. Set the effect and the ' +
           'duration together, for example with transition.set({ effect, durationMs }).',
       ],
+      [
+        'transition-variant',
+        'edit.transition-option-not-supported',
+        'The effect does not take that option. A direction belongs to Push, Wipe, and Split, ' +
+          'and throughBlack to Fade and Cut. Set the effect in the same set() call.',
+      ],
+      [
+        'transition-speed-only',
+        'edit.transition-speed-only',
+        'The transition keeps only a speed, so it takes a duration of 500, 750, or 1000 ms. ' +
+          'Set one of these, or set a new effect in the same set() call.',
+      ],
     ] as const
   )
     .map(([detail, code, hint]): [string, PptxEditorDiagnostic] => [

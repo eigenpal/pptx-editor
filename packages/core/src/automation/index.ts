@@ -86,6 +86,7 @@ export {
   MAX_ADVANCE_MS,
   MAX_TRANSITION_MS,
   MIN_TRANSITION_MS,
+  type TransitionDirection,
 } from './commands/transition-commands.ts';
 export type { AutomationImageTarget } from './plan-images.ts';
 export {

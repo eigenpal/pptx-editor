@@ -16,6 +16,7 @@ import type {
   ShapeFormatProperties,
   SlideTransitionState,
 } from '../contracts/neutral.ts';
+import type { TransitionDirection } from './commands/transition-commands.ts';
 import type { AutomationOperation } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
@@ -485,7 +486,18 @@ export interface AutomationSelectionRead {
  * settings of `p:transition` (ECMA-376 Part 1, §19.3.1.50). `kind` is `other` for an effect that
  * `setTransition` does not write, and `none` for a slide with no effect.
  */
-export type AutomationTransitionRead = SlideTransitionState;
+export interface AutomationTransitionRead extends SlideTransitionState {
+  /**
+   * The local name of the effect element when it is a `CT_SlideTransition` choice in the
+   * PresentationML namespace (`dissolve`, `zoom`, …), else null: no effect, or an extension
+   * effect.
+   */
+  readonly element: string | null;
+  /** The side of `push` and `wipe`, or the orientation and direction of `split`; else null. */
+  readonly direction: TransitionDirection | null;
+  /** `thruBlk` of `fade` and `cut`; false for any other effect. */
+  readonly throughBlack: boolean;
+}
 
 /** What an operation answered with. */
 export type AutomationValue =

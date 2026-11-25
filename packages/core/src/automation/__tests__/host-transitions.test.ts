@@ -48,6 +48,9 @@ describe('automation host: slide transitions', () => {
       durationMs: 750,
       advanceOnClick: true,
       advanceAfterMs: null,
+      element: null,
+      direction: null,
+      throughBlack: false,
     });
     ok(host, [{ op: 'setTransition', slide, transition: { kind: 'fade', durationMs: 1200 } }]);
     ok(host, [{ op: 'setTransition', slide, transition: { advanceAfterMs: 3000 } }]);
@@ -56,7 +59,13 @@ describe('automation host: slide transitions', () => {
       durationMs: 1200,
       advanceOnClick: true,
       advanceAfterMs: 3000,
+      element: 'fade',
+      direction: null,
+      throughBlack: false,
     });
+    ok(host, [{ op: 'setTransition', slide, transition: { kind: 'wipe', direction: 'd' } }]);
+    expect(read()).toMatchObject({ kind: 'wipe', element: 'wipe', direction: 'd' });
+    ok(host, [{ op: 'setTransition', slide, transition: { kind: 'fade' } }]);
     // The same settings again write nothing, and answer applied.
     const revision = exec(host, [{ op: 'readTransition', slide }]).revision;
     ok(host, [{ op: 'setTransition', slide, transition: { kind: 'fade' } }]);
@@ -83,6 +92,8 @@ describe('automation host: slide transitions', () => {
       [{ advanceOnClick: 1 }, 'advanceOnClick'],
       [{ advanceAfterMs: -1 }, 'advanceAfterMs'],
       [{ advanceAfterMs: 3_600_001 }, 'advanceAfterMs'],
+      [{ direction: 'left' }, 'direction'],
+      [{ throughBlack: 'yes' }, 'throughBlack'],
       [{ spd: 'fast' }, 'transition'],
       [null, 'transition'],
     ];
@@ -101,5 +112,12 @@ describe('automation host: slide transitions', () => {
     expect(noEffect.results[0]).toMatchObject({
       error: { code: 'unsupported-content', detail: 'transition-no-effect' },
     });
+    // A direction belongs to push, wipe, and split; through black to fade and cut.
+    for (const transition of [{ direction: 'l' }, { kind: 'push', throughBlack: true }] as const) {
+      const refused = exec(host, [{ op: 'setTransition', slide, transition }]);
+      expect(refused.results[0]).toMatchObject({
+        error: { code: 'unsupported-content', detail: 'transition-variant' },
+      });
+    }
   });
 });
