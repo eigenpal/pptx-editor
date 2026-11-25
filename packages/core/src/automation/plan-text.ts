@@ -27,7 +27,9 @@ import {
 } from './commands/package-edits.ts';
 import { addTextBody, specFromXml } from './commands/shape-commands.ts';
 import {
+  armedChildAt,
   aSpec,
+  comparePoints,
   deleteRange,
   ensureParagraphProps,
   insertBreak,
@@ -35,6 +37,7 @@ import {
   paragraphLength,
   paragraphsOf,
   paragraphsForFormatting,
+  runPropsOf,
   runsForFormatting,
   setRunAttr,
   setRunChild,
@@ -568,9 +571,15 @@ export function readFont(
   const target = readTarget(context, ref, cell, orNull);
   if (!target) return { kind: 'null' };
   const { t, ctx } = target;
-  const fonts = runsIn(ctx, t, rangeOf(t, span)).map(fontOf);
+  const runs = runsIn(ctx, t, rangeOf(t, span));
+  const fonts = runs.map(fontOf);
   const font: Record<string, unknown> = {};
   for (const field of FONT_FIELDS) font[field] = shared(fonts.map((f) => f[field]));
+  // The effective `a:highlight` (CT_Color, ECMA-376 Part 1, 21.1.2.3.4). It stays out of
+  // `fontOf`, so `readTextRuns` keeps the Office.js `TextRun` font shape.
+  font.highlightColor = shared(
+    runs.map((p) => (p.highlight ? toHex({ ...p.highlight, a: 1 }).toUpperCase() : null))
+  );
   return { kind: 'font', font: font as unknown as AutomationFontRead };
 }
 
@@ -699,6 +708,29 @@ export function setFont(
   const t = textTarget(ctx, ref, false, cell);
   const range = rangeOf(t, span);
   const { part } = t.at;
+  // Checked before any run changes, so a bad color refuses even a range with no runs.
+  const highlight =
+    font.highlightColor === undefined || font.highlightColor === null
+      ? font.highlightColor
+      : `<a:highlight>${colorSpec(font.highlightColor, 'highlightColor')}</a:highlight>`;
+  // A removal alone at a caret where no run holds its own highlight changes nothing, so it
+  // arms no empty run. An empty run already armed at the caret still takes the removal.
+  const onlyHighlight = Object.entries(font).every(
+    ([k, v]) => k === 'highlightColor' || v === undefined
+  );
+  if (
+    highlight === null &&
+    onlyHighlight &&
+    range &&
+    comparePoints(range.from, range.to) === 0 &&
+    !armedChildAt(
+      paragraphsOf(t.txBody)[range.from.paragraph],
+      range.from.offset,
+      t.slideNumber,
+      'highlight'
+    )
+  )
+    return { kind: 'applied' };
   edit(() => {
     const runs = runsForFormatting(ctx.batch, part, t.txBody.id, range, false);
     for (const run of runs) {
@@ -744,6 +776,14 @@ export function setFont(
         set('baseline', flag(font.superscript, 'superscript') ? '30000' : '0');
       if (font.subscript !== undefined)
         set('baseline', flag(font.subscript, 'subscript') ? '-25000' : '0');
+      // `a:highlight` holds one EG_ColorChoice element (CT_Color, ECMA-376 Part 1, 21.1.2.3.4).
+      // `setRunChild` puts it at its place in the CT_TextCharacterProperties sequence (ECMA-376
+      // Part 1, 21.1.2.3.9), and null removes it with no empty element left behind. A removal
+      // skips a run with no highlight of its own, so it adds no `a:rPr` (and no `lang`) there.
+      if (typeof highlight === 'string')
+        setRunChild(ctx.batch, part, run, ['highlight'], specFromXml(highlight));
+      else if (highlight === null && child(runPropsOf(ctx.batch, part, run), 'a:highlight'))
+        setRunChild(ctx.batch, part, run, ['highlight'], null);
     }
   });
   refitText(ctx, t.at);

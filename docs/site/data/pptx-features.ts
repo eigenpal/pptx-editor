@@ -140,7 +140,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Gradient and pattern text fills render. Their geometry is approximate. The Font dialog sets theme font colors.',
+      'Gradient and pattern text fills render. Their geometry is approximate. The Font dialog sets theme font colors. The editing API reads, sets, and removes the highlight through ShapeFont.highlightColor.',
   },
   {
     id: 'text.caps-baseline',

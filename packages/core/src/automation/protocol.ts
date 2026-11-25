@@ -239,6 +239,11 @@ export interface AutomationFontRead {
   readonly smallCaps: boolean | null;
   readonly superscript: boolean | null;
   readonly subscript: boolean | null;
+  /**
+   * The run highlight (`a:highlight`) as `#RRGGBB`. Null for no highlight and for a mixed range.
+   * `readTextRuns` leaves it out.
+   */
+  readonly highlightColor?: string | null;
 }
 
 /** One run of a text body with its effective character format. */

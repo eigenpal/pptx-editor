@@ -434,6 +434,7 @@ const FONT_NAMES = [
   'bold',
   'color',
   'doubleStrikethrough',
+  'highlightColor',
   'italic',
   'name',
   'size',
@@ -494,6 +495,24 @@ export class ShapeFont extends ModelObject {
     this.#write('doubleStrikethrough', {
       doubleStrikethrough: flag(value, this.at('doubleStrikethrough')),
     });
+  }
+  /**
+   * The text highlight as `#RRGGBB`. Reads `null` when the text has no highlight and when the
+   * range mixes values. A write takes `#RRGGBB` or a preset color name; `null` removes the
+   * highlight of each run and keeps its other properties. A highlight that a list style or a
+   * master gives the text still applies after a removal.
+   *
+   * SDK extension: the pinned Office.js reference has no highlight member on `ShapeFont`. It maps
+   * to `a:highlight` (`CT_Color`, ECMA-376 Part 1, 21.1.2.3.4) in the run properties (`a:rPr`,
+   * `CT_TextCharacterProperties`, ECMA-376 Part 1, 21.1.2.3.9).
+   */
+  get highlightColor(): string | null {
+    return this.loadedProperty('highlightColor');
+  }
+  set highlightColor(value: string | null) {
+    if (value !== null && typeof value !== 'string')
+      failArgument(this.at('highlightColor'), "'#RRGGBB', a color name, or null to remove");
+    this.#write('highlightColor', { highlightColor: value });
   }
   get italic(): boolean | null {
     return this.loadedProperty('italic');
@@ -565,7 +584,11 @@ export class ShapeFont extends ModelObject {
         const span = this.#span();
         return { op: 'readFont', shape: ref(shape), ...(span ? { span } : {}), ...this.#cell };
       },
-      (v) => ({ ...v.font, underline: UNDERLINE.fromFile(v.font.underline) })
+      (v) => ({
+        ...v.font,
+        highlightColor: v.font.highlightColor ?? null,
+        underline: UNDERLINE.fromFile(v.font.underline),
+      })
     );
   }
 }
