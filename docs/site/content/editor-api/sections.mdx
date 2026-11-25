@@ -78,7 +78,7 @@ export async function moveToEnd(runtime: PptxEditorRuntime, sectionId: string, n
 
 Call `delete()` to remove a section. Its slides stay, and they join the section before it. The slides of the first section join the section after it. Call `delete({ deleteSlides: true })` to delete the slides too. Deleting the last section removes the section list. Call `sections.deleteAll()` to remove every section and keep every slide.
 
-The engine cleans each name before it writes it. It removes control characters and trims spaces at the ends. A line break becomes a space. The cleaned name must have 1 to 255 characters.
+The engine cleans each name before it writes it. It removes control characters other than a tab, and it trims spaces at the ends. A line break becomes a space. The cleaned name must have 1 to 255 UTF-16 code units.
 
 These calls write nothing:
 
@@ -103,7 +103,7 @@ A refused call changes nothing in its batch.
 | Call | Error code | Diagnostic |
 | --- | --- | --- |
 | A name that is not a string | `InvalidArgument` |  |
-| A name that is empty or longer than 255 characters after cleaning | `InvalidArgument` | `edit.section-name` |
+| A name that is empty or longer than 255 UTF-16 code units after cleaning | `InvalidArgument` | `edit.section-name` |
 | `moveTo(index)` with a position past the last section | `InvalidArgument` |  |
 | `delete(options)` with an option other than `deleteSlides`, or a value that is not a boolean | `InvalidArgument` |  |
 | `add(name, firstSlide)` with an unknown slide id, or `getItem(id)` with an unknown section id | `ItemNotFound` |  |
@@ -112,7 +112,7 @@ A refused call changes nothing in its batch.
 
 ## Storage and undo
 
-The section list is saved in the extension list of the presentation part (`p:extLst`, ECMA-376 Part 1, 19.2.1.12). A section edit changes only the section list. Other extensions in the same list stay as they are. In a browser runtime, each synchronization that writes is one undo step. In a collaboration session, which needs the EigenPal Pro License, section edits from two collaborators converge to the same sections.
+The engine saves the section list in the extension list of the presentation part (`p:extLst`, ECMA-376 Part 1, 19.2.1.12). A section edit changes only the section list. Other extensions in the same list stay as they are. In a browser runtime, each synchronization that writes is one undo step. In a collaboration session, which needs the EigenPal Pro License, section edits from two collaborators converge to the same sections.
 
 ## See also
 

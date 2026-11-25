@@ -59,9 +59,9 @@ export class Section extends ModelObject {
   }
 
   /**
-   * The name of the section. A write cleans the name first: it removes control characters,
-   * turns a line break into a space, and trims spaces at the ends. A cleaned name of 1 to 255
-   * UTF-16 code units applies. An empty or longer name refuses with `InvalidArgument` and
+   * The name of the section. A write cleans the name first: it removes control characters other
+   * than a tab, turns a line break into a space, and trims spaces at the ends. A cleaned name of
+   * 1 to 255 UTF-16 code units applies. An empty or longer name refuses with `InvalidArgument` and
    * diagnostic `edit.section-name` at the sync. A name that cleans to the current name writes
    * nothing.
    */
