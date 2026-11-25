@@ -274,6 +274,46 @@ describe('Presentation.applyHeaderFooter', () => {
     expect(second).toEqual(NONE);
     runtime.dispose();
   });
+
+  test('the read of one slide applied to all slides copies its settings', async () => {
+    const runtime = await open(twoSlides());
+    for (const index of [0, 1]) {
+      await runtime.run(async (context) => {
+        const hf = context.presentation.slides.getItemAt(index).headerFooter.load(PROPS);
+        await context.sync();
+        context.presentation.applyHeaderFooter(hf.toJSON());
+        await context.sync();
+      });
+      const [first, second] = await runtime.run(settingsOf);
+      expect(second).toEqual(first!);
+    }
+    expect((await runtime.run(settingsOf))[1]).toMatchObject({ footerText: 'Footer text & more' });
+    runtime.dispose();
+  });
+
+  test('dateText with dateFixed false is an automatic date field that holds the text', async () => {
+    const runtime = await open(twoSlides());
+    await runtime.run(async (context) => {
+      context.presentation.applyHeaderFooter({ dateText: '6/1/2026', dateFixed: false });
+      await context.sync();
+    });
+    const [first] = await runtime.run(settingsOf);
+    expect(first).toMatchObject({ dateVisible: true, dateText: '6/1/2026', dateFixed: false });
+    expect(slideXml(await runtime.save(), 0)).toContain('type="datetime1"');
+    runtime.dispose();
+  });
+
+  test('hiding what no slide can show changes nothing', async () => {
+    const runtime = await open(oneLayoutWithFooter());
+    const before = await runtime.save();
+    await runtime.run(async (context) => {
+      context.presentation.applyHeaderFooter({ slideNumberVisible: false, dateVisible: false });
+      context.presentation.slides.getItemAt(1).headerFooter.footerVisible = false;
+      await context.sync();
+    });
+    for (const i of [0, 1]) expect(slideXml(await runtime.save(), i)).toBe(slideXml(before, i));
+    runtime.dispose();
+  });
 });
 
 describe('refusals', () => {
@@ -330,8 +370,8 @@ describe('refusals', () => {
     const cases: ((context: RequestContext) => void)[] = [
       (c) => c.presentation.applyHeaderFooter({}),
       (c) => c.presentation.applyHeaderFooter({ footerVisible: false, footerText: 'X' }),
-      (c) => c.presentation.applyHeaderFooter({ dateText: 'X', dateFixed: false }),
-      (c) => c.presentation.applyHeaderFooter({ dateVisible: false, dateFixed: true }),
+      (c) => c.presentation.applyHeaderFooter({ dateVisible: false, dateText: 'X' }),
+      (c) => c.presentation.applyHeaderFooter({ dateText: '' }),
       (c) => c.presentation.applyHeaderFooter({ footerText: ' ' }),
       (c) => c.presentation.applyHeaderFooter({ footerText: 'two\nlines' }),
       (c) => c.presentation.applyHeaderFooter({ footerText: 'x'.repeat(1025) }),
@@ -455,11 +495,11 @@ test('the example of the slides and shapes page runs as written', async () => {
         dateFixed: false,
         hideOnTitleSlides: true,
       });
-      const last = context.presentation.slides.getItemAt(2).headerFooter;
-      last.footerText = `${footer} (appendix)`;
-      last.load('slideNumberVisible,footerText,dateFixed');
+      const third = context.presentation.slides.getItemAt(2).headerFooter;
+      third.footerText = `${footer} (appendix)`;
+      third.load('slideNumberVisible,footerText,dateFixed');
       await context.sync();
-      return last.toJSON();
+      return third.toJSON();
     });
   }
   const runtime = await open(withTitleSlide());

@@ -20,7 +20,8 @@ import { flag, ModelObject, text } from './model-object.ts';
 
 /**
  * The settings that `Presentation.applyHeaderFooter` applies. A setting you leave out stays as
- * each slide has it. Pass at least one of the slide number, footer, or date settings.
+ * each slide has it. Pass at least one of the slide number, footer, or date settings. The
+ * `toJSON()` result of a loaded `SlideHeaderFooter` is valid settings.
  *
  * @public
  */
@@ -29,23 +30,30 @@ export interface HeaderFooterSettings {
   slideNumberVisible?: boolean;
   /**
    * Show or hide the footer. `true` without `footerText` keeps each slide's footer text. A slide
-   * with no footer takes the text of the first slide that has one.
+   * with no footer takes the footer text of another slide.
    */
   footerVisible?: boolean;
-  /** Show the footer with this text: one line of 1 to 1024 characters. */
+  /**
+   * Show the footer with this text: one line of 1 to 1024 characters. With `footerVisible:
+   * false`, only an empty string is accepted, and it changes nothing.
+   */
   footerText?: string;
   /**
    * Show or hide the date. `true` alone keeps each slide's date. A slide with no date takes the
-   * date of the first slide that has one, else today's date as an automatic date.
+   * date of another slide, else today's date as an automatic date.
    */
   dateVisible?: boolean;
-  /** Show the date as this fixed text: one line of 1 to 1024 characters. */
+  /**
+   * Show the date with this text: one line of 1 to 1024 characters. The date is fixed text,
+   * unless `dateFixed` is `false`: then it is an automatic date field that holds this text. With
+   * `dateVisible: false`, only an empty string is accepted, and it changes nothing.
+   */
   dateText?: string;
   /**
    * Show the date, as fixed text (`true`) or as an automatic date (`false`). `true` keeps the
    * text that each date shows now. `false` turns fixed text into today's date as month/day/year,
    * and keeps an automatic date in its own format. With `false`, a slide with no date takes the
-   * automatic date of the first slide that has one, else today's date.
+   * automatic date of another slide, else today's date. With `dateVisible: false`, it is ignored.
    */
   dateFixed?: boolean;
   /**
@@ -94,9 +102,10 @@ export function headerFooterWrite(value: unknown, target: string): AutomationHea
  * slide the placeholder that its layout defines, else the one that its master defines, so the
  * item takes the position and format of the layout. A slide that has the placeholder already
  * keeps its box and format. A write that hides an item removes the slide's placeholders of that
- * type. When the layout and the master of the slide have no such placeholder, a write that shows
- * the item refuses with `NotSupported` and the diagnostic `edit.no-slide-number-placeholder`,
- * `edit.no-footer-placeholder`, or `edit.no-date-placeholder`.
+ * type; with no such placeholder, it changes nothing. When the layout and the master of the
+ * slide have no such placeholder, a write that shows the item refuses with `NotSupported` and
+ * the diagnostic `edit.no-slide-number-placeholder`, `edit.no-footer-placeholder`, or
+ * `edit.no-date-placeholder`. A slide that did not open refuses with `DocumentUnavailable`.
  *
  * In a runtime over a live editor, the writes of one sync are one undo step. This object is an
  * SDK extension. The pinned Office.js reference has no such member.
@@ -137,9 +146,9 @@ export class SlideHeaderFooter extends ModelObject {
 
   /**
    * Whether the slide shows a footer. A footer placeholder with no text reads as `false`. A write
-   * of `true` keeps the slide's footer text. A slide with no footer text takes the text of the
-   * first slide that has one; when no slide has one, the write refuses with `NotSupported` and
-   * the diagnostic `edit.no-footer-text`. Set `footerText` instead to give the text.
+   * of `true` keeps the slide's footer text. A slide with no footer text takes the footer text of
+   * another slide. When no slide has footer text, the write refuses with `NotSupported` and the
+   * diagnostic `edit.no-footer-text`. Set `footerText` instead to give the text.
    */
   get footerVisible(): boolean {
     return this.loadedProperty('footerVisible');
@@ -161,7 +170,7 @@ export class SlideHeaderFooter extends ModelObject {
 
   /**
    * Whether the slide shows a date. A write of `true` keeps the slide's date. A slide with no
-   * date takes the date of the first slide that has one, else today's date as an automatic date.
+   * date takes the date of another slide, else today's date as an automatic date.
    */
   get dateVisible(): boolean {
     return this.loadedProperty('dateVisible');
@@ -187,8 +196,8 @@ export class SlideHeaderFooter extends ModelObject {
    * Whether the date is fixed text (`true`) or an automatic date field (`false`). `false` when
    * the slide shows no date. A write shows the date. `true` keeps the text that the date shows
    * now. `false` turns fixed text into today's date as month/day/year, and keeps an automatic
-   * date in its own format. A slide with no date takes the automatic date of the first slide
-   * that has one, else today's date.
+   * date in its own format. A slide with no date takes the automatic date of another slide, else
+   * today's date.
    */
   get dateFixed(): boolean {
     return this.loadedProperty('dateFixed');

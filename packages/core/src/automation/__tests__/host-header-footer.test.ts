@@ -12,6 +12,7 @@ import {
   presentationInfo,
   readPptx,
   serializeXmlPart,
+  writePptx,
   xmlPartOf,
 } from '../../store/index.ts';
 import { shortDate } from '../commands/header-footer.ts';
@@ -139,7 +140,7 @@ describe('setHeaderFooter: refusals', () => {
       ['all', 'settings'],
       [{ footerText: 7 }, 'footerText'],
       [{ footerVisible: false, footerText: 'X' }, 'footerText'],
-      [{ dateText: 'X', dateFixed: false }, 'dateFixed'],
+      [{ dateText: '', slideNumberVisible: true }, 'dateText'],
       [{ dateVisible: false, dateText: 'X' }, 'dateText'],
       [{ hideOnTitleSlides: 1, slideNumberVisible: true }, 'hideOnTitleSlides'],
     ] as const) {
@@ -154,4 +155,23 @@ describe('setHeaderFooter: refusals', () => {
     });
     expect(slideXml(store, 0)).toBe(before);
   });
+});
+
+test('a footer keeps the unknown content of its placeholder through a write, save, and reopen', () => {
+  const ext =
+    '<p:extLst><p:ext uri="{B1E1E1E1-0000-4000-8000-000000000001}"><x:keep xmlns:x="urn:example:keep"/></p:ext></p:extLst>';
+  const footer =
+    '<p:sp><p:nvSpPr><p:cNvPr id="7" name="Footer 6"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>' +
+    `<p:nvPr><p:ph type="ftr" sz="quarter" idx="11"/>${ext}</p:nvPr></p:nvSpPr><p:spPr/>` +
+    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US"/><a:t>Old</a:t></a:r></a:p></p:txBody></p:sp>';
+  const { host, store } = setup('', footer);
+  expect(write(host, { footerText: 'New' }, 1).ok).toBe(true);
+  const again = readPptx(writePptx(store.package));
+  if (!again.ok) throw new Error('reopen');
+  const xml = serializeXmlPart(
+    xmlPartOf(again.pkg, presentationInfo(again.pkg).slides[1]!.partName)!
+  );
+  expect(xml).toContain('urn:example:keep');
+  expect(xml).toContain('<a:t>New</a:t>');
+  expect(xml).not.toContain('Old');
 });

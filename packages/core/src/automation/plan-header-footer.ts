@@ -88,27 +88,34 @@ function flagOf(value: unknown, name: string): boolean | undefined {
   return value as boolean | undefined;
 }
 
-/** The checked settings. Every check runs before anything is written. */
+/**
+ * The checked settings. Every check runs before anything is written. A read of a slide is a
+ * valid write: a hidden footer or date may come with empty text, and a hidden date with
+ * `dateFixed`, which the write then ignores.
+ */
 function settingsOf(value: unknown): AutomationHeaderFooterWrite {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) badArgument('settings');
   const raw = value as Record<string, unknown>;
   for (const key of Object.keys(raw))
     if (!(NAMES as readonly string[]).includes(key)) badArgument('settings');
+  const footerVisible = flagOf(raw.footerVisible, 'footerVisible');
+  const dateVisible = flagOf(raw.dateVisible, 'dateVisible');
+  const dateFixed = flagOf(raw.dateFixed, 'dateFixed');
+  // Text shows what it names, so a write that hides it takes no text but the empty text.
+  const textOf = (v: unknown, name: string, hidden: boolean): string | undefined => {
+    if (v === undefined || (hidden && v === '')) return undefined;
+    if (hidden) badArgument(name);
+    return lineOf(v, name);
+  };
   const s = {
     slideNumberVisible: flagOf(raw.slideNumberVisible, 'slideNumberVisible'),
-    footerVisible: flagOf(raw.footerVisible, 'footerVisible'),
-    footerText: raw.footerText === undefined ? undefined : lineOf(raw.footerText, 'footerText'),
-    dateVisible: flagOf(raw.dateVisible, 'dateVisible'),
-    dateText: raw.dateText === undefined ? undefined : lineOf(raw.dateText, 'dateText'),
-    dateFixed: flagOf(raw.dateFixed, 'dateFixed'),
+    footerVisible,
+    footerText: textOf(raw.footerText, 'footerText', footerVisible === false),
+    dateVisible,
+    dateText: textOf(raw.dateText, 'dateText', dateVisible === false),
+    dateFixed: dateVisible === false ? undefined : dateFixed,
     hideOnTitleSlides: flagOf(raw.hideOnTitleSlides, 'hideOnTitleSlides'),
   };
-  // Text shows what it names, so it does not go with a write that hides it.
-  if (s.footerVisible === false && s.footerText !== undefined) badArgument('footerText');
-  if (s.dateVisible === false && s.dateText !== undefined) badArgument('dateText');
-  if (s.dateVisible === false && s.dateFixed !== undefined) badArgument('dateFixed');
-  // `dateText` is fixed text; an automatic date shows today's date.
-  if (s.dateText !== undefined && s.dateFixed === false) badArgument('dateFixed');
   const writes =
     s.slideNumberVisible ??
     s.footerVisible ??
@@ -118,6 +125,19 @@ function settingsOf(value: unknown): AutomationHeaderFooterWrite {
     s.dateFixed;
   if (writes === undefined) badArgument('settings');
   return s;
+}
+
+/**
+ * Hide an item. When no target slide can have it, there is nothing to remove, so the hide
+ * changes nothing instead of refusing: the engine refuses before it plans any op.
+ */
+function hide(run: () => unknown): void {
+  try {
+    run();
+  } catch (e) {
+    if (e instanceof CommandRefusal && /^disabled\.no\w+Placeholder$/.test(e.reason)) return;
+    throw e;
+  }
 }
 
 export function setHeaderFooter(
@@ -138,17 +158,17 @@ export function setHeaderFooter(
   const options = { indices, hideOnTitleSlides: s.hideOnTitleSlides ?? false };
   const batch = ctx.batch;
   edit(() => {
-    if (s.slideNumberVisible !== undefined)
-      applyHeaderFooter(batch, { type: 'setSlideNumbers', show: s.slideNumberVisible, ...options });
-    if (s.footerText !== undefined || s.footerVisible !== undefined)
-      setFooter(
-        batch,
-        s.footerText !== undefined || s.footerVisible === true,
-        s.footerText,
-        options
-      );
-    if (s.dateVisible === false) setDateTime(batch, false, undefined, false, options);
-    else if (s.dateText !== undefined) setDateTime(batch, true, s.dateText, true, options);
+    if (s.slideNumberVisible === true)
+      applyHeaderFooter(batch, { type: 'setSlideNumbers', show: true, ...options });
+    else if (s.slideNumberVisible === false)
+      hide(() => applyHeaderFooter(batch, { type: 'setSlideNumbers', show: false, ...options }));
+    if (s.footerText !== undefined || s.footerVisible === true)
+      setFooter(batch, true, s.footerText, options);
+    else if (s.footerVisible === false) hide(() => setFooter(batch, false, undefined, options));
+    if (s.dateVisible === false) hide(() => setDateTime(batch, false, undefined, false, options));
+    // With `dateFixed: false`, the text is the current text of an automatic date field.
+    else if (s.dateText !== undefined)
+      setDateTime(batch, true, s.dateText, s.dateFixed !== false, options);
     else if (s.dateVisible !== undefined || s.dateFixed !== undefined)
       setDateTime(batch, true, undefined, s.dateFixed === true, options, s.dateFixed === false);
   });

@@ -194,17 +194,14 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['footerVisible', BOOLEAN],
   [
     'footerText',
-    'Use one line of 1 to 1024 characters, with no control characters. Leave it out when footerVisible is false.',
+    'Use one line of 1 to 1024 characters, with no line breaks or control characters other than tab. With footerVisible false, use an empty string or leave it out.',
   ],
   ['dateVisible', BOOLEAN],
   [
     'dateText',
-    'Use one line of 1 to 1024 characters, with no control characters. Leave it out when dateVisible is false.',
+    'Use one line of 1 to 1024 characters, with no line breaks or control characters other than tab. With dateVisible false, use an empty string or leave it out.',
   ],
-  [
-    'dateFixed',
-    'Use true or false. Leave it out when dateVisible is false, and do not set it to false with dateText.',
-  ],
+  ['dateFixed', BOOLEAN],
   ['hideOnTitleSlides', BOOLEAN],
 ];
 

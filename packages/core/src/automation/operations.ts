@@ -259,13 +259,19 @@ export interface AutomationHeaderFooterWrite {
   readonly slideNumberVisible?: boolean;
   /** False hides the footer. True without `footerText` keeps or spreads the deck's footer. */
   readonly footerVisible?: boolean;
-  /** One line of 1 to 1024 characters. Shows the footer. */
+  /** One line of 1 to 1024 characters. Shows the footer. Only '' with `footerVisible: false`. */
   readonly footerText?: string;
   /** False hides the date. True without other date fields keeps or spreads the deck's date. */
   readonly dateVisible?: boolean;
-  /** Fixed text, one line of 1 to 1024 characters. Shows the date. */
+  /**
+   * One line of 1 to 1024 characters. Shows the date: fixed text, or a `datetime1` field that
+   * holds it with `dateFixed: false`. Only '' with `dateVisible: false`.
+   */
   readonly dateText?: string;
-  /** True turns date fields into fixed text; false turns fixed text into today's date field. */
+  /**
+   * True turns date fields into fixed text; false turns fixed text into today's date field.
+   * Ignored with `dateVisible: false`.
+   */
   readonly dateFixed?: boolean;
   /** Slides on a `title` layout (`ST_SlideLayoutType`, 19.7.15) hide what the others show. */
   readonly hideOnTitleSlides?: boolean;
