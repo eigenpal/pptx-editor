@@ -336,7 +336,7 @@ export const TEXT_SCENARIOS: readonly Scenario[] = [
     area: 'text',
     deck: 'text-runs',
     writes: true,
-    requires: ['Presentation.replaceAll'],
+    requires: ['Presentation.replaceAll', 'Slide.replaceAll'],
     async script(context) {
       const bold = context.presentation.replaceAll('bold', 'Heavy');
       const words = context.presentation.replaceAll('text', 'copy', {
@@ -344,9 +344,10 @@ export const TEXT_SCENARIOS: readonly Scenario[] = [
         matchWholeWord: true,
       });
       const none = context.presentation.replaceAll('Nowhere', 'x');
+      const onSlide = context.presentation.slides.getItemAt(0).replaceAll('Strike', 'Cross');
       await context.sync();
       return {
-        counts: [bold.value, words.value, none.value],
+        counts: [bold.value, words.value, none.value, onSlide.value],
         after: await replacedOf(context),
       };
     },

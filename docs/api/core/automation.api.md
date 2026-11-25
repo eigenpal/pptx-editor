@@ -576,6 +576,7 @@ export type AutomationOperation = {
     readonly query: string;
     readonly replacement: string;
     readonly options?: FindOptions;
+    readonly slide?: AutomationRef;
 } | {
     readonly op: 'listBindings';
     readonly owner: AutomationRef;

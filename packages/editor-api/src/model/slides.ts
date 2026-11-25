@@ -24,6 +24,7 @@ import { LAYOUT_TYPE, type SlideLayoutType } from './enums.ts';
 import { HyperlinkCollection } from './hyperlinks.ts';
 import { imageBox, settleImage, type SlideGetImageOptions } from './images.ts';
 import { flag, ModelObject, pathOf, text, type RefOf } from './model-object.ts';
+import { replaceOperation, type SearchOptions } from './search.ts';
 import { ShapeCollection } from './shapes.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
 import { TagCollection } from './tags.ts';
@@ -264,6 +265,37 @@ export class Slide extends ModelObject {
       'exportAsBase64',
       (ref) => ({ op: 'exportSlides', slides: [ref(this.path)] }),
       (value) => fill(hydrated(value, 'base64', label).base64)
+    );
+    return result;
+  }
+
+  /**
+   * Replace each match of `searchText` on this slide with `replacementText`, and answer the
+   * number of matches after the next `sync()`. An SDK extension: Office.js has no such member.
+   * The search reads the shapes of the slide (also in groups), the table cells the slide shows,
+   * and the speaker notes of the slide. The text rules and refusals are those of
+   * `Presentation.replaceAll`.
+   *
+   * @example
+   * ```ts
+   * const slide = context.presentation.slides.getItemAt(0);
+   * const count = slide.replaceAll('{{client}}', 'Northwind', { matchCase: true });
+   * await context.sync();
+   * ```
+   */
+  replaceAll(
+    searchText: string,
+    replacementText: string,
+    options?: SearchOptions
+  ): ClientResult<number> {
+    const target = this.at('replaceAll');
+    const op = replaceOperation(searchText, replacementText, options, target);
+    const { result, fill } = ClientResult.create<number>(target);
+    this.enqueue(
+      'write',
+      'replaceAll',
+      (ref) => ({ ...op, slide: ref(this.path) }),
+      (value) => fill(hydrated(value, 'number', target).value)
     );
     return result;
   }

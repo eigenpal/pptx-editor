@@ -11,16 +11,20 @@ import type { FindOptions } from '../contracts/neutral.ts';
 import { isValidXmlText } from '../store/index.ts';
 import { refitAll } from './commands/autofit.ts';
 import { findMatches, MAX_FIND_TEXT, replaceMatches } from './commands/find.ts';
-import type { AutomationValue } from './protocol.ts';
+import type { AutomationRef, AutomationValue } from './protocol.ts';
 import type { TextPlanContext } from './plan-text.ts';
-import { badArgument, edit } from './targets.ts';
+import { badArgument, edit, slideOf, targetOf } from './targets.ts';
 
-/** Find and replace text across the presentation. Answers the number of replaced matches. */
+/**
+ * Find and replace text across the presentation, or on one slide (its shapes, table cells, and
+ * notes). Answers the number of replaced matches.
+ */
 export function replaceText(
   ctx: TextPlanContext,
   query: string,
   replacement: string,
-  options: FindOptions | undefined
+  options: FindOptions | undefined,
+  slide?: AutomationRef
 ): AutomationValue {
   // A match stays inside one paragraph, so a query with a paragraph break never matches. The
   // object model writes a line break as `\v`; the find text model reads it as `\n`.
@@ -41,8 +45,14 @@ export function replaceText(
   for (const name of ['matchCase', 'wholeWord'] as const)
     if (options?.[name] !== undefined && typeof options[name] !== 'boolean')
       badArgument('find-options');
+  const only =
+    slide === undefined
+      ? undefined
+      : slideOf(ctx.batch.pkg, targetOf(ctx, slide, 'slide').sldId).index;
   const find: FindOptions = { matchCase: options?.matchCase, wholeWord: options?.wholeWord };
-  const matches = findMatches(ctx.batch.pkg, query.replace(/\v/g, '\n'), find);
+  const matches = findMatches(ctx.batch.pkg, query.replace(/\v/g, '\n'), find).filter(
+    (m) => only === undefined || m.slide === only
+  );
   if (!matches.length) return { kind: 'number', value: 0 };
   edit(() => replaceMatches(ctx.batch, matches, replacement));
   // Autofit text re-fits and a table frame takes its laid-out size, as after the editor's

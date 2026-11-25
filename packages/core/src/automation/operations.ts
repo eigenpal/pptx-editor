@@ -312,6 +312,8 @@ export type AutomationOperation =
       readonly query: string;
       readonly replacement: string;
       readonly options?: FindOptions;
+      /** Only this slide: its shapes, its table cells, and its speaker notes. */
+      readonly slide?: AutomationRef;
     }
   // Bindings: the host's named links to shapes, kept in memory, never in the package. The owner
   // is the presentation.

@@ -146,4 +146,4 @@ Automatic adoption with `--adopt` requires both checks:
 
 ### Find and replace extension
 
-`Presentation.replaceAll` and `SearchOptions` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. The pinned reference has no member that finds or replaces text across a presentation. `SearchOptions` takes the `matchCase` and `matchWholeWord` names of the Office.js `Word.SearchOptions` type, and refuses any other option name.
+`Presentation.replaceAll`, `Slide.replaceAll`, and `SearchOptions` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. The pinned reference has no member that finds or replaces text across a presentation. `SearchOptions` takes the `matchCase` and `matchWholeWord` names of the Office.js `Word.SearchOptions` type, and refuses any other option name.

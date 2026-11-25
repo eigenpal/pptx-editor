@@ -139,6 +139,34 @@ describe('Presentation.replaceAll', () => {
     });
   });
 
+  test('Slide.replaceAll replaces on that slide only, with its notes', async () => {
+    const runtime = await open(deck());
+    await runtime.run(async (context) => {
+      const first = context.presentation.slides.getItemAt(0).replaceAll('acme', 'Globex');
+      const second = context.presentation.slides
+        .getItemAt(1)
+        .replaceAll('acme', 'Initech', { matchWholeWord: true });
+      await context.sync();
+      expect([first.value, second.value]).toEqual([5, 2]);
+      expect(await texts(context)).toEqual([
+        'Globex plan, slide 1',
+        'by Globex',
+        'Globex',
+        'Initech Initech Acmeworks',
+      ]);
+    });
+    expect(notesOf(await runtime.save())).toBe('Say Globex twice: Globex.');
+    const error = await rejection(
+      runtime.run(async (context) => {
+        context.presentation.slides.getItemAt(0).replaceAll('', 'x');
+        await context.sync();
+      })
+    );
+    expect(isPptxEditorError(error) && error.debugInfo.errorLocation).toBe(
+      'presentation.slides.getItemAt(0).replaceAll.searchText'
+    );
+  });
+
   test('the new text keeps the run properties of the text it replaces', async () => {
     const runtime = await open(deck());
     await runtime.run(async (context) => {

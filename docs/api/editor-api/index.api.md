@@ -1602,6 +1602,7 @@ export class Slide extends ModelObject {
     moveTo(slideIndex: number): void;
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
+    replaceAll(searchText: string, replacementText: string, options?: SearchOptions): ClientResult<number>;
     setSelectedShapes(shapeIds: string[]): void;
     get shapes(): ShapeCollection;
     get slideMaster(): SlideMaster;

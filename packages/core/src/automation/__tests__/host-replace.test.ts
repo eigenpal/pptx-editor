@@ -86,6 +86,40 @@ describe('replaceText', () => {
     expect(findMatches(store.package, 'acme')).toHaveLength(0);
   });
 
+  test('a slide scope replaces on that slide and its notes only', () => {
+    const read = readPptx(
+      buildPptx({
+        slides: [1, 2].map((n) => ({
+          layout: 'blank',
+          shapes: shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, text: para(run(`Acme ${n}`)) }),
+          notes: `Acme note ${n}`,
+        })),
+      })
+    );
+    if (!read.ok) throw new Error('fixture');
+    const store = new PptxDocumentStore(read.pkg);
+    const host = createStoreAutomationHost(store);
+    const response = host.execute({
+      operations: [
+        { op: 'getSlide', key: { index: 1 } },
+        { ...replace('Acme', 'X'), slide: { result: 0 } } as AutomationOperation,
+      ],
+    });
+    expect(response.results[1]).toEqual({ status: 'ok', value: { kind: 'number', value: 2 } });
+    expect(findMatches(store.package, 'Acme').map((m) => [m.slide, m.where])).toEqual([
+      [0, 'slide'],
+      [0, 'notes'],
+    ]);
+    const bad = host.execute({
+      operations: [
+        { op: 'getPresentation' },
+        { ...replace('Acme', 'X'), slide: { result: 0 } } as AutomationOperation,
+      ],
+    });
+    const result = bad.results[1];
+    expect(result?.status === 'error' && result.error.code).toBe('invalid-handle');
+  });
+
   test('passes matchCase and wholeWord to the search', () => {
     const { host } = setup();
     const response = host.execute({

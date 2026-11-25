@@ -95,8 +95,8 @@ export {
   PageSetup,
   Presentation,
   type InsertSlideOptions,
-  type SearchOptions,
 } from '../model/presentation.ts';
+export type { SearchOptions } from '../model/search.ts';
 export {
   PlaceholderFormat,
   Shape,
