@@ -253,6 +253,9 @@ function rangeOf(
   const from = body ? textPointOf(body, start, slideNumber) : undefined;
   const to = body ? textPointOf(body, start + length, slideNumber) : undefined;
   if (!from || !to) badArgument('comment-span');
+  // Each paragraph break that the span crosses takes one offset and holds no character, so a
+  // span of breaks only anchors no text: refuse it, not store an empty anchor.
+  if (length - (to.paragraph - from.paragraph) < 1) badArgument('comment-span');
   return { start: from, end: to };
 }
 

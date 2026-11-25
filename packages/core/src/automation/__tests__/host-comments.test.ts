@@ -269,6 +269,8 @@ describe('automation comments: refusals', () => {
       { start: 0, length: 0 },
       { start: 10, length: 5 },
       { start: -1, length: 2 },
+      // Only the paragraph break between "Hello" and "World": no character to anchor.
+      { start: 5, length: 1 },
     ])
       expect(
         errorOf(host, [

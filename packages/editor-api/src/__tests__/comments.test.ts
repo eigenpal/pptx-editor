@@ -254,6 +254,18 @@ describe('Slide.comments: author identity', () => {
       }).catch((e: unknown) => e);
       expect(isPptxEditorError(error) && error.code).toBe('InvalidArgument');
     }
+    // Inner spaces collapse as the writer stores the name: this name counts 201 characters.
+    const spaced = `${'x'.repeat(100)}${' '.repeat(200)}${'y'.repeat(100)}`;
+    const runtime = await PptxEditor.createServer(plainDeck(), {
+      substitutes: false,
+      author: spaced,
+    });
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(0).comments.add('Hi');
+      await context.sync();
+    });
+    expect((await readAll(runtime))[0]!.authorName).toBe(`${'x'.repeat(100)} ${'y'.repeat(100)}`);
+    runtime.dispose();
   });
 
   test('text and author names stay plain text', async () => {
@@ -525,6 +537,24 @@ describe('Slide.comments: loads and edge cases', () => {
     runtime.dispose();
   });
 
+  test('a call through the replies of a new comment before its sync refuses clearly', async () => {
+    const runtime = await server();
+    const error = await runtime.run(async (context) => {
+      const comment = context.presentation.slides.getItemAt(0).comments.add('New');
+      try {
+        comment.replies.getItem('id').delete();
+      } catch (e) {
+        return e;
+      }
+      return undefined;
+    });
+    expect(isPptxEditorError(error) && [error.code, error.debugInfo.innerError?.code]).toEqual([
+      'InvalidObjectPath',
+      'edit.comment-not-added',
+    ]);
+    runtime.dispose();
+  });
+
   test('a shape option that is not a shape refuses', async () => {
     const runtime = await server();
     const [code] = await codeOf(runtime, (context) => {
@@ -572,6 +602,13 @@ describe('Slide.comments: legacy comments', () => {
       anchor: { type: 'point', left: 1.25, top: 1.25 },
       replies: ['Checked.'],
     });
+    const canResolve = await runtime.run(async (context) => {
+      const c = context.presentation.slides.getItemAt(0).comments.getItem('cm-0-1');
+      c.load('canResolve');
+      await context.sync();
+      return c.canResolve;
+    });
+    expect(canResolve).toBe(false);
     const date = await runtime.run(async (context) => {
       const c = context.presentation.slides.getItemAt(0).comments.getItem('cm-0-1');
       c.load('creationDate');
@@ -724,12 +761,12 @@ describe('Slide.comments: documentation', () => {
     async function answerOpenComments(runtime: PptxEditorRuntime) {
       return runtime.run(async (context) => {
         const comments = context.presentation.slides.getItemAt(0).comments;
-        comments.load('items/authorName,items/content,items/resolved');
+        comments.load('items/authorName,items/content,items/resolved,items/canResolve');
         await context.sync();
         const open: Comment[] = comments.items.filter((comment) => !comment.resolved);
         for (const comment of open) {
           comment.reply('Fixed in the next draft.', { authorName: 'Review Agent' });
-          comment.resolved = true;
+          if (comment.canResolve) comment.resolved = true;
         }
         await context.sync();
         return open.map((comment) => `${comment.authorName}: ${comment.content}`);
@@ -748,5 +785,10 @@ describe('Slide.comments: documentation', () => {
       replies: ['Fixed in the next draft.'],
     });
     runtime.dispose();
+    // On a deck with legacy comments, the example replies and leaves the state alone.
+    const legacy = await server(buildSlideStructureDeck());
+    expect(await answerOpenComments(legacy)).toEqual(['Fixture Author: Check the chart numbers.']);
+    expect((await readAll(legacy))[0]!.replies).toEqual(['Checked.', 'Fixed in the next draft.']);
+    legacy.dispose();
   });
 });

@@ -315,6 +315,7 @@ class Comment_2 extends CommentBase {
     // @internal
     constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, key: string, nullable?: boolean);
     get anchor(): CommentAnchor;
+    get canResolve(): boolean;
     // @internal (undocumented)
     protected fillFrom(read: Read$1): void;
     // @internal (undocumented)
@@ -396,13 +397,15 @@ export class CommentReply extends CommentBase {
 // @public
 export class CommentReplyCollection extends CommentList<CommentReply> {
     // @internal
-    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, thread: () => string);
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, thread: () => string, owner: Comment_2);
     // @internal (undocumented)
     protected make(path: ObjectPath, key: string, nullable: boolean): CommentReply;
     // @internal (undocumented)
     protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
     // @internal (undocumented)
     protected get noun(): string;
+    // @internal (undocumented)
+    protected requireOwner(target: string): void;
     // @internal (undocumented)
     protected get scalars(): readonly string[];
 }

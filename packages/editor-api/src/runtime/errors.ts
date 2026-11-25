@@ -565,7 +565,10 @@ export function authorOption(value: unknown, target: string): string | undefined
     const c = ch.codePointAt(0)!;
     return c > 0x1f && c !== 0x7f && (c < 0xd800 || c > 0xdfff);
   };
-  const name = typeof value === 'string' ? [...value].filter(printable).join('').trim() : '';
+  const name =
+    typeof value === 'string'
+      ? [...value].filter(printable).join('').replace(/\s+/g, ' ').trim()
+      : '';
   if (!name || name.length > 255)
     failArgument(`${target}.author`, 'an author name of 1 to 255 characters');
   return value as string;

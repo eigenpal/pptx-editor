@@ -352,7 +352,7 @@ abstract class CommentBase extends ModelObject {
 }
 
 const REPLY_SCALARS = ['id', 'authorName', 'authorInitials', 'content', 'creationDate'] as const;
-const COMMENT_SCALARS = [...REPLY_SCALARS, 'resolved', 'anchor'] as const;
+const COMMENT_SCALARS = [...REPLY_SCALARS, 'resolved', 'canResolve', 'anchor'] as const;
 
 /**
  * One reply in a comment thread. An SDK extension.
@@ -403,10 +403,12 @@ const THREAD_FILLERS = new WeakMap<Comment, (read: AutomationCommentThreadRead) 
  * ```ts
  * await runtime.run(async (context) => {
  *   const comments = context.presentation.slides.getItemAt(0).comments;
- *   comments.load('items/authorName,items/content,items/resolved');
+ *   comments.load('items/content,items/resolved,items/canResolve');
  *   await context.sync();
- *   for (const comment of comments.items)
- *     if (!comment.resolved) comment.reply('Fixed in the next draft.');
+ *   for (const comment of comments.items.filter((c) => !c.resolved)) {
+ *     comment.reply('Fixed in the next draft.');
+ *     if (comment.canResolve) comment.resolved = true;
+ *   }
  *   await context.sync();
  * });
  * ```
@@ -427,6 +429,7 @@ export class Comment extends CommentBase {
     super(context, path, slide, key, nullable);
     THREAD_FILLERS.set(this, (read) => {
       this.setLoadedProperty('resolved', read.resolved);
+      this.setLoadedProperty('canResolve', read.format === 'modern');
       this.setLoadedProperty('anchor', anchorOf(read.anchor));
     });
   }
@@ -481,6 +484,14 @@ export class Comment extends CommentBase {
     }));
   }
 
+  /**
+   * Whether the thread can take a resolved state. False for a legacy comment (ECMA-376 Part 1,
+   * 19.4.1, `CT_Comment`), whose format stores no state; a write of `resolved` on it refuses.
+   */
+  get canResolve(): boolean {
+    return this.loadedProperty('canResolve');
+  }
+
   /** Where the thread points on its slide. */
   get anchor(): CommentAnchor {
     return this.loadedProperty('anchor');
@@ -492,7 +503,8 @@ export class Comment extends CommentBase {
       this.context,
       ObjectPath.derived(`${this.path.label}.replies`, this.path),
       this.slide,
-      () => this.key
+      () => this.key,
+      this
     ));
   }
 
@@ -574,9 +586,13 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
     return result;
   }
 
+  /** @internal Refuse a call when the owner is a comment that its sync has not added yet. */
+  protected requireOwner(_target: string): void {}
+
   /** The member with this id; `ItemNotFound` at the sync when there is none. */
   getItem(id: string): T {
     const key = idOf(id, `${this.path.label}.getItem`);
+    this.requireOwner(`${this.path.label}.getItem`);
     // The id is known now, so the member needs no lookup: a write to it goes in the same batch
     // as the other writes of the sync, and the host refuses the whole batch when no comment
     // has the id. A load refuses with `ItemNotFound` then. Over an owner that is addressable,
@@ -594,12 +610,14 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
   getItemAt(index: number): T {
     if (typeof index !== 'number' || !Number.isInteger(index) || index < 0)
       failArgument(`${this.path.label}.getItemAt`, 'a whole number of 0 or more');
+    this.requireOwner(`${this.path.label}.getItemAt`);
     return this.find(`getItemAt(${index})`, (all) => all[index], '', false);
   }
 
   /** The member with this id, or a null object. */
   getItemOrNullObject(id: string): T {
     const key = idOf(id, `${this.path.label}.getItemOrNullObject`);
+    this.requireOwner(`${this.path.label}.getItemOrNullObject`);
     return this.find('getItemOrNullObject()', (all) => all.find((c) => c.id === key), key, true);
   }
 
@@ -824,11 +842,24 @@ export class CommentCollection extends CommentList<Comment> {
  */
 export class CommentReplyCollection extends CommentList<CommentReply> {
   readonly #thread: () => string;
+  readonly #owner: Comment;
 
   /** @internal */
-  constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, thread: () => string) {
+  constructor(
+    context: RequestContext,
+    path: ObjectPath,
+    slide: ObjectPath,
+    thread: () => string,
+    owner: Comment
+  ) {
     super(context, path, slide);
     this.#thread = thread;
+    this.#owner = owner;
+  }
+
+  /** @internal */
+  protected override requireOwner(target: string): void {
+    requireAdded(this.#owner, target);
   }
 
   /** @internal */

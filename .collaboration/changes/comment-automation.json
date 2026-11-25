@@ -3,7 +3,7 @@
   "fields": [],
   "before": "pptx-collaboration:1.8.1.1",
   "after": "pptx-collaboration:1.8.1.1",
-  "reason": "The automation comment operations compile through the comment commands that the editor already runs, moved unchanged from the editor lane to the automation lane. They write the same comment parts, author parts, and relationships with the same actor-scoped part names. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "reason": "The automation comment operations compile through the comment commands that the editor already runs, moved from the editor lane to the automation lane. The move adds only the id of the new comment to their result. They write the same comment parts, author parts, and relationships with the same actor-scoped part names. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
   "tests": [
     "packages/pro/src/__tests__/yjs-automation-comments.test.ts",
     "packages/pro/src/__tests__/yjs-comments.test.ts",

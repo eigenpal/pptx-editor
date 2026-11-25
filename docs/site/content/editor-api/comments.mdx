@@ -8,7 +8,7 @@ Use `slide.comments` to read the comment threads of a slide and to write new one
 
 ## Review the comments of a slide
 
-This function replies to each open thread of the first slide, resolves it, and returns what each thread said:
+This function replies to each open thread of the first slide, resolves it when its format can, and returns what each thread said:
 
 ```ts
 import type { Comment, PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
@@ -16,12 +16,12 @@ import type { Comment, PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
 export async function answerOpenComments(runtime: PptxEditorRuntime) {
   return runtime.run(async (context) => {
     const comments = context.presentation.slides.getItemAt(0).comments;
-    comments.load('items/authorName,items/content,items/resolved');
+    comments.load('items/authorName,items/content,items/resolved,items/canResolve');
     await context.sync();
     const open: Comment[] = comments.items.filter((comment) => !comment.resolved);
     for (const comment of open) {
       comment.reply('Fixed in the next draft.', { authorName: 'Review Agent' });
-      comment.resolved = true;
+      if (comment.canResolve) comment.resolved = true;
     }
     await context.sync();
     return open.map((comment) => `${comment.authorName}: ${comment.content}`);
@@ -29,7 +29,7 @@ export async function answerOpenComments(runtime: PptxEditorRuntime) {
 }
 ```
 
-A thread is a `Comment`. It has `id`, `authorName`, `authorInitials`, `content`, `creationDate`, `resolved`, `anchor`, and `replies`. Load replies with `comment.replies.load(...)`, or with a path such as `items/replies/items/content` on the collection. A reply is a `CommentReply`, with the same members except `resolved`, `anchor`, and `replies`. `comments.items` lists the threads in file order. Comment text and author names come from the file: show them as text, never as markup.
+A thread is a `Comment`. It has `id`, `authorName`, `authorInitials`, `content`, `creationDate`, `resolved`, `canResolve`, `anchor`, and `replies`. Load replies with `comment.replies.load(...)`, or with a path such as `items/replies/items/content` on the collection. A reply is a `CommentReply`, with the same members except `resolved`, `canResolve`, `anchor`, and `replies`. `comments.items` lists the threads in file order. Comment text and author names come from the file: show them as text, never as markup.
 
 `creationDate` is a `Date`, or `null` when the file has no valid date. A stored date with no time zone counts as UTC.
 
@@ -78,7 +78,7 @@ Each write applies at the next `context.sync()`. All the writes of one sync are 
 
 ## Comment formats
 
-A presentation stores comments in one of two formats. The legacy format is the comment list of ECMA-376 Part 1, 19.4. The threaded format is newer, and supports resolved threads and text anchors. `slide.comments` reads both. A new thread uses the format that the deck uses: threaded, unless the deck has only legacy comments. A reply keeps the format of its thread.
+A presentation stores comments in one of two formats. The legacy format is the comment list of ECMA-376 Part 1, 19.4. The threaded format is newer, and supports resolved threads and text anchors. `slide.comments` reads both. A new thread uses the format that the deck uses: threaded, unless the deck has only legacy comments. A reply keeps the format of its thread. `canResolve` is false for a legacy thread, because that format stores no resolved state.
 
 The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-0305E82C3301}`. The `id` of a legacy comment is `cm-<authorId>-<idx>`, from the author number and the comment index that the file stores. An `id` stays the same through save and reopen. A file can repeat a GUID, or an author number and index, on one slide. Such a comment takes a suffix that holds its place among the repeats, such as `cm-0-1-2`. A delete of one of the repeats can change that suffix.
 
@@ -94,10 +94,10 @@ The diagnostics in this table come with a write. A load of a comment that does n
 | Text that is empty or longer than 10,000 characters | `InvalidArgument` | `edit.comment-text` |
 | An author name that is blank or longer than 255 characters | `InvalidArgument` | `edit.comment-author` |
 | No comment with the id on this slide, or not in the thread of the proxy | `ItemNotFound` | `edit.comment-not-found` |
-| The comment changed since a load read it | `GeneralException` | `edit.comment-changed` |
+| Another author or date has the comment id since a load read it | `GeneralException` | `edit.comment-changed` |
 | Two repeated comments have the same author, date, and text, so the id cannot name one | `GeneralException` | `edit.comment-ambiguous` |
 | A call on a new comment before the sync that adds it | `InvalidObjectPath` | `edit.comment-not-added` |
-| A shape in a group or on another slide, or a `textRange` outside the text | `InvalidArgument` | `argument.not-accepted` |
+| A shape in a group or on another slide, or a `textRange` outside the text or with only paragraph breaks | `InvalidArgument` | `argument.not-accepted` |
 | `resolved` on a legacy comment | `NotSupported` | `edit.comment-no-status` |
 | `textRange` on a deck with only legacy comments | `NotSupported` | `edit.comment-no-text-range` |
 | A comment body with more than plain text, such as a mention, on a `content` write | `NotSupported` | `edit.comment-not-editable` |

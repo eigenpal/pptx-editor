@@ -66,6 +66,7 @@ export const NOT_DEFERRED: ReadonlySet<string> = new Set([
   'pickFrom',
   'writeScope',
   'membersOf',
+  'requireOwner',
 ]);
 
 /** How deep in wrapped calls the current call is: only the outermost queues a refusal. */
