@@ -106,23 +106,11 @@ A refused batch drops its queued calls. Existing proxies remain usable within th
 
 ## Run parallel work
 
-Runs on one runtime do not wait for each other. When two runs read, wait, and then write, the later write refuses with `StaleDocument`.
-
-### Know when a sync checks the revision
-
-The presentation has one revision for all of its content. Each commit increments it. A commit can be a write from any run, an edit in the editor, a change from a collaborator, an undo, or a redo. Thus writes to two different slides still conflict.
-
-- The context records the revision after each host batch that succeeds. Batches that only read also record it.
-- A host batch that writes requires the recorded revision. If the presentation changed, that batch refuses with `StaleDocument` and applies nothing.
-- The first host batch of a run has no recorded revision, so it does not check. A sync can read in several host batches, for example `load('items/name')` on a collection. Then its later batches, writes included, require the revision of its first batch.
-- A run that adopts a tracked object also adopts the revision of the earlier run. Then its first write also checks.
-- A sync that only reads does not check at its start. When it reads in several host batches, the later batches require the revision of the first. A write from another run between those batches refuses the read with `StaleDocument`.
-
-Thus a run that reads, waits for slow work, and then writes can fail. Slow work is, for example, a model call. If another run writes during that wait, the later write refuses with `StaleDocument`.
+Runs on one runtime do not wait for each other. The presentation has one revision for all of its content, so writes to two different slides still conflict. When two runs read, wait, and then write, the later write refuses with `StaleDocument`.
 
 ### Do slow work outside run()
 
-Do the slow work outside `run()`. Send every run for one presentation through one queue, so that only one run is active at a time. Keep each queued run short: it reads, decides, and writes. This function rewrites the text of some shapes with one model call for each shape:
+Do slow work, such as a model call, outside `run()`. Send every run for one presentation through one queue, so that only one run is active at a time. Keep each queued run short: it reads, decides, and writes. This function rewrites the text of some shapes with one model call for each shape:
 
 ```ts
 import {
@@ -146,6 +134,23 @@ export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): 
   return result;
 }
 
+// Run a task again after StaleDocument, at most maxAttempts times in total.
+async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
+      if (attempt >= maxAttempts) throw error;
+      console.warn('StaleDocument: reading again', {
+        attempt,
+        expectedRevision: error.expectedRevision,
+        actualRevision: error.actualRevision,
+      });
+    }
+  }
+}
+
 // A target whose slide or shape is gone reads as null after the sync.
 function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
   return targets.map((target) => {
@@ -159,57 +164,76 @@ function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
 export async function rewriteTexts(
   runtime: PptxEditorRuntime,
   targets: readonly TextTarget[],
-  rewrite: (text: string) => Promise<string>,
-  maxAttempts = 3
+  rewrite: (text: string) => Promise<string>
 ) {
   // 1. Read every target in one short run.
-  const before = await enqueue(runtime, () =>
-    runtime.run(async (context) => {
-      const items = loadTexts(context, targets);
-      await context.sync();
-      return items.map((item) => item.text());
-    })
+  const before = await retryStale(() =>
+    enqueue(runtime, () =>
+      runtime.run(async (context) => {
+        const items = loadTexts(context, targets);
+        await context.sync();
+        return items.map((item) => item.text());
+      })
+    )
   );
-  // 2. Do the slow work outside run(), in parallel.
-  const after = await Promise.all(before.map((text) => (text === null ? null : rewrite(text))));
+  // 2. Do the slow work outside run(), in parallel. A failed call gives null.
+  const outcomes = await Promise.allSettled(
+    before.map((text) => (text === null ? Promise.resolve(null) : rewrite(text)))
+  );
+  const after = outcomes.map((outcome) => (outcome.status === 'fulfilled' ? outcome.value : null));
   // 3. Apply every result in one run. Read again, and write only unchanged targets.
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await enqueue(runtime, () =>
-        runtime.run(async (context) => {
-          const items = loadTexts(context, targets);
-          await context.sync();
-          const skipped: TextTarget[] = [];
-          items.forEach((item, index) => {
-            const result = after[index];
-            if (typeof result === 'string' && item.text() === before[index])
-              item.range.text = result;
-            else skipped.push(item.target);
-          });
-          await context.sync();
-          return { skipped };
-        })
-      );
-    } catch (error) {
-      if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
-      if (attempt >= maxAttempts) throw error;
-      console.warn('StaleDocument: reading again', {
-        attempt,
-        expectedRevision: error.expectedRevision,
-        actualRevision: error.actualRevision,
-      });
-    }
-  }
+  return retryStale(() =>
+    enqueue(runtime, () =>
+      runtime.run(async (context) => {
+        const items = loadTexts(context, targets);
+        await context.sync();
+        const skipped: TextTarget[] = [];
+        items.forEach((item, index) => {
+          const result = after[index];
+          if (typeof result === 'string' && item.text() === before[index]) item.range.text = result;
+          else skipped.push(item.target);
+        });
+        await context.sync();
+        return { skipped };
+      })
+    )
+  );
 }
 ```
 
-The function returns the targets that it did not write. Another writer changed or deleted them during the slow work. Read them again before you decide. Each target shape must have a text frame. For example, a picture or a group refuses with `NotSupported`.
+The function returns the targets that it did not write. Another writer changed or deleted them, or their model call failed. Read them again before you decide. Each target shape must have a text frame. For example, a picture or a group refuses with `NotSupported`.
 
-The queue prevents conflicts between the runs that use it. Other writers can still change the presentation between the read and the write of step 3. These are an editor user, a collaborator, another runtime, or a run outside the queue. The retry reads again and checks each target before it writes. Keep the retry bounded. Do not repeat the slow work in the retry. Do not call `enqueue` from a queued task for the same runtime: the inner task waits for the outer task forever.
+The queue prevents conflicts between the runs that use it. Other writers can still change the presentation between a read and a write:
+
+- a user of the editor
+- a collaborator
+- another runtime
+- a run outside the queue
+
+The retry reads again and checks each target before it writes. Keep the retry bounded. Do not repeat the slow work in the retry. Do not call `enqueue` from a queued task for the same runtime. The inner task then waits forever for the outer task.
+
+### Know when a sync checks the revision
+
+Each commit increments the revision. These changes commit:
+
+- a write from any run
+- an edit in the editor
+- a change from a collaborator
+- an undo or a redo
+
+A sync sends its calls in one or more host batches. These rules apply:
+
+- The context records the revision after each host batch that succeeds. Batches that only read also record it.
+- A host batch that writes requires the recorded revision. If the presentation changed, that batch refuses with `StaleDocument` and applies nothing.
+- The first host batch of a run has no recorded revision, so it does not check.
+- A sync can read in several host batches, for example `load('items/name')` on a collection. Then its later batches require the revision of its first batch. This applies to writes and to reads. A write from another run between those batches makes the sync refuse with `StaleDocument`.
+- A run that adopts a tracked object also adopts the revision of the earlier run. Then its first write also checks.
+
+Thus a run that reads, waits for slow work, and then writes can fail. If another run writes during that wait, the later write refuses with `StaleDocument`.
 
 ### Log a stale write
 
-On `StaleDocument`, `error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. Log both to see how many commits came in between. They can be `undefined` when the refusal comes after earlier writes of the same sync applied. Do not replay that sync; see [Understand commit boundaries](#understand-commit-boundaries). Revisions are counters for one open presentation. They are not stored in the file.
+On `StaleDocument`, `error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. Log both to see how many commits came in between. They can be `undefined` when the refusal comes after earlier writes of the same sync applied. Do not replay that sync; see [Understand commit boundaries](#understand-commit-boundaries). Revisions are counters for one open presentation. The file does not store them.
 
 ## Keep proxies within their lifetime
 

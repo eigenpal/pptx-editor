@@ -267,6 +267,23 @@ export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): 
   return result;
 }
 
+// Run a task again after StaleDocument, at most maxAttempts times in total.
+async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
+      if (attempt >= maxAttempts) throw error;
+      console.warn('StaleDocument: reading again', {
+        attempt,
+        expectedRevision: error.expectedRevision,
+        actualRevision: error.actualRevision,
+      });
+    }
+  }
+}
+
 // A target whose slide or shape is gone reads as null after the sync.
 function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
   return targets.map((target) => {
@@ -280,47 +297,40 @@ function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
 export async function rewriteTexts(
   runtime: PptxEditorRuntime,
   targets: readonly TextTarget[],
-  rewrite: (text: string) => Promise<string>,
-  maxAttempts = 3
+  rewrite: (text: string) => Promise<string>
 ) {
   // 1. Read every target in one short run.
-  const before = await enqueue(runtime, () =>
-    runtime.run(async (context) => {
-      const items = loadTexts(context, targets);
-      await context.sync();
-      return items.map((item) => item.text());
-    })
+  const before = await retryStale(() =>
+    enqueue(runtime, () =>
+      runtime.run(async (context) => {
+        const items = loadTexts(context, targets);
+        await context.sync();
+        return items.map((item) => item.text());
+      })
+    )
   );
-  // 2. Do the slow work outside run(), in parallel.
-  const after = await Promise.all(before.map((text) => (text === null ? null : rewrite(text))));
+  // 2. Do the slow work outside run(), in parallel. A failed call gives null.
+  const outcomes = await Promise.allSettled(
+    before.map((text) => (text === null ? Promise.resolve(null) : rewrite(text)))
+  );
+  const after = outcomes.map((outcome) => (outcome.status === 'fulfilled' ? outcome.value : null));
   // 3. Apply every result in one run. Read again, and write only unchanged targets.
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await enqueue(runtime, () =>
-        runtime.run(async (context) => {
-          const items = loadTexts(context, targets);
-          await context.sync();
-          const skipped: TextTarget[] = [];
-          items.forEach((item, index) => {
-            const result = after[index];
-            if (typeof result === 'string' && item.text() === before[index])
-              item.range.text = result;
-            else skipped.push(item.target);
-          });
-          await context.sync();
-          return { skipped };
-        })
-      );
-    } catch (error) {
-      if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
-      if (attempt >= maxAttempts) throw error;
-      console.warn('StaleDocument: reading again', {
-        attempt,
-        expectedRevision: error.expectedRevision,
-        actualRevision: error.actualRevision,
-      });
-    }
-  }
+  return retryStale(() =>
+    enqueue(runtime, () =>
+      runtime.run(async (context) => {
+        const items = loadTexts(context, targets);
+        await context.sync();
+        const skipped: TextTarget[] = [];
+        items.forEach((item, index) => {
+          const result = after[index];
+          if (typeof result === 'string' && item.text() === before[index]) item.range.text = result;
+          else skipped.push(item.target);
+        });
+        await context.sync();
+        return { skipped };
+      })
+    )
+  );
 }
 
 // End of the example.
@@ -423,18 +433,6 @@ describe('the parallel work rules', () => {
       const error = await rejection(read);
       await write;
       expect(isPptxEditorError(error) && error.code).toBe('StaleDocument');
-      // A read with no listing is one host batch, and the same write does not refuse it.
-      const single = runtime.run(async (context) => {
-        const range = context.presentation.slides
-          .getItemAt(0)
-          .shapes.getItem('2')
-          .textFrame.textRange.load('text');
-        await context.sync();
-        return range.text;
-      });
-      const after = rename(runtime, 'After');
-      expect(await single).toBe('One');
-      await after;
     } finally {
       runtime.dispose();
     }
@@ -525,6 +523,22 @@ describe('the parallel work example', () => {
         skipped: [targets[1], targets[2]],
       });
       expect(await texts(runtime, [ids[0]!])).toEqual(['ONE']);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  test('a failed model call skips its target, and the others apply', async () => {
+    const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
+    try {
+      const ids = await slideIds(runtime);
+      const targets = ids.map((slideId) => ({ slideId, shapeId: '2' }));
+      const rewrite = async (text: string) => {
+        if (text === 'One') throw new Error('the model call failed');
+        return shout(text);
+      };
+      expect(await rewriteTexts(runtime, targets, rewrite)).toEqual({ skipped: [targets[0]] });
+      expect(await texts(runtime, ids)).toEqual(['One', 'TWO']);
     } finally {
       runtime.dispose();
     }

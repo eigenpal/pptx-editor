@@ -65,12 +65,7 @@ Dispose the runtime before the editor. A browser runtime has no `save()`: save t
 
 ## Parallel work
 
-Runs on one runtime do not wait for each other. The presentation has one revision for all of its content. Each commit increments it, also an edit in the editor or from a collaborator. Thus writes to two different slides still conflict.
-
-- The context records the revision after each host batch that succeeds. Batches that only read also record it.
-- A host batch that writes requires the recorded revision. If the presentation changed, that batch refuses with `StaleDocument` and applies nothing.
-- The first host batch of a run has no recorded revision, so it does not check. When a sync reads in several host batches, for example a collection and its items, its later batches check.
-- An adopted tracked object brings the revision of its earlier run.
+Runs on one runtime do not wait for each other. The presentation has one revision for all of its content, so writes to two different slides still conflict. Any commit increments the revision, including an edit in the editor or a change from a collaborator.
 
 Do slow work, such as a model call for each slide, outside `run()`. Send every run for one presentation through one queue. Keep each queued run short: read, decide, and write.
 
@@ -103,9 +98,19 @@ for (let attempt = 1; ; attempt += 1) {
 }
 ```
 
+The queue prevents conflicts between the runs that use it. An editor user, a collaborator, or a run outside the queue can still write between a read and a write. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime. The inner task then waits forever for the outer task.
+
 `error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. They can be `undefined` when the refusal comes after earlier writes of the same sync applied.
 
-The queue prevents conflicts between the runs that use it. An editor user, a collaborator, or a run outside the queue can still write between the read and the write. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime: the two tasks wait for each other. The [batching and errors guide](https://pptx-editor.dev/docs/editor-api/batching-and-errors#run-parallel-work) has the complete example.
+A sync sends its calls in one or more host batches:
+
+- The context records the revision after each host batch that succeeds. Batches that only read also record it.
+- A host batch that writes requires the recorded revision. If the presentation changed, that batch refuses with `StaleDocument` and applies nothing.
+- The first host batch of a run has no recorded revision, so it does not check.
+- When a sync reads in several host batches, for example a collection and its items, its later batches check. This applies to writes and to reads.
+- An adopted tracked object brings the revision of its earlier run.
+
+The [batching and errors guide](https://pptx-editor.dev/docs/editor-api/batching-and-errors#run-parallel-work) has the complete example, with deleted targets and failed model calls.
 
 ## Common mistakes
 
