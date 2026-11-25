@@ -140,6 +140,30 @@ export const SLIDE_SCENARIOS: readonly Scenario[] = [
     readBack: outline,
   },
   {
+    name: 'slides.duplicate',
+    area: 'slides',
+    deck: 'slide-layouts',
+    writes: true,
+    async script(context) {
+      const source = context.presentation.slides.getItemAt(2).load('id');
+      const copy = source.duplicate();
+      copy.load('id,index');
+      await context.sync();
+      check(copy.id !== source.id, 'the copy has a new slide id');
+      same(copy.index, 3, 'the copy follows its source');
+      // A second copy, of the copy, written to in the sync that makes it.
+      copy.duplicate().tags.add('COPY', 'second');
+      await context.sync();
+      const tags = context.presentation.slides.getItemAt(4).tags.load('items/key,items/value');
+      await context.sync();
+      return {
+        tags: tags.items.map((t) => `${t.key}=${t.value}`),
+        outline: await outline(context),
+      };
+    },
+    readBack: outline,
+  },
+  {
     name: 'slides.background-and-theme',
     area: 'slides',
     deck: 'slide-layouts',

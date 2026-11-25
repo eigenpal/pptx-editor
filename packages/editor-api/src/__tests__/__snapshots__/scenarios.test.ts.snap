@@ -3557,3 +3557,154 @@ exports[`scenarios on the server runtime errors.bindings 1`] = `
   },
 }
 `;
+
+exports[`scenarios on the server runtime slides.duplicate 1`] = `
+{
+  "readBack": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "262",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "263",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "outline": [
+      {
+        "id": "256",
+        "layout": "Title Slide",
+        "shapes": [
+          "Title 1",
+          "Subtitle 2",
+        ],
+      },
+      {
+        "id": "257",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Note box",
+        ],
+      },
+      {
+        "id": "258",
+        "layout": "Two Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Content Placeholder 3",
+        ],
+      },
+      {
+        "id": "262",
+        "layout": "Two Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Content Placeholder 3",
+        ],
+      },
+      {
+        "id": "263",
+        "layout": "Two Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Content Placeholder 3",
+        ],
+      },
+      {
+        "id": "259",
+        "layout": "Title Only",
+        "shapes": [
+          "Title 1",
+          "Text box",
+        ],
+      },
+      {
+        "id": "260",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+        ],
+      },
+      {
+        "id": "261",
+        "layout": "Quote",
+        "shapes": [
+          "Title 1",
+          "Quote Placeholder 2",
+        ],
+      },
+    ],
+    "tags": [
+      "COPY=second",
+    ],
+  },
+}
+`;

@@ -1585,6 +1585,7 @@ export class Slide extends ModelObject {
     get background(): SlideBackground;
     get customXmlParts(): CustomXmlPartCollection;
     delete(): void;
+    duplicate(): Slide;
     exportAsBase64(): ClientResult<string>;
     getImageAsBase64(options?: SlideGetImageOptions): ClientResult<string>;
     get hyperlinks(): HyperlinkCollection;

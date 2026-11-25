@@ -542,6 +542,9 @@ export type AutomationOperation = {
     readonly op: 'deleteSlide';
     readonly slide: AutomationRef;
 } | {
+    readonly op: 'duplicateSlide';
+    readonly slide: AutomationRef;
+} | {
     readonly op: 'moveSlide';
     readonly slide: AutomationRef;
     readonly index: number;

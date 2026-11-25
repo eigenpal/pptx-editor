@@ -220,6 +220,30 @@ test('the runtime example draws the embedded pictures of a slide', async () => {
   }
 });
 
+test('the duplicate example copies the slide after its source and tags the copy', async () => {
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  try {
+    const answer = await runtime.run(async (context) => {
+      const copy = context.presentation.slides.getItemAt(0).duplicate();
+      copy.tags.add('VARIANT', 'B');
+      copy.load('id,index');
+      await context.sync();
+      return { id: copy.id, index: copy.index };
+    });
+    expect(answer.index).toBe(1);
+    await runtime.run(async (context) => {
+      const slides = context.presentation.slides.load('items/id');
+      await context.sync();
+      expect(slides.items.map((s) => s.id)).toEqual(['256', answer.id, '257']);
+      const tags = slides.items[1]!.tags.load('items/key,items/value');
+      await context.sync();
+      expect(tags.items.map((t) => [t.key, t.value])).toEqual([['VARIANT', 'B']]);
+    });
+  } finally {
+    runtime.dispose();
+  }
+});
+
 /** Two slides, each with one text box: shape 2 says 'One' on slide 1 and 'Two' on slide 2. */
 function twoSlideDeck(): Uint8Array {
   const box = (text: string) =>

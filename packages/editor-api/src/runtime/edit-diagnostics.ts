@@ -239,6 +239,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'A slide to import has threaded comments or an embedded control. Leave it out with sourceSlideIds.',
   ],
   [
+    'disabled.slideNotCopyable:duplicate',
+    'edit.slide-has-controls',
+    'The slide has an embedded control (p:control), which a copy cannot share. Delete the control from the file first.',
+  ],
+  [
     'disabled.slideMaster',
     'host.slide-master',
     'The editor shows the slide master view, which takes no slide edits. Close the slide master first.',

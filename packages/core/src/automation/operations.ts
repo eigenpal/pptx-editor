@@ -268,6 +268,14 @@ export type AutomationOperation =
   | { readonly op: 'getSlideLayout'; readonly slide: AutomationRef }
   | { readonly op: 'getSlideMaster'; readonly owner: AutomationRef }
   | { readonly op: 'deleteSlide'; readonly slide: AutomationRef }
+  | {
+      /**
+       * Copy a slide, with its notes and the parts it owns, directly after it (`p:sldIdLst`,
+       * ECMA-376 Part 1, 19.2.1.34). Answers the handle of the copy.
+       */
+      readonly op: 'duplicateSlide';
+      readonly slide: AutomationRef;
+    }
   | { readonly op: 'moveSlide'; readonly slide: AutomationRef; readonly index: number }
   | { readonly op: 'applyLayout'; readonly slide: AutomationRef; readonly layout: AutomationRef }
   | { readonly op: 'exportSlides'; readonly slides: readonly AutomationRef[] }
@@ -643,6 +651,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'deleteCustomXmlPart',
   'addSlide',
   'deleteSlide',
+  'duplicateSlide',
   'moveSlide',
   'applyLayout',
   'insertSlides',
