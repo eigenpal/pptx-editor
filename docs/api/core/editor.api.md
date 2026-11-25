@@ -120,8 +120,9 @@ export type AnimationCommand =
 }
 /**
 * Set the transition of the current slide, or of the slides `indices`. Absent fields keep
-* their values. `kind: 'none'` removes the effect. Duration is 10 to 59,000 ms;
-* `advanceAfterMs` is 0 to 3,600,000 ms, or null to clear it.
+* their values. A new kind keeps the sound and the extensions of the transition, and
+* `kind: 'none'` removes the effect, the sound, and the extensions. Duration is 10 to
+* 59,000 ms; `advanceAfterMs` is 0 to 3,600,000 ms, or null to clear it.
 */
 | {
     readonly type: 'setTransition';

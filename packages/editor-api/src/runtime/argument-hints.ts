@@ -174,7 +174,7 @@ const ROWS: readonly (readonly [string, string])[] = [
   // Slide transitions.
   [
     'transition',
-    'Use an object with kind, durationMs, advanceOnClick, advanceAfterMs, direction, or throughBlack, and no other field.',
+    'Use an object with kind, durationMs, advanceOnClick, advanceAfterMs, direction, or throughBlack, or { remove: true } alone.',
   ],
   ['transitionKind', 'Use none, fade, push, wipe, split, or cut.'],
   ['durationMs', 'Use a number of milliseconds from 10 to 59000.'],

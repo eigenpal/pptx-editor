@@ -69,6 +69,11 @@ const inRange = (value: unknown, min: number, max: number): value is number =>
 function changeOf(write: AutomationTransitionWrite): TransitionChange {
   if (typeof write !== 'object' || write === null || Array.isArray(write))
     badArgument('transition');
+  // `remove` stands alone: it removes the whole transition.
+  if ('remove' in write) {
+    if (write.remove !== true || Object.keys(write).length !== 1) badArgument('transition');
+    return { clear: true };
+  }
   for (const key of Object.keys(write)) if (!FIELDS.has(key)) badArgument('transition');
   const { kind, durationMs, advanceOnClick, advanceAfterMs, direction, throughBlack } = write;
   if (kind !== undefined && (typeof kind !== 'string' || !KINDS.has(kind)))

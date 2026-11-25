@@ -129,10 +129,10 @@ export class SlideTransition extends ModelObject {
    * standard effects (such as `Dissolve`) read by name, and an effect from an extension
    * namespace reads `Other`. A write of a new effect replaces the transition markup and keeps
    * the duration, the advance settings, the sound (`p:sndAc`), and the extensions. A new `Push`
-   * goes up and a new `Split` is vertical-out, unless the same write sets `direction`. `None`
-   * removes the effect element, the sound, and the extensions; the advance settings stay (see
-   * `remove`). After `None`, set the effect and the duration together: a slide with no effect
-   * reads the duration of its speed.
+   * goes up and a new `Split` is vertical-out, unless the same write sets `direction`. On a
+   * slide with an effect, `None` removes the effect, the sound, and the extensions; the advance
+   * settings stay (see `remove`). After `None`, set the effect and the duration together: a
+   * slide with no effect reads the duration of its speed.
    */
   get effect(): SlideTransitionEffect | `${SlideTransitionEffect}` {
     return this.loadedProperty('effect');
@@ -236,11 +236,12 @@ export class SlideTransition extends ModelObject {
   }
 
   /**
-   * Remove the transition: no effect, advance on click, no advance time, and no sound. The slide
-   * then holds no `p:transition`. A slide with no transition writes nothing.
+   * Remove the whole transition: the effect, the advance settings, the sound, and the
+   * extensions. The slide then holds no `p:transition`. A slide with no transition writes
+   * nothing.
    */
   remove(): void {
-    this.#write('remove', { kind: 'none', advanceOnClick: true, advanceAfterMs: null });
+    this.#write('remove', { remove: true });
   }
 
   /** @internal */

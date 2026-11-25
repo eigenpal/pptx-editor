@@ -243,6 +243,8 @@ export interface AutomationTransitionWrite {
   readonly direction?: TransitionDirection;
   /** `thruBlk` of `fade` and `cut` (`CT_OptionalBlackTransition`). */
   readonly throughBlack?: boolean;
+  /** `true` alone removes the whole `p:transition`, with its sound and extensions. */
+  readonly remove?: true;
 }
 
 /** Every operation a host understands. */

@@ -176,4 +176,37 @@ describe('automation host: slide transitions', () => {
     expect(editor.exec({ type: 'setTransition', advanceAfterMs: null }).ok).toBe(true);
     expect(slideXml(editor.save()!)).toContain(`<p:transition>${SOUND}</p:transition>`);
   });
+
+  test('apply to all with no effect keeps the sound of a slide that has no effect', async () => {
+    // The pane's "apply to all" sends the kind and the timing of the current slide.
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const bytes = deckWith(`<p:transition>${SOUND}</p:transition>`);
+    expect((await editor.load(bytes)).ok).toBe(true);
+    editor.exec({
+      type: 'setTransition',
+      kind: 'none',
+      durationMs: 750,
+      advanceOnClick: true,
+      advanceAfterMs: null,
+      indices: [0],
+    });
+    expect(slideXml(editor.save()!)).toContain(`<p:transition>${SOUND}</p:transition>`);
+  });
+
+  test('remove drops the whole transition, and stands alone', () => {
+    const host = open(deckWith(`<p:transition>${SOUND}${EXT}</p:transition>`));
+    const slide = firstSlide(host);
+    const mixed = exec(host, [
+      { op: 'setTransition', slide, transition: { remove: true, kind: 'fade' } as never },
+    ]);
+    expect(mixed.results[0]).toMatchObject({
+      error: { code: 'invalid-argument', detail: 'transition' },
+    });
+    ok(host, [{ op: 'setTransition', slide, transition: { remove: true } }]);
+    expect(saved(host)).not.toContain('transition');
+    // Nothing left to remove: the write answers applied and writes nothing.
+    const revision = exec(host, [{ op: 'readTransition', slide }]).revision;
+    ok(host, [{ op: 'setTransition', slide, transition: { remove: true } }]);
+    expect(exec(host, [{ op: 'readTransition', slide }]).revision).toBe(revision);
+  });
 });

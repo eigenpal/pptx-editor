@@ -1329,6 +1329,7 @@ export interface AutomationTransitionWrite {
     readonly direction?: TransitionDirection;
     readonly durationMs?: number;
     readonly kind?: TransitionKind | 'none';
+    readonly remove?: true;
     readonly throughBlack?: boolean;
 }
 

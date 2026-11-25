@@ -12,11 +12,11 @@
 // `p:transition` holds only a speed: a duration that is no speed wraps it in a new
 // `mc:AlternateContent` whose `p14` choice holds the duration. A change of the kind replaces
 // the whole transition markup with a new `mc:AlternateContent` and keeps its sound (`p:sndAc`,
-// §19.5.69) and extensions. An explicit `none` keeps only the advance settings, and with the
-// default advance settings removes the transition. The new markup goes where `CT_Slide` puts
-// the transition: after `p:clrMapOvr` and before `p:timing` and `p:extLst`. A direction
-// (`push`, `wipe`, `split`) or `thruBlk` (`fade`, `cut`) goes into the effect element of every
-// copy that holds that effect.
+// §19.5.69) and extensions. A change to `none` keeps only the advance settings. `clear`
+// removes the transition, and so does `none` with the default advance settings on a transition
+// that holds nothing. The new markup goes where `CT_Slide` puts the transition: after
+// `p:clrMapOvr` and before `p:timing` and `p:extLst`. A direction (`push`, `wipe`, `split`) or
+// `thruBlk` (`fade`, `cut`) goes into the effect element of every copy that holds that effect.
 
 import type { SlideTransitionState, TransitionKind } from '../../contracts/neutral.ts';
 import { attr, elements, NS, specOf, xmlPartOf, type Element } from '../../store/index.ts';
@@ -212,6 +212,8 @@ export interface TransitionChange {
   readonly direction?: TransitionDirection;
   /** For `fade` and `cut`. */
   readonly throughBlack?: boolean;
+  /** Remove the whole transition, with its sound and extensions. The other fields are ignored. */
+  readonly clear?: boolean;
 }
 
 /** Whether `kind` takes `direction` and `throughBlack` as `change` names them. */
@@ -334,21 +336,20 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     holders.length === 1 &&
     isP(holders[0], 'transition') &&
     SPEEDS.get(speedOf(next.durationMs)) !== next.durationMs;
-  // An explicit `none` drops the effect, the sound, and the extensions of the transition, and
-  // keeps the advance settings. With the default advance settings, no transition stays. A write
-  // that does not name the kind never removes markup.
-  const explicitNone = change.kind === 'none';
-  const holdsContent = copies.some((c) => elements(c.el).length > 0);
+  // `clear` removes the whole transition. An explicit `none` on a transition that holds nothing
+  // (no effect, no sound, no extensions) with the default advance settings removes it too. A
+  // write that does not name the kind never removes markup, and a slide with no effect keeps
+  // its sound.
   const clears =
-    explicitNone &&
     copies.length > 0 &&
-    !holdsContent &&
-    next.advanceOnClick &&
-    next.advanceAfterMs === null;
-  const rebuilds = explicitNone && holdsContent;
+    (change.clear === true ||
+      (change.kind === 'none' &&
+        copies.every((c) => elements(c.el).length === 0) &&
+        next.advanceOnClick &&
+        next.advanceAfterMs === null));
   if (clears) {
     for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
-  } else if (sameKind && !plainKeepsDuration && !rebuilds) {
+  } else if (sameKind && !plainKeepsDuration) {
     // The same kind: write the settings into every copy, and keep the rest of the markup.
     for (const copy of copies) {
       setAttr(
@@ -371,7 +372,7 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
       if (copy.p14 || attr(copy.el, dur) !== undefined)
         setAttr(batch, part, copy.el, dur, String(next.durationMs));
     }
-  } else if (plainKeepsDuration && !rebuilds) {
+  } else if (plainKeepsDuration) {
     // A plain `p:transition` holds a speed only: a duration that is no speed gets the `p14`
     // copy. The plain element moves into the fallback with its markup, and the choice is a
     // copy of it with the duration.
