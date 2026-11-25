@@ -28,7 +28,7 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['fill', 'Use a fill object: a solid color, a gradient, a pattern, a picture, or no fill.'],
   ['gradientType', 'Use a value of SlideBackgroundGradientFillType.'],
   ['pattern', 'Use a value of SlideBackgroundPatternFillType.'],
-  ['imageBase64', 'Use the Base64 bytes of a PNG, JPEG, GIF, or BMP picture.'],
+  ['imageBase64', 'Use the Base64 bytes of a PNG, JPEG, or GIF picture.'],
   [
     'base64',
     'Use the Base64 bytes of a PNG, JPEG, or GIF picture of at most 50 MiB, with no data: URL prefix.',

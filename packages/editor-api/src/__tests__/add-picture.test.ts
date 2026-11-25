@@ -310,7 +310,7 @@ describe('ShapeCollection.addPicture', () => {
     runtime.dispose();
   });
 
-  test('a picture fill over 50 MiB refuses with InvalidArgument too', async () => {
+  test('a picture fill and a background picture over 50 MiB refuse with InvalidArgument too', async () => {
     // `ShapeFill.setImage` shares the check of the bytes with `addPicture`.
     const runtime = await open(deck());
     const big = new Uint8Array(50 * 1024 * 1024 + 1);
@@ -321,6 +321,16 @@ describe('ShapeCollection.addPicture', () => {
       )
     );
     expect(code(error)).toBe('InvalidArgument');
+    // A slide background picture shares the check too.
+    const background = await runtime.run((context) =>
+      refusedAtSync(context, () =>
+        context.presentation.slides.getItemAt(0).background.fill.setPictureOrTextureFill({
+          imageBase64: toBase64(big),
+          transparency: 0,
+        })
+      )
+    );
+    expect(code(background)).toBe('InvalidArgument');
     runtime.dispose();
   });
 

@@ -29,9 +29,9 @@ export async function addLogo(runtime: PptxEditorRuntime, logoBase64: string) {
 
 The options give the box in points:
 
-- With no size, the picture keeps its aspect ratio and fits 60% of the slide, centered. It is never larger than its own size. The image states its resolution, or the engine uses 96 pixels per inch.
+- With no size, the picture keeps its aspect ratio and fits 60% of the slide, centered. It is never larger than its own size. When the image states no resolution, the engine uses 96 pixels per inch.
 - With only `width` or only `height`, the other keeps the aspect ratio.
-- With a size but no `left` or `top`, the engine centers the picture on the slide.
+- When you give a size, the engine centers each missing `left` or `top` on the slide.
 
 `Shape.type` reads `Image`. The new shape has no alt text. Set `altTextDescription` in the same batch. The picture never fills an empty placeholder. One sync is one undo step. You can also add a picture to `slideLayout.shapes` or `slideMaster.shapes`.
 
