@@ -5,7 +5,7 @@
 // store ops through the edits in `commands/`. Lengths are in points and angles in degrees, as
 // the object model shows them; the host converts to EMU (12 700 per point) at this boundary.
 
-import type { LineEndType, ShapeFormatPatch } from '../contracts/neutral.ts';
+import type { FindOptions, LineEndType, ShapeFormatPatch } from '../contracts/neutral.ts';
 import type { AutomationRef } from './protocol.ts';
 
 /** How a collection item is found: by position, or by the id the object model shows. */
@@ -302,6 +302,19 @@ export type AutomationOperation =
       readonly options?: AutomationInsertSlidesOptions;
     }
   | { readonly op: 'listHyperlinks'; readonly slide: AutomationRef }
+  | {
+      /**
+       * Replace every match of `query` in the slide shapes, table cells, and speaker notes.
+       * Answers the number of replaced matches. A match stays in one paragraph and never covers
+       * a field.
+       */
+      readonly op: 'replaceText';
+      readonly query: string;
+      readonly replacement: string;
+      readonly options?: FindOptions;
+      /** Only this slide: its shapes, its table cells, and its speaker notes. */
+      readonly slide?: AutomationRef;
+    }
   // Bindings: the host's named links to shapes, kept in memory, never in the package. The owner
   // is the presentation.
   | { readonly op: 'listBindings'; readonly owner: AutomationRef }
@@ -662,6 +675,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'setSlideHidden',
   'applyLayout',
   'insertSlides',
+  'replaceText',
   'addBinding',
   'addBindingFromSelection',
   'deleteBinding',

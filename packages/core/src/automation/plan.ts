@@ -9,6 +9,7 @@ import * as adjustments from './plan-adjustments.ts';
 import * as backgrounds from './plan-backgrounds.ts';
 import * as bindings from './plan-bindings.ts';
 import type { AutomationBindings } from './plan-bindings.ts';
+import * as find from './plan-find.ts';
 import * as images from './plan-images.ts';
 import * as importing from './plan-import.ts';
 import * as custom from './plan-custom-properties.ts';
@@ -200,6 +201,8 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return images.prepareImage(ctx, op.target, op.width, op.height);
     case 'insertSlides':
       return importing.insertSlides(ctx, op.base64, op.options);
+    case 'replaceText':
+      return find.replaceText(ctx, op.query, op.replacement, op.options, op.slide);
     case 'listHyperlinks':
       return slides.listHyperlinks(ctx, op.slide);
     case 'listTextHyperlinks':

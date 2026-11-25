@@ -105,6 +105,16 @@ async function linksOf(context: RequestContext): Promise<Json> {
   }));
 }
 
+/** The first box of `text-runs` after `text.replace-all`: its text and the font of "Heavy". */
+async function replacedOf(context: RequestContext): Promise<Json> {
+  const range = context.presentation.slides.getItemAt(0).shapes.getItem('2').textFrame.textRange;
+  range.load('text');
+  const heavy = range.getSubstring(11, 5).load('text');
+  const font = heavy.font.load('bold,size');
+  await context.sync();
+  return { text: range.text.split('\r'), heavy: heavy.text, bold: font.bold, size: font.size };
+}
+
 export const TEXT_SCENARIOS: readonly Scenario[] = [
   {
     name: 'text.frame-properties',
@@ -320,6 +330,28 @@ export const TEXT_SCENARIOS: readonly Scenario[] = [
       };
     },
     readBack: rangeLinksOf,
+  },
+  {
+    name: 'text.replace-all',
+    area: 'text',
+    deck: 'text-runs',
+    writes: true,
+    requires: ['Presentation.replaceAll', 'Slide.replaceAll'],
+    async script(context) {
+      const bold = context.presentation.replaceAll('bold', 'Heavy');
+      const words = context.presentation.replaceAll('text', 'copy', {
+        matchCase: true,
+        matchWholeWord: true,
+      });
+      const none = context.presentation.replaceAll('Nowhere', 'x');
+      const onSlide = context.presentation.slides.getItemAt(0).replaceAll('Strike', 'Cross');
+      await context.sync();
+      return {
+        counts: [bold.value, words.value, none.value, onSlide.value],
+        after: await replacedOf(context),
+      };
+    },
+    readBack: replacedOf,
   },
   {
     name: 'text.delete-text',

@@ -39,6 +39,32 @@ export async function replaceText(
 
 Offsets use UTF-16 code units, as JavaScript string indexes do. Do not split a surrogate pair. Paragraph breaks read as `\r`; line breaks read as `\v`. If another writer changes the presentation after the read, the write can fail with `StaleDocument`. Read the text again and reconsider the replacement before retrying.
 
+## Replace text across the presentation
+
+Use `Presentation.replaceAll` to replace every match in one call. It returns the number of matches after the sync:
+
+```ts
+await runtime.run(async (context) => {
+  const count = context.presentation.replaceAll('FY25', 'FY26', { matchWholeWord: true });
+  await context.sync();
+  console.log(`${count.value} replaced`);
+});
+```
+
+The search reads the shapes on each slide, also in groups. It also reads the table cells that the slide shows and the speaker notes. It does not read charts, diagrams, layouts, or masters. To replace on one slide, call `replaceAll` on that `Slide`. It reads the shapes, the table cells, and the speaker notes of that slide.
+
+```ts
+const slide = context.presentation.slides.getItemAt(0);
+const count = slide.replaceAll('{{client}}', 'Northwind', { matchCase: true });
+await context.sync();
+```
+
+Letters match in either case unless you set `matchCase`. With `matchWholeWord`, no letter, digit, combining mark, or underscore can touch either end of a match.
+
+The new text takes the font of the run that holds the first replaced character. A match that starts at a line break takes the font of the text before it. A match stays in one paragraph. The call refuses search text with `\r` or `\n` with `InvalidArgument`. Search for a line break with `\v`. A field, such as a slide number, or an equation is never part of a match. The call refuses search text with U+FFFC, the character that stands for a field in the search. The replacement is one line: a line break, a paragraph break, or a tab in it becomes a space. An empty replacement deletes each match. Search text and replacement text take at most 1000 characters.
+
+With no match, nothing changes and the count is 0. In a browser runtime, the sync is one undo step. `Presentation.replaceAll` and `Slide.replaceAll` are SDK extensions: the pinned Office.js reference has no such members.
+
 ## Format a range
 
 Inside a `run()` callback, set properties on a known text range:

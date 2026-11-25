@@ -218,7 +218,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'none',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'Searches slide text and speaker notes.',
+    notes: 'Searches slide text, table cells, and speaker notes.',
   },
   {
     id: 'text.clipboard',

@@ -244,6 +244,27 @@ test('the duplicate example copies the slide after its source and tags the copy'
   }
 });
 
+test('the text-and-ranges Replace All example replaces whole words and counts them', async () => {
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  try {
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(0).shapes.addTextBox('FY25 plan, not FY250');
+      await context.sync();
+      const count = context.presentation.replaceAll('FY25', 'FY26', { matchWholeWord: true });
+      await context.sync();
+      expect(count.value).toBe(1);
+      context.presentation.slides.getItemAt(0).shapes.addTextBox('For {{client}}');
+      await context.sync();
+      const slide = context.presentation.slides.getItemAt(0);
+      const onSlide = slide.replaceAll('{{client}}', 'Northwind', { matchCase: true });
+      await context.sync();
+      expect(onSlide.value).toBe(1);
+    });
+  } finally {
+    runtime.dispose();
+  }
+});
+
 /** Two slides, each with one text box: shape 2 says 'One' on slide 1 and 'Two' on slide 2. */
 function twoSlideDeck(): Uint8Array {
   const box = (text: string) =>

@@ -3708,3 +3708,43 @@ exports[`scenarios on the server runtime slides.duplicate 1`] = `
   },
 }
 `;
+
+exports[`scenarios on the server runtime text.replace-all 1`] = `
+{
+  "readBack": {
+    "bold": true,
+    "heavy": "Heavy",
+    "size": 18,
+    "text": [
+      "Regular 18 Heavy Italic Underline Cross",
+      "Size 32 Heavy red",
+      "All caps copy and small caps",
+      "Spaced out tight",
+      "H2O and x2",
+      "Highlighted copy",
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "bold": true,
+      "heavy": "Heavy",
+      "size": 18,
+      "text": [
+        "Regular 18 Heavy Italic Underline Cross",
+        "Size 32 Heavy red",
+        "All caps copy and small caps",
+        "Spaced out tight",
+        "H2O and x2",
+        "Highlighted copy",
+      ],
+    },
+    "counts": [
+      2,
+      2,
+      0,
+      1,
+    ],
+  },
+}
+`;

@@ -147,6 +147,16 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['import-base64', 'Use the Base64 bytes of a PPTX file.'],
   ['sourceSlideIds', 'Use an array of different slide ids of the source file.'],
   ['operations', 'Make fewer calls in one sync.'],
+  // Find and replace.
+  [
+    'query',
+    'Use search text of 1 to 1000 characters, with no paragraph break, no U+FFFC, and no control characters.',
+  ],
+  ['replacement', 'Use replacement text of at most 1000 characters, with no control characters.'],
+  [
+    'find-options',
+    'Use a SearchOptions object with matchCase and matchWholeWord as true or false.',
+  ],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */

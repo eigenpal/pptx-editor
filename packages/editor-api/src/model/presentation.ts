@@ -7,6 +7,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `PageSetup`.
 
 import type { AutomationInsertSlidesOptions } from '@pptx-editor.dev/core/automation';
+import { ClientResult } from '../runtime/client-result.ts';
 import { failArgument, nearest, oneOf } from '../runtime/errors.ts';
 import { hydrated } from '../runtime/hydrate.ts';
 import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
@@ -17,6 +18,7 @@ import { InsertSlideFormatting } from './enums.ts';
 import { CustomPropertyCollection } from './custom-properties.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
 import { finite, ModelObject, pathOf, text } from './model-object.ts';
+import { replaceOperation, type SearchOptions } from './search.ts';
 import { ShapeScopedCollection } from './shapes.ts';
 import {
   SlideCollection,
@@ -226,6 +228,58 @@ export class Presentation extends ModelObject {
       base64,
       ...(request ? { options: request } : {}),
     }));
+  }
+
+  /**
+   * Replace each match of `searchText` with `replacementText`, and answer the number of matches
+   * after the next `sync()`. An SDK extension: Office.js has no such member.
+   *
+   * The search reads the text of every shape on each slide, also in groups. It also reads every
+   * table cell that the slide shows, and the speaker notes. It does not read charts, diagrams,
+   * layouts, or masters. To replace on one slide, use `Slide.replaceAll`. A match stays in one
+   * paragraph. Search for a line break with `\v`. A field, such as a slide number, or an
+   * equation is never part of a match.
+   *
+   * The replacement takes the font of the run that holds the first replaced character. A match
+   * that starts at a line break takes the font of the text before it. The replacement is one
+   * line: a line break, a paragraph break, or a tab in it becomes a space. An empty replacement
+   * deletes each match. Matches do not overlap, and the search does not read the replacement
+   * text again. With no match, nothing changes and the count is 0. In a runtime over a live
+   * editor, the sync that writes is one undo step.
+   *
+   * Letters match in either case unless `matchCase` is set. With `matchWholeWord`, no letter,
+   * digit, combining mark, or underscore touches either end of a match.
+   *
+   * The call refuses these arguments with `InvalidArgument`:
+   * - empty search text, or search text longer than 1000 characters;
+   * - search text with a paragraph break (`\r` or `\n`) or with U+FFFC;
+   * - replacement text longer than 1000 characters;
+   * - text with characters that XML cannot hold, such as control characters.
+   *
+   * @example
+   * ```ts
+   * await runtime.run(async (context) => {
+   *   const count = context.presentation.replaceAll('FY25', 'FY26', { matchWholeWord: true });
+   *   await context.sync();
+   *   console.log(`${count.value} replaced`);
+   * });
+   * ```
+   */
+  replaceAll(
+    searchText: string,
+    replacementText: string,
+    options?: SearchOptions
+  ): ClientResult<number> {
+    const target = this.at('replaceAll');
+    const op = replaceOperation(searchText, replacementText, options, target);
+    const { result, fill } = ClientResult.create<number>(target);
+    this.enqueue(
+      'write',
+      'replaceAll',
+      () => op,
+      (value) => fill(hydrated(value, 'number', target).value)
+    );
+    return result;
   }
 
   /** @internal */
