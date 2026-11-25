@@ -29,7 +29,7 @@ A section has these properties:
 - `id`: a GUID in braces, such as `{6E1B33A1-4C0F-4B53-9C2B-0D4A4B3E8A11}`. It stays the same when you rename or move the section. A section of a file that has no id reads as an empty string. Find it with `getItemAt(index)`.
 - `name`: the name of the section.
 - `index`: the zero-based position of the section.
-- `slideIds`: the `Slide.id` of each slide in the section, in slide order. An empty section has an empty array.
+- `slideIds`: the `Slide.id` of each slide in the section, in slide order. An empty section has an empty array. Pass an id to `presentation.slides.getItem(id)` to work on the slide.
 
 A presentation without sections has an empty collection. Use `getItem(id)`, `getItemAt(index)`, or `getItemOrNullObject(id)` to find one section. An id matches in either case.
 
@@ -54,7 +54,7 @@ export async function groupSlides(
 }
 ```
 
-In a presentation without sections, the first call also puts the slides before `firstSlide` into a first section named `Default Section`. A slide that already starts a section leaves that section empty, and the new section takes its slides.
+In a presentation without sections, the first call also puts the slides before `firstSlide` into a first section. This section has the English name `Default Section` in every runtime and locale. Rename it with `sections.getItemAt(0).name`. A slide that already starts a section leaves that section empty, and the new section takes its slides.
 
 ## Rename, move, and delete sections
 
@@ -78,7 +78,13 @@ export async function moveToEnd(runtime: PptxEditorRuntime, sectionId: string, n
 
 Call `delete()` to remove a section. Its slides stay, and they join the section before it. The slides of the first section join the section after it. Call `delete({ deleteSlides: true })` to delete the slides too. Deleting the last section removes the section list. Call `sections.deleteAll()` to remove every section and keep every slide.
 
-A name has 1 to 255 characters on one line. A line break in a name becomes a space. Setting the current name, also with extra spaces at the ends, moving a section to its current position, and `deleteAll()` with no sections write nothing.
+The engine cleans each name before it writes it. It removes control characters and trims spaces at the ends. A line break becomes a space. The cleaned name must have 1 to 255 characters.
+
+These calls write nothing:
+
+- Setting a name that cleans to the current name.
+- Moving a section to its current position.
+- Calling `deleteAll()` when there are no sections.
 
 ## Edit slides in a presentation with sections
 
@@ -96,12 +102,13 @@ A refused call changes nothing in its batch.
 
 | Call | Error code | Diagnostic |
 | --- | --- | --- |
-| A name that is empty, longer than 255 characters, or not a string | `InvalidArgument` | `edit.section-name` for the length |
-| `moveTo(index)` with a position past the last section | `InvalidArgument` | |
-| `delete(options)` with an option other than `deleteSlides`, or a value that is not a boolean | `InvalidArgument` | |
-| `add(name, firstSlide)` with an unknown slide id, or `getItem(id)` with an unknown section id | `ItemNotFound` | |
+| A name that is not a string | `InvalidArgument` |  |
+| A name that is empty or longer than 255 characters after cleaning | `InvalidArgument` | `edit.section-name` |
+| `moveTo(index)` with a position past the last section | `InvalidArgument` |  |
+| `delete(options)` with an option other than `deleteSlides`, or a value that is not a boolean | `InvalidArgument` |  |
+| `add(name, firstSlide)` with an unknown slide id, or `getItem(id)` with an unknown section id | `ItemNotFound` |  |
 | `delete({ deleteSlides: true })` on a section that holds every slide | `NotSupported` | `edit.last-slide` |
-| A call on a section that an earlier synchronization deleted | `InvalidObjectPath` | |
+| A call on a section that an earlier synchronization deleted | `InvalidObjectPath` |  |
 
 ## Storage and undo
 

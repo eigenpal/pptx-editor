@@ -59,8 +59,11 @@ export class Section extends ModelObject {
   }
 
   /**
-   * The name of the section. A write takes 1 to 255 characters on one line; a line break
-   * becomes a space. Other text refuses with `InvalidArgument` at the sync.
+   * The name of the section. A write cleans the name first: it removes control characters,
+   * turns a line break into a space, and trims spaces at the ends. A cleaned name of 1 to 255
+   * UTF-16 code units applies. An empty or longer name refuses with `InvalidArgument` and
+   * diagnostic `edit.section-name` at the sync. A name that cleans to the current name writes
+   * nothing.
    */
   get name(): string {
     return this.loadedProperty('name');
@@ -75,7 +78,18 @@ export class Section extends ModelObject {
     return this.loadedProperty('index');
   }
 
-  /** The ids of the slides of the section (`Slide.id`), in slide order. Empty for no slides. */
+  /**
+   * The ids of the slides of the section (`Slide.id`), in slide order. Empty for no slides. Pass
+   * an id to `presentation.slides.getItem` to work on that slide.
+   *
+   * @example
+   * ```ts
+   * const section = context.presentation.sections.getItemAt(1).load('slideIds');
+   * await context.sync();
+   * for (const id of section.slideIds) context.presentation.slides.getItem(id).hidden = true;
+   * await context.sync();
+   * ```
+   */
   get slideIds(): string[] {
     return this.loadedProperty('slideIds');
   }
