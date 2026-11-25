@@ -78,6 +78,17 @@ function gif(width: number, height: number): string {
   return toBase64(b);
 }
 
+/** A JPEG start and a baseline frame header (`SOF0`) of `width` × `height` pixels. */
+function jpeg(width: number, height: number): string {
+  const b = new Uint8Array(13);
+  b.set([0xff, 0xd8, 0xff, 0xc0, 0, 11, 8]);
+  const view = new DataView(b.buffer);
+  view.setUint16(7, height);
+  view.setUint16(9, width);
+  b.set([1, 1], 11);
+  return toBase64(b);
+}
+
 const code = (error: unknown): string | undefined =>
   isPptxEditorError(error) ? error.code : undefined;
 
@@ -248,6 +259,57 @@ describe('ShapeCollection.addPicture', () => {
     runtime.dispose();
   });
 
+  test('takes a JPEG', async () => {
+    const runtime = await open(deck());
+    expect(await addOne(runtime, jpeg(200, 400))).toMatchObject({ width: 150, height: 300 });
+    const pkg = packageOf(await runtime.save());
+    const embed = attr(child(child(picturesOf(pkg)[0]!, 'p:blipFill'), 'a:blip')!, 'r:embed');
+    expect(relationshipsOf(pkg, SLIDE).find((r) => r.id === embed)?.target).toMatch(/\.jpeg$/);
+    runtime.dispose();
+  });
+
+  test('bytes over 50 MiB refuse with InvalidArgument before and after the decode', async () => {
+    const runtime = await open(deck());
+    const before = await runtime.save();
+    // A PNG header and padding past 50 MiB: the base64 fits its length cap, the bytes do not.
+    const big = new Uint8Array(50 * 1024 * 1024 + 1);
+    big.set(Buffer.from(png(10, 10), 'base64'));
+    // Base64 text past the length cap refuses before it is decoded.
+    const long = 'A'.repeat(Math.ceil((50 * 1024 * 1024) / 3) * 4 * 1.1 + 4);
+    for (const value of [toBase64(big), long]) {
+      const error = await runtime.run((context) =>
+        refusedAtSync(context, () =>
+          context.presentation.slides.getItemAt(0).shapes.addPicture(value)
+        )
+      );
+      expect(code(error)).toBe('InvalidArgument');
+    }
+    expect(await runtime.save()).toEqual(before);
+    runtime.dispose();
+  });
+
+  test('a computed side out of range refuses with picture-size, not with a value never given', async () => {
+    const runtime = await open(deck());
+    // 1 × 60000 px at a width of 100 pt makes a height of 6 000 000 pt.
+    const error = await runtime.run((context) =>
+      refusedAtSync(context, () =>
+        context.presentation.slides.getItemAt(0).shapes.addPicture(png(1, 60_000), { width: 100 })
+      )
+    );
+    expect(code(error)).toBe('InvalidArgument');
+    const hint = isPptxEditorError(error) ? error.debugInfo.innerError?.message : undefined;
+    expect(hint).toContain('Give a width and a height');
+    // A width out of range names the width, though the left is computed from it.
+    const wide = await runtime.run((context) =>
+      refusedAtSync(context, () =>
+        context.presentation.slides.getItemAt(0).shapes.addPicture(png(10, 10), { width: 1e9 })
+      )
+    );
+    const named = isPptxEditorError(wide) ? wide.debugInfo.innerError?.message : undefined;
+    expect(named).toBe('Use a number of points from 0 to 169 093.');
+    runtime.dispose();
+  });
+
   test('adds to a slide layout', async () => {
     const runtime = await open(deck());
     const type = await runtime.run(async (context) => {
@@ -337,22 +399,18 @@ describe('ShapeCollection.addPicture', () => {
       },
     };
     const base64 = png(8, 8);
-    await createRuntime({ host, save: false }).run(async (context) => {
-      context.presentation.slides.getItemAt(0).shapes.addPicture(base64, { left: 10, top: 20 });
-      await context.sync();
-    });
-    expect(batches).toEqual([
-      [
-        { op: 'getPresentation' },
-        { op: 'getSlide', key: { index: 0 } },
-        {
-          op: 'addShape',
-          container: { result: 1 },
-          shape: { kind: 'picture', base64 },
-          box: { left: 10, top: 20 },
-        },
-      ],
-    ]);
+    const runtime = createRuntime({ host, save: false });
+    for (const options of [undefined, { left: 10, top: 20 }])
+      await runtime.run(async (context) => {
+        context.presentation.slides.getItemAt(0).shapes.addPicture(base64, options);
+        await context.sync();
+      });
+    const sent = (box: object): AutomationOperation[] => [
+      { op: 'getPresentation' },
+      { op: 'getSlide', key: { index: 0 } },
+      { op: 'addShape', container: { result: 1 }, shape: { kind: 'picture', base64 }, box },
+    ];
+    expect(batches).toEqual([sent({}), sent({ left: 10, top: 20 })]);
   });
 
   test('the example of the pictures page runs as written', async () => {

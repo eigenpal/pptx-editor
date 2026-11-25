@@ -652,12 +652,13 @@ export class ShapeCollection extends ShapeList {
   }
 
   /**
-   * Add a picture shape (`p:pic`, ECMA-376 Part 1, §19.3.1.37) and answer it. This is an SDK
+   * Add a picture shape (`p:pic`, ECMA-376 Part 1, §19.3.1.37) and return it. This is an SDK
    * extension: the pinned Office.js reference has no member that adds a picture.
    *
    * @param base64EncodedImage - The Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB.
    * The bytes go into a new image part of the package. Other bytes, SVG among them, refuse with
-   * `InvalidArgument` at the sync, and nothing is written.
+   * `InvalidArgument` at the sync, and nothing is written. Send the bytes alone, with no
+   * `data:` URL prefix.
    * @param options - The box in points. With no size, the picture keeps the pixel aspect ratio
    * of the image and fits 60% of the slide, centered, never larger than its size at 96 pixels
    * per inch. With only `width` or only `height`, the other keeps the aspect ratio. With a size

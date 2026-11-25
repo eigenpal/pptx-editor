@@ -491,7 +491,9 @@ function decodeImage(base64: unknown): DecodedImage {
 /**
  * The box of a new picture from the caller's `box`, in points. A missing width or height keeps
  * the pixel aspect ratio of the image. When the caller sets a size but no position, the picture
- * is centered on the slide (`w` × `h` EMU), as the default size is.
+ * is centered on the slide (`w` × `h` EMU), as the default size is. The caller's values are
+ * checked first, so a refusal names the value the caller gave; a computed dimension out of range
+ * refuses with `picture-size`.
  */
 function pictureBox(
   box: AutomationBox,
@@ -499,22 +501,32 @@ function pictureBox(
   w: number,
   h: number
 ): AutomationBox | undefined {
-  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-  let { width, height } = box;
-  if (num(width) && height === undefined) height = (width * image.height) / image.width;
-  else if (num(height) && width === undefined) width = (height * image.width) / image.height;
-  const sized = width !== undefined || height !== undefined;
-  const center = (slide: number, size: unknown) =>
-    num(size) ? (slide / 12_700 - size) / 2 : undefined;
-  const left = box.left ?? (sized ? center(w, width) : undefined);
-  const top = box.top ?? (sized ? center(h, height) : undefined);
-  const out: AutomationBox = {
-    ...(left === undefined ? {} : { left }),
-    ...(top === undefined ? {} : { top }),
-    ...(width === undefined ? {} : { width }),
-    ...(height === undefined ? {} : { height }),
+  const given = (v: number | undefined, name: string, min: number) =>
+    v === undefined ? undefined : numberIn(v, name, min, MAX_POINTS);
+  const left = given(box.left, 'left', -MAX_POINTS);
+  const top = given(box.top, 'top', -MAX_POINTS);
+  let width = given(box.width, 'width', 0);
+  let height = given(box.height, 'height', 0);
+  if (width !== undefined && height === undefined) height = (width * image.height) / image.width;
+  else if (height !== undefined && width === undefined)
+    width = (height * image.width) / image.height;
+  if (width === undefined || height === undefined) {
+    // No size: the default size, at the caller's position if any.
+    const at = { ...(left === undefined ? {} : { left }), ...(top === undefined ? {} : { top }) };
+    return Object.keys(at).length ? at : undefined;
+  }
+  if (width > MAX_POINTS || height > MAX_POINTS)
+    throw new AutomationFailure(
+      'invalid-argument',
+      'the other dimension of the picture is too large',
+      'picture-size'
+    );
+  return {
+    left: left ?? (w / 12_700 - width) / 2,
+    top: top ?? (h / 12_700 - height) / 2,
+    width,
+    height,
   };
-  return Object.keys(out).length ? out : undefined;
 }
 
 /** A stretched picture fill (`a:blipFill`, ECMA-376 Part 1, 20.1.8.14) over a new media part. */

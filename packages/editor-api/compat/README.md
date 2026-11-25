@@ -162,4 +162,4 @@ Automatic adoption with `--adopt` requires both checks:
 
 ### Picture extension
 
-`ShapeCollection.addPicture()` is an SDK extension. It is not an entry in the pinned Office.js PowerPoint reference or compatibility manifest, because the pinned reference has no member that adds a picture shape. It adds a `p:pic` element (ECMA-376 Part 1, §19.3.1.37) over a new Image part (§15.2.14). It takes PNG, JPEG, or GIF bytes of at most 50 MiB, as `ShapeFill.setImage()` does.
+`ShapeCollection.addPicture()` is an SDK extension. The pinned Office.js PowerPoint reference has no member that adds a picture shape. Thus the compatibility manifest has no entry for it. It adds a `p:pic` element (ECMA-376 Part 1, §19.3.1.37) over a new Image part (§15.2.14). It takes PNG, JPEG, or GIF bytes of at most 50 MiB, as `ShapeFill.setImage()` does.
