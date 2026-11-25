@@ -99,6 +99,52 @@ export class Slide extends ModelObject {
     this.command('hidden', (ref) => ({ op: 'setSlideHidden', slide: ref(this.path), hidden }));
   }
 
+  /**
+   * The speaker notes of the slide as plain text. The notes are the text of the body
+   * placeholder (`p:ph` with `type="body"`, ECMA-376 Part 1, 19.3.1.36) of the slide's notes
+   * slide (`p:notes`, `CT_NotesSlide`, 19.3.1.26). A read joins the paragraphs (`a:p`,
+   * 21.1.2.2.6) with `\n`, and a line break (`a:br`, 21.1.2.2.1) also reads as `\n`. A slide
+   * with no notes slide reads `""`.
+   *
+   * A write makes one paragraph for each line: `\n`, `\r\n`, `\r`, and `\v` each end a line.
+   * It rewrites only the text that differs, so unchanged runs keep their formatting, and new
+   * text takes the formatting of the place where it goes. A write of the current text writes
+   * nothing, and a line break that the write does not change stays a line break. A write of
+   * text to a slide with no notes slide creates the notes slide (13.3.5) from the notes master
+   * (13.3.4); a write of `""` there creates nothing.
+   *
+   * A value that is not a string, longer than 1,000,000 characters, or with a character that
+   * XML cannot hold refuses with `InvalidArgument`, and nothing changes. A write that must create
+   * a notes slide refuses with `NotSupported` and the diagnostic `edit.no-notes-master` when the
+   * presentation has no notes master. A notes slide with no body placeholder refuses a write with `NotSupported` and the diagnostic
+   * `edit.no-notes-placeholder`.
+   *
+   * The notes are a part of their own, so a read of them is one more operation for each slide.
+   * A load of every scalar property (`load()`) includes them.
+   *
+   * This property is an SDK extension. The pinned Office.js reference has no such member.
+   * Unlike `TextRange.text`, which joins paragraphs with `\r`, the notes text uses `\n`.
+   *
+   * @example
+   * ```ts
+   * const slide = context.presentation.slides.getItemAt(0).load('speakerNotes');
+   * await context.sync();
+   * slide.speakerNotes = `${slide.speakerNotes}\nSource: 2026 annual report`;
+   * await context.sync();
+   * ```
+   */
+  get speakerNotes(): string {
+    return this.loadedProperty('speakerNotes');
+  }
+  set speakerNotes(value: string) {
+    const notes = text(value, this.at('speakerNotes'));
+    this.command('speakerNotes', (ref) => ({
+      op: 'setSlideNotes',
+      slide: ref(this.path),
+      text: notes,
+    }));
+  }
+
   /** The shapes of the slide, in z-order. */
   get shapes(): ShapeCollection {
     return (this.#shapes ??= new ShapeCollection(
@@ -314,7 +360,7 @@ export class Slide extends ModelObject {
 
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
-    const names = this.selection(request, ['id', 'index', 'hidden'], {
+    const names = this.selection(request, ['id', 'index', 'hidden', 'speakerNotes'], {
       shapes: () => this.shapes,
       tags: () => this.tags,
       hyperlinks: () => this.hyperlinks,
@@ -325,10 +371,17 @@ export class Slide extends ModelObject {
       customXmlParts: () => this.customXmlParts,
     });
     this.loadScalars(
-      names,
+      names.filter((name) => name !== 'speakerNotes'),
       'slide',
       (ref) => ({ op: 'readSlide', slide: ref(this.path) }),
       (v) => ({ id: v.slide.id, index: v.slide.index, hidden: v.slide.hidden })
+    );
+    // The notes live in a part of their own, which a read of its own answers.
+    this.loadScalars(
+      names.filter((name) => name === 'speakerNotes'),
+      'text',
+      (ref) => ({ op: 'readSlideNotes', slide: ref(this.path) }),
+      (v) => ({ speakerNotes: v.text })
     );
   }
 }

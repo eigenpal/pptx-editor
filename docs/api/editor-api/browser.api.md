@@ -1610,6 +1610,8 @@ export class Slide extends ModelObject {
     setSelectedShapes(shapeIds: string[]): void;
     get shapes(): ShapeCollection;
     get slideMaster(): SlideMaster;
+    get speakerNotes(): string;
+    set speakerNotes(value: string);
     get tags(): TagCollection;
     get themeColorScheme(): ThemeColorScheme;
 }

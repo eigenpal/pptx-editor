@@ -602,6 +602,16 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'edit.not-a-group',
     'The shape is not a group. Check shape.type first, and use a group shape.',
   ],
+  [
+    'notes-master',
+    'edit.no-notes-master',
+    'The presentation has no notes master, so a slide cannot get speaker notes. Use a presentation that has a notes master.',
+  ],
+  [
+    'notes-body',
+    'edit.no-notes-placeholder',
+    'The notes slide has no body placeholder with a text body for the speaker notes. Add one to the notes slide in the file.',
+  ],
 ];
 
 /**

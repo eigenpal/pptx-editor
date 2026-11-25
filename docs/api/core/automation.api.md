@@ -896,6 +896,13 @@ export type AutomationOperation = {
     readonly op: 'selectText';
     readonly shape: AutomationRef;
     readonly span?: AutomationTextSpan;
+} | {
+    readonly op: 'readSlideNotes';
+    readonly slide: AutomationRef;
+} | {
+    readonly op: 'setSlideNotes';
+    readonly slide: AutomationRef;
+    readonly text: string;
 };
 
 // @public

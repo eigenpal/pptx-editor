@@ -11,6 +11,7 @@ import * as bindings from './plan-bindings.ts';
 import type { AutomationBindings } from './plan-bindings.ts';
 import * as find from './plan-find.ts';
 import * as images from './plan-images.ts';
+import * as notes from './plan-notes.ts';
 import * as importing from './plan-import.ts';
 import * as custom from './plan-custom-properties.ts';
 import * as customXml from './plan-custom-xml.ts';
@@ -423,6 +424,10 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
         };
       return { kind: 'applied' };
     }
+    case 'readSlideNotes':
+      return notes.readSlideNotes(ctx, op.slide);
+    case 'setSlideNotes':
+      return notes.setSlideNotes(ctx, op.slide, op.text);
     default:
       throw new AutomationFailure(
         'unknown-operation',

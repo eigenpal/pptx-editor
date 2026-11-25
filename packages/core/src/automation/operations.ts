@@ -663,6 +663,18 @@ export type AutomationOperation =
       readonly op: 'selectText';
       readonly shape: AutomationRef;
       readonly span?: AutomationTextSpan;
+    }
+  // Speaker notes: the body placeholder of the slide's notes slide (`p:notes`, ECMA-376 Part 1,
+  // 19.3.1.26). Paragraphs and line breaks read as `\n`.
+  | { readonly op: 'readSlideNotes'; readonly slide: AutomationRef }
+  | {
+      /**
+       * Set the notes text, one paragraph for each line. A slide with no notes slide gets one
+       * from the notes master (Part 1, 13.3.5 and 13.3.4) when the text is not empty.
+       */
+      readonly op: 'setSlideNotes';
+      readonly slide: AutomationRef;
+      readonly text: string;
     };
 
 /** The operations that write. Every other operation only reads. */
@@ -720,6 +732,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'setTableCellMargins',
   'setTableStyle',
   'setAdjustment',
+  'setSlideNotes',
 ]);
 
 /** The operations that need a reader's selection. */

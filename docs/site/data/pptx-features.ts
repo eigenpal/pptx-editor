@@ -755,7 +755,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Edit speaker notes and apply bold, italic, underline, or strikethrough. Other formatting stays in the file but is not editable. Formatting at a caret outside a word does not carry into new text.',
+      'Edit speaker notes and apply bold, italic, underline, or strikethrough. Other formatting stays in the file but is not editable. Formatting at a caret outside a word does not carry into new text. The editing API reads and writes notes text with `slide.speakerNotes`.',
   },
   {
     id: 'slides.header-footer',
