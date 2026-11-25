@@ -61,7 +61,50 @@ Dispose the runtime before the editor. A browser runtime has no `save()`: save t
 - `load(...)` takes paths through navigation properties and collections, such as `load('shapes/items/textFrame/textRange/text')`, the property tree `load({ shapes: { items: { name: true } } })`, `expand`, and `$all`. Collections take `load('items/name')` and `load({ select, top, skip })`; `load()` and `load('items')` load every scalar property of each item. Each level of collections on a path costs one more host batch; the items of one level are read together. In a sync that writes, put such a load before the writes. An item read after the writes that fails has the diagnostic `edit.read-after-commit`: the writes applied.
 - `getItemOrNullObject` answers an object with `isNullObject` set when there is no such item. `getItem` refuses with `ItemNotFound`.
 - Proxies end with their run. Use `context.trackedObjects.add(...)` to keep one, and pass it to a later `runtime.run(object, callback)`.
-- A write that follows a read in the same run is conditional on that read. If another writer changed the presentation in between, the batch refuses with `StaleDocument` and applies nothing.
+- A write that follows a read in the same run is conditional on that read. If another writer changed the presentation in between, the batch refuses with `StaleDocument` and applies nothing. See [Parallel work](#parallel-work).
+
+## Parallel work
+
+Runs on one runtime do not wait for each other. The presentation has one revision for all of its content, and each commit increments it. Thus writes to two different slides still conflict.
+
+- The context records the revision after each sync that succeeds, also after a sync that only reads.
+- A sync that writes requires that recorded revision. The first sync of a run has no recorded revision, so its writes do not check. An adopted tracked object brings the revision of its earlier run.
+- A sync that only reads does not check at its start. When it reads in several host batches, for example a collection and its items, the later batches require the revision of the first.
+
+Do slow work, such as a model call for each slide, outside `run()`. Then send every run for one presentation through one queue, and keep each run short: read, decide, and write.
+
+```ts
+// Import isPptxEditorError and the PptxEditorRuntime type from @pptx-editor.dev/editor-api.
+const queues = new WeakMap<PptxEditorRuntime, Promise<unknown>>();
+
+function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): Promise<T> {
+  const result = (queues.get(runtime) ?? Promise.resolve()).then(task);
+  queues.set(
+    runtime,
+    result.catch(() => undefined)
+  );
+  return result;
+}
+
+// 1. Read in one queued run. 2. Do the slow work in parallel, outside run().
+// 3. Apply in one queued run: read again, and write only targets that still hold the text you read.
+// applyResults is the run callback of step 3.
+for (let attempt = 1; ; attempt += 1) {
+  try {
+    await enqueue(runtime, () => runtime.run(applyResults));
+    break;
+  } catch (error) {
+    if (!isPptxEditorError(error) || error.code !== 'StaleDocument' || attempt >= 3) throw error;
+    console.warn('StaleDocument', {
+      attempt,
+      expectedRevision: error.expectedRevision,
+      actualRevision: error.actualRevision,
+    });
+  }
+}
+```
+
+`error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. They can be `undefined` when the refusal comes after earlier writes of the same sync applied. The queue prevents conflicts between the runs of one process. An editor user or another runtime can still write between the read and the write, so keep the retry bounded. Do not repeat the slow work in the retry. The [batching and errors guide](https://pptx-editor.dev/docs/editor-api/batching-and-errors#run-parallel-work) has the complete example.
 
 ## Common mistakes
 

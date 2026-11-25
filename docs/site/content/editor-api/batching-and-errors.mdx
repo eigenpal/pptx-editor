@@ -86,7 +86,7 @@ export async function normalizeName(runtime: PptxEditorRuntime) {
 }
 ```
 
-This example requires a first slide with a shape. After `StaleDocument`, read again and reconsider the edit. Do not blindly retry a model-generated replacement.
+This example requires a first slide with a shape. After `StaleDocument`, read again and reconsider the edit. Do not blindly retry a model-generated replacement. To avoid the error in jobs that edit one presentation at the same time, see [Run parallel work](#run-parallel-work).
 
 | Code | Action |
 | --- | --- |
@@ -103,6 +103,110 @@ This example requires a first slide with a shape. After `StaleDocument`, read ag
 Most invalid operation arguments are reported at the next sync. Invalid loads, unloaded property reads, and invalid object lifetimes can throw immediately. `error.debugInfo.innerError` provides a stable engine diagnostic when available. Error messages do not contain presentation content.
 
 A refused batch drops its queued calls. Existing proxies remain usable within their run. After correcting a known argument error, queue only the corrected operations again. Recreate objects that the refused batch would have added; those objects never existed.
+
+## Run parallel work
+
+Runs on one runtime do not wait for each other. When two runs read, wait, and then write, the later write refuses with `StaleDocument`.
+
+### Know when a sync checks the revision
+
+The presentation has one revision for all of its content. Each commit increments it: a write from any run, an edit in the editor, an undo, or a redo. Writes to two different slides still conflict.
+
+- The context records the revision after each sync that succeeds, also after a sync that only reads.
+- A sync that writes requires that recorded revision. If the presentation changed, the host batch refuses with `StaleDocument` and applies nothing.
+- The first sync of a run has no recorded revision, so its writes do not check.
+- A run that adopts a tracked object also adopts the revision that the earlier run recorded. Then its first sync that writes also checks.
+- A sync that only reads does not check at its start. When it reads in several host batches, for example `load('items/name')` on a collection, the later batches require the revision of the first. A write from another run between those batches refuses the read with `StaleDocument`.
+
+Thus a run that holds a read across slow work, such as a model call, fails if another run writes in that time.
+
+### Fan out the slow work, then apply in one run
+
+Do the slow work outside `run()`. Send every run for one presentation through one queue, so that only one run is active at a time. Each queued run stays short: it reads, decides, and writes. This function rewrites the text of some shapes with one model call for each shape:
+
+```ts
+import {
+  isPptxEditorError,
+  type PptxEditorRuntime,
+  type RequestContext,
+} from '@pptx-editor.dev/editor-api';
+
+export interface TextTarget {
+  readonly slideId: string;
+  readonly shapeId: string;
+}
+
+// One queue for each runtime. A task starts when the task before it settles.
+const queues = new WeakMap<PptxEditorRuntime, Promise<unknown>>();
+
+export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): Promise<T> {
+  const result = (queues.get(runtime) ?? Promise.resolve()).then(task);
+  queues.set(
+    runtime,
+    result.catch(() => undefined)
+  );
+  return result;
+}
+
+function loadTexts(context: RequestContext, targets: readonly TextTarget[]) {
+  return targets.map(({ slideId, shapeId }) => {
+    const shape = context.presentation.slides.getItem(slideId).shapes.getItem(shapeId);
+    return shape.textFrame.textRange.load('text');
+  });
+}
+
+export async function rewriteTexts(
+  runtime: PptxEditorRuntime,
+  targets: readonly TextTarget[],
+  rewrite: (text: string) => Promise<string>,
+  maxAttempts = 3
+) {
+  // 1. Read every target in one short run.
+  const before = await enqueue(runtime, () =>
+    runtime.run(async (context) => {
+      const ranges = loadTexts(context, targets);
+      await context.sync();
+      return ranges.map((range) => range.text);
+    })
+  );
+  // 2. Do the slow work outside run(), in parallel.
+  const after = await Promise.all(before.map((text) => rewrite(text)));
+  // 3. Apply every result in one run. Read again, and write only unchanged targets.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await enqueue(runtime, () =>
+        runtime.run(async (context) => {
+          const ranges = loadTexts(context, targets);
+          await context.sync();
+          const skipped: TextTarget[] = [];
+          ranges.forEach((range, index) => {
+            if (range.text === before[index]) range.text = after[index];
+            else skipped.push(targets[index]);
+          });
+          await context.sync();
+          return { skipped };
+        })
+      );
+    } catch (error) {
+      if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
+      if (attempt >= maxAttempts) throw error;
+      console.warn('StaleDocument: reading again', {
+        attempt,
+        expectedRevision: error.expectedRevision,
+        actualRevision: error.actualRevision,
+      });
+    }
+  }
+}
+```
+
+Each target must exist and have a text frame. Otherwise the sync refuses with `ItemNotFound` or `NotSupported`. The function returns the targets that another writer changed during the slow work. It does not write them; reconsider them with fresh text.
+
+The queue prevents conflicts between the runs of one process. An editor user or another runtime can still change the presentation between the read and the write of step 3. The retry reads again and checks each target before it writes. Keep the retry bounded. Do not repeat the slow work in a loop.
+
+### Log a stale write
+
+On `StaleDocument`, `error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. Log them to see how many commits happened in between. They can be `undefined` when the refusal comes after earlier writes of the same sync applied. Do not replay that sync; see [Understand commit boundaries](#understand-commit-boundaries). Revisions are counters for one open presentation. They are not stored in the file.
 
 ## Keep proxies within their lifetime
 
