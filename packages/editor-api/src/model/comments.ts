@@ -9,8 +9,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `reply`, `delete`).
 //
 // Two file formats hold comments. The legacy format is ECMA-376 Part 1, 19.4: `p:cm`
-// (`CT_Comment`, 19.4.1) in a slide's comments part (13.3.2), by a `p:cmAuthor`
-// (`CT_CommentAuthor`, 19.4.2), at a `p:pos` (19.4.5). It has no resolved state and no text
+// (`CT_Comment`, 19.4.1) in the `p:cmLst` (`CT_CommentList`, 19.4.4) of a slide's comments part
+// (13.3.2), by a `p:cmAuthor` (`CT_CommentAuthor`, 19.4.2), at a `p:pos` (`CT_Point2D`, 19.4.5). It has no resolved state and no text
 // anchor. The threaded format is a part that the slide names in its `p:extLst` (19.3.1.20); it is
 // not part of ECMA-376. Reads cover both; a new thread uses the format that the deck uses.
 //
@@ -35,6 +35,7 @@ import { itemRequest, type ResolvedLoadOptions } from '../runtime/load-options.t
 import { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
 import { flag, ModelObject, pathOf, type Navigation, type RefOf } from './model-object.ts';
+import type { Shape } from './shapes.ts';
 
 /**
  * Where a comment thread points on its slide.
@@ -88,7 +89,7 @@ export interface CommentAddOptions extends CommentAuthorOptions {
    * Default: the slide as a whole. On a deck with only legacy comments, the thread stores a
    * place near the shape (`p:pos`), and `anchor` reads it back as a `point`.
    */
-  shape?: ClientObject | string;
+  shape?: Shape | string;
   /**
    * With `shape`: the stretch of its text the thread points at, as `TextRange.start` and
    * `TextRange.length` count it. The length is 1 or more. A deck with only legacy comments has
@@ -110,8 +111,28 @@ function fillComment(comment: CommentBase, read: Read): void {
 /** Gives a comment that a write created its id key. Module-private. */
 const KEYS = new WeakMap<CommentBase, (key: string) => void>();
 
+/** The comments that `add` or `reply` queued and whose sync has not answered yet. */
+const UNSYNCED = new WeakSet<CommentBase>();
+
 function takeKey(comment: CommentBase, key: string): void {
+  UNSYNCED.delete(comment);
   KEYS.get(comment)?.(key);
+}
+
+/**
+ * Refuse a call on a comment that `add` or `reply` queued, before the sync that adds it: the
+ * host names the new comment only in its answer, so a call in the same sync cannot address it.
+ */
+function requireAdded(comment: CommentBase, target: string): void {
+  if (!UNSYNCED.has(comment)) return;
+  fail({
+    code: 'InvalidObjectPath',
+    target,
+    diagnostic: Object.freeze({
+      code: 'edit.comment-not-added',
+      hint: 'The comment is added at the next sync. Call context.sync() before you use it.',
+    }),
+  });
 }
 
 /** The comment threads a `readComments` answer holds. */
@@ -227,7 +248,9 @@ abstract class CommentBase extends ModelObject {
   /**
    * The comment's id on its slide: the GUID of a threaded comment, or `cm-<authorId>-<idx>` for
    * a legacy comment, from the numbers `p:cm/@authorId` and `p:cm/@idx` (ECMA-376 Part 1,
-   * 19.4.1). It stays the same through save and reopen.
+   * 19.4.1). It stays the same through save and reopen. A file can repeat a GUID, or an author
+   * and index, on one slide: such a comment takes a suffix that holds its place among the
+   * repeats, such as `cm-0-1-2`, and a delete of one of the repeats can change it.
    */
   get id(): string {
     return this.loadedProperty('id');
@@ -260,6 +283,7 @@ abstract class CommentBase extends ModelObject {
     return this.loadedProperty('content');
   }
   set content(value: string) {
+    requireAdded(this, this.at('content'));
     const text = contentOf(value, this.at('content'));
     const expect = this.expected;
     this.command('content', (ref) => ({
@@ -280,6 +304,7 @@ abstract class CommentBase extends ModelObject {
    * On a reply, it deletes only that reply.
    */
   delete(): void {
+    requireAdded(this, this.at('delete'));
     const expect = this.expected;
     this.command('delete', (ref) => ({
       op: 'deleteComment',
@@ -310,8 +335,7 @@ abstract class CommentBase extends ModelObject {
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
     const names = this.selection(request, this.scalars, this.navigations);
-    if (names.length === 0 || (names.every((n) => n === 'id') && this.hasLoadedProperty('id')))
-      return;
+    if (names.length === 0) return;
     const label = `${this.path.label}.load`;
     this.enqueue(
       'read',
@@ -444,6 +468,7 @@ export class Comment extends CommentBase {
     return this.loadedProperty('resolved');
   }
   set resolved(value: boolean) {
+    requireAdded(this, this.at('resolved'));
     const resolved = flag(value, this.at('resolved'));
     const expect = this.expected;
     this.command('resolved', (ref) => ({
@@ -479,11 +504,13 @@ export class Comment extends CommentBase {
    */
   reply(content: string, options?: CommentAuthorOptions): CommentReply {
     const label = `${this.path.label}.reply`;
+    requireAdded(this, label);
     const text = contentOf(content, label);
     const author = authorFields(options, label);
     const expect = this.expected;
     const path = ObjectPath.pending(`${label}()`);
     const reply = new CommentReply(this.context, path, this.slide, () => this.key, '');
+    UNSYNCED.add(reply);
     this.enqueue(
       'write',
       'reply',
@@ -610,6 +637,9 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
     return true;
   }
 
+  /** @internal What the members are, for a refusal of a load path. */
+  protected abstract get noun(): string;
+
   /** @internal The navigation properties of a member, which `items/<name>/...` may load. */
   protected get memberNavigations(): readonly string[] {
     return [];
@@ -623,7 +653,7 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
       if (!accepted.includes(name))
         failArgument(
           `${this.path.label}.${name}`,
-          `a property of comments: ${accepted.join(', ')}`,
+          `a property of ${this.noun}: ${accepted.join(', ')}`,
           nearest(name, accepted)
         );
     this.takeNestedPaths();
@@ -687,16 +717,19 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
  */
 export class CommentCollection extends CommentList<Comment> {
   readonly #shapeById: (id: string) => ClientObject;
+  readonly #isShape: (value: unknown) => boolean;
 
   /** @internal */
   constructor(
     context: RequestContext,
     path: ObjectPath,
     slide: ObjectPath,
-    shapeById: (id: string) => ClientObject
+    shapeById: (id: string) => ClientObject,
+    isShape: (value: unknown) => boolean
   ) {
     super(context, path, slide);
     this.#shapeById = shapeById;
+    this.#isShape = isShape;
   }
 
   /** @internal */
@@ -719,6 +752,11 @@ export class CommentCollection extends CommentList<Comment> {
     return ['replies'];
   }
 
+  /** @internal */
+  protected get noun(): string {
+    return 'comments';
+  }
+
   /**
    * Add a comment thread at the next `context.sync()`. The text takes 1 to 10,000 characters; a
    * line feed starts a new paragraph.
@@ -737,10 +775,8 @@ export class CommentCollection extends CommentList<Comment> {
       const given = options.shape;
       // A shape id looks the shape up in the same sync; an object must be one of this API.
       if (typeof given === 'string') shape = this.#shapeById(idOf(given, `${label}.shape`));
-      else {
-        pathOf(given);
-        shape = given;
-      }
+      else if (this.#isShape(given)) shape = given;
+      else failArgument(`${label}.shape`, 'a Shape of this slide, or the id of one');
     }
     if (options?.textRange !== undefined) {
       const range = options.textRange as { start?: unknown; length?: unknown } | null;
@@ -758,6 +794,7 @@ export class CommentCollection extends CommentList<Comment> {
     }
     const path = ObjectPath.pending(`${label}()`);
     const comment = new Comment(this.context, path, this.slide, '');
+    UNSYNCED.add(comment);
     this.enqueue(
       'write',
       'add',
@@ -809,5 +846,10 @@ export class CommentReplyCollection extends CommentList<CommentReply> {
   /** @internal */
   protected get scalars(): readonly string[] {
     return REPLY_SCALARS;
+  }
+
+  /** @internal */
+  protected get noun(): string {
+    return 'comment replies';
   }
 }

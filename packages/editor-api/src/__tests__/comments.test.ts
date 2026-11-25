@@ -24,9 +24,10 @@ import {
   type Comment,
   type PptxEditorRuntime,
   type RequestContext,
+  type Shape,
 } from '../index.ts';
 import { createRuntime } from '../runtime/runtime.ts';
-import { refusedAtSync } from './support.ts';
+import { refusedAtSync, rejection } from './support.ts';
 
 const IN = 914_400;
 
@@ -479,6 +480,60 @@ describe('Slide.comments: loads and edge cases', () => {
       expect([options, code]).toEqual([options, 'InvalidArgument']);
     }
     expect(await readAll(runtime)).toEqual([]);
+    runtime.dispose();
+  });
+
+  test('a call on a new comment before its sync refuses with a clear diagnostic', async () => {
+    const runtime = await server();
+    const error = await runtime.run(async (context) => {
+      const comment = context.presentation.slides.getItemAt(0).comments.add('New');
+      try {
+        comment.reply('Too early');
+      } catch (e) {
+        return e;
+      }
+      return undefined;
+    });
+    expect(isPptxEditorError(error) && [error.code, error.debugInfo.innerError?.code]).toEqual([
+      'InvalidObjectPath',
+      'edit.comment-not-added',
+    ]);
+    runtime.dispose();
+  });
+
+  test('a slide loads its comments by path, and getItem of an unknown id refuses a load', async () => {
+    const runtime = await server();
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(0).comments.add('Hello');
+      await context.sync();
+    });
+    const contents = await runtime.run(async (context) => {
+      const slide = context.presentation.slides.getItemAt(0).load('comments/items/content');
+      await context.sync();
+      return slide.comments.items.map((c) => c.content);
+    });
+    expect(contents).toEqual(['Hello']);
+    const error = await runtime.run((context) =>
+      rejection(
+        (async () => {
+          context.presentation.slides.getItemAt(0).comments.getItem('nope').load('id');
+          await context.sync();
+        })()
+      )
+    );
+    expect(isPptxEditorError(error) && error.code).toBe('ItemNotFound');
+    runtime.dispose();
+  });
+
+  test('a shape option that is not a shape refuses', async () => {
+    const runtime = await server();
+    const [code] = await codeOf(runtime, (context) => {
+      const slide = context.presentation.slides.getItemAt(0);
+      slide.comments.add('x', {
+        shape: slide.shapes.getItemAt(0).textFrame as unknown as Shape,
+      });
+    });
+    expect(code).toBe('InvalidArgument');
     runtime.dispose();
   });
 

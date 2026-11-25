@@ -47,7 +47,7 @@ await context.sync();
 
 `anchor` reads the place back: `{ type: 'slide' }`, `{ type: 'shape', shapeId }`, `{ type: 'text', shapeId, start, length }`, or `{ type: 'point', left, top }` in points for a legacy comment. A thread whose shape is gone points at the slide. A legacy comment stores only a place on the slide. On a deck with only legacy comments, `shape` gives a place near the shape, and `anchor` reads it as a `point`.
 
-The text takes 1 to 10,000 characters. A line feed starts a new paragraph. `add` and `reply` return the new comment. Call its members after the `context.sync()` that adds it.
+The text takes 1 to 10,000 characters, counted as UTF-16 code units. A line feed starts a new paragraph. `add` and `reply` return the new comment. Call its members after the `context.sync()` that adds it. A call on it before that sync refuses with `InvalidObjectPath` and the diagnostic `edit.comment-not-added`.
 
 ## Choose the author
 
@@ -86,13 +86,17 @@ A `Comment` writes only to its thread, and a `CommentReply` writes only to a rep
 
 ## Refusals
 
+The diagnostics in this table come with a write. A load of a comment that does not exist refuses with `ItemNotFound` and no diagnostic.
+
 | Cause | Code | Diagnostic |
 | --- | --- | --- |
 | No author for a new comment or reply | `NotSupported` | `edit.no-comment-author` |
 | Text that is empty or longer than 10,000 characters | `InvalidArgument` | `edit.comment-text` |
-| An author name longer than 255 characters | `InvalidArgument` | `edit.comment-author` |
+| An author name that is blank or longer than 255 characters | `InvalidArgument` | `edit.comment-author` |
 | No comment with the id on this slide, or not in the thread of the proxy | `ItemNotFound` | `edit.comment-not-found` |
 | The comment changed since a load read it | `GeneralException` | `edit.comment-changed` |
+| Two repeated comments have the same author, date, and text, so the id cannot name one | `GeneralException` | `edit.comment-ambiguous` |
+| A call on a new comment before the sync that adds it | `InvalidObjectPath` | `edit.comment-not-added` |
 | A shape in a group or on another slide, or a `textRange` outside the text | `InvalidArgument` | `argument.not-accepted` |
 | `resolved` on a legacy comment | `NotSupported` | `edit.comment-no-status` |
 | `textRange` on a deck with only legacy comments | `NotSupported` | `edit.comment-no-text-range` |

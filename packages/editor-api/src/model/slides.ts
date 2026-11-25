@@ -27,7 +27,7 @@ import { HyperlinkCollection } from './hyperlinks.ts';
 import { imageBox, settleImage, type SlideGetImageOptions } from './images.ts';
 import { flag, ModelObject, pathOf, text, type RefOf } from './model-object.ts';
 import { replaceOperation, type SearchOptions } from './search.ts';
-import { ShapeCollection } from './shapes.ts';
+import { Shape, ShapeCollection } from './shapes.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
 import { TagCollection } from './tags.ts';
 import { ThemeColorScheme } from './theme.ts';
@@ -187,7 +187,8 @@ export class Slide extends ModelObject {
       this.context,
       ObjectPath.derived(`${this.path.label}.comments`, this.path),
       this.path,
-      (id) => this.shapes.getItem(id)
+      (id) => this.shapes.getItem(id),
+      (value) => value instanceof Shape
     ));
   }
 
@@ -429,6 +430,7 @@ export class Slide extends ModelObject {
       customXmlParts: () => this.customXmlParts,
       transition: () => this.transition,
       headerFooter: () => this.headerFooter,
+      comments: () => this.comments,
     });
     this.loadScalars(
       names.filter((name) => name !== 'speakerNotes'),

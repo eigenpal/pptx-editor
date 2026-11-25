@@ -2,9 +2,10 @@
 // delete through the comment commands the editor runs (`commands/comment-commands.ts`), so a
 // write here and the same edit in the editor produce the same package.
 //
-// The legacy format is ECMA-376 Part 1, 19.4: `p:cm` (`CT_Comment`, 19.4.1) in the slide's
-// comments part (13.3.2), by a `p:cmAuthor` (`CT_CommentAuthor`, 19.4.2) of the comment authors
-// part (13.3.1), at `p:pos` (19.4.5). It has no resolved state and no text anchor. The threaded
+// The legacy format is ECMA-376 Part 1, 19.4: `p:cm` (`CT_Comment`, 19.4.1) in the `p:cmLst`
+// (`CT_CommentList`, 19.4.4) of the slide's comments part (13.3.2), by a `p:cmAuthor`
+// (`CT_CommentAuthor`, 19.4.2) of the comment authors part (13.3.1), at `p:pos` (`CT_Point2D`,
+// 19.4.5). It has no resolved state and no text anchor. The threaded
 // format is a part that the slide names in a `p:ext` of its `p:extLst` (19.3.1.20); it is not
 // part of ECMA-376.
 //

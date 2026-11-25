@@ -335,7 +335,7 @@ export { Comment_2 as Comment }
 
 // @public
 export interface CommentAddOptions extends CommentAuthorOptions {
-    shape?: ClientObject | string;
+    shape?: Shape | string;
     textRange?: {
         start: number;
         length: number;
@@ -368,7 +368,7 @@ export interface CommentAuthorOptions {
 // @public
 export class CommentCollection extends CommentList<Comment_2> {
     // @internal
-    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, shapeById: (id: string) => ClientObject);
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, shapeById: (id: string) => ClientObject, isShape: (value: unknown) => boolean);
     add(content: string, options?: CommentAddOptions): Comment_2;
     // @internal (undocumented)
     protected make(path: ObjectPath, key: string, nullable: boolean): Comment_2;
@@ -376,6 +376,8 @@ export class CommentCollection extends CommentList<Comment_2> {
     protected get memberNavigations(): readonly string[];
     // @internal (undocumented)
     protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
+    // @internal (undocumented)
+    protected get noun(): string;
     // @internal (undocumented)
     protected get scalars(): readonly string[];
 }
@@ -400,6 +402,8 @@ export class CommentReplyCollection extends CommentList<CommentReply> {
     protected make(path: ObjectPath, key: string, nullable: boolean): CommentReply;
     // @internal (undocumented)
     protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
+    // @internal (undocumented)
+    protected get noun(): string;
     // @internal (undocumented)
     protected get scalars(): readonly string[];
 }
