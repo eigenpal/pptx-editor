@@ -267,14 +267,15 @@ export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): 
   return result;
 }
 
-// Run a task again after StaleDocument, at most maxAttempts times in total. Use it only
-// for a run that applies nothing when it refuses, as in this example.
+// Run a task again after StaleDocument, at most maxAttempts times in total.
 async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await task();
     } catch (error) {
       if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
+      // No revisions: earlier writes of that sync applied. Do not run it again.
+      if (error.expectedRevision === undefined) throw error;
       if (attempt >= maxAttempts) throw error;
       console.warn('StaleDocument: reading again', {
         attempt,
@@ -401,7 +402,7 @@ describe('the parallel work rules', () => {
     }
   });
 
-  test('a first sync that reads in several host batches checks its writes', async () => {
+  test('a first sync that reads in several host batches refuses before its writes', async () => {
     const runtime = await PptxEditor.createServer(twoSlideDeck(), { substitutes: false });
     try {
       const mine = runtime.run(async (context) => {

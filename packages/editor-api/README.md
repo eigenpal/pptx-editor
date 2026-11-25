@@ -98,7 +98,7 @@ for (let attempt = 1; ; attempt += 1) {
 }
 ```
 
-The queue prevents conflicts between the runs that use it. An editor user, a collaborator, another runtime, or a run outside the queue can still write between a read and a write. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime. The inner task then waits forever for the outer task.
+The queue prevents conflicts between the runs that use it. Other writers can still write between a read and a write: an editor user, a collaborator, another runtime, or a run outside the queue. Thus keep the retry bounded, and do not repeat the slow work in it. Do not call `enqueue` from a queued task for the same runtime. The inner task then waits forever for the outer task.
 
 `error.expectedRevision` is the revision that the context recorded. `error.actualRevision` is the revision of the presentation at the refusal. They can be `undefined` when the refusal comes after earlier writes of the same sync applied.
 

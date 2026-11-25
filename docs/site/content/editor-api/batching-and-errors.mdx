@@ -108,7 +108,7 @@ A refused batch drops its queued calls. Existing proxies remain usable within th
 
 Runs on one runtime do not wait for each other. The presentation has one revision for all of its content, so writes to two different slides still conflict. When two runs read, wait, and then write, the later write refuses with `StaleDocument`.
 
-### Do slow work outside run()
+### Do slow work outside `run()`
 
 Do slow work, such as a model call, outside `run()`. Send every run for one presentation through one queue, so that only one run is active at a time. Keep each queued run short: it reads, decides, and writes. This function rewrites the text of some shapes with one model call for each shape:
 
@@ -134,14 +134,15 @@ export function enqueue<T>(runtime: PptxEditorRuntime, task: () => Promise<T>): 
   return result;
 }
 
-// Run a task again after StaleDocument, at most maxAttempts times in total. Use it only
-// for a run that applies nothing when it refuses, as in this example.
+// Run a task again after StaleDocument, at most maxAttempts times in total.
 async function retryStale<T>(task: () => Promise<T>, maxAttempts = 3): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await task();
     } catch (error) {
       if (!isPptxEditorError(error) || error.code !== 'StaleDocument') throw error;
+      // No revisions: earlier writes of that sync applied. Do not run it again.
+      if (error.expectedRevision === undefined) throw error;
       if (attempt >= maxAttempts) throw error;
       console.warn('StaleDocument: reading again', {
         attempt,
