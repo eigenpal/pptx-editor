@@ -236,14 +236,15 @@ export class Presentation extends ModelObject {
    *
    * The search reads the text of every shape on each slide (also in groups), every table cell
    * the slide shows, and the speaker notes. Layouts and masters are not searched. To replace on
-   * one slide, use `Slide.replaceAll`. A match stays
-   * in one paragraph; search for a line break with `\v`. A field, such as a slide number, or an
-   * equation is never part of a match.
+   * one slide, use `Slide.replaceAll`. A match stays in one paragraph; search for a line break
+   * with `\v`. A field, such as a slide number, or an equation is never part of a match.
    *
-   * The replacement takes the font of the first character it replaces. It is one line: a line
-   * break, a paragraph break, or a tab in it becomes a space. Matches do not overlap, and the replacement text is not
-   * searched again. With no match, nothing changes and the count is 0. In a runtime over a live
-   * editor, the sync that writes is one undo step.
+   * The replacement takes the font of the run that holds the first replaced character; a match
+   * that starts at a line break takes the font of the text before it. The replacement is one
+   * line: a line break, a paragraph break, or a tab in it becomes a space. An empty replacement
+   * deletes each match. Matches do not overlap, and the replacement text is not searched again.
+   * With no match, nothing changes and the count is 0. In a runtime over a live editor, the sync
+   * that writes is one undo step.
    *
    * Letters match in either case unless `matchCase` is set. With `matchWholeWord`, no letter,
    * digit, combining mark, or underscore touches either end of a match.

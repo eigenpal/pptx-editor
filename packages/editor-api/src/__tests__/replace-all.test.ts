@@ -241,6 +241,16 @@ describe('Presentation.replaceAll', () => {
     });
   });
 
+  test('an empty replacement deletes each match', async () => {
+    const runtime = await open(deck());
+    await runtime.run(async (context) => {
+      const count = context.presentation.replaceAll(' plan', '', { matchCase: true });
+      await context.sync();
+      expect(count.value).toBe(1);
+      expect((await texts(context))[0]).toBe('Acme, slide 1');
+    });
+  });
+
   test('no match changes nothing and answers 0', async () => {
     const runtime = await open(deck());
     const before = await runtime.save();
