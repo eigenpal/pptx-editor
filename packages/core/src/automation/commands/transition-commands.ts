@@ -307,6 +307,12 @@ function setAttr(
 export function setTransition(batch: OpBatch, part: string, change: TransitionChange): void {
   const root = xmlPartOf(batch.pkg, part)?.root;
   if (!root) throw new CommandRefusal('errors.malformed');
+  if (change.clear === true) {
+    const { holders } = transitionOf(root);
+    if (holders.length === 0) throw new CommandRefusal('disabled.noAnimationChange');
+    for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
+    return;
+  }
   if (change.kind !== undefined && change.kind !== 'none' && !KINDS.has(change.kind))
     throw new CommandRefusal('errors.unsupported', 'kind');
   const current = readTransition(root);
@@ -336,17 +342,16 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     holders.length === 1 &&
     isP(holders[0], 'transition') &&
     SPEEDS.get(speedOf(next.durationMs)) !== next.durationMs;
-  // `clear` removes the whole transition. An explicit `none` on a transition that holds nothing
-  // (no effect, no sound, no extensions) with the default advance settings removes it too. A
+  // An explicit `none` on a transition that holds nothing (no effect, no sound, no extensions)
+  // with the default advance settings removes it, as `clear` does. A
   // write that does not name the kind never removes markup, and a slide with no effect keeps
   // its sound.
   const clears =
     copies.length > 0 &&
-    (change.clear === true ||
-      (change.kind === 'none' &&
-        copies.every((c) => elements(c.el).length === 0) &&
-        next.advanceOnClick &&
-        next.advanceAfterMs === null));
+    change.kind === 'none' &&
+    copies.every((c) => elements(c.el).length === 0) &&
+    next.advanceOnClick &&
+    next.advanceAfterMs === null;
   if (clears) {
     for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
   } else if (sameKind && !plainKeepsDuration) {

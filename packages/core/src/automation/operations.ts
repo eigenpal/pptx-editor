@@ -231,7 +231,10 @@ export type AutomationZOrder = 'bringForward' | 'bringToFront' | 'sendBackward' 
  * Part 1, §19.3.1.50). Absent fields keep their values.
  */
 export interface AutomationTransitionWrite {
-  /** The effect element to write; `none` removes the effect and keeps the advance settings. */
+  /**
+   * The effect element to write. On a transition with an effect, `none` removes the effect, the
+   * sound, and the extensions, and keeps the advance settings. A slide with only a sound keeps it.
+   */
   readonly kind?: TransitionKind | 'none';
   /** 10 to 59,000 ms: `p14:dur`, and the nearest `spd` (`ST_TransitionSpeed`, §19.7.54). */
   readonly durationMs?: number;

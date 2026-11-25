@@ -169,7 +169,7 @@ The writes of one `context.sync()` are one transaction. A browser runtime record
 
 A slide with no transition reads `None`, 750 ms, advance on click, and no advance time. A standard effect reads by its element name. An effect from an extension namespace reads `Other`. A write of the timing or the direction keeps the effect and the `mc:AlternateContent` branches that hold it. A write of a new effect replaces the transition markup. It keeps the duration, the advance settings, the transition sound (`p:sndAc`), and the extensions. A new `Push` goes up, and a new `Split` is `VerticalOut`, unless the same `set()` call sets `direction`.
 
-On a slide with an effect, `effect: 'None'` removes the effect, the sound, and the extensions. It keeps the advance settings. `remove()` removes the whole `p:transition`, also on a slide that holds only a sound. A write that does not set `effect` never removes markup. A slide with no effect reads the duration of its speed. So after `None`, set the effect and the duration in one `set()` call.
+On a slide with an effect, `effect: 'None'` removes the effect, the sound, and the extensions. It keeps the advance settings. `remove()` removes the whole `p:transition`, also on a slide that holds only a sound. A write that does not set `effect` never removes markup. After `None`, set the effect and the duration in one `set()` call. A slide with no `p:transition` reads 750 ms. A slide that keeps an empty `p:transition` reads its speed, 500 ms by default.
 
 These writes refuse with `NotSupported`, and nothing in that synchronization is written:
 

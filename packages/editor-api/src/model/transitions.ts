@@ -127,12 +127,12 @@ export class SlideTransition extends ModelObject {
    * The effect, in PascalCase: the name of the effect element. A write takes `None`, `Fade`,
    * `Push`, `Wipe`, `Split`, or `Cut`; any other value refuses with `InvalidArgument`. The other
    * standard effects (such as `Dissolve`) read by name, and an effect from an extension
-   * namespace reads `Other`. A write of a new effect replaces the transition markup and keeps
+   * namespace reads `Other`. A write of a new effect replaces the transition markup. It keeps
    * the duration, the advance settings, the sound (`p:sndAc`), and the extensions. A new `Push`
    * goes up and a new `Split` is vertical-out, unless the same write sets `direction`. On a
    * slide with an effect, `None` removes the effect, the sound, and the extensions; the advance
-   * settings stay (see `remove`). After `None`, set the effect and the duration together: a
-   * slide with no effect reads the duration of its speed.
+   * settings stay (see `remove`). After `None`, set the effect and the duration together. A
+   * slide with no `p:transition` reads 750 ms, and an empty `p:transition` reads its speed.
    */
   get effect(): SlideTransitionEffect | `${SlideTransitionEffect}` {
     return this.loadedProperty('effect');
@@ -145,7 +145,7 @@ export class SlideTransition extends ModelObject {
    * How long the effect plays, in milliseconds, from 10 to 59,000. A write saves `p14:dur` and
    * the nearest speed (`spd`). A slide with no effect refuses a duration write with
    * `NotSupported`: set `effect` in the same `set` call. An extension effect with no `p14`
-   * branch keeps only a speed: it refuses a duration other than 500, 750, or 1000 with
+   * branch keeps only a speed. It refuses a duration other than 500, 750, or 1000 ms with
    * `NotSupported`.
    */
   get durationMs(): number {
