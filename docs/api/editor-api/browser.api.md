@@ -11,6 +11,7 @@ import { AutomationCellAddress } from '@pptx-editor.dev/core/automation';
 import { AutomationCellBorderSide } from '@pptx-editor.dev/core/automation';
 import { AutomationCommentExpect } from '@pptx-editor.dev/core/automation';
 import { AutomationCommentRead } from '@pptx-editor.dev/core/automation';
+import { AutomationCommentScope } from '@pptx-editor.dev/core/automation';
 import { AutomationCommentThreadRead } from '@pptx-editor.dev/core/automation';
 import { AutomationCustomXmlPartRead } from '@pptx-editor.dev/core/automation';
 import { AutomationHandle } from '@pptx-editor.dev/core/automation';
@@ -325,6 +326,8 @@ class Comment_2 extends CommentBase {
     set resolved(value: boolean);
     // @internal (undocumented)
     protected get scalars(): readonly string[];
+    // @internal (undocumented)
+    protected scope(): AutomationCommentScope;
 }
 export { Comment_2 as Comment }
 
@@ -381,6 +384,8 @@ export class CommentReply extends CommentBase {
     protected pick(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
     // @internal (undocumented)
     protected get scalars(): readonly string[];
+    // @internal (undocumented)
+    protected scope(): AutomationCommentScope;
 }
 
 // @public

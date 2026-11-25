@@ -4,7 +4,7 @@ description: 'Read, add, reply to, resolve, and delete slide comments through th
 category: 'Editing API'
 ---
 
-Use `slide.comments` to read the comment threads of a slide and to write new ones. A review agent can leave a comment on a slide, a shape, or a stretch of text, and answer the comments that people leave. `slide.comments` is an SDK extension: the pinned Office.js reference has no comment members. The member names follow the comment API of DOCX Editor.
+Use `slide.comments` to read the comment threads of a slide and to write new ones. A review agent can comment on a slide, a shape, or a stretch of text. It can also answer the comments that people leave. `slide.comments` is an SDK extension: the pinned Office.js reference has no comment members. The member names follow the comment API of DOCX Editor.
 
 ## Review the comments of a slide
 
@@ -45,7 +45,7 @@ slide.comments.add('Say "Q3".', { shape: title, textRange: { start: 0, length: 9
 await context.sync();
 ```
 
-`anchor` reads the place back: `{ type: 'slide' }`, `{ type: 'shape', shapeId }`, `{ type: 'text', shapeId, start, length }`, or `{ type: 'point', left, top }` in points for a legacy comment. A thread whose shape is gone points at the slide.
+`anchor` reads the place back: `{ type: 'slide' }`, `{ type: 'shape', shapeId }`, `{ type: 'text', shapeId, start, length }`, or `{ type: 'point', left, top }` in points for a legacy comment. A thread whose shape is gone points at the slide. A legacy comment stores only a place on the slide. On a deck with only legacy comments, `shape` gives a place near the shape, and `anchor` reads it as a `point`.
 
 The text takes 1 to 10,000 characters. A line feed starts a new paragraph. `add` and `reply` return the new comment. Call its members after the `context.sync()` that adds it.
 
@@ -80,7 +80,9 @@ Each write applies at the next `context.sync()`. All the writes of one sync are 
 
 A presentation stores comments in one of two formats. The legacy format is the comment list of ECMA-376 Part 1, 19.4. The threaded format is newer, and supports resolved threads and text anchors. `slide.comments` reads both. A new thread uses the format that the deck uses: threaded, unless the deck has only legacy comments. A reply keeps the format of its thread.
 
-The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-0305E82C3301}`. The `id` of a legacy comment is `cm-<author>-<index>`. An `id` stays the same through save and reopen.
+The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-0305E82C3301}`. The `id` of a legacy comment is `cm-<authorId>-<idx>`, from the author number and the comment index that the file stores. An `id` stays the same through save and reopen.
+
+A `Comment` writes only to its thread, and a `CommentReply` writes only to a reply of its thread. A write through `comments.getItem(id)` with the id of a reply refuses with `ItemNotFound`. Use `comment.replies.getItem(id)` for a reply.
 
 ## Refusals
 
@@ -89,7 +91,8 @@ The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-03
 | No author for a new comment or reply | `NotSupported` | `edit.no-comment-author` |
 | Text that is empty or longer than 10,000 characters | `InvalidArgument` | `edit.comment-text` |
 | An author name longer than 255 characters | `InvalidArgument` | `edit.comment-author` |
-| No comment with the id on this slide | `ItemNotFound` | `edit.comment-not-found` |
+| No comment with the id on this slide, or not in the thread of the proxy | `ItemNotFound` | `edit.comment-not-found` |
+| The comment changed since a load of the same run read it | `GeneralException` | `edit.comment-changed` |
 | A shape in a group or on another slide, or a `textRange` outside the text | `InvalidArgument` | `argument.not-accepted` |
 | `resolved` on a legacy comment | `NotSupported` | `edit.comment-no-status` |
 | `textRange` on a deck with only legacy comments | `NotSupported` | `edit.comment-no-text-range` |

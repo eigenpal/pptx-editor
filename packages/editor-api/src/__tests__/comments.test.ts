@@ -246,7 +246,7 @@ describe('Slide.comments: author identity', () => {
   });
 
   test('an author option that is not a name refuses at creation', async () => {
-    for (const author of ['', '   ', 'x'.repeat(256), 7]) {
+    for (const author of ['', '   ', '\u0007\u0007', 'x'.repeat(256), 7]) {
       const error = await PptxEditor.createServer(plainDeck(), {
         substitutes: false,
         author: author as string,
@@ -336,6 +336,62 @@ describe('Slide.comments: refusals', () => {
       })
     );
     expect(isPptxEditorError(error) && error.code).toBe('StaleDocument');
+    runtime.dispose();
+  });
+});
+
+describe('Slide.comments: scope of a proxy', () => {
+  test('a write through a proxy never reaches a comment outside its thread', async () => {
+    const runtime = await server();
+    const [first, second, reply] = await runtime.run(async (context) => {
+      const comments = context.presentation.slides.getItemAt(0).comments;
+      const a = comments.add('First');
+      const b = comments.add('Second');
+      await context.sync();
+      const r = a.reply('Reply to first');
+      await context.sync();
+      return [a.id, b.id, r.id];
+    });
+    const cases: ((context: RequestContext) => void)[] = [
+      // The replies of the first thread do not hold the second thread.
+      (c) =>
+        c.presentation.slides.getItemAt(0).comments.getItem(first).replies.getItem(second).delete(),
+      // A reply id is not a thread of the slide.
+      (c) => {
+        c.presentation.slides.getItemAt(0).comments.getItem(reply).resolved = true;
+      },
+      (c) => void c.presentation.slides.getItemAt(0).comments.getItem(reply).reply('x'),
+      (c) => c.presentation.slides.getItemAt(0).comments.getItem(reply).delete(),
+      (c) => {
+        c.presentation.slides.getItemAt(0).comments.getItem(first).replies.getItem(first).content =
+          'x';
+      },
+    ];
+    for (const [i, call] of cases.entries())
+      expect([i, ...(await codeOf(runtime, call))]).toEqual([
+        i,
+        'ItemNotFound',
+        'edit.comment-not-found',
+      ]);
+    const all = await readAll(runtime);
+    expect(all.map((t) => [t.content, t.resolved, t.replies])).toEqual([
+      ['First', false, ['Reply to first']],
+      ['Second', false, []],
+    ]);
+    runtime.dispose();
+  });
+
+  test('a legacy reply proxy does not reach its thread', async () => {
+    const runtime = await server(buildSlideStructureDeck());
+    expect(
+      await codeOf(runtime, (context) => {
+        context.presentation.slides
+          .getItemAt(0)
+          .comments.getItem('cm-0-1')
+          .replies.getItem('cm-0-1').content = 'hijack';
+      })
+    ).toEqual(['ItemNotFound', 'edit.comment-not-found']);
+    expect((await readAll(runtime))[0]!.content).toBe('Check the chart numbers.');
     runtime.dispose();
   });
 });
@@ -462,6 +518,33 @@ describe('Slide.comments: browser runtime', () => {
         { op: 'addComment', slide: { result: 1 }, text: 'Hi' },
       ],
     ]);
+  });
+});
+
+describe('Slide.comments: browser runtime author', () => {
+  test('a browser runtime with no author refuses as a server runtime does', async () => {
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await live.load(plainDeck())).ok).toBe(true);
+    const runtime = BrowserEditor.createBrowser(live);
+    expect(
+      await codeOf(runtime, (context) =>
+        context.presentation.slides.getItemAt(0).comments.add('Hi')
+      )
+    ).toEqual(['NotSupported', 'edit.no-comment-author']);
+  });
+
+  test('createBrowser refuses an author option that is not a name', async () => {
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await live.load(plainDeck())).ok).toBe(true);
+    for (const author of ['', '\u0007\u0007', 'x'.repeat(256), 7]) {
+      let error: unknown;
+      try {
+        BrowserEditor.createBrowser(live, { author: author as string });
+      } catch (e) {
+        error = e;
+      }
+      expect(isPptxEditorError(error) && error.code).toBe('InvalidArgument');
+    }
   });
 });
 

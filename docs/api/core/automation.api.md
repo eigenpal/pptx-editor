@@ -182,6 +182,11 @@ export interface AutomationCommentRead {
 }
 
 // @public
+export type AutomationCommentScope = 'thread' | {
+    readonly replyOf: string;
+};
+
+// @public
 export interface AutomationCommentThreadRead extends AutomationCommentRead {
     // (undocumented)
     readonly anchor: AutomationCommentAnchor;
@@ -978,23 +983,27 @@ export type AutomationOperation = {
     readonly author?: string;
     readonly initials?: string;
     readonly expect?: AutomationCommentExpect;
+    readonly scope?: AutomationCommentScope;
 } | {
     readonly op: 'setCommentText';
     readonly slide: AutomationRef;
     readonly comment: string;
     readonly text: string;
     readonly expect?: AutomationCommentExpect;
+    readonly scope?: AutomationCommentScope;
 } | {
     readonly op: 'setCommentResolved';
     readonly slide: AutomationRef;
     readonly comment: string;
     readonly resolved: boolean;
     readonly expect?: AutomationCommentExpect;
+    readonly scope?: AutomationCommentScope;
 } | {
     readonly op: 'deleteComment';
     readonly slide: AutomationRef;
     readonly comment: string;
     readonly expect?: AutomationCommentExpect;
+    readonly scope?: AutomationCommentScope;
 } | {
     readonly op: 'readSelection';
 } | {

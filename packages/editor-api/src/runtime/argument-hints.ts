@@ -223,6 +223,7 @@ const ROWS: readonly (readonly [string, string])[] = [
     'Use a textRange of 1 or more characters inside the text of the shape, with a shape that holds text.',
   ],
   ['comment-expect', 'Use a comment that a load of this slide returned.'],
+  ['comment-scope', 'Use a comment that a load of this slide returned.'],
   ['resolved', BOOLEAN],
 ];
 

@@ -22,6 +22,7 @@ import type {
   AutomationCommentAnchor,
   AutomationCommentExpect,
   AutomationCommentRead,
+  AutomationCommentScope,
   AutomationCommentThreadRead,
   AutomationOperation,
 } from '@pptx-editor.dev/core/automation';
@@ -83,7 +84,8 @@ export interface CommentAuthorOptions {
 export interface CommentAddOptions extends CommentAuthorOptions {
   /**
    * The shape the thread points at: a shape on the top level of the same slide, or its id.
-   * Default: the slide as a whole.
+   * Default: the slide as a whole. On a deck with only legacy comments, the thread stores a
+   * place near the shape (`p:pos`), and `anchor` reads it back as a `point`.
    */
   shape?: ClientObject | string;
   /**
@@ -222,8 +224,9 @@ abstract class CommentBase extends ModelObject {
   }
 
   /**
-   * The comment's id on its slide: the GUID of a threaded comment, or `cm-<author>-<index>` for
-   * a legacy comment. It stays the same through save and reopen.
+   * The comment's id on its slide: the GUID of a threaded comment, or `cm-<authorId>-<idx>` for
+   * a legacy comment, from the numbers `p:cm/@authorId` and `p:cm/@idx` (ECMA-376 Part 1,
+   * 19.4.1). It stays the same through save and reopen.
    */
   get id(): string {
     return this.loadedProperty('id');
@@ -262,11 +265,13 @@ abstract class CommentBase extends ModelObject {
       op: 'setCommentText',
       slide: ref(this.path),
       comment: this.key,
+      scope: this.scope(),
       text,
       ...(expect === undefined ? {} : { expect }),
     }));
-    // A later write of this batch checks the comment as this write leaves it.
-    if (expect) this.expected = { ...expect, text };
+    // The host stores the text cleaned and trimmed, so a later write of this run does not
+    // check the comment against the text this write sent. A new load reads it again.
+    this.expected = undefined;
   }
 
   /**
@@ -279,9 +284,16 @@ abstract class CommentBase extends ModelObject {
       op: 'deleteComment',
       slide: ref(this.path),
       comment: this.key,
+      scope: this.scope(),
       ...(expect === undefined ? {} : { expect }),
     }));
   }
+
+  /**
+   * @internal What a write may reach: a thread of the slide, or a reply of the parent thread. A
+   * write sends it, so the host refuses a key outside that scope.
+   */
+  protected abstract scope(): AutomationCommentScope;
 
   /** @internal The values of this comment in a `readComments` answer, or undefined. */
   protected abstract pick(threads: readonly AutomationCommentThreadRead[]): Read | undefined;
@@ -342,6 +354,11 @@ export class CommentReply extends CommentBase {
     const thread = threads.find((t) => t.id === this.#thread());
     return thread?.replies.find((r) => r.id === this.key);
   }
+
+  /** @internal */
+  protected scope(): AutomationCommentScope {
+    return { replyOf: this.#thread() };
+  }
 }
 
 /** Fills a thread's state and anchor. Module-private. */
@@ -399,6 +416,11 @@ export class Comment extends CommentBase {
     return threads.find((t) => t.id === this.key);
   }
 
+  /** @internal */
+  protected scope(): AutomationCommentScope {
+    return 'thread';
+  }
+
   /**
    * Whether the thread is resolved. Always false for a legacy comment, which has no state.
    *
@@ -416,6 +438,7 @@ export class Comment extends CommentBase {
       op: 'setCommentResolved',
       slide: ref(this.path),
       comment: this.key,
+      scope: 'thread',
       resolved,
       ...(expect === undefined ? {} : { expect }),
     }));
@@ -456,6 +479,7 @@ export class Comment extends CommentBase {
         op: 'replyToComment',
         slide: ref(this.path),
         comment: this.key,
+        scope: 'thread',
         text,
         ...author,
         ...(expect === undefined ? {} : { expect }),

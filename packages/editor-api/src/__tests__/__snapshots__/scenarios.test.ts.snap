@@ -3748,3 +3748,49 @@ exports[`scenarios on the server runtime text.replace-all 1`] = `
   },
 }
 `;
+
+exports[`scenarios on the server runtime slides.comments 1`] = `
+{
+  "readBack": [
+    {
+      "anchor": "slide",
+      "author": "Review Agent",
+      "content": "Shorten the title.",
+      "initials": "RA",
+      "replies": [
+        "Grace Hopper: Done.",
+      ],
+      "resolved": true,
+    },
+    {
+      "anchor": "shape",
+      "author": "Review Agent",
+      "content": "Check this shape.",
+      "initials": "RA",
+      "replies": [],
+      "resolved": false,
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "anchor": "slide",
+      "author": "Review Agent",
+      "content": "Shorten the title.",
+      "initials": "RA",
+      "replies": [
+        "Grace Hopper: Done.",
+      ],
+      "resolved": true,
+    },
+    {
+      "anchor": "shape",
+      "author": "Review Agent",
+      "content": "Check this shape.",
+      "initials": "RA",
+      "replies": [],
+      "resolved": false,
+    },
+  ],
+}
+`;

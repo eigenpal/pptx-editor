@@ -27,7 +27,11 @@ import {
 } from './commands/comment-commands.ts';
 import { deckUses, readSlideComments } from './commands/comment-read.ts';
 import { CommandRefusal } from './commands/op-batch.ts';
-import type { AutomationCommentExpect, AutomationTextSpan } from './operations.ts';
+import type {
+  AutomationCommentExpect,
+  AutomationCommentScope,
+  AutomationTextSpan,
+} from './operations.ts';
 import type {
   AutomationCommentAnchor,
   AutomationCommentRead,
@@ -130,6 +134,34 @@ function keyOf(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_KEY)
     badArgument('comment');
   return value;
+}
+
+/**
+ * The id key of a comment that a write names, checked against `scope` when the caller gives
+ * one: `thread`, the key names a thread of the slide; `{ replyOf }`, it names a reply of that
+ * thread. A key outside the scope is `item-not-found`, so a write through a thread never
+ * reaches a reply, and a write through a reply never reaches another thread.
+ */
+function scoped(ctx: PlanContext, part: string, comment: unknown, scope: unknown): string {
+  const key = keyOf(comment);
+  if (scope === undefined) return key;
+  const replyOf =
+    typeof scope === 'object' && scope !== null
+      ? (scope as { replyOf?: unknown }).replyOf
+      : undefined;
+  if (scope !== 'thread' && (typeof replyOf !== 'string' || !replyOf || replyOf.length > MAX_KEY))
+    badArgument('comment-scope');
+  const prefix = part.length + 1;
+  const threads = readSlideComments(ctx.batch.pkg, part);
+  const inScope =
+    scope === 'thread'
+      ? threads.some((t) => t.id.slice(prefix) === key)
+      : threads.some(
+          (t) => t.id.slice(prefix) === replyOf && t.replies.some((r) => r.id.slice(prefix) === key)
+        );
+  if (!inScope)
+    throw new AutomationFailure('item-not-found', 'no comment with that id', 'errors.noComment');
+  return key;
 }
 
 /** An author name, initials, or text the caller passed: a string, or absent. */
@@ -251,10 +283,11 @@ export function replyToComment(
   text: string,
   author: string | undefined,
   initials: string | undefined,
-  expect: AutomationCommentExpect | undefined
+  expect: AutomationCommentExpect | undefined,
+  scope?: AutomationCommentScope
 ): AutomationValue {
   const { part, index } = slideAt(ctx, ref);
-  const key = keyOf(comment);
+  const key = scoped(ctx, part, comment, scope);
   if (typeof text !== 'string') badArgument('comment-text');
   const name = optionalText(author, 'comment-author');
   const short = optionalText(initials, 'comment-initials');
@@ -275,10 +308,11 @@ export function setCommentText(
   ref: AutomationRef,
   comment: string,
   text: string,
-  expect: AutomationCommentExpect | undefined
+  expect: AutomationCommentExpect | undefined,
+  scope?: AutomationCommentScope
 ): AutomationValue {
   const { part, index } = slideAt(ctx, ref);
-  const key = keyOf(comment);
+  const key = scoped(ctx, part, comment, scope);
   if (typeof text !== 'string') badArgument('comment-text');
   const checked = expectOf(expect);
   run(ctx, index, {
@@ -295,10 +329,11 @@ export function setCommentResolved(
   ref: AutomationRef,
   comment: string,
   resolved: boolean,
-  expect: AutomationCommentExpect | undefined
+  expect: AutomationCommentExpect | undefined,
+  scope?: AutomationCommentScope
 ): AutomationValue {
   const { part, index } = slideAt(ctx, ref);
-  const key = keyOf(comment);
+  const key = scoped(ctx, part, comment, scope);
   if (typeof resolved !== 'boolean') badArgument('resolved');
   const checked = expectOf(expect);
   run(ctx, index, {
@@ -313,10 +348,11 @@ export function deleteComment(
   ctx: CommentPlanContext,
   ref: AutomationRef,
   comment: string,
-  expect: AutomationCommentExpect | undefined
+  expect: AutomationCommentExpect | undefined,
+  scope?: AutomationCommentScope
 ): AutomationValue {
   const { part, index } = slideAt(ctx, ref);
-  const key = keyOf(comment);
+  const key = scoped(ctx, part, comment, scope);
   const checked = expectOf(expect);
   run(ctx, index, {
     type: 'deleteComment',

@@ -399,14 +399,22 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
         op.text,
         op.author,
         op.initials,
-        op.expect
+        op.expect,
+        op.scope
       );
     case 'setCommentText':
-      return comments.setCommentText(ctx, op.slide, op.comment, op.text, op.expect);
+      return comments.setCommentText(ctx, op.slide, op.comment, op.text, op.expect, op.scope);
     case 'setCommentResolved':
-      return comments.setCommentResolved(ctx, op.slide, op.comment, op.resolved, op.expect);
+      return comments.setCommentResolved(
+        ctx,
+        op.slide,
+        op.comment,
+        op.resolved,
+        op.expect,
+        op.scope
+      );
     case 'deleteComment':
-      return comments.deleteComment(ctx, op.slide, op.comment, op.expect);
+      return comments.deleteComment(ctx, op.slide, op.comment, op.expect, op.scope);
     case 'readSelection':
       return readSelection(ctx);
     case 'selectSlides': {

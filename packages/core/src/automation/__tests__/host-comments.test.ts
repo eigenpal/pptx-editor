@@ -303,6 +303,47 @@ describe('automation comments: refusals', () => {
   });
 });
 
+describe('automation comments: scope', () => {
+  test('a key outside the scope is item-not-found and writes nothing', () => {
+    const host = open();
+    const [a, b] = ok(host, [
+      { op: 'addComment', slide: SLIDE, text: 'A' },
+      { op: 'addComment', slide: SLIDE, text: 'B' },
+    ]).map(keyOf);
+    const reply = keyOf(
+      ok(host, [{ op: 'replyToComment', slide: SLIDE, comment: a!, text: 'R' }])[0]
+    );
+    const before = host.revision();
+    for (const op of [
+      { op: 'deleteComment', slide: SLIDE, comment: b, scope: { replyOf: a } },
+      { op: 'setCommentText', slide: SLIDE, comment: a, scope: { replyOf: a }, text: 'x' },
+      { op: 'setCommentResolved', slide: SLIDE, comment: reply, scope: 'thread', resolved: true },
+      { op: 'replyToComment', slide: SLIDE, comment: reply, scope: 'thread', text: 'x' },
+      { op: 'setCommentText', slide: SLIDE, comment: reply, scope: { replyOf: b }, text: 'x' },
+    ] as AutomationOperation[])
+      expect(errorOf(host, [op])).toMatchObject({
+        error: { code: 'item-not-found', detail: 'errors.noComment' },
+      });
+    expect(
+      errorOf(host, [
+        {
+          op: 'deleteComment',
+          slide: SLIDE,
+          comment: a,
+          scope: 'reply',
+        } as unknown as AutomationOperation,
+      ])
+    ).toMatchObject({ error: { code: 'invalid-argument', detail: 'comment-scope' } });
+    expect(host.revision()).toBe(before);
+    // In scope: the reply of its own thread, and the thread itself.
+    ok(host, [
+      { op: 'setCommentText', slide: SLIDE, comment: reply, scope: { replyOf: a! }, text: 'R2' },
+      { op: 'setCommentResolved', slide: SLIDE, comment: a!, scope: 'thread', resolved: true },
+    ]);
+    expect(threads(host)[0]).toMatchObject({ resolved: true, replies: [{ text: 'R2' }] });
+  });
+});
+
 describe('automation comments: legacy format', () => {
   test('read a legacy thread with its reply, at its p:pos', () => {
     const host = open(buildSlideStructureDeck());

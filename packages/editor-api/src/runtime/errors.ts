@@ -554,14 +554,17 @@ export function failArgument(target: string | undefined, accepted: string, guess
 }
 
 /**
- * The `author` option of a runtime: absent, or a name of 1 to 255 characters after its spaces
- * are trimmed. Anything else refuses with `InvalidArgument` at creation.
+ * The `author` option of a runtime: absent, or a name of 1 to 255 characters once control
+ * characters are removed and spaces are trimmed, as the comment writers store a name. Anything
+ * else refuses with `InvalidArgument` at creation.
  */
 export function authorOption(value: unknown, target: string): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || !value.trim() || value.trim().length > 255)
+  const printable = (ch: string): boolean => ch.charCodeAt(0) > 0x1f && ch !== '\u007F';
+  const name = typeof value === 'string' ? [...value].filter(printable).join('').trim() : '';
+  if (!name || name.length > 255)
     failArgument(`${target}.author`, 'an author name of 1 to 255 characters');
-  return value;
+  return value as string;
 }
 
 /** Longer values get no suggestion: they are no typo of a name. */

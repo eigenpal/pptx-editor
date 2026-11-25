@@ -257,6 +257,13 @@ export interface AutomationCommentExpect {
   readonly text: string;
 }
 
+/**
+ * What a comment write may reach. `thread`: `comment` names a thread of the slide. `replyOf`:
+ * it names a reply of that thread. A key outside the scope is `item-not-found`. Absent: any
+ * comment of the slide.
+ */
+export type AutomationCommentScope = 'thread' | { readonly replyOf: string };
+
 /** `ShapeZOrder` moves. */
 export type AutomationZOrder = 'bringForward' | 'bringToFront' | 'sendBackward' | 'sendToBack';
 
@@ -780,6 +787,7 @@ export type AutomationOperation =
       readonly author?: string;
       readonly initials?: string;
       readonly expect?: AutomationCommentExpect;
+      readonly scope?: AutomationCommentScope;
     }
   | {
       readonly op: 'setCommentText';
@@ -787,6 +795,7 @@ export type AutomationOperation =
       readonly comment: string;
       readonly text: string;
       readonly expect?: AutomationCommentExpect;
+      readonly scope?: AutomationCommentScope;
     }
   | {
       /** Resolve or reopen a thread. The legacy format has no state and refuses. */
@@ -795,6 +804,7 @@ export type AutomationOperation =
       readonly comment: string;
       readonly resolved: boolean;
       readonly expect?: AutomationCommentExpect;
+      readonly scope?: AutomationCommentScope;
     }
   | {
       /** Delete a reply, or a thread with its replies. */
@@ -802,6 +812,7 @@ export type AutomationOperation =
       readonly slide: AutomationRef;
       readonly comment: string;
       readonly expect?: AutomationCommentExpect;
+      readonly scope?: AutomationCommentScope;
     }
   // Selection (browser host only)
   | { readonly op: 'readSelection' }

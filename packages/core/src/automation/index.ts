@@ -62,6 +62,7 @@ export type {
   AutomationCellBorderSide,
   AutomationCellMarginsWrite,
   AutomationCommentExpect,
+  AutomationCommentScope,
   AutomationCustomPropertyWrite,
   AutomationFillWrite,
   AutomationFontWrite,
