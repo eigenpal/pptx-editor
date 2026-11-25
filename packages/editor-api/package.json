@@ -45,9 +45,16 @@
     "office-js"
   ],
   "peerDependencies": {
+    "@napi-rs/canvas": "^1.0.12",
     "@pptx-editor.dev/core": "~0.7.0"
   },
+  "peerDependenciesMeta": {
+    "@napi-rs/canvas": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.12",
     "@pptx-editor.dev/core": "workspace:*"
   },
   "license": "LicenseRef-EigenPal-Pro-Evaluation-1.0",
