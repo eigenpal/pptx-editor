@@ -128,17 +128,68 @@ describe('TextFrame.getTextFit', () => {
     runtime.dispose();
   });
 
-  test('empty paragraphs at the end do not count', async () => {
+  test('empty paragraphs at the end count only when they move the text up', async () => {
     const lines = para(run('One', 'sz="2400"')) + para(run('Two', 'sz="2400"'));
     const empty = '<a:p><a:endParaRPr lang="en-US" sz="4000"/></a:p>';
-    const [plain, trailing] = await fitsOf(
+    const anchored = (anchor: string) =>
+      `<a:bodyPr wrap="square" anchor="${anchor}"><a:noAutofit/></a:bodyPr>`;
+    const [plain, top, bottom, middle] = await fitsOf(
       deckOf(
         { text: lines, bodyPr: NO_AUTOFIT },
-        { text: lines + empty + empty, bodyPr: NO_AUTOFIT }
+        { text: lines + empty + empty, bodyPr: NO_AUTOFIT },
+        { text: lines + empty + empty, bodyPr: anchored('b') },
+        { text: lines + empty + empty, bodyPr: anchored('ctr') }
       ),
-      ['2', '3']
+      ['2', '3', '4', '5']
     );
-    expect(trailing).toEqual(plain!);
+    expect(plain!.overflows).toBe(false);
+    // Below top-anchored text, the empty paragraphs draw nothing.
+    expect(top).toEqual(plain!);
+    // Bottom or middle anchoring pushes "One" above the shape: the picture shows the overflow.
+    expect(bottom!.overflows).toBe(true);
+    expect(middle!.overflows).toBe(true);
+    expect(bottom!.textHeight).toBeGreaterThan(plain!.textHeight);
+  });
+
+  test('a font write in the same sync re-fits the frame before the read', async () => {
+    const runtime = await open(deckOf({ text: para(run('Grow')), bodyPr: SP_AUTOFIT }));
+    const fit = await runtime.run(async (context) => {
+      const frame = context.presentation.slides.getItemAt(0).shapes.getItem('2').textFrame;
+      frame.textRange.font.size = 96;
+      const result = frame.getTextFit();
+      await context.sync();
+      return result.value;
+    });
+    expect(fit.overflows).toBe(false);
+    expect(fit.availableHeight).toBeGreaterThan(64.8);
+    runtime.dispose();
+  });
+
+  test('a placeholder with no text body reads as an empty frame', async () => {
+    const runtime = await open(
+      buildPptx({
+        slides: [
+          {
+            layout: 'title',
+            shapes:
+              '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/>' +
+              '<p:nvPr><p:ph type="ctrTitle"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>',
+          },
+        ],
+      })
+    );
+    const fit = await runtime.run(async (context) => {
+      const result = context.presentation.slides
+        .getItemAt(0)
+        .shapes.getItem('2')
+        .textFrame.getTextFit();
+      await context.sync();
+      return result.value;
+    });
+    expect(fit.overflows).toBe(false);
+    expect(fit.textHeight).toBeGreaterThan(0);
+    expect(fit.availableHeight).toBeGreaterThan(fit.textHeight);
+    runtime.dispose();
   });
 
   test('vertical text measures across its lines, along the shape width', async () => {
@@ -225,7 +276,9 @@ describe('TextFrame.getTextFit', () => {
     runtime.dispose();
   });
 
-  test('a table, a hidden shape, and a layout shape refuse with NotSupported', async () => {
+  test('a table, a group, a hidden shape, and a layout shape refuse with NotSupported', async () => {
+    const hidden = (xml: string, id: number) =>
+      xml.replace(`name="Shape ${id}"/>`, `name="Shape ${id}" hidden="1"/>`);
     const bytes = buildPptx({
       slides: [
         {
@@ -241,10 +294,11 @@ describe('TextFrame.getTextFit', () => {
               tblPr: '<a:tblPr/>',
               rows: `<a:tr h="${IN}">${cell('Cell')}</a:tr>`,
             }) +
-            shape({ id: 3, x: IN, y: 3 * IN, cx: IN, cy: IN, text: para(run('x')) }).replace(
-              '<p:cNvPr id="3" name="Shape 3"/>',
-              '<p:cNvPr id="3" name="Shape 3" hidden="1"/>'
-            ),
+            hidden(shape({ id: 3, x: IN, y: 3 * IN, cx: IN, cy: IN, text: para(run('x')) }), 3) +
+            group(
+              { id: 4, x: IN, y: 5 * IN, cx: IN, cy: IN },
+              shape({ id: 5, x: IN, y: 5 * IN, cx: IN, cy: IN, text: para(run('y')) })
+            ).replace('name="Group 4"/>', 'name="Group 4" hidden="1"/>'),
         },
       ],
     });
@@ -254,7 +308,20 @@ describe('TextFrame.getTextFit', () => {
         'edit.no-text-frame',
       ],
       [
+        (c) => c.presentation.slides.getItemAt(0).shapes.getItem('4').textFrame.getTextFit(),
+        'edit.no-text-frame',
+      ],
+      [
         (c) => c.presentation.slides.getItemAt(0).shapes.getItem('3').textFrame.getTextFit(),
+        'text-fit.not-drawn',
+      ],
+      [
+        (c) =>
+          c.presentation.slides
+            .getItemAt(0)
+            .shapes.getItem('4')
+            .group.shapes.getItem('5')
+            .textFrame.getTextFit(),
         'text-fit.not-drawn',
       ],
       [

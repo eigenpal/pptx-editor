@@ -5,7 +5,9 @@
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import {
+  createAutomationHost,
   createStoreAutomationHost,
+  storeAutomationPort,
   type AutomationHost,
   type AutomationOperation,
   type AutomationValue,
@@ -117,11 +119,27 @@ describe('readTextFit', () => {
     session.dispose();
   });
 
-  test('a host with no measurer, or with the fixed measurer, refuses', async () => {
+  test('a host with no measurer, the fixed measurer, or a stand-in measurer refuses', async () => {
     const session = await open();
+    // An editor's port while its canvas measurer stands in for the fonts.
+    const standIn = createAutomationHost({
+      port: {
+        ...storeAutomationPort(session.store, { measurer: session.measurer }),
+        standInMeasurer: () => true,
+      },
+      capabilities: {
+        document: true,
+        save: true,
+        events: true,
+        selection: false,
+        images: false,
+        autofit: true,
+      },
+    });
     for (const host of [
       createStoreAutomationHost(session.store),
       createStoreAutomationHost(session.store, { measurer: createFixedMeasurer() }),
+      standIn,
     ]) {
       const response = host.execute({
         operations: [

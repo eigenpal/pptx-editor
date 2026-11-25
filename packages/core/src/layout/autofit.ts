@@ -319,10 +319,13 @@ export interface TextFit {
  * `a:noAutofit` (CT_TextNoAutofit, 21.1.2.1.2) as it is. Vertical text (`vert`,
  * ST_TextVerticalType, 20.1.10.83) measures across its lines, in its own turned frame, as
  * autofit does. With columns, the text height is the bottom of the lowest line, and at least
- * the column height when the text flows into a second column (`contentHeight`). Empty
- * paragraphs at the end do not count, as for the shrink steps (`fittedText`): they draw
- * nothing. The overflow test is the one the shrink steps use (`fits`). Null for a shape with
- * no text body.
+ * the column height when the text flows into a second column (`contentHeight`). With top
+ * anchoring, empty paragraphs at the end do not count, as for the shrink steps (`fittedText`):
+ * they draw nothing below the text. With `ctr` or `b` anchoring (ST_TextAnchoringType,
+ * 20.1.10.60) they count: they move the text that draws up, past the top of the text area,
+ * once the whole body is taller than it. The overflow test is the one the shrink steps use
+ * (`fits`). Null for a shape with no text body; a slide shape, whose text lays out in its
+ * geometry's text rectangle (no diagram `textXfrm`).
  */
 export function textFitOf(
   item: Extract<LayoutItem, { kind: 'shape' }>,
@@ -331,21 +334,19 @@ export function textFitOf(
   const full = item.element.text;
   if (!full) return null;
   const drawn = item.text;
-  const text = fittedText(full);
+  const anchor = full.body.anchor;
+  const text = anchor === 'ctr' || anchor === 'b' ? full : fittedText(full);
   let laid = drawn;
   if (!laid || text !== full) {
     // The layout call of `layoutPlaced`, with the empty paragraphs at the end left out. A body
     // with no paragraph draws nothing; its layout gives the text area alone.
-    const tx = item.element.textXfrm;
     const r = item.geometry.textRect;
-    laid = tx
-      ? layoutTextOn(text, { x: 0, y: 0, width: tx.cx, height: tx.cy }, measurer, 'face')
-      : layoutTextOn(
-          text,
-          { x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t },
-          measurer,
-          'size'
-        );
+    laid = layoutTextOn(
+      text,
+      { x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t },
+      measurer,
+      'size'
+    );
   }
   const { tIns, bIns } = frameInsets(text.body);
   // A metric-compatible substitute keeps the advance widths, so the lines break as with the

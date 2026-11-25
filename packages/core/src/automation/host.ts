@@ -80,6 +80,11 @@ export interface AutomationDocumentPort {
   /** The measurer text writes re-fit with, when the host has one. */
   measurer?(): TextMeasurer | undefined;
   /**
+   * True while the measurer stands in for the fonts (an editor that waits for its fonts, or
+   * whose text engine did not load): a read that reports measured text refuses then.
+   */
+  standInMeasurer?(): boolean;
+  /**
    * True while the document is in a collaboration room. A table structure edit then marks the
    * table, as the editor's own table commands do, so a save repairs the merge markup that a
    * concurrent edit of a peer leaves.
@@ -222,6 +227,7 @@ export function createAutomationHost(composition: AutomationHostComposition): Au
       afterCommit: [],
       selectionAfter: {},
       ...(port.measurer?.() ? { measurer: port.measurer()! } : {}),
+      ...(port.standInMeasurer?.() ? { standInMeasurer: true } : {}),
       ...(port.collaborating?.() ? { collaborating: true } : {}),
       ...(capabilities.selection && port.selection ? { selection: port.selection } : {}),
     };

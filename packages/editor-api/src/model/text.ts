@@ -173,11 +173,11 @@ export class TextFrame extends ModelObject {
    * the same shape. Read the result after `context.sync()`. The text lays out at its stored
    * `autoSizeSetting`: `AutoSizeShapeToFitText` grows the shape, so its text does not overflow;
    * `AutoSizeTextToFitShape` overflows only when the smallest shrink step still does not fit;
-   * `AutoSizeNone` reports the raw overflow. Vertical text measures across its lines. A text
-   * write in this API re-fits the frame first; a size change does not. A runtime with no font
-   * measurement (its fonts still load), a shape of a layout or a master, and a hidden shape
-   * refuse with `NotSupported`. An SDK extension: the pinned Office.js reference has no such
-   * member.
+   * `AutoSizeNone` reports the raw overflow. Vertical text measures across its lines. A text,
+   * font, paragraph, or frame write in this API re-fits the frame first; a size change does not.
+   * A runtime with approximate font metrics (an editor whose fonts still load), a shape of a
+   * layout or a master, and a hidden shape refuse with `NotSupported`. An SDK extension: the
+   * pinned Office.js reference has no such member.
    *
    * @example
    * ```ts

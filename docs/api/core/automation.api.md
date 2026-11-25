@@ -196,6 +196,7 @@ export interface AutomationDocumentPort {
     revision(): number;
     save(): Uint8Array | null;
     readonly selection?: AutomationSelectionPort;
+    standInMeasurer?(): boolean;
     subscribe(listener: () => void): () => void;
     wholeDocument?(): boolean;
 }

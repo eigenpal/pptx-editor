@@ -235,7 +235,10 @@ export interface AutomationTextFitRead {
   readonly textHeight: number;
   /** The height of the text area: the text rectangle less the top and bottom insets. */
   readonly availableHeight: number;
-  /** The families that the presentation names but that another face measured. */
+  /**
+   * The families that the presentation names but that a face with other advance widths
+   * measured. A metric-compatible substitute is not listed.
+   */
   readonly substitutedFonts: readonly string[];
 }
 

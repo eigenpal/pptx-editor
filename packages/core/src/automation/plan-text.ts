@@ -78,6 +78,8 @@ import type { TextPoint } from '../contracts/neutral.ts';
 export interface TextPlanContext extends PlanContext {
   /** Present when the host can re-fit text bodies by their autofit rules. */
   readonly measurer?: TextMeasurer;
+  /** Set while `measurer` stands in for the fonts (`AutomationDocumentPort.standInMeasurer`). */
+  readonly standInMeasurer?: boolean;
   /** Set in a collaboration room: a table structure edit marks the table. */
   readonly collaborating?: boolean;
 }
