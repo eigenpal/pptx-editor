@@ -8,6 +8,7 @@
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import { AdvanceCache } from './advance-cache.ts';
+import { markApproximateMeasurer } from './approximate.ts';
 import { os2LineExtents, withFaceLineMetrics } from './face-line-metrics.ts';
 import { isIdeographic } from './line-break.ts';
 import { unkernedTextRanges } from './run-kerning.ts';
@@ -21,7 +22,6 @@ import {
   DEFAULT_FALLBACK_FAMILY,
   eastAsianFallbackFamilies,
   fontSubstitutes,
-  markApproximateMeasurer,
   type FaceMetrics,
   type FontRequest,
   type MathScriptLevel,

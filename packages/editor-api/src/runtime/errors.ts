@@ -234,7 +234,7 @@ const DIAGNOSTICS: ReadonlyMap<string, PptxEditorDiagnostic> = new Map(
       [
         'text-fit-measurer',
         'host.no-font-measurement',
-        'The runtime measures text with approximate metrics: its fonts are still loading, no ' +
+        'The runtime measures text with approximate metrics. Its fonts are still loading, no ' +
           'font loaded, or its text engine did not load. Try again after the fonts load, or ' +
           'give the runtime fonts.',
       ],

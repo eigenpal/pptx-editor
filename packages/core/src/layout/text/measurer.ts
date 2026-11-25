@@ -5,6 +5,7 @@
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import { eastAsianScriptOf } from '../../cascade/script-fonts.ts';
+import { markApproximateMeasurer } from './approximate.ts';
 
 /** A font request from a run. */
 export interface FontRequest {
@@ -220,23 +221,6 @@ const FALLBACKS_BY_SCRIPT: Readonly<Record<string, readonly string[]>> = {
 export function eastAsianFallbackFamilies(lang?: string): readonly string[] {
   const script = eastAsianScriptOf(lang);
   return (script && FALLBACKS_BY_SCRIPT[script]) || EAST_ASIAN_FALLBACK_FAMILIES;
-}
-
-/** The measurers whose heights model no font (`isApproximateMeasurer`). */
-const approximateMeasurers = new WeakSet<TextMeasurer>();
-
-/** Record that `measurer` models no font: the fixed measurer, or one with no face. @internal */
-export function markApproximateMeasurer(measurer: TextMeasurer): void {
-  approximateMeasurers.add(measurer);
-}
-
-/**
- * Whether `measurer` models no font: a fixed measurer (`createFixedMeasurer`), or a shaping
- * measurer with no face, whose families all take stand-in metrics. A read that reports measured
- * text refuses with it. @internal
- */
-export function isApproximateMeasurer(measurer: TextMeasurer): boolean {
-  return approximateMeasurers.has(measurer);
 }
 
 /**

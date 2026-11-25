@@ -174,6 +174,24 @@ describe('TextFrame.getTextFit', () => {
     expect(bottom!.textHeight).toBeGreaterThan(plain!.textHeight);
   });
 
+  test('a frame of empty paragraphs alone reports its first line under any anchor', async () => {
+    const empty = '<a:p><a:endParaRPr lang="en-US" sz="4000"/></a:p>';
+    const anchored = (anchor: string) =>
+      `<a:bodyPr wrap="square" anchor="${anchor}"><a:noAutofit/></a:bodyPr>`;
+    const fits = await fitsOf(
+      deckOf(
+        { text: empty, bodyPr: anchored('t') },
+        { text: empty.repeat(20), bodyPr: anchored('t') },
+        { text: empty.repeat(20), bodyPr: anchored('ctr') },
+        { text: empty.repeat(20), bodyPr: anchored('b') }
+      ),
+      ['2', '3', '4', '5']
+    );
+    // Nothing draws, so nothing overflows: each reads as the single empty line.
+    for (const fit of fits) expect(fit).toEqual(fits[0]!);
+    expect(fits[0]!.overflows).toBe(false);
+  });
+
   test('a font write in the same sync re-fits the frame before the read', async () => {
     const runtime = await open(deckOf({ text: para(run('Grow')), bodyPr: SP_AUTOFIT }));
     const fit = await runtime.run(async (context) => {

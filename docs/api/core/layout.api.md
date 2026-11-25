@@ -489,9 +489,6 @@ export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): v
 export function invert(m: Matrix): Matrix;
 
 // @internal
-export function isApproximateMeasurer(measurer: TextMeasurer): boolean;
-
-// @internal
 export function isExactScheme(scheme: string, upTo?: number): boolean;
 
 // @public
@@ -649,9 +646,6 @@ export interface LineMark {
 
 // @internal
 export function lineUnderlines(runs: readonly GlyphRun[], baseline: number): Map<GlyphRun, UnderlineRing[]>;
-
-// @internal
-export function markApproximateMeasurer(measurer: TextMeasurer): void;
 
 // @public
 export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & FontResolverMark;

@@ -324,8 +324,7 @@ export interface TextFit {
  * below the text. One case differs: single-column text with `ctr` or `b` anchoring
  * (ST_TextAnchoringType, 20.1.10.60) and a paragraph that is not empty. There they count,
  * because they move the text that draws up, past the top of the text area, once the whole body
- * is taller than it. The overflow test
- * is the one the shrink steps use (`fits`).
+ * is taller than it. The overflow test is the one the shrink steps use (`fits`).
  *
  * `item` is a slide shape, whose text lays out in its geometry's text rectangle; a diagram
  * shape's `textXfrm` is not read. Null for a shape with no text body.

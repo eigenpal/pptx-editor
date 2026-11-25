@@ -16,7 +16,8 @@
 // with no face: `isApproximateMeasurer`), or with a measurer that stands in for the fonts (an
 // editor's canvas measurer).
 
-import { isApproximateMeasurer, layoutSlide, type LayoutItem } from '../layout/index.ts';
+import { layoutSlide, type LayoutItem } from '../layout/index.ts';
+import { isApproximateMeasurer } from '../layout/text/approximate.ts';
 import { textFitOf } from '../layout/autofit.ts';
 import type { AutomationRef, AutomationValue } from './protocol.ts';
 import { resolvedSlide } from './plan-reads.ts';

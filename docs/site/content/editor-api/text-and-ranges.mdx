@@ -146,8 +146,8 @@ The read uses the shrink step and the shape size that the presentation stores. A
 
 These rules apply to the layout:
 
-- Empty paragraphs at the end of the text do not count, because they draw nothing below the text. One case differs: text in one column with middle or bottom anchoring. There, they count, because they push the visible text up. The shrink steps do not count them, so such text can overflow at the step that `AutoSizeTextToFitShape` selects.
-- An empty text frame reports the height of one empty line.
+- Empty paragraphs at the end of the text do not count, because they draw nothing below the text. One case differs: text in one column with middle or bottom anchoring and some visible text. There, they count, because they push the visible text up. The shrink steps do not count them, so such text can overflow at the step that `AutoSizeTextToFitShape` selects.
+- A text frame with only empty paragraphs reports the height of its first line, with any anchoring.
 - Vertical text measures across its lines. For this text, `availableHeight` is along the width of the shape, less the side margins.
 - With columns, `textHeight` is the bottom of the lowest line. When the text flows into a second column, `textHeight` is at least `availableHeight`.
 - The read checks the height only. With `wordWrap` set to `false`, a line can run past the sides of the shape, and `overflows` stays `false`.
@@ -170,7 +170,7 @@ These targets refuse the read with `NotSupported`:
 - A shape with no text frame: a picture, a connector, a group, or a table (diagnostic `edit.no-text-frame`). The API has no fit read for a table cell. A table row grows to fit the horizontal text of its cells.
 - A shape of a slide layout or a slide master (diagnostic `text-fit.not-on-slide`).
 - A hidden shape, or a shape in a hidden group (diagnostic `text-fit.not-drawn`).
-- Any shape while the runtime has no exact font measurement (diagnostic `host.no-font-measurement`). A runtime has none when it has no font at all. For example, a server runtime with `substitutes: false`, no `fonts`, and no embedded fonts has none. A runtime over a live editor can also have none while its fonts load, or when its text engine does not load.
+- Any shape while the runtime has no exact font measurement (diagnostic `host.no-font-measurement`). A runtime has none when it has no font at all. For example, a server runtime with `substitutes: false`, no `fonts`, and no embedded fonts has none. A runtime over a live editor can also have none while its fonts load. The same is true when its text engine does not load.
 
 A text frame from `getTextFrameOrNullObject()` that is a null object skips the read, and the result stays not loaded. `getTextFit()` is an SDK extension. The pinned Office.js reference has no such member.
 
