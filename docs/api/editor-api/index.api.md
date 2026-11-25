@@ -1361,6 +1361,8 @@ export class ShapeFont extends ModelObject {
     // (undocumented)
     get doubleStrikethrough(): boolean | null;
     set doubleStrikethrough(value: boolean | null);
+    get highlightColor(): string | null;
+    set highlightColor(value: string | null);
     // (undocumented)
     get italic(): boolean | null;
     set italic(value: boolean | null);

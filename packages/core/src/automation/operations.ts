@@ -136,6 +136,11 @@ export interface AutomationFontWrite {
   readonly smallCaps?: boolean;
   readonly superscript?: boolean;
   readonly subscript?: boolean;
+  /**
+   * The run highlight (`a:highlight`, CT_Color, ECMA-376 Part 1, 21.1.2.3.4): `#RRGGBB` or a
+   * preset color name sets it, null removes it.
+   */
+  readonly highlightColor?: string | null;
 }
 
 /** Paragraph properties a write sets. */

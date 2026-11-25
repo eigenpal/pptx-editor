@@ -80,6 +80,25 @@ await context.sync();
 
 A formatting read returns `null` when the range has mixed values. Narrow that value before reusing it in a write. Paragraph formatting applies to the paragraphs that the range touches.
 
+## Highlight text
+
+`font.highlightColor` reads and sets the text highlight. It is an SDK extension, not a member of the pinned Office.js reference.
+
+```ts
+// shape is a Shape with a text frame, loaded in this run.
+const text = shape.textFrame.textRange;
+// Remove every highlight. The other character formatting stays.
+text.font.highlightColor = null;
+// Highlight the first five characters.
+const first = text.getSubstring(0, 5);
+first.font.highlightColor = '#FFFF00';
+first.font.load('highlightColor');
+await context.sync();
+console.log(first.font.highlightColor); // '#FFFF00'
+```
+
+A read returns `#RRGGBB`. It returns `null` when the text has no highlight and when the range has mixed highlights. A write takes `#RRGGBB` or one of these color names: `black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `gray`, `grey`, `silver`, `maroon`, `navy`, `teal`, `olive`, `lime`, `aqua`, `fuchsia`, `cyan`, `magenta`, `pink`, `brown`, `gold`, `indigo`, or `violet`. A write of `null` removes the highlight from each run and keeps the other character formatting. A highlight that a list style or a master gives the text still applies. The property also works on `TableCell.font`. `TableCell.textRuns` and the table cell options do not include it.
+
 ## Check text targets
 
 Pictures, connectors, tables, and groups do not expose an editable text frame through this API. A direct text read on those shapes fails with `NotSupported` and diagnostic `edit.no-text-frame`. Use [Tables](/docs/editor-api/tables) for table cell text.

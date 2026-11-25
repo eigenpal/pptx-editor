@@ -138,6 +138,8 @@ Automatic adoption with `--adopt` requires both checks:
 
 `Shape.getFormat()`, `Shape.patchFormat()`, `ShapeLineFormat.beginArrowheadStyle`, `ShapeLineFormat.endArrowheadStyle`, and `ShapeArrowheadStyle` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. Endpoint values use PascalCase. `Open` maps to DrawingML `arrow`. The endpoint names do not imply Office.js PowerPoint compatibility.
 
+`ShapeFont.highlightColor` is an SDK extension too. The pinned Office.js PowerPoint reference has no highlight member on `ShapeFont`, so it is not an entry in the compatibility manifest. It reads and writes `a:highlight` in the run properties. A read returns `#RRGGBB`, or `null` for no highlight and for a mixed range. A write of `null` removes the highlight. `TableCell.textRuns`, `FontProperties`, and the table cell options keep the Office.js shape and do not include it.
+
 ### Slide extensions
 
 `Slide.duplicate()` is an SDK extension. It copies a slide inside the presentation and returns the copy. The pinned reference has no member that copies a slide in place, so the manifest has no entry for it. Office.js code copies a slide with `Slide.exportAsBase64()` and `Presentation.insertSlidesFromBase64()`. This package implements both of them too.

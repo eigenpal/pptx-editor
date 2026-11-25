@@ -20,6 +20,10 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['color', "Use '#RRGGBB' (for example '#1F4E79') or a named color such as 'red'."],
   ['foregroundColor', "Use '#RRGGBB' (for example '#1F4E79') or a named color such as 'red'."],
   ['backgroundColor', "Use '#RRGGBB' (for example '#1F4E79') or a named color such as 'red'."],
+  [
+    'highlightColor',
+    "Use '#RRGGBB' (for example '#FFFF00'), a named color such as 'yellow', or null to remove.",
+  ],
   ['transparency', 'Use a fraction from 0 (opaque) to 1 (clear).'],
   ['fill', 'Use a fill object: a solid color, a gradient, a pattern, a picture, or no fill.'],
   ['gradientType', 'Use a value of SlideBackgroundGradientFillType.'],

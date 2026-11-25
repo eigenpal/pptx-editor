@@ -219,12 +219,34 @@ export function comparePoints(a: TextPoint, b: TextPoint): number {
 
 /** The run properties spec a new run at a point inherits. */
 function rPrSpecAt(p: Element, offset: number, slideNumber: number | undefined): NodeSpec {
-  const slots = slotsOf(p, slideNumber).filter((s) => s.kind === 'run');
-  const before = [...slots].reverse().find((s) => s.start < offset) ?? slots[0];
-  const source = before ? child(before.el, 'a:rPr') : child(p, 'a:endParaRPr');
+  const source = armSourceAt(p, offset, slideNumber);
   if (!source) return aSpec('rPr', { lang: 'en-US', dirty: '0' });
   const spec = specOf(source);
   return { ...spec, local: 'rPr' };
+}
+
+/** The properties a run armed at `offset` copies: the run before, the first run, or the mark. */
+function armSourceAt(p: Element, offset: number, n: number | undefined): Element | undefined {
+  const slots = slotsOf(p, n).filter((s) => s.kind === 'run');
+  const before = [...slots].reverse().find((s) => s.start < offset) ?? slots[0];
+  return before ? child(before.el, 'a:rPr') : child(p, 'a:endParaRPr');
+}
+
+/**
+ * True when a caret write at `offset` reaches an own `a:<local>`: on an empty run armed there,
+ * or on the properties that `armedRun` would copy.
+ */
+export function armedChildAt(
+  p: Element | undefined,
+  offset: number,
+  n: number | undefined,
+  local: string
+): boolean {
+  if (!p) return false;
+  const empty = slotsOf(p, n).some(
+    (s) => s.kind === 'run' && s.start === offset && s.end === offset
+  );
+  return empty || child(armSourceAt(p, offset, n), `a:${local}`) !== undefined;
 }
 
 /** Index in the paragraph's children where inline content at `offset` starts. */
@@ -668,6 +690,12 @@ export function ensureRunProps(batch: OpBatch, part: string, runLike: Element): 
     index: 0,
     spec: aSpec('rPr', { lang: 'en-US', dirty: '0' }),
   });
+}
+
+/** The properties of a run-like node as they stand in the batch: `a:rPr`, or the mark itself. */
+export function runPropsOf(batch: OpBatch, part: string, runLike: Element): Element | undefined {
+  const el = batch.element(part, runLike.id);
+  return el.local === 'endParaRPr' ? el : child(el, 'a:rPr');
 }
 
 /** Set or remove an attribute on a run's properties. */

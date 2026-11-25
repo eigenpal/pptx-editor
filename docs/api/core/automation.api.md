@@ -269,6 +269,7 @@ export interface AutomationFontRead {
     readonly color: string | null;
     // (undocumented)
     readonly doubleStrikethrough: boolean | null;
+    readonly highlightColor?: string | null;
     // (undocumented)
     readonly italic: boolean | null;
     // (undocumented)
@@ -296,6 +297,7 @@ export interface AutomationFontWrite {
     readonly color?: string;
     // (undocumented)
     readonly doubleStrikethrough?: boolean;
+    readonly highlightColor?: string | null;
     // (undocumented)
     readonly italic?: boolean;
     // (undocumented)
