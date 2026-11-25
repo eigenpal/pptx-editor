@@ -51,7 +51,10 @@ export interface InsertSlideOptions {
 export interface SearchOptions {
   /** Match upper and lower case exactly. */
   matchCase?: boolean;
-  /** Match whole words only: no letter, digit, or underscore touches either end of a match. */
+  /**
+   * Match whole words only: no letter, digit, combining mark, or underscore touches either end
+   * of a match.
+   */
   matchWholeWord?: boolean;
 }
 
@@ -255,7 +258,7 @@ export class Presentation extends ModelObject {
    * equation is never part of a match.
    *
    * The replacement takes the font of the first character it replaces. It is one line: a line
-   * break or a tab in it becomes a space. Matches do not overlap, and the replacement text is not
+   * break, a paragraph break, or a tab in it becomes a space. Matches do not overlap, and the replacement text is not
    * searched again. With no match, nothing changes and the count is 0. In a runtime over a live
    * editor, the sync that writes is one undo step.
    *

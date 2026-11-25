@@ -333,4 +333,28 @@ describe('Presentation.replaceAll', () => {
       ]);
     });
   });
+
+  test('text that grows re-fits its shape and its table, the same on both runtimes', async () => {
+    const long = 'Acme Corporation of the Western Hemisphere and Beyond';
+    const heights: number[][] = [];
+    const runtimes = [await open(deck()), BrowserEditor.createBrowser(await liveEditor())];
+    for (const runtime of runtimes)
+      await runtime.run(async (context) => {
+        const read = async () => {
+          const title = box(context, 0, '2').load('height');
+          const table = box(context, 0, '5').load('height');
+          await context.sync();
+          return [title.height, table.height];
+        };
+        const before = await read();
+        context.presentation.replaceAll('Acme', long, { matchCase: true });
+        await context.sync();
+        const after = await read();
+        // The box fits its text (`a:spAutoFit`), and the table row grows with its cell.
+        expect(after[0]!).toBeGreaterThan(before[0]!);
+        expect(after[1]!).toBeGreaterThan(before[1]!);
+        heights.push(after);
+      });
+    expect(heights[1]).toEqual(heights[0]);
+  });
 });

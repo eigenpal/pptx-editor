@@ -51,9 +51,9 @@ await runtime.run(async (context) => {
 });
 ```
 
-The search reads every shape on each slide, also in groups, every table cell that the slide shows, and the speaker notes. It does not read layouts or masters. Letters match in either case unless you set `matchCase`. With `matchWholeWord`, no letter, digit, combining mark, or underscore can touch either end of a match.
+The search reads the shapes on each slide, also in groups. It also reads the table cells that the slide shows and the speaker notes. It does not read layouts or masters. Letters match in either case unless you set `matchCase`. With `matchWholeWord`, no letter, digit, combining mark, or underscore can touch either end of a match.
 
-The new text takes the font of the first character that it replaces. A match stays in one paragraph, so the call refuses search text with `\r` or `\n` with `InvalidArgument`. Search for a line break with `\v`. A field, such as a slide number, or an equation is never part of a match. The call refuses search text with U+FFFC, the character that stands for a field in the search. The replacement is one line: a line break or a tab in it becomes a space. Search text and replacement text take at most 1000 characters.
+The new text takes the font of the first character that it replaces. A match stays in one paragraph, so the call refuses search text with `\r` or `\n` with `InvalidArgument`. Search for a line break with `\v`. A field, such as a slide number, or an equation is never part of a match. The call refuses search text with U+FFFC, the character that stands for a field in the search. The replacement is one line: a line break, a paragraph break, or a tab in it becomes a space. Search text and replacement text take at most 1000 characters.
 
 With no match, nothing changes and the count is 0. In a browser runtime, the sync is one undo step. `replaceAll` is an SDK extension: the pinned Office.js reference has no such member.
 

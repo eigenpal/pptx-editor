@@ -43,7 +43,7 @@ const replace = (query: unknown, replacement: unknown, options?: unknown): Autom
     ...(options === undefined ? {} : { options }),
   }) as AutomationOperation;
 
-describe('replaceText', () => {
+describe('findMatches', () => {
   test('a field never matches, also when the editor searches for U+FFFC', () => {
     const read = readPptx(
       buildPptx({
@@ -72,7 +72,9 @@ describe('replaceText', () => {
     expect(findMatches(read.pkg, 'page 1')).toEqual([]);
     expect(findMatches(read.pkg, 'page ')).toHaveLength(1);
   });
+});
 
+describe('replaceText', () => {
   test('answers the count and writes every match in one commit', () => {
     const { host, store } = setup();
     const before = store.revision;

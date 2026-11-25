@@ -218,8 +218,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'none',
     roundTrip: 'full',
     tier: 'community',
-    notes:
-      'Searches slide text, table cells, and speaker notes. The editing API replaces every match with `Presentation.replaceAll`.',
+    notes: 'Searches slide text, table cells, and speaker notes.',
   },
   {
     id: 'text.clipboard',

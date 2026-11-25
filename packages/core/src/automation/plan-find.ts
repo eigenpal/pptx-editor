@@ -9,7 +9,7 @@
 
 import type { FindOptions } from '../contracts/neutral.ts';
 import { isValidXmlText } from '../store/index.ts';
-import { refit } from './commands/autofit.ts';
+import { refitAll } from './commands/autofit.ts';
 import { findMatches, MAX_FIND_TEXT, replaceMatches } from './commands/find.ts';
 import type { AutomationValue } from './protocol.ts';
 import type { TextPlanContext } from './plan-text.ts';
@@ -46,18 +46,20 @@ export function replaceText(
   if (!matches.length) return { kind: 'number', value: 0 };
   edit(() => replaceMatches(ctx.batch, matches, replacement));
   // Autofit text re-fits and a table frame takes its laid-out size, as after the editor's
-  // Replace All (`editor/commands.ts`). Notes have no autofit.
+  // Replace All (`editor/commands.ts`), from one resolution of each slide. Notes have no autofit.
   const measurer = ctx.measurer;
   if (measurer) {
-    const shapes = new Set<string>();
+    const bySlide = new Map<number, { part: string; ids: Set<string> }>();
     for (const m of matches) {
-      const key = `${m.part}\u0000${m.nodeId}`;
-      if (m.where !== 'slide' || shapes.has(key)) continue;
-      shapes.add(key);
+      if (m.where !== 'slide') continue;
       const kind = ctx.batch.element(m.part, m.nodeId).kind;
-      if (kind === 'sp' || kind === 'graphicFrame')
-        edit(() => refit(ctx.batch, m.slide, m.part, m.nodeId, measurer));
+      if (kind !== 'sp' && kind !== 'graphicFrame') continue;
+      const entry = bySlide.get(m.slide) ?? { part: m.part, ids: new Set<string>() };
+      entry.ids.add(m.nodeId);
+      bySlide.set(m.slide, entry);
     }
+    for (const [slide, { part, ids }] of bySlide)
+      edit(() => refitAll(ctx.batch, slide, part, ids, measurer));
   }
   return { kind: 'number', value: matches.length };
 }
