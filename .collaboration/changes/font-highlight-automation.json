@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operations setFont and readFont carry a highlight color. A write adds or removes the highlight element of run properties through existing tree operations. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-automation-highlight.test.ts",
+    "packages/editor-api/src/__tests__/text-highlight.test.ts"
+  ]
+}
