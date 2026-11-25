@@ -10,6 +10,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // fixed hint becomes `debugInfo.innerError`. The edit refusals of the engine have their
 // diagnostics in `edit-diagnostics.ts`.
 
+import { commentAuthorName, MAX_COMMENT_AUTHOR } from '@pptx-editor.dev/core/automation';
 import { argumentHint } from './argument-hints.ts';
 import { CODE_DIAGNOSTICS, EDIT_DIAGNOSTICS } from './edit-diagnostics.ts';
 
@@ -554,23 +555,15 @@ export function failArgument(target: string | undefined, accepted: string, guess
 }
 
 /**
- * The `author` option of a runtime: absent, or a name of 1 to 255 characters once control
- * characters are removed and spaces are trimmed, as the comment writers store a name. Anything
- * else refuses with `InvalidArgument` at creation.
+ * The `author` option of a runtime: absent, or a name that the comment writers accept once they
+ * clean it (`commentAuthorName`): 1 to 255 characters. Anything else refuses with
+ * `InvalidArgument` at creation, so no later write refuses the option.
  */
 export function authorOption(value: unknown, target: string): string | undefined {
   if (value === undefined) return undefined;
-  // A control character or a lone surrogate is removed on save, as the comment writers do.
-  const printable = (ch: string): boolean => {
-    const c = ch.codePointAt(0)!;
-    return c > 0x1f && c !== 0x7f && (c < 0xd800 || c > 0xdfff);
-  };
-  const name =
-    typeof value === 'string'
-      ? [...value].filter(printable).join('').replace(/\s+/g, ' ').trim()
-      : '';
-  if (!name || name.length > 255)
-    failArgument(`${target}.author`, 'an author name of 1 to 255 characters');
+  const name = typeof value === 'string' ? commentAuthorName(value) : '';
+  if (!name || name.length > MAX_COMMENT_AUTHOR)
+    failArgument(`${target}.author`, `an author name of 1 to ${MAX_COMMENT_AUTHOR} characters`);
   return value as string;
 }
 

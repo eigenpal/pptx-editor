@@ -92,8 +92,9 @@ export interface CommentAddOptions extends CommentAuthorOptions {
   shape?: Shape | string;
   /**
    * With `shape`: the stretch of its text the thread points at, as `TextRange.start` and
-   * `TextRange.length` count it. The length is 1 or more. A deck with only legacy comments has
-   * no text anchors, and refuses with `NotSupported`.
+   * `TextRange.length` count it. The range holds 1 or more characters, not only paragraph
+   * breaks; a line break in a paragraph counts as a character. A deck with only legacy comments
+   * has no text anchors, and refuses with `NotSupported`.
    */
   textRange?: { start: number; length: number };
 }
@@ -512,7 +513,9 @@ export class Comment extends CommentBase {
    * Reply to the thread at the next `context.sync()`. The text takes 1 to 10,000 characters; a
    * line feed starts a new paragraph. The reply keeps the format of its thread.
    *
-   * The answer is the new reply. Call its members after the sync that adds it.
+   * The answer is the new reply. Before the sync that adds it, a write, a reply, or a lookup
+   * through it refuses with `InvalidObjectPath` and the diagnostic `edit.comment-not-added`.
+   * A load waits for that sync.
    */
   reply(content: string, options?: CommentAuthorOptions): CommentReply {
     const label = `${this.path.label}.reply`;
@@ -780,8 +783,9 @@ export class CommentCollection extends CommentList<Comment> {
    * line feed starts a new paragraph.
    *
    * The thread uses the format that the deck uses: threaded, unless the deck has only legacy
-   * comments. It is one undo step in a browser runtime. The answer is the new thread. Call its
-   * members after the sync that adds it.
+   * comments. It is one undo step in a browser runtime. The answer is the new thread. Before
+   * the sync that adds it, a write, a reply, or a lookup in its `replies` refuses with
+   * `InvalidObjectPath` and the diagnostic `edit.comment-not-added`. A load waits for that sync.
    */
   add(content: string, options?: CommentAddOptions): Comment {
     const label = `${this.path.label}.add`;

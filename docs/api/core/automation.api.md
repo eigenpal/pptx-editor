@@ -1590,6 +1590,9 @@ export type AutomationValue = {
 export type AutomationZOrder = 'bringForward' | 'bringToFront' | 'sendBackward' | 'sendToBack';
 
 // @public
+export function commentAuthorName(raw: string): string;
+
+// @public
 export function createAutomationHost(composition: AutomationHostComposition): AutomationHost;
 
 // @public
@@ -1618,6 +1621,9 @@ export const MAX_TRANSITION_MS = 59000;
 
 // @public
 export const MIN_TRANSITION_MS = 10;
+
+// @public
+export const MAX_COMMENT_AUTHOR = 255;
 
 // @public
 export interface ServerAutomationOptions extends StoreAutomationOptions {

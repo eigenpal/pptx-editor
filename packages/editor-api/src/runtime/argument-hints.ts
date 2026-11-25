@@ -220,7 +220,7 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['comment-shape', 'Use a shape on the top level of the same slide, not a shape in a group.'],
   [
     'comment-span',
-    'Use a textRange of 1 or more characters inside the text of the shape, with a shape that holds text.',
+    'Use a textRange inside the text of the shape that holds 1 or more characters, not only paragraph breaks.',
   ],
   ['comment-expect', 'Use a comment that a load of this slide returned.'],
   ['comment-scope', 'Use a comment that a load of this slide returned.'],

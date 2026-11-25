@@ -178,4 +178,4 @@ Automatic adoption with `--adopt` requires both checks:
 
 ### Comment extension
 
-`Slide.comments`, `Comment`, `CommentReply`, `CommentCollection`, `CommentReplyCollection`, and the `author` option of `createServer` and `createBrowser` are SDK extensions. The pinned Office.js PowerPoint reference has no comment members, so the manifest has no entry for them. The member names follow the comment API of DOCX Editor. They read both comment formats: the legacy comments of ECMA-376 Part 1, 19.4 (`p:cm`, 19.4.1, in a `p:cmLst`, 19.4.4) and the threaded comments. A new thread uses the format that the deck uses.
+`Slide.comments`, `Comment`, `CommentReply`, `CommentCollection`, `CommentReplyCollection`, and the `author` option of `createServer` and `createBrowser` are SDK extensions. The pinned Office.js reference has no comment members, so the manifest has no entry for them. The member names follow the comment API of DOCX Editor. They read both comment formats: the legacy comments of ECMA-376 Part 1, 19.4 (`p:cm`, 19.4.1, in a `p:cmLst`, 19.4.4) and the threaded comments. A new thread uses the format that the deck uses.

@@ -39,13 +39,24 @@ export function commentText(raw: unknown): string {
   return text;
 }
 
+/**
+ * An author name as the writers store it: no control characters, with each run of white space
+ * as one space, trimmed. The result can be empty or longer than the writers accept.
+ */
+export function commentAuthorName(raw: string): string {
+  return cleanText(raw).replace(/\s+/g, ' ').trim();
+}
+
+/** The longest author name that the writers accept. */
+export const MAX_COMMENT_AUTHOR = MAX_AUTHOR;
+
 /** The author of a new comment: the command's, else the editor's. Refused without a name. */
 export function commentAuthor(
   input: CommentAuthorInput,
   fallback: string | undefined
 ): { readonly name: string; readonly initials: string } {
   const raw = typeof input.author === 'string' && input.author.trim() ? input.author : fallback;
-  const name = typeof raw === 'string' ? cleanText(raw).replace(/\s+/g, ' ').trim() : '';
+  const name = typeof raw === 'string' ? commentAuthorName(raw) : '';
   if (!name) throw new CommandRefusal('disabled.noCommentAuthor');
   if (name.length > MAX_AUTHOR) throw new CommandRefusal('errors.commentAuthor');
   const given =

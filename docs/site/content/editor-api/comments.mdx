@@ -35,7 +35,7 @@ A thread is a `Comment`. It has `id`, `authorName`, `authorInitials`, `content`,
 
 ## Add a comment
 
-Call `comments.add(content, options)`. With no options, the thread points at the slide. Pass `shape` to point at a shape on the top level of the slide, as a `Shape` or as its id. Add `textRange` to point at a stretch of the shape's text, with the `start` and `length` that `TextRange` uses:
+Call `comments.add(content, options)`. With no options, the thread points at the slide. Pass `shape` to point at a shape on the top level of the slide, as a `Shape` or as its id. Add `textRange` to point at a stretch of the shape's text, with the `start` and `length` that `TextRange` uses. The range must hold at least one character, not only paragraph breaks. A line break in a paragraph counts as a character.
 
 ```ts
 const slide = context.presentation.slides.getItemAt(0);
@@ -47,7 +47,7 @@ await context.sync();
 
 `anchor` reads the place back: `{ type: 'slide' }`, `{ type: 'shape', shapeId }`, `{ type: 'text', shapeId, start, length }`, or `{ type: 'point', left, top }` in points for a legacy comment. A thread whose shape is gone points at the slide. A legacy comment stores only a place on the slide. On a deck with only legacy comments, `shape` gives a place near the shape, and `anchor` reads it as a `point`.
 
-The text takes 1 to 10,000 characters, counted as UTF-16 code units. A line feed starts a new paragraph. `add` and `reply` return the new comment. Call its members after the `context.sync()` that adds it. A call on it before that sync refuses with `InvalidObjectPath` and the diagnostic `edit.comment-not-added`.
+The text takes 1 to 10,000 characters, counted as UTF-16 code units. A line feed starts a new paragraph. `add` and `reply` return the new comment. Before the `context.sync()` that adds it, a write, a reply, or a lookup in its `replies` refuses with `InvalidObjectPath` and the diagnostic `edit.comment-not-added`. A load waits for that sync.
 
 ## Choose the author
 
@@ -96,7 +96,7 @@ The diagnostics in this table come with a write. A load of a comment that does n
 | No comment with the id on this slide, or not in the thread of the proxy | `ItemNotFound` | `edit.comment-not-found` |
 | Another author or date has the comment id since a load read it | `GeneralException` | `edit.comment-changed` |
 | Two repeated comments have the same author, date, and text, so the id cannot name one | `GeneralException` | `edit.comment-ambiguous` |
-| A call on a new comment before the sync that adds it | `InvalidObjectPath` | `edit.comment-not-added` |
+| A write, a reply, or a lookup on a new comment before the sync that adds it | `InvalidObjectPath` | `edit.comment-not-added` |
 | A shape in a group or on another slide, or a `textRange` outside the text or with only paragraph breaks | `InvalidArgument` | `argument.not-accepted` |
 | `resolved` on a legacy comment | `NotSupported` | `edit.comment-no-status` |
 | `textRange` on a deck with only legacy comments | `NotSupported` | `edit.comment-no-text-range` |

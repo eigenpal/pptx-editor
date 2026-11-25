@@ -254,6 +254,17 @@ describe('Slide.comments: author identity', () => {
       }).catch((e: unknown) => e);
       expect(isPptxEditorError(error) && error.code).toBe('InvalidArgument');
     }
+    // The option is checked as the writer cleans a name: a tab is a space, U+FFFF is removed.
+    for (const author of [`${'x'.repeat(254)}\tY`, '\uFFFF']) {
+      const error = await PptxEditor.createServer(plainDeck(), {
+        substitutes: false,
+        author,
+      }).catch((e: unknown) => e);
+      expect([author.length, isPptxEditorError(error) && error.code]).toEqual([
+        author.length,
+        'InvalidArgument',
+      ]);
+    }
     // Inner spaces collapse as the writer stores the name: this name counts 201 characters.
     const spaced = `${'x'.repeat(100)}${' '.repeat(200)}${'y'.repeat(100)}`;
     const runtime = await PptxEditor.createServer(plainDeck(), {
@@ -541,17 +552,22 @@ describe('Slide.comments: loads and edge cases', () => {
     const runtime = await server();
     const error = await runtime.run(async (context) => {
       const comment = context.presentation.slides.getItemAt(0).comments.add('New');
-      try {
-        comment.replies.getItem('id').delete();
-      } catch (e) {
-        return e;
-      }
-      return undefined;
+      const errors: unknown[] = [];
+      for (const call of [
+        () => comment.replies.getItem('id').delete(),
+        () => comment.replies.getItemAt(0),
+        () => comment.replies.getItemOrNullObject('id'),
+      ])
+        try {
+          call();
+        } catch (e) {
+          errors.push(e);
+        }
+      return errors;
     });
-    expect(isPptxEditorError(error) && [error.code, error.debugInfo.innerError?.code]).toEqual([
-      'InvalidObjectPath',
-      'edit.comment-not-added',
-    ]);
+    expect(
+      error.map((e) => isPptxEditorError(e) && [e.code, e.debugInfo.innerError?.code])
+    ).toEqual(Array(3).fill(['InvalidObjectPath', 'edit.comment-not-added']));
     runtime.dispose();
   });
 
