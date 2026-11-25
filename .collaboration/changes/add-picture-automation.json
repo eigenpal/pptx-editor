@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation addShape with a picture shape adds a picture through the insertImage helper of the Insert Picture editor command. It uses the existing part, relationship, content type, and node operations of that command. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-add-picture.test.ts",
+    "packages/editor-api/src/__tests__/add-picture.test.ts"
+  ]
+}

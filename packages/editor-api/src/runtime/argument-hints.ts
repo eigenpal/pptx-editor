@@ -29,7 +29,7 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['gradientType', 'Use a value of SlideBackgroundGradientFillType.'],
   ['pattern', 'Use a value of SlideBackgroundPatternFillType.'],
   ['imageBase64', 'Use the Base64 bytes of a PNG, JPEG, GIF, or BMP picture.'],
-  ['base64', 'Use the Base64 bytes of a PNG, JPEG, GIF, or BMP picture.'],
+  ['base64', 'Use the Base64 bytes of a PNG, JPEG, or GIF picture of at most 50 MiB.'],
   ['image-size', 'Use a width and a height greater than 0, at most 8192 pixels.'],
   ['background', 'Use a fill write that this slide can take; a layout or master cannot inherit.'],
   ['areBackgroundGraphicsHidden', BOOLEAN],

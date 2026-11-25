@@ -516,7 +516,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Insert and transform pictures, or replace them with PNG, JPEG, or GIF files. Simple SVG pictures render as vectors; other SVG pictures use their PNG fallback. Large raster pictures can display at reduced resolution without changing stored images.',
+      'Insert and transform pictures, or replace them with PNG, JPEG, or GIF files. The editing API adds PNG, JPEG, or GIF pictures with `shapes.addPicture`. Simple SVG pictures render as vectors; other SVG pictures use their PNG fallback. Large raster pictures can display at reduced resolution without changing stored images.',
     docsLink: '/docs/guides/images',
   },
   {

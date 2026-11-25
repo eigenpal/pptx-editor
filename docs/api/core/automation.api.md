@@ -463,6 +463,14 @@ export type AutomationNewShape =
     readonly rows: number;
     readonly columns: number;
     readonly values?: readonly (readonly string[])[];
+}
+/**
+* A picture (`p:pic`, `CT_Picture`, ECMA-376 Part 1, §19.3.1.37) over a new Image part
+* (§15.2.14): the Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB.
+*/
+| {
+    readonly kind: 'picture';
+    readonly base64: string;
 };
 
 // @public

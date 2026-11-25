@@ -23,7 +23,10 @@ import {
   type Element,
   type PptxPackage,
 } from '../packages/core/src/store/index.ts';
-import { createPptxEditor } from '../packages/core/src/editor/index.ts';
+import {
+  createBrowserAutomationHost,
+  createPptxEditor,
+} from '../packages/core/src/editor/index.ts';
 
 const SCHEMAS = 'reference/ecma-376/part4/transitional-schemas';
 
@@ -319,6 +322,22 @@ async function edited(bytes: Uint8Array): Promise<PptxPackage | null> {
     editor.exec({ type: 'setRowHeight', height: 457_200 });
     editor.exec({ type: 'deleteColumn' });
   }
+  // The editing API's `addPicture` (the `addShape` operation with a picture), with a box and alt
+  // text set in the same batch.
+  const added = createBrowserAutomationHost(editor).execute({
+    operations: [
+      { op: 'getPresentation' },
+      { op: 'getSlide', key: { index: 0 } },
+      {
+        op: 'addShape',
+        container: { result: 1 },
+        shape: { kind: 'picture', base64: Buffer.from(png(40, 20)).toString('base64') },
+        box: { width: 120 },
+      },
+      { op: 'setShape', shape: { result: 2 }, props: { altTextDescription: 'Logo & <mark>' } },
+    ],
+  });
+  if (!added.ok) throw new Error(`addPicture refused: ${JSON.stringify(added.results)}`);
   const r = readPptx(editor.save()!);
   return r.ok ? r.pkg : null;
 }
