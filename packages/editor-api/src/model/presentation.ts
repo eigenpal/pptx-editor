@@ -318,9 +318,11 @@ export class Presentation extends ModelObject {
    * the properties of `Slide.headerFooter`.
    *
    * A slide whose layout and master have no placeholder for an item is skipped for that item.
-   * When no slide can show an item that the call shows, the call refuses with `NotSupported` and the diagnostic
-   * `edit.no-slide-number-placeholder`, `edit.no-footer-placeholder`, or
-   * `edit.no-date-placeholder`, and nothing changes. Settings that do not go together, such as
+   * When no slide has a placeholder for an item that the call shows, the call refuses with
+   * `NotSupported` and the diagnostic `edit.no-slide-number-placeholder`,
+   * `edit.no-footer-placeholder`, or `edit.no-date-placeholder`, and nothing changes. A title
+   * slide that `hideOnTitleSlides` skips counts as a slide with a placeholder here. Hiding an
+   * item that no slide has changes nothing. Settings that do not go together, such as
    * `footerVisible: false` with `footerText`, refuse with `InvalidArgument`. In a runtime over a
    * live editor, the call is one undo step.
    *

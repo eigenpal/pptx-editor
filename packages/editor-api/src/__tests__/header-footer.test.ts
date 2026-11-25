@@ -303,6 +303,33 @@ describe('Presentation.applyHeaderFooter', () => {
     runtime.dispose();
   });
 
+  test('dateFixed alone shows the date on a slide with none', async () => {
+    const runtime = await open(twoSlides());
+    await runtime.run(async (context) => {
+      context.presentation.applyHeaderFooter({ dateFixed: true });
+      await context.sync();
+    });
+    for (const s of await runtime.run(settingsOf))
+      expect(s).toMatchObject({ dateVisible: true, dateText: today(), dateFixed: true });
+    runtime.dispose();
+  });
+
+  test('footerVisible true with no footer text anywhere refuses with edit.no-footer-text', async () => {
+    const runtime = await open(oneLayoutWithFooter());
+    const error = await runtime.run(async (context) => {
+      context.presentation.applyHeaderFooter({ footerVisible: true });
+      return context.sync().then(
+        () => undefined,
+        (e: unknown) => e
+      );
+    });
+    expect(isPptxEditorError(error) && error.code).toBe('NotSupported');
+    expect(isPptxEditorError(error) && error.debugInfo.innerError?.code).toBe(
+      'edit.no-footer-text'
+    );
+    runtime.dispose();
+  });
+
   test('hiding what no slide can show changes nothing', async () => {
     const runtime = await open(oneLayoutWithFooter());
     const before = await runtime.save();

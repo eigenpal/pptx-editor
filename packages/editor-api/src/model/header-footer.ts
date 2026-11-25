@@ -21,7 +21,9 @@ import { flag, ModelObject, text } from './model-object.ts';
 /**
  * The settings that `Presentation.applyHeaderFooter` applies. A setting you leave out stays as
  * each slide has it. Pass at least one of the slide number, footer, or date settings. The
- * `toJSON()` result of a loaded `SlideHeaderFooter` is valid settings.
+ * `toJSON()` result of a loaded `SlideHeaderFooter` is valid settings. Written back, it also
+ * removes a footer or date placeholder that holds no text, because such a placeholder reads as
+ * not visible.
  *
  * @public
  */
@@ -53,7 +55,8 @@ export interface HeaderFooterSettings {
    * Show the date, as fixed text (`true`) or as an automatic date (`false`). `true` keeps the
    * text that each date shows now. `false` turns fixed text into today's date as month/day/year,
    * and keeps an automatic date in its own format. With `false`, a slide with no date takes the
-   * automatic date of another slide, else today's date. With `dateVisible: false`, it is ignored.
+   * date that `dateVisible: true` would give it when that date is automatic, else today's date.
+   * With `dateVisible: false`, it is ignored.
    */
   dateFixed?: boolean;
   /**
@@ -184,7 +187,9 @@ export class SlideHeaderFooter extends ModelObject {
    * The text that the date shows, or an empty string when the slide shows no date. For an
    * automatic date, this is the date text that the file holds. The engine does not update it
    * when the presentation opens. A write shows the date as this fixed text: one line of 1 to 1024
-   * characters.
+   * characters. Each property write is its own change, applied in order. Thus a later write of
+   * `dateFixed = false` replaces this text with today's date. For an automatic date that holds
+   * given text, pass `dateText` with `dateFixed: false` to `Presentation.applyHeaderFooter`.
    */
   get dateText(): string {
     return this.loadedProperty('dateText');
@@ -197,8 +202,8 @@ export class SlideHeaderFooter extends ModelObject {
    * Whether the date is fixed text (`true`) or an automatic date field (`false`). `false` when
    * the slide shows no date. A write shows the date. `true` keeps the text that the date shows
    * now. `false` turns fixed text into today's date as month/day/year, and keeps an automatic
-   * date in its own format. A slide with no date takes the automatic date of another slide, else
-   * today's date.
+   * date in its own format. A slide with no date takes the date that `dateVisible = true` would
+   * give it when that date is automatic, else today's date.
    */
   get dateFixed(): boolean {
     return this.loadedProperty('dateFixed');
