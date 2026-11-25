@@ -3,6 +3,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
+import { createPptxEditor } from '../../editor/index.ts';
+import { presentationInfo, readPptx, serializeXmlPart, xmlPartOf } from '../../store/index.ts';
 import {
   createServerAutomationHost,
   type AutomationBatchResponse,
@@ -12,10 +14,29 @@ import {
   type AutomationValue,
 } from '../index.ts';
 
-function open(): AutomationHost {
-  const opened = createServerAutomationHost(
-    buildPptx({ slides: [{ layout: 'blank', shapes: '' }] })
-  );
+const SOUND = '<p:sndAc><p:endSnd/></p:sndAc>';
+const EXT = '<p:extLst><p:ext uri="{00000000-0000-0000-0000-000000000176}"/></p:extLst>';
+
+/** A deck of one slide whose slide XML after `clrMapOvr` is `ext`. */
+const deckWith = (ext = ''): Uint8Array =>
+  buildPptx({ slides: [{ layout: 'blank', shapes: '', ext }] });
+
+/** The saved XML of the first slide. */
+function slideXml(bytes: Uint8Array): string {
+  const r = readPptx(bytes);
+  if (!r.ok) throw new Error('reopen');
+  return serializeXmlPart(xmlPartOf(r.pkg, presentationInfo(r.pkg).slides[0]!.partName)!);
+}
+
+/** The saved XML of the first slide of the host's presentation. */
+function saved(host: AutomationHost): string {
+  const result = host.save();
+  if (!result.ok) throw new Error(JSON.stringify(result.error));
+  return slideXml(result.bytes);
+}
+
+function open(bytes = deckWith()): AutomationHost {
+  const opened = createServerAutomationHost(bytes);
   if (!opened.ok) throw new Error(JSON.stringify(opened.error));
   return opened.host;
 }
@@ -119,5 +140,40 @@ describe('automation host: slide transitions', () => {
         error: { code: 'unsupported-content', detail: 'transition-variant' },
       });
     }
+  });
+
+  test('a write that does not name the kind keeps a transition that holds only a sound', () => {
+    const host = open(deckWith(`<p:transition advTm="3000">${SOUND}</p:transition>`));
+    const slide = firstSlide(host);
+    ok(host, [{ op: 'setTransition', slide, transition: { advanceAfterMs: null } }]);
+    expect(saved(host)).toContain(`<p:transition>${SOUND}</p:transition>`);
+    ok(host, [{ op: 'setTransition', slide, transition: { advanceOnClick: false } }]);
+    expect(saved(host)).toContain(SOUND);
+  });
+
+  test('a new effect keeps the sound and the extensions; an explicit none drops them', () => {
+    const host = open(
+      deckWith(`<p:transition advTm="3000"><p:fade/>${SOUND}${EXT}</p:transition>`)
+    );
+    const slide = firstSlide(host);
+    ok(host, [{ op: 'setTransition', slide, transition: { kind: 'push', durationMs: 900 } }]);
+    const pushed = saved(host);
+    expect(
+      pushed.match(new RegExp(`<p:push dir="u"/>${SOUND}${EXT.replace(/[{}]/g, '\\$&')}`, 'g'))
+    ).toHaveLength(2);
+    ok(host, [{ op: 'setTransition', slide, transition: { kind: 'none' } }]);
+    expect(saved(host)).toContain('<p:transition advTm="3000"/>');
+    ok(host, [{ op: 'setTransition', slide, transition: { kind: 'none', advanceAfterMs: null } }]);
+    expect(saved(host)).not.toContain('transition');
+  });
+
+  test("the editor's own command keeps a sound when the pane clears the advance time", async () => {
+    // The animations pane sends `setTransition` with `advanceAfterMs: null` for its check box.
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect(
+      (await editor.load(deckWith(`<p:transition advTm="3000">${SOUND}</p:transition>`))).ok
+    ).toBe(true);
+    expect(editor.exec({ type: 'setTransition', advanceAfterMs: null }).ok).toBe(true);
+    expect(slideXml(editor.save()!)).toContain(`<p:transition>${SOUND}</p:transition>`);
   });
 });

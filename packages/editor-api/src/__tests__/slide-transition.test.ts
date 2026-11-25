@@ -280,8 +280,11 @@ describe('Slide.transition', () => {
 
   test('a duration that an extension effect keeps only as a speed refuses', async () => {
     const runtime = await open(withTransitions());
+    const before = slideXml(await runtime.save());
     const error = await runtime.run((context) =>
       refusedAtSync(context, () => {
+        // The advance write of the same sync does not apply either.
+        context.presentation.slides.getItemAt(3).transition.advanceAfterMs = 2000;
         context.presentation.slides.getItemAt(3).transition.durationMs = 700;
       })
     );
@@ -289,6 +292,7 @@ describe('Slide.transition', () => {
     expect(isPptxEditorError(error) && error.debugInfo.innerError?.code).toBe(
       'edit.transition-speed-only'
     );
+    expect(slideXml(await runtime.save())).toEqual(before);
     await runtime.run(async (context) => {
       context.presentation.slides.getItemAt(3).transition.durationMs = 750;
       // A plain `p:transition` gets a `p14` copy, so it keeps any duration.

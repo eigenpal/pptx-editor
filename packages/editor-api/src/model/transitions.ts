@@ -128,9 +128,11 @@ export class SlideTransition extends ModelObject {
    * `Push`, `Wipe`, `Split`, or `Cut`; any other value refuses with `InvalidArgument`. The other
    * standard effects (such as `Dissolve`) read by name, and an effect from an extension
    * namespace reads `Other`. A write of a new effect replaces the transition markup and keeps
-   * the duration, the advance settings, and the transition sound (`p:sndAc`). A new `Push` goes up and a new `Split` is
-   * vertical-out, unless the same write sets `direction`. `None` removes the effect element;
-   * the advance settings stay (see `remove`).
+   * the duration, the advance settings, the sound (`p:sndAc`), and the extensions. A new `Push`
+   * goes up and a new `Split` is vertical-out, unless the same write sets `direction`. `None`
+   * removes the effect element, the sound, and the extensions; the advance settings stay (see
+   * `remove`). After `None`, set the effect and the duration together: a slide with no effect
+   * reads the duration of its speed.
    */
   get effect(): SlideTransitionEffect | `${SlideTransitionEffect}` {
     return this.loadedProperty('effect');

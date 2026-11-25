@@ -167,9 +167,9 @@ The writes of one `context.sync()` are one transaction. A browser runtime record
 | `direction` | `Left`, `Up`, `Right`, or `Down` for `Push` and `Wipe`. `HorizontalIn`, `HorizontalOut`, `VerticalIn`, or `VerticalOut` for `Split`. `null` for other effects. | `dir`, and `orient` for `Split` |
 | `throughBlack` | `true` or `false`, for `Fade` and `Cut` | `thruBlk` |
 
-A slide with no transition reads `None`, 750 ms, advance on click, and no advance time. A standard effect reads by its element name. An effect from an extension namespace reads `Other`. A write of the timing or the direction keeps the effect and the `mc:AlternateContent` branches that hold it. A write of a new effect replaces the transition markup. It keeps the duration, the advance settings, and the transition sound (`p:sndAc`). A new `Push` goes up, and a new `Split` is `VerticalOut`, unless the same `set()` call sets `direction`.
+A slide with no transition reads `None`, 750 ms, advance on click, and no advance time. A standard effect reads by its element name. An effect from an extension namespace reads `Other`. A write of the timing or the direction keeps the effect and the `mc:AlternateContent` branches that hold it. A write of a new effect replaces the transition markup. It keeps the duration, the advance settings, the transition sound (`p:sndAc`), and the extensions. A new `Push` goes up, and a new `Split` is `VerticalOut`, unless the same `set()` call sets `direction`.
 
-`effect: 'None'` removes the effect element and keeps the advance settings. `remove()` also clears the advance settings and the sound, so the slide has no `p:transition`.
+`effect: 'None'` removes the effect element, the sound, and the extensions. It keeps the advance settings. `remove()` also clears the advance settings, so the slide has no `p:transition`. A write that does not set `effect` never removes markup. A slide with no effect reads the duration of its speed. So after `None`, set the effect and the duration in one `set()` call.
 
 These writes refuse with `NotSupported`, and nothing in that synchronization is written:
 

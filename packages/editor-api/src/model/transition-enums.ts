@@ -67,8 +67,8 @@ export enum SlideTransitionEffect {
 
 /**
  * The effect elements of `CT_SlideTransition` (ECMA-376 Part 1, §19.3.1.50). A write names
- * §19.5.41 `fade`, §19.5.59 `push`, §19.5.96 `wipe`, §19.5.71 `split`, §19.5.34 `cut`, or `none`;
- * the other elements read only.
+ * §19.5.41 `fade`, §19.5.59 `push`, §19.5.96 `wipe`, §19.5.71 `split`, §19.5.34 `cut`, or
+ * `none`; the other elements read only.
  */
 export const TRANSITION_EFFECT = enumMap<`${SlideTransitionEffect}`>(
   [
