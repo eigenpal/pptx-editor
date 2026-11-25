@@ -5,7 +5,11 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as Y from 'yjs';
-import type { AutomationHost, AutomationOperation } from '@pptx-editor.dev/core/automation';
+import type {
+  AutomationBox,
+  AutomationHost,
+  AutomationOperation,
+} from '@pptx-editor.dev/core/automation';
 import {
   createBrowserAutomationHost,
   createPptxEditor,
@@ -98,11 +102,11 @@ function execute(host: AutomationHost, operations: AutomationOperation[]): void 
  * Add a picture to the first slide with the operations `addPicture` sends: the lookups, then the
  * write. `packages/editor-api/src/__tests__/add-picture.test.ts` checks that it sends these.
  */
-function addPicture(host: AutomationHost, base64: string): void {
+function addPicture(host: AutomationHost, base64: string, box: AutomationBox = {}): void {
   execute(host, [
     { op: 'getPresentation' },
     { op: 'getSlide', key: { index: 0 } },
-    { op: 'addShape', container: { result: 1 }, shape: { kind: 'picture', base64 }, box: {} },
+    { op: 'addShape', container: { result: 1 }, shape: { kind: 'picture', base64 }, box },
   ]);
 }
 
@@ -169,6 +173,20 @@ describe('ShapeCollection.addPicture on two peers', () => {
     const title = elements(tree).find((e) => e.local === 'sp')!;
     const off = child(child(child(title, 'p:spPr'), 'a:xfrm'), 'a:off')!;
     expect(attr(off, 'x')).toBe(String(400 * 12_700));
+  });
+
+  test('a picture with a box, added while a peer edits the slide, converges', async () => {
+    const { sync, a, b } = await pair();
+    sync.pause();
+    // The box writes a transform after the insert: `addPicture(base64, { width: 120 })`.
+    addPicture(createBrowserAutomationHost(a), png(40, 20), { width: 120 });
+    moveTitle(createBrowserAutomationHost(b));
+    sync.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    const tree = child(child(xmlPartOf(saved(b), SLIDE)!.root, 'p:cSld'), 'p:spTree');
+    const pic = elements(tree).find((e) => e.local === 'pic')!;
+    const ext = child(child(child(pic, 'p:spPr'), 'a:xfrm'), 'a:ext')!;
+    expect([attr(ext, 'cx'), attr(ext, 'cy')]).toEqual([String(120 * 12_700), String(60 * 12_700)]);
   });
 
   test('pictures added on both peers at once keep two media parts', async () => {

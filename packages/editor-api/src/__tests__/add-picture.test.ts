@@ -371,6 +371,34 @@ describe('ShapeCollection.addPicture', () => {
     runtime.dispose();
   });
 
+  test('never fills an empty picture placeholder', async () => {
+    const withPlaceholder = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            name: 'Picture Placeholder 1',
+            x: 914_400,
+            y: 914_400,
+            cx: 2 * 914_400,
+            cy: 2 * 914_400,
+            ph: '<p:ph type="pic" idx="1"/>',
+          }),
+        },
+      ],
+    });
+    const runtime = await open(withPlaceholder);
+    const added = await addOne(runtime, png(400, 200));
+    expect(added).toMatchObject({ type: 'Image', left: 330, top: 195 });
+    const read = await runtime.run(shapesOf);
+    expect(read.map((s) => s.name)).toEqual(['Picture Placeholder 1', 'Picture 2']);
+    const [pic] = picturesOf(packageOf(await runtime.save()));
+    const nvPr = child(child(pic!, 'p:nvPicPr'), 'p:nvPr')!;
+    expect(child(nvPr, 'p:ph')).toBeUndefined();
+    runtime.dispose();
+  });
+
   test('bytes that are no PNG, JPEG, or GIF refuse with InvalidArgument and write nothing', async () => {
     const runtime = await open(deck());
     const before = await runtime.save();

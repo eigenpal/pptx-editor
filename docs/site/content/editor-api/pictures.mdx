@@ -25,7 +25,7 @@ export async function addLogo(runtime: PptxEditorRuntime, logoBase64: string) {
 }
 ```
 
-`addPicture` is an SDK extension. Pass the Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB, with no `data:` URL prefix. The bytes go into a new image part of the presentation. Other bytes, SVG among them, refuse with `InvalidArgument` at the sync. The refused call writes nothing.
+`addPicture` is an SDK extension. Pass the Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB. Do not add a `data:` URL prefix. The bytes go into a new image part of the presentation. Other bytes, SVG among them, refuse with `InvalidArgument` at the sync. The refused call writes nothing.
 
 The options give the box in points:
 

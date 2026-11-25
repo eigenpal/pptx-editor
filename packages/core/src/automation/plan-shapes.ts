@@ -507,6 +507,7 @@ function pictureBox(
   w: number,
   h: number
 ): AutomationBox | undefined {
+  // `writeBox` checks the values again; checking here first keeps the caller's names in errors.
   const given = (v: number | undefined, name: string, min: number) =>
     v === undefined ? undefined : numberIn(v, name, min, MAX_POINTS);
   const left = given(box.left, 'left', -MAX_POINTS);

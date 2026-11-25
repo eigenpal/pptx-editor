@@ -516,7 +516,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Insert and transform pictures, or replace them with PNG, JPEG, or GIF files. The editing API adds PNG, JPEG, or GIF pictures with `shapes.addPicture`. Simple SVG pictures render as vectors; other SVG pictures use their PNG fallback. Large raster pictures can display at reduced resolution without changing stored images.',
+      'Insert and transform pictures, or replace them with PNG, JPEG, or GIF files. Simple SVG pictures render as vectors; other SVG pictures use their PNG fallback. Large raster pictures can display at reduced resolution without changing stored images.',
     docsLink: '/docs/guides/images',
   },
   {
@@ -909,7 +909,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application.',
+      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application. `shapes.addPicture` adds PNG, JPEG, or GIF pictures.',
     docsLink: '/docs/editor-api',
   },
 
