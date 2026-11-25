@@ -59,8 +59,9 @@ const FRAME_NAMES = [
 
 /**
  * Whether the text of a shape fits its text area, as `TextFrame.getTextFit()` reports it. The
- * text area is the shape's text rectangle less `topMargin` and `bottomMargin`. Heights are in
- * points. An SDK extension: the pinned Office.js reference has no such type.
+ * text area is the shape's text rectangle less the margins before and after the lines:
+ * `topMargin` and `bottomMargin` for horizontal text, the side margins for vertical text.
+ * Heights are in points. An SDK extension: the pinned Office.js reference has no such type.
  *
  * @public
  */
@@ -72,8 +73,9 @@ export interface TextFrameFit {
   /** The height of the text area, in points. */
   readonly availableHeight: number;
   /**
-   * The font families that the text names but that the runtime does not have. Another face
-   * measured them, so line breaks and heights can differ where the named font is present.
+   * The font families that the text names but that the runtime does not have, and that a face
+   * with other advance widths measured. Line breaks and heights can differ where the named font
+   * is present. A metric-compatible substitute keeps the line breaks, so it is not listed.
    */
   readonly substitutedFonts: readonly string[];
 }
@@ -172,9 +174,10 @@ export class TextFrame extends ModelObject {
    * `autoSizeSetting`: `AutoSizeShapeToFitText` grows the shape, so its text does not overflow;
    * `AutoSizeTextToFitShape` overflows only when the smallest shrink step still does not fit;
    * `AutoSizeNone` reports the raw overflow. Vertical text measures across its lines. A text
-   * write in this API re-fits the frame first. A runtime that cannot measure text, a shape of a
-   * layout or a master, and a hidden shape refuse with `NotSupported`. An SDK extension: the
-   * pinned Office.js reference has no such member.
+   * write in this API re-fits the frame first; a size change does not. A runtime with no font
+   * measurement (its fonts still load), a shape of a layout or a master, and a hidden shape
+   * refuse with `NotSupported`. An SDK extension: the pinned Office.js reference has no such
+   * member.
    *
    * @example
    * ```ts

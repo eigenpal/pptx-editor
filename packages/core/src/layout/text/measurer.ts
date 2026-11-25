@@ -222,11 +222,28 @@ export function eastAsianFallbackFamilies(lang?: string): readonly string[] {
   return (script && FALLBACKS_BY_SCRIPT[script]) || EAST_ASIAN_FALLBACK_FAMILIES;
 }
 
+/** The measurers that `createFixedMeasurer` made. */
+const fixedMeasurers = new WeakSet<TextMeasurer>();
+
+/**
+ * Whether `measurer` is a fixed measurer (`createFixedMeasurer`): its heights model no font, so
+ * a read that reports measured text refuses with it. @internal
+ */
+export function isFixedMeasurer(measurer: TextMeasurer): boolean {
+  return fixedMeasurers.has(measurer);
+}
+
 /**
  * A deterministic measurer for tests and for hosts without fonts: every code unit is 0.5 em,
  * spaces 0.25 em, and every glyph outline is a box. Never use it for fidelity work.
  */
 export function createFixedMeasurer(): TextMeasurer {
+  const measurer = fixedMeasurer();
+  fixedMeasurers.add(measurer);
+  return measurer;
+}
+
+function fixedMeasurer(): TextMeasurer {
   const metrics: FaceMetrics = {
     ascent: 0.9,
     descent: 0.25,

@@ -491,6 +491,9 @@ export function invert(m: Matrix): Matrix;
 // @internal
 export function isExactScheme(scheme: string, upTo?: number): boolean;
 
+// @internal
+export function isFixedMeasurer(measurer: TextMeasurer): boolean;
+
 // @public
 export function isFontResolver(value: unknown): value is MarkedFontResolver;
 

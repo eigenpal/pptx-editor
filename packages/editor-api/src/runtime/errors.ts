@@ -233,8 +233,9 @@ const DIAGNOSTICS: ReadonlyMap<string, PptxEditorDiagnostic> = new Map(
       ],
       [
         'text-fit-measurer',
-        'host.no-text-measurer',
-        'This host cannot measure text, so it has no text layout. Give the host a text measurer.',
+        'host.no-font-measurement',
+        'The runtime measures text with fixed metrics that model no font: its text engine did ' +
+          'not load, or its fonts are still loading. Try again after the fonts load.',
       ],
       [
         'text-fit-owner',

@@ -276,7 +276,7 @@ describe('TextFrame.getTextFit', () => {
   });
 
   test('a runtime over a live editor reads the fit and records no undo step', async () => {
-    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const live = createPptxEditor({ substitutes: false });
     expect((await live.load(deckOf({ text: para(run(LONG)), bodyPr: NO_AUTOFIT }))).ok).toBe(true);
     const runtime = BrowserEditor.createBrowser(live);
     const fit = await runtime.run(async (context) => {
@@ -289,6 +289,60 @@ describe('TextFrame.getTextFit', () => {
     });
     expect(fit.overflows).toBe(true);
     expect(live.snapshot().canUndo).toBe(false);
+  });
+
+  test('fixed metrics, which model no font, refuse the read', async () => {
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await live.load(deckOf({ text: para(run('a')), bodyPr: NO_AUTOFIT }))).ok).toBe(true);
+    const runtime = BrowserEditor.createBrowser(live);
+    const error = await rejection(
+      runtime.run(async (context) => {
+        context.presentation.slides.getItemAt(0).shapes.getItem('2').textFrame.getTextFit();
+        await context.sync();
+      })
+    );
+    expect(failure(error)).toEqual(['NotSupported', 'host.no-font-measurement']);
+  });
+
+  test('columns: text that flows into the second column reports the column height', async () => {
+    const columns = '<a:bodyPr wrap="square" numCol="2"><a:noAutofit/></a:bodyPr>';
+    const [two, over] = await fitsOf(
+      deckOf(
+        {
+          text: para(
+            run('The quick brown fox jumps over the lazy dog. A lazy dog sleeps.', 'sz="1400"')
+          ),
+          bodyPr: columns,
+        },
+        { text: para(run(LONG, 'sz="1800"')), bodyPr: columns }
+      ),
+      ['2', '3']
+    );
+    expect(two!.overflows).toBe(false);
+    expect(two!.textHeight).toBe(two!.availableHeight);
+    expect(over!.overflows).toBe(true);
+    expect(over!.textHeight).toBeGreaterThan(over!.availableHeight);
+  });
+
+  test('a metric-compatible substitute is not listed', async () => {
+    const runtime = await PptxEditor.createServer(
+      deckOf({
+        text:
+          para(run('Named', 'sz="1800"', '<a:latin typeface="Calibri"/>')) +
+          para(run('Other', 'sz="1800"', '<a:latin typeface="No Such Family"/>')),
+        bodyPr: NO_AUTOFIT,
+      })
+    );
+    const fit = await runtime.run(async (context) => {
+      const result = context.presentation.slides
+        .getItemAt(0)
+        .shapes.getItem('2')
+        .textFrame.getTextFit();
+      await context.sync();
+      return result.value;
+    });
+    expect(fit.substitutedFonts).toEqual(['No Such Family']);
+    runtime.dispose();
   });
 
   test('a null text frame skips the read, as other reads of a null object', async () => {

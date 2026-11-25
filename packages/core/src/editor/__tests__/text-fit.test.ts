@@ -10,7 +10,7 @@ import {
   type AutomationOperation,
   type AutomationValue,
 } from '../../automation/index.ts';
-import type { LayoutItem } from '../../layout/index.ts';
+import { createFixedMeasurer, type LayoutItem } from '../../layout/index.ts';
 import { openPresentation, type DocumentSession } from '../index.ts';
 
 const IN = 914_400;
@@ -117,21 +117,26 @@ describe('readTextFit', () => {
     session.dispose();
   });
 
-  test('a host with no measurer refuses', async () => {
+  test('a host with no measurer, or with the fixed measurer, refuses', async () => {
     const session = await open();
-    const host = createStoreAutomationHost(session.store);
-    const response = host.execute({
-      operations: [
-        { op: 'getSlide', key: { index: 0 } },
-        shapeOp('2'),
-        { op: 'readTextFit', shape: { result: 1 } },
-      ],
-    });
-    expect(response.ok).toBe(false);
-    expect(response.results[2]).toMatchObject({
-      status: 'error',
-      error: { code: 'unsupported-capability', detail: 'text-fit-measurer' },
-    });
+    for (const host of [
+      createStoreAutomationHost(session.store),
+      createStoreAutomationHost(session.store, { measurer: createFixedMeasurer() }),
+    ]) {
+      const response = host.execute({
+        operations: [
+          { op: 'getSlide', key: { index: 0 } },
+          shapeOp('2'),
+          { op: 'readTextFit', shape: { result: 1 } },
+        ],
+      });
+      expect(response.ok).toBe(false);
+      expect(response.results[2]).toMatchObject({
+        status: 'error',
+        error: { code: 'unsupported-capability', detail: 'text-fit-measurer' },
+      });
+      host.dispose();
+    }
     session.dispose();
   });
 });
