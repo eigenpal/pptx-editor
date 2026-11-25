@@ -27,6 +27,7 @@ import {
 } from './commands/comment-commands.ts';
 import { deckUses, readSlideComments } from './commands/comment-read.ts';
 import { CommandRefusal } from './commands/op-batch.ts';
+import { cleanText } from './commands/text-units.ts';
 import type {
   AutomationCommentExpect,
   AutomationCommentScope,
@@ -63,6 +64,8 @@ export interface CommentPlanContext extends PlanContext {
 
 /** The longest comment id key a write takes. A key from a file is far shorter. */
 const MAX_KEY = 1024;
+/** The most initials a comment author has (`comment-write.ts`). */
+const MAX_INITIALS = 8;
 
 /** The slide a ref names: its part (refused when it did not open) and its index. */
 function slideAt(ctx: PlanContext, ref: AutomationRef): { part: string; index: number } {
@@ -164,10 +167,28 @@ function scoped(ctx: PlanContext, part: string, comment: unknown, scope: unknown
   return key;
 }
 
-/** An author name, initials, or text the caller passed: a string, or absent. */
-function optionalText(value: unknown, name: string): string | undefined {
-  if (value !== undefined && typeof value !== 'string') badArgument(name);
-  return value as string | undefined;
+/**
+ * An author name the caller passed: absent, or a string that keeps a character once the
+ * writers clean it (`commentAuthor`). A blank name is refused, not replaced by the host's.
+ */
+function authorOf(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') badArgument('comment-author');
+  if (!cleanText(value).trim())
+    throw new AutomationFailure(
+      'invalid-argument',
+      'invalid comment input',
+      'errors.commentAuthor'
+    );
+  return value;
+}
+
+/** Initials the caller passed: absent, or at most 8 characters once cleaned, not cut. */
+function initialsOf(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || cleanText(value).replace(/\s+/g, '').length > MAX_INITIALS)
+    badArgument('comment-initials');
+  return value;
 }
 
 /** The engine's check of what the caller read, from the protocol's. */
@@ -245,8 +266,8 @@ export function addComment(
 ): AutomationValue {
   const { part, index } = slideAt(ctx, ref);
   if (typeof text !== 'string') badArgument('comment-text');
-  const name = optionalText(author, 'comment-author');
-  const short = optionalText(initials, 'comment-initials');
+  const name = authorOf(author);
+  const short = initialsOf(initials);
   if (span !== undefined && shapeRef === undefined) badArgument('comment-span');
   let nodeId: string | undefined;
   let range: { start: TextPoint; end: TextPoint } | undefined;
@@ -289,8 +310,8 @@ export function replyToComment(
   const { part, index } = slideAt(ctx, ref);
   const key = scoped(ctx, part, comment, scope);
   if (typeof text !== 'string') badArgument('comment-text');
-  const name = optionalText(author, 'comment-author');
-  const short = optionalText(initials, 'comment-initials');
+  const name = authorOf(author);
+  const short = initialsOf(initials);
   const checked = expectOf(expect);
   const effect = run(ctx, index, {
     type: 'replyToComment',

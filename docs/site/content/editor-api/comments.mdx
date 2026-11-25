@@ -29,7 +29,7 @@ export async function answerOpenComments(runtime: PptxEditorRuntime) {
 }
 ```
 
-A thread is a `Comment`. It has `id`, `authorName`, `authorInitials`, `content`, `creationDate`, `resolved`, `anchor`, and `replies`. A reply is a `CommentReply`, with the same members except `resolved`, `anchor`, and `replies`. `comments.items` lists the threads in file order. Comment text and author names come from the file: show them as text, never as markup.
+A thread is a `Comment`. It has `id`, `authorName`, `authorInitials`, `content`, `creationDate`, `resolved`, `anchor`, and `replies`. Load replies with `comment.replies.load(...)`, or with a path such as `items/replies/items/content` on the collection. A reply is a `CommentReply`, with the same members except `resolved`, `anchor`, and `replies`. `comments.items` lists the threads in file order. Comment text and author names come from the file: show them as text, never as markup.
 
 `creationDate` is a `Date`, or `null` when the file has no valid date. A stored date with no time zone counts as UTC.
 
@@ -57,7 +57,7 @@ A new comment or reply needs an author name. The runtime takes the first of thes
 2. The `author` option of the runtime: `PptxEditor.createServer(bytes, { author })` or `PptxEditor.createBrowser(editor, { author })`.
 3. In a browser runtime, the name that signs the editor's own comments: the editor's `author` option, else the collaboration identity.
 
-A server has no signed-in user. Without an author, a write refuses with `NotSupported` and the diagnostic `edit.no-comment-author`, so the runtime never signs a comment with a placeholder name. An author name has 1 to 255 characters. Initials have up to 8 characters; the default is the first letters of the first two words of the name.
+A server has no signed-in user. Without an author, a write refuses with `NotSupported` and the diagnostic `edit.no-comment-author`, so the runtime never signs a comment with a placeholder name. An author name has 1 to 255 characters; a blank name refuses with `InvalidArgument`. Initials have up to 8 characters; the default is the first letters of the first two words of the name.
 
 ## Reply, edit, resolve, and delete
 
@@ -80,7 +80,7 @@ Each write applies at the next `context.sync()`. All the writes of one sync are 
 
 A presentation stores comments in one of two formats. The legacy format is the comment list of ECMA-376 Part 1, 19.4. The threaded format is newer, and supports resolved threads and text anchors. `slide.comments` reads both. A new thread uses the format that the deck uses: threaded, unless the deck has only legacy comments. A reply keeps the format of its thread.
 
-The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-0305E82C3301}`. The `id` of a legacy comment is `cm-<authorId>-<idx>`, from the author number and the comment index that the file stores. An `id` stays the same through save and reopen.
+The `id` of a threaded comment is its GUID, such as `{3F2504E0-4F89-41D3-9A0C-0305E82C3301}`. The `id` of a legacy comment is `cm-<authorId>-<idx>`, from the author number and the comment index that the file stores. An `id` stays the same through save and reopen. A file can repeat a GUID, or an author number and index, on one slide. Such a comment takes a suffix that holds its place among the repeats, such as `cm-0-1-2`. A delete of one of the repeats can change that suffix.
 
 A `Comment` writes only to its thread, and a `CommentReply` writes only to a reply of its thread. A write through `comments.getItem(id)` with the id of a reply refuses with `ItemNotFound`. Use `comment.replies.getItem(id)` for a reply.
 
@@ -92,7 +92,7 @@ A `Comment` writes only to its thread, and a `CommentReply` writes only to a rep
 | Text that is empty or longer than 10,000 characters | `InvalidArgument` | `edit.comment-text` |
 | An author name longer than 255 characters | `InvalidArgument` | `edit.comment-author` |
 | No comment with the id on this slide, or not in the thread of the proxy | `ItemNotFound` | `edit.comment-not-found` |
-| The comment changed since a load of the same run read it | `GeneralException` | `edit.comment-changed` |
+| The comment changed since a load read it | `GeneralException` | `edit.comment-changed` |
 | A shape in a group or on another slide, or a `textRange` outside the text | `InvalidArgument` | `argument.not-accepted` |
 | `resolved` on a legacy comment | `NotSupported` | `edit.comment-no-status` |
 | `textRange` on a deck with only legacy comments | `NotSupported` | `edit.comment-no-text-range` |

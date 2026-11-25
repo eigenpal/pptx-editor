@@ -30,10 +30,11 @@ import { ClientResult } from '../runtime/client-result.ts';
 import type { ClientObject } from '../runtime/client-object.ts';
 import { fail, failArgument, nearest } from '../runtime/errors.ts';
 import { hydrated } from '../runtime/hydrate.ts';
-import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
+import { LOAD_REQUEST } from '../runtime/internals.ts';
+import { itemRequest, type ResolvedLoadOptions } from '../runtime/load-options.ts';
 import { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
-import { flag, ModelObject, pathOf, type RefOf } from './model-object.ts';
+import { flag, ModelObject, pathOf, type Navigation, type RefOf } from './model-object.ts';
 
 /**
  * Where a comment thread points on its slide.
@@ -201,7 +202,7 @@ abstract class CommentBase extends ModelObject {
     this.slide = slide;
     this.key = key;
     if (key) this.setLoadedProperty('id', key);
-    FILLERS.set(this, (read) => this.fill(read));
+    FILLERS.set(this, (read) => this.fillFrom(read));
     KEYS.set(this, (k) => {
       this.key = k;
       this.setLoadedProperty('id', k);
@@ -209,7 +210,7 @@ abstract class CommentBase extends ModelObject {
   }
 
   /** @internal Take the values a read gave. */
-  protected fill(read: Read): void {
+  protected fillFrom(read: Read): void {
     this.key = read.id;
     this.expected = {
       author: read.author,
@@ -265,7 +266,7 @@ abstract class CommentBase extends ModelObject {
       op: 'setCommentText',
       slide: ref(this.path),
       comment: this.key,
-      scope: this.scope(),
+      scope: this.writeScope(),
       text,
       ...(expect === undefined ? {} : { expect }),
     }));
@@ -284,7 +285,7 @@ abstract class CommentBase extends ModelObject {
       op: 'deleteComment',
       slide: ref(this.path),
       comment: this.key,
-      scope: this.scope(),
+      scope: this.writeScope(),
       ...(expect === undefined ? {} : { expect }),
     }));
   }
@@ -293,18 +294,24 @@ abstract class CommentBase extends ModelObject {
    * @internal What a write may reach: a thread of the slide, or a reply of the parent thread. A
    * write sends it, so the host refuses a key outside that scope.
    */
-  protected abstract scope(): AutomationCommentScope;
+  protected abstract writeScope(): AutomationCommentScope;
 
   /** @internal The values of this comment in a `readComments` answer, or undefined. */
-  protected abstract pick(threads: readonly AutomationCommentThreadRead[]): Read | undefined;
+  protected abstract pickFrom(threads: readonly AutomationCommentThreadRead[]): Read | undefined;
 
   /** @internal The scalar properties a load can name. */
   protected abstract get scalars(): readonly string[];
 
+  /** @internal The navigation properties a load can name. */
+  protected get navigations(): Navigation {
+    return {};
+  }
+
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
-    const names = this.selection(request, this.scalars);
-    if (names.length === 0 || names.every((n) => n === 'id')) return;
+    const names = this.selection(request, this.scalars, this.navigations);
+    if (names.length === 0 || (names.every((n) => n === 'id') && this.hasLoadedProperty('id')))
+      return;
     const label = `${this.path.label}.load`;
     this.enqueue(
       'read',
@@ -312,9 +319,9 @@ abstract class CommentBase extends ModelObject {
       (ref) => ({ op: 'readComments', slide: ref(this.slide) }),
       (value) => {
         if (value.kind === 'null') return;
-        const found = this.pick(threadsOf(value, label));
+        const found = this.pickFrom(threadsOf(value, label));
         if (!found) fail({ code: 'ItemNotFound', target: label });
-        this.fill(found);
+        this.fillFrom(found);
       }
     );
   }
@@ -350,13 +357,13 @@ export class CommentReply extends CommentBase {
   }
 
   /** @internal */
-  protected pick(threads: readonly AutomationCommentThreadRead[]): Read | undefined {
+  protected pickFrom(threads: readonly AutomationCommentThreadRead[]): Read | undefined {
     const thread = threads.find((t) => t.id === this.#thread());
     return thread?.replies.find((r) => r.id === this.key);
   }
 
   /** @internal */
-  protected scope(): AutomationCommentScope {
+  protected writeScope(): AutomationCommentScope {
     return { replyOf: this.#thread() };
   }
 }
@@ -401,8 +408,8 @@ export class Comment extends CommentBase {
   }
 
   /** @internal */
-  protected override fill(read: Read): void {
-    super.fill(read);
+  protected override fillFrom(read: Read): void {
+    super.fillFrom(read);
     if ('replies' in read) THREAD_FILLERS.get(this)?.(read);
   }
 
@@ -412,12 +419,17 @@ export class Comment extends CommentBase {
   }
 
   /** @internal */
-  protected pick(threads: readonly AutomationCommentThreadRead[]): Read | undefined {
+  protected override get navigations(): Navigation {
+    return { replies: () => this.replies };
+  }
+
+  /** @internal */
+  protected pickFrom(threads: readonly AutomationCommentThreadRead[]): Read | undefined {
     return threads.find((t) => t.id === this.key);
   }
 
   /** @internal */
-  protected scope(): AutomationCommentScope {
+  protected writeScope(): AutomationCommentScope {
     return 'thread';
   }
 
@@ -507,7 +519,7 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
   }
 
   /** @internal The members in a `readComments` answer, in order. */
-  protected abstract members(threads: readonly AutomationCommentThreadRead[]): readonly Read[];
+  protected abstract membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read[];
   /** @internal A proxy for one member. */
   protected abstract make(path: ObjectPath, key: string, nullable: boolean): T;
   /** @internal The scalar properties of a member. */
@@ -530,7 +542,7 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
       'read',
       'getCount',
       (ref) => this.#listing(ref),
-      (value) => fill(this.members(threadsOf(value, label)).length)
+      (value) => fill(this.membersOf(threadsOf(value, label)).length)
     );
     return result;
   }
@@ -540,13 +552,14 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
     const key = idOf(id, `${this.path.label}.getItem`);
     // The id is known now, so the member needs no lookup: a write to it goes in the same batch
     // as the other writes of the sync, and the host refuses the whole batch when no comment
-    // has the id. A load refuses with `ItemNotFound` then. Over a slide that is addressable, the
-    // member has a path of its own, so tracking it keeps it; over a slide that a lookup of this
-    // sync finds, it shares the slide's path.
+    // has the id. A load refuses with `ItemNotFound` then. Over an owner that is addressable,
+    // the member has a path of its own, so tracking it keeps it. Over an owner that a lookup of
+    // this sync finds (a slide, or the thread of a reply), it shares the owner's path, so a
+    // write waits for that lookup and knows the thread it is in.
     const label = `${this.path.label}.getItem()`;
-    const path = this.slide.isAddressable
-      ? ObjectPath.of(label, this.slide.handle())
-      : ObjectPath.derived(label, this.slide);
+    const path = this.path.isAddressable
+      ? ObjectPath.of(label, this.path.handle())
+      : ObjectPath.derived(label, this.path);
     return this.make(path, key, false);
   }
 
@@ -578,7 +591,7 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
       name,
       (ref) => this.#listing(ref),
       (value) => {
-        const found = pick(this.members(threadsOf(value, label)));
+        const found = pick(this.membersOf(threadsOf(value, label)));
         if (!found) {
           if (orNull) return path.resolveNull();
           fail({ code: 'ItemNotFound', target: label });
@@ -597,37 +610,61 @@ abstract class CommentList<T extends CommentBase> extends ModelObject {
     return true;
   }
 
+  /** @internal The navigation properties of a member, which `items/<name>/...` may load. */
+  protected get memberNavigations(): readonly string[] {
+    return [];
+  }
+
   /** @internal */
   protected override onLoad(request: ResolvedLoadOptions): void {
-    const accepted = ['items', ...this.scalars];
-    for (const name of [...request.select, ...request.itemSelect])
+    const accepted = ['items', ...this.scalars, ...this.memberNavigations];
+    const nested = [...request.nested.keys(), ...(request.items?.nested.keys() ?? [])];
+    for (const name of [...request.select, ...request.itemSelect, ...nested])
       if (!accepted.includes(name))
         failArgument(
           `${this.path.label}.${name}`,
           `a property of comments: ${accepted.join(', ')}`,
           nearest(name, accepted)
         );
+    this.takeNestedPaths();
+    // A navigation of the members loads in a second read, after the listing named them. The
+    // listing fills their scalar properties, so the second read asks only for the navigation.
+    const navigations = this.memberNavigations;
+    const navigates =
+      nested.length > 0 || request.itemSelect.some((name) => navigations.includes(name));
+    const forItems = navigates ? itemRequest(request) : undefined;
+    const deeper = forItems && {
+      ...forItems,
+      select: forItems.select.filter((name) => navigations.includes(name)),
+      all: false,
+      itemSelect: [],
+    };
     const label = `${this.path.label}.items`;
     this.enqueue(
       'read',
       'items',
       (ref) => this.#listing(ref),
       (value) => {
-        const all = this.members(threadsOf(value, label));
+        const all = this.membersOf(threadsOf(value, label));
         const end = request.top === undefined ? all.length : (request.skip ?? 0) + request.top;
-        this.setLoadedProperty(
-          'items',
-          all.slice(request.skip ?? 0, end).map((read, i) => {
-            const member = this.make(
-              ObjectPath.of(`${label}[${i}]`, this.slide.handle()),
-              read.id,
-              false
-            );
-            fillComment(member, read);
-            return member;
-          })
-        );
-      }
+        const loaded = all.slice(request.skip ?? 0, end).map((read, i) => {
+          const member = this.make(
+            ObjectPath.of(`${label}[${i}]`, this.slide.handle()),
+            read.id,
+            false
+          );
+          fillComment(member, read);
+          return member;
+        });
+        this.setLoadedProperty('items', loaded);
+        if (deeper)
+          this.internals.queue.continuing(() => {
+            for (const member of loaded) member[LOAD_REQUEST](deeper);
+          });
+      },
+      undefined,
+      true,
+      deeper !== undefined
     );
   }
 }
@@ -663,7 +700,7 @@ export class CommentCollection extends CommentList<Comment> {
   }
 
   /** @internal */
-  protected members(threads: readonly AutomationCommentThreadRead[]): readonly Read[] {
+  protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read[] {
     return threads;
   }
 
@@ -675,6 +712,11 @@ export class CommentCollection extends CommentList<Comment> {
   /** @internal */
   protected get scalars(): readonly string[] {
     return COMMENT_SCALARS;
+  }
+
+  /** @internal */
+  protected override get memberNavigations(): readonly string[] {
+    return ['replies'];
   }
 
   /**
@@ -753,7 +795,7 @@ export class CommentReplyCollection extends CommentList<CommentReply> {
   }
 
   /** @internal */
-  protected members(threads: readonly AutomationCommentThreadRead[]): readonly Read[] {
+  protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read[] {
     const thread = threads.find((t) => t.id === this.#thread());
     if (!thread) fail({ code: 'ItemNotFound', target: this.path.label });
     return thread.replies;

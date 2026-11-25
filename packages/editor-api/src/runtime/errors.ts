@@ -560,7 +560,11 @@ export function failArgument(target: string | undefined, accepted: string, guess
  */
 export function authorOption(value: unknown, target: string): string | undefined {
   if (value === undefined) return undefined;
-  const printable = (ch: string): boolean => ch.charCodeAt(0) > 0x1f && ch !== '\u007F';
+  // A control character or a lone surrogate is removed on save, as the comment writers do.
+  const printable = (ch: string): boolean => {
+    const c = ch.codePointAt(0)!;
+    return c > 0x1f && c !== 0x7f && (c < 0xd800 || c > 0xdfff);
+  };
   const name = typeof value === 'string' ? [...value].filter(printable).join('').trim() : '';
   if (!name || name.length > 255)
     failArgument(`${target}.author`, 'an author name of 1 to 255 characters');

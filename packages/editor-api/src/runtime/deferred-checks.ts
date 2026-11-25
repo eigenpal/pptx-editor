@@ -62,6 +62,10 @@ export const NOT_DEFERRED: ReadonlySet<string> = new Set([
   'takeNestedPaths',
   'writeBackground',
   'writeSize',
+  'fillFrom',
+  'pickFrom',
+  'writeScope',
+  'membersOf',
 ]);
 
 /** How deep in wrapped calls the current call is: only the outermost queues a refusal. */

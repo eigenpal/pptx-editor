@@ -317,9 +317,11 @@ class Comment_2 extends CommentBase {
     constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, key: string, nullable?: boolean);
     get anchor(): CommentAnchor;
     // @internal (undocumented)
-    protected fill(read: Read$1): void;
+    protected fillFrom(read: Read$1): void;
     // @internal (undocumented)
-    protected pick(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
+    protected get navigations(): Navigation_2;
+    // @internal (undocumented)
+    protected pickFrom(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
     get replies(): CommentReplyCollection;
     reply(content: string, options?: CommentAuthorOptions): CommentReply;
     get resolved(): boolean;
@@ -327,7 +329,7 @@ class Comment_2 extends CommentBase {
     // @internal (undocumented)
     protected get scalars(): readonly string[];
     // @internal (undocumented)
-    protected scope(): AutomationCommentScope;
+    protected writeScope(): AutomationCommentScope;
 }
 export { Comment_2 as Comment }
 
@@ -371,7 +373,9 @@ export class CommentCollection extends CommentList<Comment_2> {
     // @internal (undocumented)
     protected make(path: ObjectPath, key: string, nullable: boolean): Comment_2;
     // @internal (undocumented)
-    protected members(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
+    protected get memberNavigations(): readonly string[];
+    // @internal (undocumented)
+    protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
     // @internal (undocumented)
     protected get scalars(): readonly string[];
 }
@@ -381,11 +385,11 @@ export class CommentReply extends CommentBase {
     // @internal
     constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, thread: () => string, key: string, nullable?: boolean);
     // @internal (undocumented)
-    protected pick(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
+    protected pickFrom(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
     // @internal (undocumented)
     protected get scalars(): readonly string[];
     // @internal (undocumented)
-    protected scope(): AutomationCommentScope;
+    protected writeScope(): AutomationCommentScope;
 }
 
 // @public
@@ -395,7 +399,7 @@ export class CommentReplyCollection extends CommentList<CommentReply> {
     // @internal (undocumented)
     protected make(path: ObjectPath, key: string, nullable: boolean): CommentReply;
     // @internal (undocumented)
-    protected members(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
+    protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
     // @internal (undocumented)
     protected get scalars(): readonly string[];
 }

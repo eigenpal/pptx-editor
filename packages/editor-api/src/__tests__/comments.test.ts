@@ -396,6 +396,114 @@ describe('Slide.comments: scope of a proxy', () => {
   });
 });
 
+describe('Slide.comments: loads and edge cases', () => {
+  test('replies load through a navigation path, on a thread and on the collection', async () => {
+    const runtime = await server();
+    await runtime.run(async (context) => {
+      const comment = context.presentation.slides.getItemAt(0).comments.add('Thread');
+      await context.sync();
+      comment.reply('One');
+      comment.reply('Two');
+      await context.sync();
+    });
+    const read = await runtime.run(async (context) => {
+      const comments = context.presentation.slides.getItemAt(0).comments;
+      comments.load('items/content,items/replies/items/content');
+      const first = comments.getItemAt(0);
+      first.load('replies/items/authorName');
+      await context.sync();
+      return [
+        comments.items.map((c) => [c.content, c.replies.items.map((r) => r.content)]),
+        first.replies.items.map((r) => r.authorName),
+      ];
+    });
+    expect(read).toEqual([[['Thread', ['One', 'Two']]], ['Review Agent', 'Review Agent']]);
+    runtime.dispose();
+  });
+
+  test('the replies of a thread that does not exist refuse with ItemNotFound', async () => {
+    const runtime = await server();
+    const calls: ((context: RequestContext) => void)[] = [
+      (c) => void c.presentation.slides.getItemAt(0).comments.getItem('nope').replies.getCount(),
+      (c) =>
+        void c.presentation.slides
+          .getItemAt(0)
+          .comments.getItem('nope')
+          .replies.load('items/content'),
+      (c) =>
+        void c.presentation.slides
+          .getItemAt(0)
+          .comments.getItem('nope')
+          .replies.getItemAt(0)
+          .load('content'),
+    ];
+    for (const [i, call] of calls.entries()) {
+      const error = await runtime.run((context) => refusedAtSync(context, () => call(context)));
+      expect([i, isPptxEditorError(error) && error.code]).toEqual([i, 'ItemNotFound']);
+    }
+    runtime.dispose();
+  });
+
+  test('a reply of a thread found in the same sync writes to that thread', async () => {
+    const runtime = await server();
+    const replyId = await runtime.run(async (context) => {
+      const comment = context.presentation.slides.getItemAt(0).comments.add('Thread');
+      await context.sync();
+      const reply = comment.reply('Remove me');
+      await context.sync();
+      return reply.id;
+    });
+    await runtime.run(async (context) => {
+      context.presentation.slides
+        .getItemAt(0)
+        .comments.getItemAt(0)
+        .replies.getItem(replyId)
+        .delete();
+      await context.sync();
+    });
+    expect((await readAll(runtime))[0]!.replies).toEqual([]);
+    runtime.dispose();
+  });
+
+  test('a blank author name or long initials refuse, not fall back or cut', async () => {
+    const runtime = await server();
+    for (const options of [
+      { authorName: '   ' },
+      { authorName: '' },
+      { authorName: '\u0001\u0002' },
+      { authorInitials: 'ABCDEFGHIJ' },
+    ]) {
+      const [code] = await codeOf(runtime, (context) =>
+        context.presentation.slides.getItemAt(0).comments.add('Hi', options)
+      );
+      expect([options, code]).toEqual([options, 'InvalidArgument']);
+    }
+    expect(await readAll(runtime)).toEqual([]);
+    runtime.dispose();
+  });
+
+  test('a write of the current resolved state changes nothing', async () => {
+    const live = createPptxEditor({ fixedMeasurer: true, substitutes: false, author: 'Editor' });
+    expect((await live.load(plainDeck())).ok).toBe(true);
+    const runtime = BrowserEditor.createBrowser(live);
+    await runtime.run(async (context) => {
+      context.presentation.slides.getItemAt(0).comments.add('Open');
+      await context.sync();
+    });
+    const revision = live.session!.store.revision;
+    await runtime.run(async (context) => {
+      const comments = context.presentation.slides.getItemAt(0).comments.load('items/resolved');
+      await context.sync();
+      comments.items[0]!.resolved = false;
+      await context.sync();
+    });
+    expect(live.session!.store.revision).toBe(revision);
+    // Undo removes the add: the write of the current state left no step of its own.
+    expect(live.exec({ type: 'undo' }).ok).toBe(true);
+    expect(await readAll(runtime)).toEqual([]);
+  });
+});
+
 describe('Slide.comments: legacy comments', () => {
   test('read a legacy thread and reply; resolve refuses with NotSupported', async () => {
     const runtime = await server(buildSlideStructureDeck());
@@ -536,7 +644,7 @@ describe('Slide.comments: browser runtime author', () => {
   test('createBrowser refuses an author option that is not a name', async () => {
     const live = createPptxEditor({ fixedMeasurer: true, substitutes: false });
     expect((await live.load(plainDeck())).ok).toBe(true);
-    for (const author of ['', '\u0007\u0007', 'x'.repeat(256), 7]) {
+    for (const author of ['', '\u0007\u0007', '\uD800', 'x'.repeat(256), 7]) {
       let error: unknown;
       try {
         BrowserEditor.createBrowser(live, { author: author as string });
@@ -545,6 +653,13 @@ describe('Slide.comments: browser runtime author', () => {
       }
       expect(isPptxEditorError(error) && error.code).toBe('InvalidArgument');
     }
+    let error: unknown;
+    try {
+      BrowserEditor.createBrowser(live, null as unknown as { author?: string });
+    } catch (e) {
+      error = e;
+    }
+    expect(isPptxEditorError(error) && error.code).toBe('InvalidArgument');
   });
 });
 
