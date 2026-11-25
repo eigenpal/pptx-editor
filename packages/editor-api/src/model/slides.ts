@@ -21,6 +21,7 @@ import type { RequestContext } from '../runtime/request-context.ts';
 import { SlideBackground, SlideLayoutBackground, SlideMasterBackground } from './backgrounds.ts';
 import { ItemCollection } from './collection.ts';
 import { LAYOUT_TYPE, type SlideLayoutType } from './enums.ts';
+import { SlideHeaderFooter } from './header-footer.ts';
 import { HyperlinkCollection } from './hyperlinks.ts';
 import { imageBox, settleImage, type SlideGetImageOptions } from './images.ts';
 import { flag, ModelObject, pathOf, text, type RefOf } from './model-object.ts';
@@ -58,6 +59,7 @@ export class Slide extends ModelObject {
   #background: SlideBackground | undefined;
   #theme: ThemeColorScheme | undefined;
   #transition: SlideTransition | undefined;
+  #headerFooter: SlideHeaderFooter | undefined;
 
   /** @internal */
   constructor(context: RequestContext, path: ObjectPath, nullable = false) {
@@ -218,6 +220,20 @@ export class Slide extends ModelObject {
     return (this.#theme ??= new ThemeColorScheme(
       this.context,
       ObjectPath.derived(`${this.path.label}.themeColorScheme`, this.path),
+      this.path
+    ));
+  }
+
+  /**
+   * The slide number, footer, and date of the slide. To change all slides at once, call
+   * `Presentation.applyHeaderFooter`.
+   *
+   * This property is an SDK extension. The pinned Office.js reference has no such member.
+   */
+  get headerFooter(): SlideHeaderFooter {
+    return (this.#headerFooter ??= new SlideHeaderFooter(
+      this.context,
+      ObjectPath.derived(`${this.path.label}.headerFooter`, this.path),
       this.path
     ));
   }
@@ -395,6 +411,7 @@ export class Slide extends ModelObject {
       themeColorScheme: () => this.themeColorScheme,
       customXmlParts: () => this.customXmlParts,
       transition: () => this.transition,
+      headerFooter: () => this.headerFooter,
     });
     this.loadScalars(
       names.filter((name) => name !== 'speakerNotes'),

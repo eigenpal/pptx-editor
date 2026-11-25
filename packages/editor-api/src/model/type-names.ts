@@ -28,6 +28,7 @@ import {
   CustomXmlPartScopedCollection,
 } from './custom-xml.ts';
 import { ShapeFill, ShapeLineFormat } from './fill-line.ts';
+import { SlideHeaderFooter } from './header-footer.ts';
 import { Hyperlink, HyperlinkCollection, HyperlinkScopedCollection } from './hyperlinks.ts';
 import { DocumentProperties, PageSetup, Presentation } from './presentation.ts';
 import { Section, SectionCollection } from './sections.ts';
@@ -123,6 +124,7 @@ const CLASSES: readonly (readonly [unknown, string])[] = [
   [TextRange, 'TextRange'],
   [ThemeColorScheme, 'ThemeColorScheme'],
   [SlideTransition, 'SlideTransition'],
+  [SlideHeaderFooter, 'SlideHeaderFooter'],
 ];
 
 const BY_CLASS = new Map<unknown, string>(CLASSES.map(([type, name]) => [type, name]));

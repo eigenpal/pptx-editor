@@ -329,6 +329,31 @@ export type AutomationHandleRef = string & {
 };
 
 // @public
+export interface AutomationHeaderFooterRead {
+    readonly dateFixed: boolean;
+    readonly dateText: string;
+    // (undocumented)
+    readonly dateVisible: boolean;
+    readonly footerText: string;
+    // (undocumented)
+    readonly footerVisible: boolean;
+    // (undocumented)
+    readonly slideNumberVisible: boolean;
+}
+
+// @public
+export interface AutomationHeaderFooterWrite {
+    readonly dateFixed?: boolean;
+    readonly dateText?: string;
+    readonly dateVisible?: boolean;
+    readonly footerText?: string;
+    readonly footerVisible?: boolean;
+    readonly hideOnTitleSlides?: boolean;
+    // (undocumented)
+    readonly slideNumberVisible?: boolean;
+}
+
+// @public
 export interface AutomationHost {
     // (undocumented)
     readonly capabilities: AutomationCapabilities;
@@ -945,6 +970,13 @@ export type AutomationOperation = {
     readonly op: 'setTransition';
     readonly slide: AutomationRef;
     readonly transition: AutomationTransitionWrite;
+} | {
+    readonly op: 'readHeaderFooter';
+    readonly slide: AutomationRef;
+} | {
+    readonly op: 'setHeaderFooter';
+    readonly slides?: readonly AutomationRef[];
+    readonly settings: AutomationHeaderFooterWrite;
 };
 
 // @public
@@ -1439,6 +1471,9 @@ export type AutomationValue = {
 } | {
     readonly kind: 'transition';
     readonly transition: AutomationTransitionRead;
+} | {
+    readonly kind: 'headerFooter';
+    readonly headerFooter: AutomationHeaderFooterRead;
 }
 /** A command that committed. The effect is the response's revision. */
 | {

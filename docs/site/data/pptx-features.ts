@@ -766,7 +766,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Show or hide slide numbers, dates, and footers through layout or master placeholders. Apply changes to selected slides or all slides, optionally excluding title slides. New date fields use the datetime1 format only.',
+      'Show or hide slide numbers, dates, and footers through layout or master placeholders. Apply changes to selected slides or all slides, optionally excluding title slides. The editing API reads and writes them with `slide.headerFooter` and `presentation.applyHeaderFooter()`. New date fields use the datetime1 format only.',
   },
   {
     id: 'slides.size',

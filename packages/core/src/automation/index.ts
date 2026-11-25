@@ -50,6 +50,7 @@ export type {
   AutomationTransitionRead,
   AutomationUnsubscribe,
   AutomationValue,
+  AutomationHeaderFooterRead,
 } from './protocol.ts';
 export type {
   AutomationBackgroundWrite,
@@ -73,6 +74,7 @@ export type {
   AutomationTextSpan,
   AutomationTransitionWrite,
   AutomationZOrder,
+  AutomationHeaderFooterWrite,
 } from './operations.ts';
 export { AUTOMATION_COMMANDS } from './operations.ts';
 export {

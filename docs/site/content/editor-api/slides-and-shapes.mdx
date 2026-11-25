@@ -181,6 +181,51 @@ A read-only effect, an unknown name, or a value out of range refuses with `Inval
 
 `slide.transition`, `SlideTransition`, `SlideTransitionEffect`, and `SlideTransitionDirection` are SDK extensions, not members of the pinned Office.js reference. Layouts and masters do not have this property.
 
+## Show slide numbers, the date, and a footer
+
+Use `presentation.applyHeaderFooter()` to change all slides in one call. Use `slide.headerFooter` to read or change one slide. This example numbers every slide except the title slide, adds a footer and an automatic date, and gives the third slide its own footer:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function numberSlides(runtime: PptxEditorRuntime, footer: string) {
+  return runtime.run(async (context) => {
+    context.presentation.applyHeaderFooter({
+      slideNumberVisible: true,
+      footerText: footer,
+      dateVisible: true,
+      dateFixed: false,
+      hideOnTitleSlides: true,
+    });
+    const last = context.presentation.slides.getItemAt(2).headerFooter;
+    last.footerText = `${footer} (appendix)`;
+    last.load('slideNumberVisible,footerText,dateFixed');
+    await context.sync();
+    return last.toJSON();
+  });
+}
+```
+
+`HeaderFooterSettings` and `slide.headerFooter` have these properties:
+
+| Property | Value |
+| --- | --- |
+| `slideNumberVisible` | Show or hide the slide number. The number is the position of the slide, from 1. |
+| `footerVisible` | Show or hide the footer. `true` keeps the footer text of each slide. A slide with no footer takes the text of the first slide that has one. |
+| `footerText` | The footer text. A write shows the footer with this text. A read returns an empty string when the slide shows no footer. |
+| `dateVisible` | Show or hide the date. `true` keeps the date of each slide. A slide with no date takes the date of the first slide that has one, else today's date. |
+| `dateText` | The text that the date shows. A write shows the date as this fixed text. A read returns an empty string when the slide shows no date. |
+| `dateFixed` | `true` for fixed text, `false` for an automatic date. A write of `true` keeps the text that each date shows. A write of `false` turns fixed text into today's date as month/day/year. |
+| `hideOnTitleSlides` | `applyHeaderFooter` only. Slides whose layout is a title slide layout hide what the call shows on the other slides. |
+
+A setting that you leave out stays as each slide has it. Footer and date text is one line of 1 to 1024 characters. `footerVisible: false` with `footerText`, `dateVisible: false` with `dateText` or `dateFixed`, and `dateText` with `dateFixed: false` refuse with `InvalidArgument`, and so does a call with no slide number, footer, or date setting.
+
+A slide shows each item through its own placeholder. A write that shows an item gives the slide the placeholder of its layout, else the one of its master. The item takes the position and format of that placeholder. A slide that has the placeholder already keeps its own box and format. A write that hides an item removes the placeholder from the slide. The layouts and the master do not change.
+
+When the layout and the master of a slide have no placeholder for an item, `applyHeaderFooter` skips that slide for that item. When no target slide can show an item, the call refuses with `NotSupported` and the diagnostic `edit.no-slide-number-placeholder`, `edit.no-footer-placeholder`, or `edit.no-date-placeholder`. Nothing changes then, also for the other items of the call. `footerVisible: true` with no footer text on any slide refuses with `NotSupported` and the diagnostic `edit.no-footer-text`.
+
+An automatic date holds the date text of the moment that you set it. The engine shows that text, and it does not update the date when the presentation opens. Browser and server runtimes behave the same, and a browser runtime records the writes of one sync as one undo step. `slide.headerFooter`, `SlideHeaderFooter`, `presentation.applyHeaderFooter()`, and `HeaderFooterSettings` are SDK extensions, not members of the pinned Office.js reference.
+
 ## Edit line width, dashes, and endpoints
 
 Use `shape.lineFormat` to read or change line properties in either runtime. This example formats the first shape, which must be a supported line or connector:

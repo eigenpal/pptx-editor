@@ -17,6 +17,7 @@ import { BindingCollection } from './bindings.ts';
 import { InsertSlideFormatting } from './enums.ts';
 import { CustomPropertyCollection } from './custom-properties.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
+import { headerFooterWrite, type HeaderFooterSettings } from './header-footer.ts';
 import { finite, ModelObject, pathOf, text } from './model-object.ts';
 import { replaceOperation, type SearchOptions } from './search.ts';
 import { SectionCollection } from './sections.ts';
@@ -308,6 +309,36 @@ export class Presentation extends ModelObject {
       (value) => fill(hydrated(value, 'number', target).value)
     );
     return result;
+  }
+
+  /**
+   * Show or hide the slide number, footer, and date on all slides, as one write. A setting you
+   * leave out stays as each slide has it. With `hideOnTitleSlides`, the slides whose layout is a
+   * title slide layout hide what the call shows on the other slides. To change one slide, set
+   * the properties of `Slide.headerFooter`.
+   *
+   * A slide whose layout and master have no placeholder for an item is skipped for that item.
+   * When no slide can show an item, the call refuses with `NotSupported` and the diagnostic
+   * `edit.no-slide-number-placeholder`, `edit.no-footer-placeholder`, or
+   * `edit.no-date-placeholder`, and nothing changes. Settings that do not go together, such as
+   * `footerVisible: false` with `footerText`, refuse with `InvalidArgument`. In a runtime over a
+   * live editor, the call is one undo step.
+   *
+   * This method is an SDK extension. The pinned Office.js reference has no such member.
+   *
+   * @example
+   * ```ts
+   * context.presentation.applyHeaderFooter({
+   *   slideNumberVisible: true,
+   *   footerText: 'Quarterly review',
+   *   hideOnTitleSlides: true,
+   * });
+   * await context.sync();
+   * ```
+   */
+  applyHeaderFooter(settings: HeaderFooterSettings): void {
+    const write = headerFooterWrite(settings, this.at('applyHeaderFooter'));
+    this.command('applyHeaderFooter', () => ({ op: 'setHeaderFooter', settings: write }));
   }
 
   /** @internal */
