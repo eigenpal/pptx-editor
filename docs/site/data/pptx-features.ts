@@ -858,7 +858,7 @@ export const pptxFeatures: PptxFeature[] = [
     tier: 'community',
     docsLink: '/docs/guides/animations',
     notes:
-      'Configure 13 animation presets and five transition types, including timing and order. Motion paths and interactive sequences cannot be added, and markup-compatibility timing remains read-only. The editor preserves effects but does not play them.',
+      'Configure 13 animation presets and five transition types, including timing and order. The editing API reads and writes `slide.transition`. Motion paths and interactive sequences cannot be added, and markup-compatibility timing remains read-only. The editor preserves effects but does not play them.',
   },
 
   // --- Comments & review -----------------------------------------------

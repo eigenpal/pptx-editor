@@ -751,3 +751,32 @@ test('the section examples group, list, move, and rename sections as written', a
     runtime.dispose();
   }
 });
+
+test('the slide transition example fades every slide', async () => {
+  // From slides-and-shapes.mdx, "Set slide transitions".
+  async function fadeEverySlide(runtime: PptxEditorRuntime) {
+    return runtime.run(async (context) => {
+      const slides = context.presentation.slides.load('items');
+      await context.sync();
+      for (const slide of slides.items) {
+        slide.transition.set({ effect: 'Fade', durationMs: 700, advanceAfterMs: null });
+      }
+      await context.sync();
+      slides.load('items/transition/effect');
+      await context.sync();
+      return slides.items.map((slide) => slide.transition.effect);
+    });
+  }
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  try {
+    expect(await fadeEverySlide(runtime)).toEqual(['Fade', 'Fade']);
+    const durations = await runtime.run(async (context) => {
+      const slides = context.presentation.slides.load('items/transition/durationMs');
+      await context.sync();
+      return slides.items.map((slide) => slide.transition.durationMs);
+    });
+    expect(durations).toEqual([700, 700]);
+  } finally {
+    runtime.dispose();
+  }
+});

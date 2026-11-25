@@ -11,7 +11,11 @@
 // nothing at all. Nothing in this file names a tree node or a store: a value a consumer receives
 // must not be a reference into the engine.
 
-import type { LineEndType, ShapeFormatProperties } from '../contracts/neutral.ts';
+import type {
+  LineEndType,
+  ShapeFormatProperties,
+  SlideTransitionState,
+} from '../contracts/neutral.ts';
 import type { AutomationOperation } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
@@ -476,6 +480,13 @@ export interface AutomationSelectionRead {
   } | null;
 }
 
+/**
+ * The transition of a slide (`readTransition`): the effect, the duration, and the advance
+ * settings of `p:transition` (ECMA-376 Part 1, §19.3.1.50). `kind` is `other` for an effect that
+ * `setTransition` does not write, and `none` for a slide with no effect.
+ */
+export type AutomationTransitionRead = SlideTransitionState;
+
 /** What an operation answered with. */
 export type AutomationValue =
   | { readonly kind: 'shapeFormat'; readonly format: ShapeFormatProperties }
@@ -518,6 +529,7 @@ export type AutomationValue =
   | { readonly kind: 'hyperlinks'; readonly hyperlinks: readonly AutomationHyperlinkRead[] }
   | { readonly kind: 'bindings'; readonly bindings: readonly AutomationBindingRead[] }
   | { readonly kind: 'selection'; readonly selection: AutomationSelectionRead }
+  | { readonly kind: 'transition'; readonly transition: AutomationTransitionRead }
   /** A command that committed. The effect is the response's revision. */
   | { readonly kind: 'applied' };
 

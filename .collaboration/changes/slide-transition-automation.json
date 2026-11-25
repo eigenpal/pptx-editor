@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operations readTransition and setTransition read and write p:transition through the same transition edit that the setTransition editor command uses, with existing node and attribute operations. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-slide-transition.test.ts",
+    "packages/core/src/automation/__tests__/host-transitions.test.ts",
+    "packages/editor-api/src/__tests__/slide-transition.test.ts"
+  ]
+}

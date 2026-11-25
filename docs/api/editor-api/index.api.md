@@ -1651,6 +1651,7 @@ export class Slide extends ModelObject {
     set speakerNotes(value: string);
     get tags(): TagCollection;
     get themeColorScheme(): ThemeColorScheme;
+    get transition(): SlideTransition;
 }
 
 // @public
@@ -2085,6 +2086,42 @@ export class SlideScopedCollection extends ItemCollection<Slide> {
     protected listing(): AutomationOperation;
     // @internal (undocumented)
     protected lookup(): undefined;
+}
+
+// @public
+export class SlideTransition extends ModelObject {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath);
+    get advanceAfterMs(): number | null;
+    set advanceAfterMs(value: number | null);
+    get advanceOnClick(): boolean;
+    set advanceOnClick(value: boolean);
+    get durationMs(): number;
+    set durationMs(value: number);
+    get effect(): SlideTransitionEffect | `${SlideTransitionEffect}`;
+    set effect(value: SlideTransitionEffect | `${SlideTransitionEffect}`);
+    // @internal (undocumented)
+    protected onLoad(request: ResolvedLoadOptions): void;
+    set(options: SlideTransitionOptions): void;
+}
+
+// @public
+export enum SlideTransitionEffect {
+    cut = "Cut",
+    fade = "Fade",
+    none = "None",
+    other = "Other",
+    push = "Push",
+    split = "Split",
+    wipe = "Wipe"
+}
+
+// @public
+export interface SlideTransitionOptions {
+    advanceAfterMs?: number | null | undefined;
+    advanceOnClick?: boolean | undefined;
+    durationMs?: number | undefined;
+    effect?: SlideTransitionEffect | `${SlideTransitionEffect}` | undefined;
 }
 
 // @public

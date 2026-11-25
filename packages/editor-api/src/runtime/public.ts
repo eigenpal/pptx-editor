@@ -57,6 +57,7 @@ export {
   TableStyle,
   TextVerticalAlignment,
   ThemeColor,
+  SlideTransitionEffect,
 } from '../model/enums.ts';
 export { Adjustments } from '../model/adjustments.ts';
 export { Application } from '../model/application.ts';
@@ -148,6 +149,8 @@ export {
   TextRange,
   type TextFrameFit,
 } from '../model/text.ts';
+
+export { SlideTransition, type SlideTransitionOptions } from '../model/transitions.ts';
 
 export type {
   LineEndType,

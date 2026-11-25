@@ -60,6 +60,7 @@ import {
 import { Tag, TagCollection } from './tags.ts';
 import { ThemeColorScheme } from './theme.ts';
 import { BulletFormat, ParagraphFormat, ShapeFont, TextFrame, TextRange } from './text.ts';
+import { SlideTransition } from './transitions.ts';
 
 /** Each class with its Office.js type name. */
 const CLASSES: readonly (readonly [unknown, string])[] = [
@@ -121,6 +122,7 @@ const CLASSES: readonly (readonly [unknown, string])[] = [
   [TextFrame, 'TextFrame'],
   [TextRange, 'TextRange'],
   [ThemeColorScheme, 'ThemeColorScheme'],
+  [SlideTransition, 'SlideTransition'],
 ];
 
 const BY_CLASS = new Map<unknown, string>(CLASSES.map(([type, name]) => [type, name]));

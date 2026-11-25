@@ -47,6 +47,7 @@ export type {
   AutomationTextFitRead,
   AutomationTextFrameRead,
   AutomationTextRunRead,
+  AutomationTransitionRead,
   AutomationUnsubscribe,
   AutomationValue,
 } from './protocol.ts';
@@ -70,6 +71,7 @@ export type {
   AutomationTableStyleWrite,
   AutomationTextFrameWrite,
   AutomationTextSpan,
+  AutomationTransitionWrite,
   AutomationZOrder,
 } from './operations.ts';
 export { AUTOMATION_COMMANDS } from './operations.ts';
@@ -80,6 +82,11 @@ export {
   type AutomationHostComposition,
 } from './host.ts';
 export type { AutomationSelectionPort } from './plan.ts';
+export {
+  MAX_ADVANCE_MS,
+  MAX_TRANSITION_MS,
+  MIN_TRANSITION_MS,
+} from './commands/transition-commands.ts';
 export type { AutomationImageTarget } from './plan-images.ts';
 export {
   createServerAutomationHost,

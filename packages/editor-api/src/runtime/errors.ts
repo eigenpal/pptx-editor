@@ -290,6 +290,12 @@ const DIAGNOSTICS: ReadonlyMap<string, PptxEditorDiagnostic> = new Map(
         'The writes of this sync were applied, but a read after them failed. Read again, and ' +
           'do not apply the same edit again.',
       ],
+      [
+        'transition-no-effect',
+        'edit.transition-no-effect',
+        'The slide has no transition effect, so it has no duration. Set the effect and the ' +
+          'duration together, for example with transition.set({ effect, durationMs }).',
+      ],
     ] as const
   )
     .map(([detail, code, hint]): [string, PptxEditorDiagnostic] => [

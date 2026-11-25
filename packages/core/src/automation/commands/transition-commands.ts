@@ -25,9 +25,11 @@ const isP = (el: Element | undefined, local: string): boolean =>
   !!el && el.ns === NS.p && el.local === local;
 const isAlternate = (el: Element): boolean => el.ns === NS.mc && el.local === 'AlternateContent';
 
-/** The shortest and longest transition, and the longest advance time, in ms. */
+/** The shortest transition duration that `setTransition` writes, in ms. */
 export const MIN_TRANSITION_MS = 10;
+/** The longest transition duration that `setTransition` writes, in ms. */
 export const MAX_TRANSITION_MS = 59_000;
+/** The longest advance time (`advTm`) that `setTransition` writes, in ms. */
 export const MAX_ADVANCE_MS = 3_600_000;
 
 // The tables are `Map`s: their keys come from the file and from commands, and an object would

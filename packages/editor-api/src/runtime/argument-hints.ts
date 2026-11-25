@@ -171,6 +171,15 @@ const ROWS: readonly (readonly [string, string])[] = [
     'picture-size',
     'Give a width and a height. At the aspect ratio of the image, the other side is larger than 169 093 points.',
   ],
+  // Slide transitions.
+  [
+    'transition',
+    'Use an object with kind, durationMs, advanceOnClick, or advanceAfterMs, and no other field.',
+  ],
+  ['transitionKind', 'Use none, fade, push, wipe, split, or cut.'],
+  ['durationMs', 'Use a number of milliseconds from 10 to 59000.'],
+  ['advanceOnClick', BOOLEAN],
+  ['advanceAfterMs', 'Use a number of milliseconds from 0 to 3600000, or null to remove it.'],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */
