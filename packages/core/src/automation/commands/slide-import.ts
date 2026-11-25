@@ -7,11 +7,13 @@
 //
 // - Keep source formatting: the slide keeps its layout, master, and theme. They are copied too,
 //   once per import, and the copied master lists only the copied layouts (ECMA-376 Part 1,
-//   19.3.1.42 `sldLayoutIdLst`).
-// - Use destination theme: the slide goes on the layout of this presentation of the same type
-//   (`p:sldLayout/@type`; a custom layout matches by name), else on the first layout of the first
-//   master. Its placeholders are re-mapped as Change Layout does (`applyLayout`): each placeholder
-//   first takes the box it showed in the source as its own, so one with no place keeps it.
+//   19.3.1.41 `sldLayoutIdLst`).
+// - Use destination theme: the slide goes on a layout of this presentation of the same type
+//   (`p:sldLayout/@type`), preferring the same name, then a master of the same name, then, when
+//   both names match, the same part (`destinationLayout`); a custom layout matches only by name.
+//   With no match, it goes on the first layout of the first master. Its placeholders are
+//   re-mapped as Change Layout does (`applyLayout`): each placeholder first takes the box it
+//   showed in the source as its own, so one with no place keeps it.
 //
 // Comment lists come along, with their authors merged into this presentation's comment author
 // list (`import-comments.ts`). Threaded comments and embedded controls (`p:control`) name
@@ -47,7 +49,7 @@ import { partNameKey } from '@eigenpal/ooxml-core';
 import { addRelationship, relativeTarget, xmlAttr, XML_DECL } from './package-edits.ts';
 import { specFromXml } from './shape-commands.ts';
 import { registerSlide } from './slide-commands.ts';
-import { applyLayout, deckLayouts, keepBox } from './slide-layouts.ts';
+import { applyLayout, deckLayouts, keepBox, type DeckLayout } from './slide-layouts.ts';
 import { CT_COMMENTS, mergeImportedComments, REL_COMMENTS } from './import-comments.ts';
 import {
   creationIdsOf,
@@ -521,22 +523,58 @@ class Importer {
 }
 
 /**
- * The destination layout for a source layout: the first of the same type (a custom layout: of
- * the same name), else the first layout of the first master.
+ * The name a layout matches by: `p:sldLayout/@matchingName`, which is "used for layout matching"
+ * in place of `p:cSld/@name` (ECMA-376 Part 1, 19.3.1.39 `CT_SlideLayout`), else that name
+ * (19.3.1.16 `CT_CommonSlideData`). An empty `matchingName` names nothing, so the name applies.
+ */
+function matchingName(pkg: PptxPackage, layout: DeckLayout): string {
+  return attr(xmlPartOf(pkg, layout.part)?.root, 'matchingName') || layout.name;
+}
+
+/**
+ * The destination layout for a source layout, among the layouts of the same type
+ * (`p:sldLayout/@type`, `ST_SlideLayoutType`, ECMA-376 Part 1, 19.3.1.39 and 19.7.15). Several
+ * layouts can have one type, so the match prefers, in this order:
+ *
+ * 1. the same name (`matchingName`, else `p:cSld/@name`);
+ * 2. a master of the same name (its `p:cSld/@name`, else its theme's name);
+ * 3. when both names match, the same layout part, so a slide exported from this presentation
+ *    goes back on its own layout. Part names alone are no evidence: two files can use one part
+ *    name for different layouts. A layout part has one entry in `deckLayouts`, so its master
+ *    needs no check of its own.
+ *
+ * An empty name matches nothing in these steps. Ties go to the first in master order
+ * (`p:sldMasterIdLst`, 19.2.1.37), then layout order (`p:sldLayoutIdLst`, 19.3.1.41). A custom
+ * layout (`cust`) can only go on a custom layout with an equal name (two empty names are
+ * equal). With no match, the slide goes on the first layout of the first master.
  */
 function destinationLayout(
-  sourceLayouts: ReturnType<typeof deckLayouts>,
-  all: ReturnType<typeof deckLayouts>,
+  source: PptxPackage,
+  sourceLayouts: readonly DeckLayout[],
+  destination: PptxPackage,
+  all: readonly DeckLayout[],
   layout: string | undefined
 ): string {
   if (all.length === 0) throw new CommandRefusal('errors.layoutNotFound');
-  const from = sourceLayouts.find((l) => l.part === layout);
-  const match = from
-    ? all.find((l) =>
-        from.type === 'cust' ? l.type === 'cust' && l.name === from.name : l.type === from.type
-      )
-    : undefined;
-  return (match ?? all[0]!).part;
+  const key = layout === undefined ? undefined : partNameKey(layout);
+  const from = sourceLayouts.find((l) => partNameKey(l.part) === key);
+  if (!from) return all[0]!.part;
+  const name = matchingName(source, from);
+  let best: DeckLayout | undefined;
+  let bestScore = -1;
+  for (const l of all) {
+    if (l.type !== from.type) continue;
+    const sameName = matchingName(destination, l) === name;
+    if (from.type === 'cust' && !sameName) continue;
+    const named = sameName && name !== '';
+    const sameMaster = l.masterName === from.masterName && from.masterName !== '';
+    const identity = named && sameMaster;
+    // One weight per step of the list above: a higher step outweighs all lower steps together.
+    const score =
+      (named ? 8 : 0) + (sameMaster ? 4 : 0) + (identity && partNameKey(l.part) === key ? 2 : 0);
+    if (score > bestScore) [best, bestScore] = [l, score];
+  }
+  return (best ?? all[0]!).part;
 }
 
 /** Give each placeholder of a copied slide the box it showed in the source as its own. */
@@ -726,7 +764,10 @@ export function importSlides(batch: OpBatch, request: SlideImport): string[] {
   const destLayouts = keep ? [] : deckLayouts(batch.pkg);
   for (const ref of refs) {
     if (ref.layoutPart) keepLayouts.add(ref.layoutPart);
-    layouts?.set(ref.partName, destinationLayout(sourceLayouts, destLayouts, ref.layoutPart));
+    layouts?.set(
+      ref.partName,
+      destinationLayout(source, sourceLayouts, batch.pkg, destLayouts, ref.layoutPart)
+    );
   }
   if (keep && refs.some((r) => !r.layoutPart || roleOf(source, r.layoutPart) !== 'layout'))
     throw new CommandRefusal('errors.malformed', 'import layout');

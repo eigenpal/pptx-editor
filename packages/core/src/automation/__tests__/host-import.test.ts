@@ -394,6 +394,147 @@ describe('insertSlides: use destination theme', () => {
     expect(child(child(shapes[0]!, 'p:spPr'), 'a:xfrm')).toBeUndefined();
     expect(child(child(shapes[2]!, 'p:spPr'), 'a:xfrm')).toBeDefined();
   });
+
+  test('the match prefers the matching name, and a custom layout matches only by name', () => {
+    // `p:sldLayout/@matchingName` stands in for `p:cSld/@name` (ECMA-376 Part 1, 19.3.1.39).
+    const dest = patch(
+      buildPptx({
+        layouts: [
+          { name: 'Other', type: 'obj', shapes: '' },
+          { name: 'Renamed', type: 'obj', shapes: '' },
+          { name: 'Mine', shapes: '' },
+        ],
+        slides: [{ layout: 'blank', shapes: '' }],
+      }),
+      {
+        'ppt/slideLayouts/slideLayout4.xml': (t) =>
+          t.replace('<p:sldLayout ', '<p:sldLayout matchingName="Content" '),
+      }
+    );
+    const source = buildPptx({
+      layouts: [
+        { name: 'Content', type: 'obj', shapes: '' },
+        { name: 'Mine', shapes: '' },
+        { name: 'Unknown', shapes: '' },
+      ],
+      slides: [
+        { layoutName: 'Content', shapes: title('A') },
+        { layoutName: 'Mine', shapes: title('B') },
+        { layoutName: 'Unknown', shapes: title('C') },
+      ],
+    });
+    const host = open(dest);
+    insert(host, source, { formatting: 'useDestinationTheme' });
+    const pkg = expectWhole(save(host));
+    expect(presentationInfo(pkg).slides.map((s) => s.layoutPart)).toEqual([
+      '/ppt/slideLayouts/slideLayout4.xml',
+      '/ppt/slideLayouts/slideLayout5.xml',
+      '/ppt/slideLayouts/slideLayout1.xml',
+      '/ppt/slideLayouts/slideLayout2.xml',
+    ]);
+  });
+
+  test('with no name to match, a part name of another file decides nothing', () => {
+    // Title and Content is the first `obj` layout; `slideLayout4.xml` is `Dest B` here and
+    // `Src B` in the source, under masters of other names.
+    const layouts = (prefix: string) =>
+      ['A', 'B'].map((n) => ({ name: `${prefix} ${n}`, type: 'obj', shapes: '' }));
+    const host = open(
+      buildPptx({ themeName: 'Dest', layouts: layouts('Dest'), slides: [{ shapes: '' }] })
+    );
+    const source = buildPptx({
+      themeName: 'Src',
+      layouts: layouts('Src'),
+      slides: [{ layoutName: 'Src B', shapes: title('A') }],
+    });
+    insert(host, source, { formatting: 'useDestinationTheme' });
+    const pkg = expectWhole(save(host));
+    expect(presentationInfo(pkg).slides[0]!.layoutPart).toBe('/ppt/slideLayouts/slideLayout1.xml');
+  });
+
+  test('with empty names, a part name of another file decides nothing', () => {
+    // The masters and the second extra layout of each file have no name.
+    const unnamed = (bytes: Uint8Array) =>
+      patch(bytes, {
+        'ppt/slideLayouts/slideLayout4.xml': (t) => t.replace(/<p:cSld name="[^"]*">/, '<p:cSld>'),
+      });
+    const layouts = [
+      { name: 'One', type: 'obj', shapes: '' },
+      { name: 'Two', type: 'obj', shapes: '' },
+    ];
+    const host = open(unnamed(buildPptx({ themeName: '', layouts, slides: [{ shapes: '' }] })));
+    const source = unnamed(
+      buildPptx({ themeName: '', layouts, slides: [{ layoutName: 'Two', shapes: title('A') }] })
+    );
+    insert(host, source, { formatting: 'useDestinationTheme' });
+    const pkg = expectWhole(save(host));
+    expect(presentationInfo(pkg).slides[0]!.layoutPart).toBe('/ppt/slideLayouts/slideLayout1.xml');
+  });
+
+  test('an empty matching name gives way to the layout name', () => {
+    const host = open(
+      patch(
+        buildPptx({
+          layouts: [
+            { name: 'Other', type: 'obj', shapes: '' },
+            { name: 'Content', type: 'obj', shapes: '' },
+          ],
+          slides: [{ shapes: '' }],
+        }),
+        {
+          'ppt/slideLayouts/slideLayout4.xml': (t) =>
+            t.replace('<p:sldLayout ', '<p:sldLayout matchingName="" '),
+        }
+      )
+    );
+    const source = buildPptx({
+      layouts: [{ name: 'Content', type: 'obj', shapes: '' }],
+      slides: [{ layoutName: 'Content', shapes: title('A') }],
+    });
+    insert(host, source, { formatting: 'useDestinationTheme' });
+    const pkg = expectWhole(save(host));
+    expect(presentationInfo(pkg).slides[0]!.layoutPart).toBe('/ppt/slideLayouts/slideLayout4.xml');
+  });
+
+  test('a layout of the same name wins over a master of the same name', () => {
+    // Master 1 (`First`) holds `obj` layout `Content`; master 2 (`Second`) holds `obj` layout
+    // `Other`. The source slide is on `Content` under a master named `Second`.
+    const host = open(
+      buildPptx({
+        themeName: 'First',
+        layouts: [{ name: 'Content', type: 'obj', shapes: '' }],
+        slides: [{ shapes: '' }],
+      })
+    );
+    const second = (layout: string) =>
+      buildPptx({
+        themeName: 'Second',
+        layouts: [{ name: layout, type: 'obj', shapes: '' }],
+        slides: [{ layoutName: layout, shapes: title(layout) }],
+      });
+    insert(host, second('Other'));
+    insert(host, second('Content'), { formatting: 'useDestinationTheme' });
+    const pkg = expectWhole(save(host));
+    expect(masterCount(pkg)).toBe(2);
+    expect(presentationInfo(pkg).slides[0]!.layoutPart).toBe('/ppt/slideLayouts/slideLayout3.xml');
+  });
+
+  test('two masters with no name are not a master match', () => {
+    // Master 1 is `X`; master 2 and the source master have no name. Each holds `obj` layout
+    // `Content`, so the first in master order wins.
+    const deck = (themeName: string) =>
+      buildPptx({
+        themeName,
+        layouts: [{ name: 'Content', type: 'obj', shapes: '' }],
+        slides: [{ layoutName: 'Content', shapes: title(themeName) }],
+      });
+    const host = open(deck('X'));
+    insert(host, deck(''));
+    insert(host, deck(''), { formatting: 'useDestinationTheme' });
+    const pkg = expectWhole(save(host));
+    expect(masterCount(pkg)).toBe(2);
+    expect(presentationInfo(pkg).slides[0]!.layoutPart).toBe('/ppt/slideLayouts/slideLayout3.xml');
+  });
 });
 
 describe('insertSlides: refusals', () => {

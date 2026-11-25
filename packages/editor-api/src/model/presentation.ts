@@ -197,10 +197,13 @@ export class Presentation extends ModelObject {
    * Insert the slides of another presentation, given as Base64-encoded PPTX bytes. Each slide
    * comes with its notes, pictures, media, charts, and other parts. With `KeepSourceFormatting`
    * (the default), its layout, master, and theme come too; with `UseDestinationTheme`, it goes on
-   * the layout of this presentation with the same type. Without `targetSlideId`, the slides go
-   * first. Comments come along, with their authors merged by name and initials. An unknown slide
-   * id refuses with `ItemNotFound`; a slide with threaded comments or an embedded control refuses
-   * with `NotSupported`, naming the slide ids. Nothing changes when the call is refused.
+   * a layout of this presentation with the same type. It prefers the same layout name, then the
+   * same master name, then the same layout when both names match. Thus a slide exported from this
+   * presentation keeps its layout when its layout and master have names. Without
+   * `targetSlideId`, the slides go first. Comments come along, with their authors merged by name
+   * and initials. An unknown slide id refuses with `ItemNotFound`; a slide with threaded comments
+   * or an embedded control refuses with `NotSupported`, naming the slide ids. Nothing changes
+   * when the call is refused.
    *
    * @example
    * ```ts
