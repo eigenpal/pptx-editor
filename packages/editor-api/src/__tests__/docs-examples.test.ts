@@ -663,9 +663,3 @@ describe('the parallel work example', () => {
     }
   });
 });
-    });
-  } finally {
-    runtime.dispose();
-  }
-});
-
