@@ -3794,3 +3794,102 @@ exports[`scenarios on the server runtime slides.comments 1`] = `
   ],
 }
 `;
+
+exports[`scenarios on the server runtime shapes.chart-data 1`] = `
+{
+  "readBack": {
+    "categories": [
+      "North",
+      "South",
+      "East",
+      "West",
+      "Central",
+    ],
+    "series": [
+      {
+        "name": "Plan",
+        "values": [
+          42,
+          35,
+          51,
+          28,
+          1,
+        ],
+      },
+      {
+        "name": "Actual",
+        "values": [
+          38,
+          41,
+          47,
+          33,
+          1,
+        ],
+      },
+      {
+        "name": "Forecast",
+        "values": [
+          45,
+          39,
+          55,
+          36,
+          1,
+        ],
+      },
+      {
+        "name": "Stretch",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+        ],
+      },
+    ],
+    "workbook": "Embedded",
+  },
+  "status": "ok",
+  "value": {
+    "categories": [
+      "North",
+      "South",
+      "East",
+      "West",
+    ],
+    "chartType": "ColumnClustered",
+    "readOnlyReason": null,
+    "series": [
+      {
+        "name": "Plan",
+        "values": [
+          42,
+          35,
+          51,
+          28,
+        ],
+      },
+      {
+        "name": "Actual",
+        "values": [
+          38,
+          41,
+          47,
+          33,
+        ],
+      },
+      {
+        "name": "Forecast",
+        "values": [
+          45,
+          39,
+          55,
+          36,
+        ],
+      },
+    ],
+    "title": "Sales by region",
+    "workbook": "Embedded",
+  },
+}
+`;

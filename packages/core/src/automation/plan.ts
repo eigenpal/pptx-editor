@@ -9,6 +9,7 @@ import * as adjustments from './plan-adjustments.ts';
 import * as backgrounds from './plan-backgrounds.ts';
 import * as bindings from './plan-bindings.ts';
 import * as comments from './plan-comments.ts';
+import * as charts from './plan-charts.ts';
 import type { AutomationBindings } from './plan-bindings.ts';
 import * as find from './plan-find.ts';
 import * as headerFooter from './plan-header-footer.ts';
@@ -415,6 +416,10 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       );
     case 'deleteComment':
       return comments.deleteComment(ctx, op.slide, op.comment, op.expect, op.scope);
+    case 'readChart':
+      return charts.readChart(ctx, op.shape, op.orNull);
+    case 'setChartData':
+      return charts.setChartData(ctx, op.shape, op.data);
     case 'readSelection':
       return readSelection(ctx);
     case 'selectSlides': {

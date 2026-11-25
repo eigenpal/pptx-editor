@@ -814,6 +814,23 @@ export type AutomationOperation =
       readonly expect?: AutomationCommentExpect;
       readonly scope?: AutomationCommentScope;
     }
+  // Charts: the chart part (`c:chartSpace`, ECMA-376 Part 1, §21.2.2.29) of a chart frame.
+  | {
+      /** The type, title, categories, series, and workbook of a chart frame. */
+      readonly op: 'readChart';
+      readonly shape: AutomationRef;
+      /** Answer null, not a refusal, for a shape that is not a chart frame. */
+      readonly orNull?: boolean;
+    }
+  | {
+      /**
+       * Replace the categories and series of a chart frame, by position: the caches (`c:cat`,
+       * `c:val`), the cell references, and an embedded workbook change together.
+       */
+      readonly op: 'setChartData';
+      readonly shape: AutomationRef;
+      readonly data: AutomationChartData;
+    }
   // Selection (browser host only)
   | { readonly op: 'readSelection' }
   | { readonly op: 'selectSlides'; readonly slides: readonly AutomationRef[] }
@@ -953,6 +970,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'setCommentText',
   'setCommentResolved',
   'deleteComment',
+  'setChartData',
 ]);
 
 /** The operations that need a reader's selection. */
@@ -963,3 +981,21 @@ export const AUTOMATION_SELECTION_OPERATIONS: ReadonlySet<AutomationOperation['o
   'selectShapes',
   'selectText',
 ]);
+
+/**
+ * One series of a chart: its name (`c:tx`, ECMA-376 Part 1, §21.2.2.215) and one value for each
+ * category (`c:val`, §21.2.2.224, or `c:yVal`, §21.2.2.237). `null` is a blank point.
+ */
+export interface AutomationChartSeries {
+  readonly name: string;
+  readonly values: readonly (number | null)[];
+}
+
+/**
+ * The data of a chart: the category labels (`c:cat`, §21.2.2.24), or the X values of a scatter
+ * chart (`c:xVal`, §21.2.2.234) as text, and the series in plot order.
+ */
+export interface AutomationChartData {
+  readonly categories: readonly string[];
+  readonly series: readonly AutomationChartSeries[];
+}

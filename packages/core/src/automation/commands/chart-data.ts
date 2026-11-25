@@ -77,18 +77,35 @@ function dataOf(model: ChartModel): Omit<ChartData, 'workbook'> {
   };
 }
 
+/**
+ * The dry runs already made, by the bytes of the workbook and then of the chart part. A part
+ * that an edit writes gets new bytes, so an entry never outlives what it measured, and a read
+ * of many charts does not unzip each workbook again.
+ */
+const DRY_RUNS = new WeakMap<Uint8Array, WeakMap<Uint8Array, ChartWorkbookState>>();
+
 /** Where the chart's workbook is, and whether an edit can write it: a dry run of the edit. */
 function workbookState(pkg: PptxPackage, frame: ChartFrame, model: ChartModel): ChartWorkbookState {
   const book = chartWorkbook(pkg, frame.part, frame.chartSpace);
   if (book.state !== 'embedded') return book.state;
   const bytes = book.part ? binaryPartOf(pkg, book.part) : undefined;
   if (!bytes || !model.layout) return 'kept';
+  const chartBytes = binaryPartOf(pkg, frame.part);
+  const known = chartBytes ? DRY_RUNS.get(bytes)?.get(chartBytes) : undefined;
+  if (known) return known;
+  let state: ChartWorkbookState;
   try {
     const plan = planChartEdit(model, dataOf(model));
-    return updatedWorkbook(bytes, plan, model.layout) ? 'embedded' : 'kept';
+    state = updatedWorkbook(bytes, plan, model.layout) ? 'embedded' : 'kept';
   } catch {
-    return 'kept';
+    state = 'kept';
   }
+  if (chartBytes) {
+    const byChart = DRY_RUNS.get(bytes) ?? new WeakMap<Uint8Array, ChartWorkbookState>();
+    byChart.set(chartBytes, state);
+    DRY_RUNS.set(bytes, byChart);
+  }
+  return state;
 }
 
 /** The data of the chart frame `nodeId` of `slidePart`, or why it cannot be edited. */

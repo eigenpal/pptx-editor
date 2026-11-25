@@ -173,3 +173,11 @@ export type {
   ShadowDetail,
   ReflectionDetail,
 } from '@pptx-editor.dev/core/contracts';
+export {
+  Chart,
+  ChartReadOnlyReason,
+  ChartType,
+  ChartWorkbookState,
+  type ChartData,
+  type ChartSeriesData,
+} from '../model/charts.ts';

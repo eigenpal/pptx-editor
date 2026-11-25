@@ -1,0 +1,95 @@
+---
+title: 'Charts'
+description: 'Read and replace the data of charts with the editing API.'
+category: 'Editing API'
+---
+
+Use `shape.chart` to read the chart type, title, categories, and series of a chart. Call `chart.setData()` to replace its data. Both members are SDK extensions, not members of the pinned Office.js reference. They work the same in browser and server runtimes.
+
+## Replace chart data
+
+This example updates every chart on the first slide. For each series whose name is a key of `values`, it writes the new values. It skips a chart whose data the engine cannot edit:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function updateCharts(
+  runtime: PptxEditorRuntime,
+  values: Record<string, (number | null)[]>
+) {
+  return runtime.run(async (context) => {
+    const shapes = context.presentation.slides.getItemAt(0).shapes.load('items/type');
+    await context.sync();
+    const charts = shapes.items
+      .filter((shape) => shape.type === 'Chart')
+      .map((shape) => shape.chart.load('categories,series,readOnlyReason'));
+    await context.sync();
+    for (const chart of charts) {
+      if (chart.isNullObject || chart.readOnlyReason !== null) continue;
+      chart.setData({
+        categories: chart.categories,
+        series: chart.series.map((s) => ({
+          name: s.name,
+          values: Object.hasOwn(values, s.name) ? values[s.name]! : s.values,
+        })),
+      });
+    }
+    await context.sync();
+    return charts.length;
+  });
+}
+```
+
+`shape.chart` is a null object for a shape that is not a chart. Check `isNullObject` after a sync.
+
+## Read a chart
+
+A chart loads these properties:
+
+| Property | Value |
+| --- | --- |
+| `chartType` | A `ChartType` value, such as `ColumnClustered` or `XYScatter`. It is `null` for a type that has no `ChartType` value, such as a 3-D, stock, bubble, combination, or stacked line chart. Such a chart can still take new data when `readOnlyReason` is `null`. A read-only chart with one plot still reads its type. |
+| `title` | The title as it shows, or `null` for no title. An automatic title of a chart with one series reads as the series name. For a read-only chart, an automatic title reads as `Chart Title`, and a chart with no `c:title` reads `null`. |
+| `categories` | The category labels. For a scatter chart, the X values as text. A number or date category reads as its cached value, such as `44927`, without its number format. |
+| `series` | Each series in plot order, with its `name` and one value for each category. A blank point reads as `null`. |
+| `workbook` | A `ChartWorkbookState` value. See [Keep the workbook in step](#keep-the-workbook-in-step). |
+| `readOnlyReason` | A `ChartReadOnlyReason` value, or `null` when `setData` can edit the data. |
+
+The values come from the caches in the chart part. The engine never opens a linked workbook.
+
+When `readOnlyReason` is not `null`, `categories` and `series` are empty. A `Combination` chart, such as columns with a line, is an exception: when its plots share one set of categories, it reads the series of every plot in plot order. `setData` still refuses it. The reasons are `NoData`, `Combination`, `UnsupportedType`, `Filtered`, `MultiLevel`, `MixedCategories`, `TooLarge`, and `Unreadable`.
+
+## Change the number of series or categories
+
+`setData` replaces the data by position. Category `i` and series `j` keep the formatting, the data point overrides, and the data labels of the ones at the same position. A series past the old count is new, and it takes the automatic color of its position. To remove a series, leave it out.
+
+Give at least one category and one series, at most 4000 categories and 255 series, and one value for each category. Labels and names have at most 255 characters. The X values of a scatter chart are numbers as text, unless the chart already names them as text.
+
+## Keep the workbook in step
+
+A chart can keep its data in a workbook. The write changes the caches, the point counts, and the cell references of each series together. What happens to the workbook depends on `workbook`:
+
+- `Embedded`: the embedded workbook gets the same values, so a later edit of the workbook starts from the new data.
+- `Kept`: the embedded workbook has a structure that the engine does not change, so it keeps its old values.
+- `External`: the workbook is a linked file. The write turns off its automatic update, so the old values do not come back.
+- `None`: the chart has no workbook, and its data is in the chart part only.
+
+## Handle refusals
+
+`setData` refuses before it writes anything:
+
+- Data of the wrong form, empty data, too much data, text that XML cannot keep, or a value that is not a finite number refuses with `InvalidArgument`.
+- A chart whose data is read-only refuses with `NotSupported` and the diagnostic `edit.chart-data-unsupported`.
+- A change that the cell references or the embedded workbook cannot take refuses with `NotSupported` and the diagnostic `edit.chart-data-layout`. Examples are a change of the counts when the references do not form one table, and two series with the same name when the workbook holds a table.
+- A chart part that is missing refuses with `NotSupported` and the diagnostic `edit.chart-unreadable`.
+- A write to the chart of a shape that is not a chart refuses with `NotSupported` and the diagnostic `edit.not-a-chart`. After a sync shows the null object, the write refuses with `InvalidObjectPath` and the diagnostic `edit.null-object`.
+
+A refusal refuses the whole sync, so the other writes of that sync do not apply either. In a browser editor, each sync that writes is one undo step.
+
+A chart of an extension namespace is not a chart frame in this API. Its shape type reads `Unsupported`, and its `chart` is a null object.
+
+## See also
+
+- [Charts](/docs/guides/charts)
+- [Office.js compatibility](/docs/editor-api/office-js-api)
+- [Batching, loading, and errors](/docs/editor-api/batching-and-errors)

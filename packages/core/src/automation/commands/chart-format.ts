@@ -86,6 +86,16 @@ function collectText(el: Element): string {
   return s;
 }
 
+/**
+ * The title of a chart whose data the editor does not edit (`c:title`, ECMA-376 Part 1,
+ * §21.2.2.210): its own text, `Chart Title` for an automatic title, or null for no title. With
+ * no series read, an automatic title never reads as a series name.
+ */
+export function chartTitleText(chartSpace: Element): string | null {
+  const title = cChild(cChild(chartSpace, 'chart'), 'title');
+  return title ? (titleText(title) ?? 'Chart Title') : null;
+}
+
 /** The chart's title as it shows: its own text, the one series' name, or `Chart Title`. */
 function chartTitle(chart: Element, model: ChartModel): string | null {
   const title = cChild(chart, 'title');

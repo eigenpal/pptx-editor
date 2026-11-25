@@ -12,12 +12,14 @@
 // must not be a reference into the engine.
 
 import type {
+  ChartType,
+  ChartWorkbookState,
   LineEndType,
   ShapeFormatProperties,
   SlideTransitionState,
 } from '../contracts/neutral.ts';
 import type { TransitionDirection } from './commands/transition-commands.ts';
-import type { AutomationOperation } from './operations.ts';
+import type { AutomationChartSeries, AutomationOperation } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
 export type AutomationObjectKind =
@@ -628,7 +630,47 @@ export type AutomationValue =
   | { readonly kind: 'headerFooter'; readonly headerFooter: AutomationHeaderFooterRead }
   | { readonly kind: 'comments'; readonly comments: readonly AutomationCommentThreadRead[] }
   /** A command that committed. The effect is the response's revision. */
-  | { readonly kind: 'applied' };
+  | { readonly kind: 'applied' }
+  | { readonly kind: 'chart'; readonly chart: AutomationChartRead };
+
+/**
+ * Why the engine cannot edit the data of a chart: no series (`noData`), more than one plot
+ * (`combination`), a plot or reference type it does not edit (`unsupportedType`), hidden series
+ * (`filtered`), multi-level categories (`multiLevel`), series with different categories
+ * (`mixedCategories`), more points or series than it reads (`tooLarge`), or a chart part that is
+ * missing or is not a `c:chartSpace` (`unreadable`).
+ */
+export type AutomationChartReadOnlyReason =
+  | 'noData'
+  | 'combination'
+  | 'unsupportedType'
+  | 'filtered'
+  | 'multiLevel'
+  | 'mixedCategories'
+  | 'tooLarge'
+  | 'unreadable';
+
+/**
+ * The chart of a chart frame (`c:chartSpace`, ECMA-376 Part 1, §21.2.2.29), from the caches that
+ * the chart part holds (`c:numCache`, §21.2.2.120; `c:strCache`, §21.2.2.199).
+ */
+export interface AutomationChartRead {
+  /** The chart type, or null for a type that the engine does not write (3-D, stock, bubble). */
+  readonly type: ChartType | null;
+  /** The title as it shows (`c:title`, §21.2.2.210), or null for no title. */
+  readonly title: string | null;
+  /**
+   * The category labels, or the X values of a scatter chart. Empty when read-only, except for a
+   * combination chart whose plots share one set of categories.
+   */
+  readonly categories: readonly string[];
+  /** The series in plot order; empty when `categories` is. */
+  readonly series: readonly AutomationChartSeries[];
+  /** Where the chart's workbook is (`c:externalData`, §21.2.2.63), and what an edit does to it. */
+  readonly workbook: ChartWorkbookState;
+  /** Why the data cannot be edited, or null when `setChartData` can edit it. */
+  readonly readOnlyReason: AutomationChartReadOnlyReason | null;
+}
 
 /**
  * One operation's outcome.

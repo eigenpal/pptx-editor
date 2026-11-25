@@ -292,6 +292,23 @@ const DIAGNOSTICS: ReadonlyMap<string, PptxEditorDiagnostic> = new Map(
           'do not apply the same edit again.',
       ],
       [
+        'not-chart',
+        'edit.not-a-chart',
+        'The shape is not a chart. Check shape.chart.isNullObject first, and use a chart shape.',
+      ],
+      [
+        'chart-read-only',
+        'edit.chart-data-unsupported',
+        'The engine cannot edit the data of this chart. Read chart.readOnlyReason for the ' +
+          'cause, and edit a chart whose readOnlyReason is null.',
+      ],
+      [
+        'chart-unreadable',
+        'edit.chart-unreadable',
+        'The chart part of this frame is missing or is not a chart. Read chart.readOnlyReason ' +
+          'first, and edit a chart that reads.',
+      ],
+      [
         'transition-no-effect',
         'edit.transition-no-effect',
         'The slide has no transition effect, so it has no duration. Set the effect and the ' +

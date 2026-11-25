@@ -363,4 +363,40 @@ export const SHAPE_SCENARIOS: readonly Scenario[] = [
       return shapes.items.map((s) => s.name);
     },
   },
+  {
+    name: 'shapes.chart-data',
+    area: 'shapes',
+    deck: 'chart-data',
+    writes: true,
+    async script(context) {
+      const shapes = context.presentation.slides.getItemAt(0).shapes.load('items/type');
+      await context.sync();
+      const frame = shapes.items.find((s) => s.type === 'Chart');
+      const other = shapes.items.find((s) => s.type !== 'Chart');
+      check(frame && other, 'the deck has a chart and another shape');
+      const chart = frame.chart.load('chartType,title,categories,series,workbook,readOnlyReason');
+      const none = other.chart;
+      await context.sync();
+      check(none.isNullObject, 'a shape that is not a chart has a null chart');
+      const before = chart.toJSON();
+      chart.setData({
+        categories: [...chart.categories, 'Central'],
+        series: [
+          ...chart.series.map((s) => ({ name: s.name, values: [...s.values, 1] })),
+          { name: 'Stretch', values: chart.categories.map((_, i) => i + 1).concat(5) },
+        ],
+      });
+      await context.sync();
+      return before as Json;
+    },
+    async readBack(context) {
+      const shapes = context.presentation.slides.getItemAt(0).shapes.load('items/type');
+      await context.sync();
+      const chart = shapes.items
+        .find((s) => s.type === 'Chart')!
+        .chart.load('categories,series,workbook');
+      await context.sync();
+      return chart.toJSON() as Json;
+    },
+  },
 ];
