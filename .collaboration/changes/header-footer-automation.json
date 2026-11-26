@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation setHeaderFooter adds and removes slide placeholders through the node operations that the setSlideNumbers, setFooter, and setDateTime editor commands use. readHeaderFooter writes nothing. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-header-footer.test.ts",
+    "packages/core/src/automation/__tests__/host-header-footer.test.ts",
+    "packages/editor-api/src/__tests__/header-footer.test.ts"
+  ]
+}

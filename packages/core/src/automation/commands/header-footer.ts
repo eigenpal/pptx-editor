@@ -25,7 +25,7 @@ import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { fieldId, nextShapeId, spTreeOf, xmlAttr, xmlText } from './package-edits.ts';
 import { specFromXml } from './shape-commands.ts';
 import { removeShapes } from './shape-removal.ts';
-import { setSlideNumbers } from './slide-numbers.ts';
+import { hasSlideNumber, setSlideNumbers } from './slide-numbers.ts';
 import type {
   DateTimeState as DateShown,
   EditorCommand,
@@ -131,6 +131,32 @@ export function dateShown(
 ): DateShown | null {
   const got = deckShown(pkg, 'dt', index, ready);
   return got ? { text: got.text, fixed: got.fieldType === undefined } : null;
+}
+
+/** What one slide shows in its own placeholders, as `slideHeaderFooter` reads it. */
+export interface SlideHeaderFooter {
+  /** The slide has a slide-number placeholder (`p:ph type="sldNum"`). */
+  readonly slideNumber: boolean;
+  /** The text of the slide's footer placeholder; null when it has none with text. */
+  readonly footer: string | null;
+  /** The slide's date: its text, and fixed text or a field. Null when it has none with text. */
+  readonly date: DateShown | null;
+}
+
+/**
+ * The slide number, footer, and date that slide `index` shows in its own placeholders. Unlike
+ * `footerText` and `dateShown`, which give the deck state for the menus, this reads the one
+ * slide. Null for an index out of range.
+ */
+export function slideHeaderFooter(pkg: PptxPackage, index: number): SlideHeaderFooter | null {
+  const part = presentationInfo(pkg).slides[index]?.partName;
+  if (!part) return null;
+  const date = shownOn(pkg, part, 'dt');
+  return {
+    slideNumber: hasSlideNumber(pkg, index),
+    footer: shownOn(pkg, part, 'ftr')?.text ?? null,
+    date: date ? { text: date.text, fixed: date.fieldType === undefined } : null,
+  };
 }
 
 /** The paragraph content of a footer or date: plain text, or a date field. */
@@ -271,6 +297,10 @@ interface Showing {
   readonly fallback: (() => Shown) | undefined;
   /** Without text: turn the date fields that slides keep into fixed text. */
   readonly toFixed?: boolean;
+  /** Without text: turn the fixed dates that slides keep into today's date as a field. */
+  readonly toField?: boolean;
+  /** With text for a field: a slide's own date field keeps its field type. */
+  readonly keepFieldType?: boolean;
 }
 
 /**
@@ -301,10 +331,12 @@ function applyKind(
   let changed = 0;
   let possible = 0;
   // Text absent: a slide without the placeholder shows what the first slide with one shows.
-  const deck =
+  let deck =
     showing.text === undefined && targets.show.length > 0
       ? (deckShown(pkg, kind, targets.show[0]!, () => true) ?? showing.fallback?.() ?? null)
       : null;
+  // An automatic date spreads a field, never fixed text.
+  if (showing.toField && deck?.fieldType === undefined) deck = showing.fallback?.() ?? null;
   for (const index of [...targets.show, ...targets.hide]) {
     const slide = slides[index]!;
     const tree = spTreeOf(batch, slide.partName);
@@ -336,15 +368,36 @@ function applyKind(
             replaceText(batch, slide.partName, shape, what, deck.text, field);
           } else if (own && showing.toFixed && own.fieldType !== undefined) {
             replaceText(batch, slide.partName, shape, what, own.text, undefined);
+          } else if (own && showing.toField && own.fieldType === undefined && showing.fallback) {
+            // Fixed text becomes today's date, not the stored text of another slide's field.
+            const today = showing.fallback();
+            replaceText(batch, slide.partName, shape, what, today.text, today.fieldType);
           } else continue;
           edited = true;
         }
         changed += edited ? 1 : 0;
         continue;
       }
-      for (const shape of existing)
-        replaceText(batch, slide.partName, shape, what, showing.text, showing.field);
-      changed += 1;
+      let edited = false;
+      for (const shape of existing) {
+        const own = shownBy(shape);
+        const field = (showing.keepFieldType && own?.fieldType) || showing.field;
+        // A placeholder that shows this text already, as a field or as fixed text as asked, keeps
+        // its paragraphs and line breaks: a read of the slide written back changes nothing.
+        // A footer asks for no field, so a footer with a field (a slide number) that shows the
+        // text keeps that field too.
+        const same =
+          own?.text === showing.text &&
+          (kind === 'ftr' ||
+            (field === undefined
+              ? own.fieldType === undefined
+              : own.fieldType !== undefined &&
+                (own.fieldType === field || !!showing.keepFieldType)));
+        if (same) continue;
+        replaceText(batch, slide.partName, shape, what, showing.text, field);
+        edited = true;
+      }
+      changed += edited ? 1 : 0;
       continue;
     }
     const text = showing.text ?? deck?.text;
@@ -396,14 +449,19 @@ export function setFooter(
  * Show or hide the date. With `text`, every slide that shows it shows `text`: a `datetime1` field
  * that a presentation application can update when it opens the file, or fixed text with `fixed`.
  * Without `text`, a slide keeps its date, and a slide without one takes the deck's date, else
- * today's date as a field; `fixed` then turns the dates into fixed text.
+ * today's date as a field; `fixed` then turns the dates into fixed text. With `automatic`
+ * (and no `text` or `fixed`), a slide's fixed text becomes today's date as a `datetime1` field
+ * (`a:fld`, `CT_TextField`, ECMA-376 Part 1, 21.1.2.2.4), a date field keeps its type, and a
+ * slide without a date takes the deck's date field, else today's. With `automatic` and `text`
+ * (not `fixed`), a slide's own date field keeps its type and takes `text`.
  */
 export function setDateTime(
   batch: OpBatch,
   show: boolean,
   text?: string,
   fixed = false,
-  options: HeaderFooterTargets = {}
+  options: HeaderFooterTargets = {},
+  automatic = false
 ): number {
   const targets = headerFooterTargets(batch.pkg, show, options);
   return applyKind(batch, 'dt', targets, {
@@ -411,6 +469,8 @@ export function setDateTime(
     field: fixed ? undefined : 'datetime1',
     fallback: () => ({ text: shortDate(), fieldType: 'datetime1' }),
     toFixed: fixed && text === undefined,
+    toField: automatic && !fixed && text === undefined,
+    keepFieldType: automatic && !fixed && text !== undefined,
   });
 }
 

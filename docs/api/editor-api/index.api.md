@@ -828,6 +828,17 @@ export { GradientDetail }
 export { GradientStopDetail }
 
 // @public
+export interface HeaderFooterSettings {
+    dateFixed?: boolean;
+    dateText?: string;
+    dateVisible?: boolean;
+    footerText?: string;
+    footerVisible?: boolean;
+    hideOnTitleSlides?: boolean;
+    slideNumberVisible?: boolean;
+}
+
+// @public
 export class Hyperlink extends ModelObject {
     // @internal
     constructor(context: RequestContext, path: ObjectPath, shape: ObjectPath, span: LinkSpan | undefined, values?: {
@@ -1128,6 +1139,7 @@ export interface PptxEditorServerRuntime extends PptxEditorRuntime {
 
 // @public
 export class Presentation extends ModelObject {
+    applyHeaderFooter(settings: HeaderFooterSettings): void;
     get bindings(): BindingCollection;
     get customXmlParts(): CustomXmlPartCollection;
     getSelectedShapes(): ShapeScopedCollection;
@@ -1634,6 +1646,7 @@ export class Slide extends ModelObject {
     duplicate(): Slide;
     exportAsBase64(): ClientResult<string>;
     getImageAsBase64(options?: SlideGetImageOptions): ClientResult<string>;
+    get headerFooter(): SlideHeaderFooter;
     get hidden(): boolean;
     set hidden(value: boolean);
     get hyperlinks(): HyperlinkCollection;
@@ -1909,6 +1922,26 @@ export class SlideCollection extends ItemCollection<Slide> {
 export interface SlideGetImageOptions {
     height?: number;
     width?: number;
+}
+
+// @public
+export class SlideHeaderFooter extends ModelObject {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath);
+    get dateFixed(): boolean;
+    set dateFixed(value: boolean);
+    get dateText(): string;
+    set dateText(value: string);
+    get dateVisible(): boolean;
+    set dateVisible(value: boolean);
+    get footerText(): string;
+    set footerText(value: string);
+    get footerVisible(): boolean;
+    set footerVisible(value: boolean);
+    // @internal (undocumented)
+    protected onLoad(request: ResolvedLoadOptions): void;
+    get slideNumberVisible(): boolean;
+    set slideNumberVisible(value: boolean);
 }
 
 // @public

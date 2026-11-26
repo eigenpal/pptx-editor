@@ -10,6 +10,7 @@ import * as backgrounds from './plan-backgrounds.ts';
 import * as bindings from './plan-bindings.ts';
 import type { AutomationBindings } from './plan-bindings.ts';
 import * as find from './plan-find.ts';
+import * as headerFooter from './plan-header-footer.ts';
 import * as images from './plan-images.ts';
 import * as notes from './plan-notes.ts';
 import * as importing from './plan-import.ts';
@@ -450,6 +451,10 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return transitions.readTransition(ctx, op.slide);
     case 'setTransition':
       return transitions.setTransition(ctx, op.slide, op.transition);
+    case 'readHeaderFooter':
+      return headerFooter.readHeaderFooter(ctx, op.slide);
+    case 'setHeaderFooter':
+      return headerFooter.setHeaderFooter(ctx, op.slides, op.settings);
     default:
       throw new AutomationFailure(
         'unknown-operation',

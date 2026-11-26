@@ -185,6 +185,24 @@ const ROWS: readonly (readonly [string, string])[] = [
     'Use l, u, r, or d for push and wipe, or horzIn, horzOut, vertIn, or vertOut for split.',
   ],
   ['throughBlack', BOOLEAN],
+  // Slide number, footer, and date.
+  [
+    'settings',
+    'Use a HeaderFooterSettings object that sets at least one of slideNumberVisible, footerVisible, footerText, dateVisible, dateText, or dateFixed.',
+  ],
+  ['slideNumberVisible', BOOLEAN],
+  ['footerVisible', BOOLEAN],
+  [
+    'footerText',
+    'Use one line of 1 to 1024 characters, with no line breaks or control characters other than tab. An empty string is accepted only with footerVisible false in applyHeaderFooter.',
+  ],
+  ['dateVisible', BOOLEAN],
+  [
+    'dateText',
+    'Use one line of 1 to 1024 characters, with no line breaks or control characters other than tab. An empty string is accepted only with dateVisible false in applyHeaderFooter.',
+  ],
+  ['dateFixed', BOOLEAN],
+  ['hideOnTitleSlides', BOOLEAN],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */

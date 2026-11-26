@@ -250,6 +250,34 @@ export interface AutomationTransitionWrite {
   readonly remove?: true;
 }
 
+/**
+ * The slide number, footer, and date that a `setHeaderFooter` write shows or hides, through the
+ * `sldNum`, `ftr`, and `dt` placeholders (`p:ph`, `ST_PlaceholderType`, ECMA-376 Part 1,
+ * 19.3.1.36 and 19.7.10). A field the write leaves out stays as it is.
+ */
+export interface AutomationHeaderFooterWrite {
+  /** Show or hide the slide number: a `sldNum` placeholder with a `slidenum` field. */
+  readonly slideNumberVisible?: boolean;
+  /** False hides the footer. True without `footerText` keeps or spreads the deck's footer. */
+  readonly footerVisible?: boolean;
+  /** One line of 1 to 1024 characters. Shows the footer. Only '' with `footerVisible: false`. */
+  readonly footerText?: string;
+  /** False hides the date. True without other date fields keeps or spreads the deck's date. */
+  readonly dateVisible?: boolean;
+  /**
+   * One line of 1 to 1024 characters. Shows the date: fixed text, or a `datetime1` field that
+   * holds it with `dateFixed: false`. Only '' with `dateVisible: false`.
+   */
+  readonly dateText?: string;
+  /**
+   * True turns date fields into fixed text; false turns fixed text into today's date field.
+   * Ignored with `dateVisible: false`.
+   */
+  readonly dateFixed?: boolean;
+  /** Slides on a `title` layout (`ST_SlideLayoutType`, 19.7.15) hide what the others show. */
+  readonly hideOnTitleSlides?: boolean;
+}
+
 /** Every operation a host understands. */
 export type AutomationOperation =
   // Presentation
@@ -751,6 +779,14 @@ export type AutomationOperation =
       readonly op: 'setTransition';
       readonly slide: AutomationRef;
       readonly transition: AutomationTransitionWrite;
+    }
+  // Slide number, footer, and date (the placeholders `sldNum`, `ftr`, and `dt`).
+  | { readonly op: 'readHeaderFooter'; readonly slide: AutomationRef }
+  | {
+      readonly op: 'setHeaderFooter';
+      /** The slides to change. Every slide when absent. */
+      readonly slides?: readonly AutomationRef[];
+      readonly settings: AutomationHeaderFooterWrite;
     };
 
 /** The operations that write. Every other operation only reads. */
@@ -815,6 +851,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'deleteSection',
   'deleteAllSections',
   'setTransition',
+  'setHeaderFooter',
 ]);
 
 /** The operations that need a reader's selection. */

@@ -33,6 +33,7 @@ const EXTENSIONS: ReadonlySet<string> = new Set([
   'getTextFit',
   'speakerNotes',
   'addPicture',
+  'applyHeaderFooter',
 ]);
 
 /** The members of `proto` and the classes above it that check their arguments at the sync. */

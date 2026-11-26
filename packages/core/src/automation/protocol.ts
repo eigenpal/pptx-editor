@@ -499,6 +499,26 @@ export interface AutomationTransitionRead extends SlideTransitionState {
   readonly throughBlack: boolean;
 }
 
+/**
+ * The slide number, footer, and date of one slide (`readHeaderFooter`): what its own `sldNum`,
+ * `ftr`, and `dt` placeholders show (`p:ph`, ECMA-376 Part 1, 19.3.1.36). A footer or date
+ * placeholder with no text shows nothing, so it reads as not visible.
+ */
+export interface AutomationHeaderFooterRead {
+  /** The slide has a `sldNum` placeholder, with or without text. */
+  readonly slideNumberVisible: boolean;
+  /** The slide has an `ftr` placeholder with text. */
+  readonly footerVisible: boolean;
+  /** The footer text; empty when the footer is not visible. */
+  readonly footerText: string;
+  /** The slide has a `dt` placeholder with text. */
+  readonly dateVisible: boolean;
+  /** The text the date shows; empty when the date is not visible. */
+  readonly dateText: string;
+  /** True for fixed text, false for a date field (`a:fld`) or no date. */
+  readonly dateFixed: boolean;
+}
+
 /** What an operation answered with. */
 export type AutomationValue =
   | { readonly kind: 'shapeFormat'; readonly format: ShapeFormatProperties }
@@ -542,6 +562,7 @@ export type AutomationValue =
   | { readonly kind: 'bindings'; readonly bindings: readonly AutomationBindingRead[] }
   | { readonly kind: 'selection'; readonly selection: AutomationSelectionRead }
   | { readonly kind: 'transition'; readonly transition: AutomationTransitionRead }
+  | { readonly kind: 'headerFooter'; readonly headerFooter: AutomationHeaderFooterRead }
   /** A command that committed. The effect is the response's revision. */
   | { readonly kind: 'applied' };
 

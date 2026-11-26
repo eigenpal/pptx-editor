@@ -167,3 +167,7 @@ Automatic adoption with `--adopt` requires both checks:
 ### Slide transition extension
 
 `Slide.transition`, `SlideTransition`, `SlideTransitionOptions`, `SlideTransitionEffect`, and `SlideTransitionDirection` are SDK extensions. The pinned Office.js reference has no transition member, so the compatibility manifest has no entry for them. They read and write `p:transition` (`CT_SlideTransition`, ECMA-376 Part 1, §19.3.1.50). The effect names are the ECMA-376 effect element names in PascalCase. `Other` reads an effect from an extension namespace, and a timing write keeps it.
+
+### Header and footer extensions
+
+`Slide.headerFooter`, `SlideHeaderFooter`, `Presentation.applyHeaderFooter()`, and `HeaderFooterSettings` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. The pinned reference has no member for the slide number, the date, or the footer. They add or remove the slide placeholders of type `sldNum`, `ftr`, and `dt` (`p:ph`, ECMA-376 Part 1, 19.3.1.36; `ST_PlaceholderType`, 19.7.10), and leave `p:hf` (19.3.1.25) unchanged.
