@@ -146,6 +146,8 @@ Automatic adoption with `--adopt` requires both checks:
 
 `Slide.hidden` is an SDK extension. It is not an entry in the pinned Office.js PowerPoint reference or compatibility manifest, because the manifest selects only upstream members. It reads and writes `p:sld/@show` (ECMA-376 Part 1, §19.3.1.38).
 
+`Slide.speakerNotes` is an SDK extension. It is not an entry in the pinned Office.js PowerPoint reference or compatibility manifest, because the pinned reference has no member for speaker notes. It reads and writes the text of the body placeholder (`p:ph type="body"`, ECMA-376 Part 1, 19.3.1.36) of the slide's notes slide (`p:notes`, 19.3.1.26). A write to a slide with no notes slide creates the Notes Slide part (13.3.5) from the notes master (13.3.4).
+
 ### Find and replace extension
 
 `Presentation.replaceAll`, `Slide.replaceAll`, and `SearchOptions` are SDK extensions. They are not entries in the pinned Office.js presentation reference or the compatibility manifest. The pinned reference has no member that finds or replaces text across a presentation. `SearchOptions` uses the Office.js option names `matchCase` and `matchWholeWord`. It refuses any other option name.

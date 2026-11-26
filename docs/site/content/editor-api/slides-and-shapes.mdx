@@ -105,6 +105,33 @@ The write applies at the next `context.sync()`. A load of `hidden` queued after 
 
 A hidden slide stays in `presentation.slides`. `slide.getImageAsBase64()` draws a hidden slide. A PDF export from `@pptx-editor.dev/pptx-to-pdf` leaves hidden slides out unless you set `includeHiddenSlides: true`. `slide.hidden` is an SDK extension, not a member of the pinned Office.js reference.
 
+## Read and write speaker notes
+
+Use `slide.speakerNotes` to read or replace the speaker notes of a slide as plain text. This example adds a source line to the notes of one slide and returns the new notes:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function addSource(runtime: PptxEditorRuntime, position: number, source: string) {
+  return runtime.run(async (context) => {
+    const slide = context.presentation.slides.getItemAt(position).load('speakerNotes');
+    await context.sync();
+    const lines = slide.speakerNotes ? [slide.speakerNotes] : [];
+    slide.speakerNotes = [...lines, `Source: ${source}`].join('\n');
+    await context.sync();
+    slide.load('speakerNotes');
+    await context.sync();
+    return slide.speakerNotes;
+  });
+}
+```
+
+A read joins the paragraphs of the notes with `\n`. A line break inside a paragraph also reads as `\n`. A slide with no notes reads as an empty string. `TextRange.text` joins paragraphs with `\r`, but the notes text uses `\n`.
+
+A write makes one paragraph for each line. `\n`, `\r\n`, `\r`, and `\v` each end a line. The write changes only the text that differs, so unchanged text keeps its formatting. A line break that the write does not change stays a line break. New text takes the formatting of the place where it goes. A write of text to a slide with no notes creates the notes slide from the notes master. A write of an empty string to that slide creates nothing.
+
+The write applies at the next `context.sync()`, and a browser runtime records each synchronization as one undo step. Browser and server runtimes behave the same. The API refuses a value that is not a string, longer than 1,000,000 characters, or with a character that XML cannot hold. The refusal has the code `InvalidArgument`, and nothing in that synchronization applies. When the presentation has no notes master, a write that must create a notes slide refuses with `NotSupported`. The diagnostic is `edit.no-notes-master`. A notes slide with no body placeholder refuses a write with `NotSupported` and the diagnostic `edit.no-notes-placeholder`. `Presentation.replaceAll` and `Slide.replaceAll` also search the speaker notes. `slide.speakerNotes` is an SDK extension, not a member of the pinned Office.js reference.
+
 ## Edit line width, dashes, and endpoints
 
 Use `shape.lineFormat` to read or change line properties in either runtime. This example formats the first shape, which must be a supported line or connector:
