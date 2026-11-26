@@ -197,9 +197,11 @@ export function findMatches(
 }
 
 /**
- * The matches of `query` in one text body, as `[start, end)` offsets over its paragraphs joined
- * by one separator character, as the automation text offsets count (`plan-text.ts`). The rules
- * are those of `findMatches`: a match stays in one paragraph and never covers a field.
+ * The matches of `query` in one text body, as `[start, end)` offsets over its paragraphs
+ * (`a:p`, `CT_TextParagraph`, ECMA-376 Part 1, 21.1.2.2.6) joined by one separator character,
+ * as the automation text offsets count (`plan-text.ts`). A line break (`a:br`,
+ * `CT_TextLineBreak`, 21.1.2.2.1) is one character. The rules are those of `findMatches`: a
+ * match stays in one paragraph and never covers a field (`a:fld`, `CT_TextField`, 21.1.2.2.4).
  */
 export function matchesInBody(
   txBody: Element,
