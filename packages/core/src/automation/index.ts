@@ -65,8 +65,6 @@ export type {
   AutomationCellMarginsWrite,
   AutomationCommentExpect,
   AutomationCommentScope,
-  AutomationChartData,
-  AutomationChartSeries,
   AutomationCustomPropertyWrite,
   AutomationFillWrite,
   AutomationFontWrite,
@@ -85,6 +83,7 @@ export type {
   AutomationZOrder,
   AutomationHeaderFooterWrite,
 } from './operations.ts';
+export type { AutomationChartData, AutomationChartSeries } from './operations-chart.ts';
 export { AUTOMATION_COMMANDS } from './operations.ts';
 export { commentAuthorName, MAX_COMMENT_AUTHOR } from './commands/comment-write.ts';
 export {

@@ -155,7 +155,7 @@ The edits that need no DOM, after DOCX Editor's `core/src/automation`. Each take
 
 | Module | Purpose |
 | --- | --- |
-| `protocol.ts`, `operations.ts` | The automation protocol: object kinds, opaque handles, result references, error codes, read values, and the `AutomationOperation` union |
+| `protocol.ts`, `operations.ts`, `operations-chart.ts` | The automation protocol: object kinds, opaque handles, result references, error codes, read values, the `AutomationOperation` union, and the chart data that chart operations take |
 | `host.ts` | `createAutomationHost`: one atomic batch per request, a revision check, and events after the batch |
 | `server-host.ts` | `createServerAutomationHost` and `createStoreAutomationHost`: a host over bytes or a `PptxDocumentStore`, with no DOM |
 | `handles.ts`, `targets.ts`, `text-offsets.ts` | The handle table with its host token, and the lookup of a handle in the working package |

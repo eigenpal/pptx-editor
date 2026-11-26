@@ -21,7 +21,7 @@ import { chartTypeOf } from './commands/chart-type.ts';
 import { cChild } from './commands/chart-xml.ts';
 import { chartWorkbook } from './commands/chart-workbook.ts';
 import { CommandRefusal } from './commands/op-batch.ts';
-import type { AutomationChartData } from './operations.ts';
+import type { AutomationChartData } from './operations-chart.ts';
 import type {
   AutomationChartRead,
   AutomationChartReadOnlyReason,

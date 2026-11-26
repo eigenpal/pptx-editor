@@ -19,7 +19,8 @@ import type {
   SlideTransitionState,
 } from '../contracts/neutral.ts';
 import type { TransitionDirection } from './commands/transition-commands.ts';
-import type { AutomationChartSeries, AutomationOperation } from './operations.ts';
+import type { AutomationChartSeries } from './operations-chart.ts';
+import type { AutomationOperation } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
 export type AutomationObjectKind =
