@@ -849,6 +849,7 @@
     "mixedSize": "선택한 텍스트에 크기가 둘 이상 있습니다",
     "noCommentAuthor": "댓글을 달려면 작성자를 설정하세요",
     "commentNoStatus": "이전 형식의 댓글은 해결로 표시할 수 없습니다",
+    "commentNoTextRange": "이전 형식의 댓글은 텍스트를 가리킬 수 없습니다",
     "commentNotEditable": "이 댓글에는 여기서 편집할 수 없는 내용이 있습니다",
     "noCommentTarget": "댓글은 슬라이드 최상위 요소에만 달 수 있습니다",
     "animationsReadOnly": "이 슬라이드의 효과는 편집기가 변경하지 않는 마크업을 사용합니다",

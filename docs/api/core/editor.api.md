@@ -285,6 +285,11 @@ export type BevelPreset = 'circle' | 'relaxedInset' | 'cross' | 'coolSlant' | 'a
 // @public
 export function bindHistoryGroup(editor: HistoryGroupHost, element: HTMLElement, config: HistoryGroupBindingOptions): HistoryGroupBinding;
 
+// @public
+export interface BrowserAutomationOptions {
+    readonly author?: string;
+}
+
 // @internal
 export function builtInGroupPriority(groupId: string, groups: readonly Pick<ChromeGroup, 'id' | 'contextual'>[]): number;
 
@@ -1543,7 +1548,7 @@ export function correctionSwatch(brightness: number, contrast: number): readonly
 }[];
 
 // @public
-export function createBrowserAutomationHost(editor: PptxEditorInstance): AutomationHost;
+export function createBrowserAutomationHost(editor: PptxEditorInstance, options?: BrowserAutomationOptions): AutomationHost;
 
 // @public
 export function createCollaborationStatusTracker(initial?: CollaborationStatus): CollaborationStatusTracker;

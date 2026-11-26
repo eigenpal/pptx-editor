@@ -14,7 +14,10 @@ import {
   type AnimationEditCommand,
 } from './animation-command-table.ts';
 import { compileChartCommand, isChartCommandType } from './chart-commands.ts';
-import { compileCommentCommand, isCommentCommand } from './comment-commands.ts';
+import {
+  compileCommentCommand,
+  isCommentCommand,
+} from '../automation/commands/comment-commands.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { compileDiagramCommand } from './diagram-commands.ts';
 

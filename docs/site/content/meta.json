@@ -91,6 +91,7 @@
     "editor-api/text-and-ranges",
     "editor-api/tables",
     "editor-api/pictures",
+    "editor-api/comments",
     "editor-api/reference",
     "editor-api/office-js-api",
     "---Reference---",

@@ -9,6 +9,10 @@ import { AutomationBackgroundWrite } from '@pptx-editor.dev/core/automation';
 import { AutomationCapabilities } from '@pptx-editor.dev/core/automation';
 import { AutomationCellAddress } from '@pptx-editor.dev/core/automation';
 import { AutomationCellBorderSide } from '@pptx-editor.dev/core/automation';
+import { AutomationCommentExpect } from '@pptx-editor.dev/core/automation';
+import { AutomationCommentRead } from '@pptx-editor.dev/core/automation';
+import { AutomationCommentScope } from '@pptx-editor.dev/core/automation';
+import { AutomationCommentThreadRead } from '@pptx-editor.dev/core/automation';
 import { AutomationCustomXmlPartRead } from '@pptx-editor.dev/core/automation';
 import { AutomationHandle } from '@pptx-editor.dev/core/automation';
 import { AutomationHost } from '@pptx-editor.dev/core/automation';
@@ -306,6 +310,106 @@ export class ClientResult<T> {
     get value(): T;
 }
 
+// @public
+class Comment_2 extends CommentBase {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, key: string, nullable?: boolean);
+    get anchor(): CommentAnchor;
+    get canResolve(): boolean;
+    // @internal (undocumented)
+    protected fillFrom(read: Read$1): void;
+    // @internal (undocumented)
+    protected get navigations(): Navigation_2;
+    // @internal (undocumented)
+    protected pickFrom(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
+    get replies(): CommentReplyCollection;
+    reply(content: string, options?: CommentAuthorOptions): CommentReply;
+    get resolved(): boolean;
+    set resolved(value: boolean);
+    // @internal (undocumented)
+    protected get scalars(): readonly string[];
+    // @internal (undocumented)
+    protected writeScope(): AutomationCommentScope;
+}
+export { Comment_2 as Comment }
+
+// @public
+export interface CommentAddOptions extends CommentAuthorOptions {
+    shape?: Shape | string;
+    textRange?: {
+        start: number;
+        length: number;
+    };
+}
+
+// @public
+export type CommentAnchor = {
+    readonly type: 'slide';
+} | {
+    readonly type: 'point';
+    readonly left: number;
+    readonly top: number;
+} | {
+    readonly type: 'shape';
+    readonly shapeId: string;
+} | {
+    readonly type: 'text';
+    readonly shapeId: string;
+    readonly start: number;
+    readonly length: number;
+};
+
+// @public
+export interface CommentAuthorOptions {
+    authorInitials?: string;
+    authorName?: string;
+}
+
+// @public
+export class CommentCollection extends CommentList<Comment_2> {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, shapeById: (id: string) => ClientObject, isShape: (value: unknown) => boolean);
+    add(content: string, options?: CommentAddOptions): Comment_2;
+    // @internal (undocumented)
+    protected make(path: ObjectPath, key: string, nullable: boolean): Comment_2;
+    // @internal (undocumented)
+    protected get memberNavigations(): readonly string[];
+    // @internal (undocumented)
+    protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
+    // @internal (undocumented)
+    protected get noun(): string;
+    // @internal (undocumented)
+    protected get scalars(): readonly string[];
+}
+
+// @public
+export class CommentReply extends CommentBase {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, thread: () => string, key: string, nullable?: boolean);
+    // @internal (undocumented)
+    protected pickFrom(threads: readonly AutomationCommentThreadRead[]): Read$1 | undefined;
+    // @internal (undocumented)
+    protected get scalars(): readonly string[];
+    // @internal (undocumented)
+    protected writeScope(): AutomationCommentScope;
+}
+
+// @public
+export class CommentReplyCollection extends CommentList<CommentReply> {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, slide: ObjectPath, thread: () => string, owner: Comment_2);
+    // @internal (undocumented)
+    protected make(path: ObjectPath, key: string, nullable: boolean): CommentReply;
+    // @internal (undocumented)
+    protected membersOf(threads: readonly AutomationCommentThreadRead[]): readonly Read$1[];
+    // @internal (undocumented)
+    protected get noun(): string;
+    // @internal (undocumented)
+    protected requireOwner(target: string): void;
+    // @internal (undocumented)
+    protected get scalars(): readonly string[];
+}
+
 // @public (undocumented)
 export enum ConnectorType {
     // (undocumented)
@@ -317,7 +421,13 @@ export enum ConnectorType {
 }
 
 // @public
+export interface CreateBrowserOptions {
+    readonly author?: string;
+}
+
+// @public
 export interface CreateServerOptions {
+    readonly author?: string;
     readonly fonts?: FontSource | readonly FontSource[];
     readonly rasterize?: ImageRasterizer;
     readonly substitutes?: boolean;
@@ -1665,6 +1775,7 @@ export class Slide extends ModelObject {
     constructor(context: RequestContext, path: ObjectPath, nullable?: boolean);
     applyLayout(slideLayout: SlideLayout): void;
     get background(): SlideBackground;
+    get comments(): CommentCollection;
     get customXmlParts(): CustomXmlPartCollection;
     delete(): void;
     duplicate(): Slide;

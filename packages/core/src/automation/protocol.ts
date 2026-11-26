@@ -540,6 +540,48 @@ export interface AutomationHeaderFooterRead {
   readonly dateFixed: boolean;
 }
 
+/**
+ * Where a comment thread points on its slide. `slide`: the slide as a whole. `point`: a place on
+ * the slide, in points from its top left corner (`p:pos`, ECMA-376 Part 1, 19.4.5, for a legacy
+ * comment). `shape`: a shape of the slide, by `p:cNvPr/@id`. `text`: a stretch of a shape's text,
+ * as a UTF-16 start and length over its paragraphs joined with a carriage return.
+ */
+export type AutomationCommentAnchor =
+  | { readonly kind: 'slide' }
+  | { readonly kind: 'point'; readonly left: number; readonly top: number }
+  | { readonly kind: 'shape'; readonly shapeId: string }
+  | {
+      readonly kind: 'text';
+      readonly shapeId: string;
+      readonly start: number;
+      readonly length: number;
+    };
+
+/** One comment or reply. The text and the author come from the file: show them as text. */
+export interface AutomationCommentRead {
+  /** The id key that the comment operations take, unique on its slide. */
+  readonly id: string;
+  /** The author's display name, or an empty string when the file names none. */
+  readonly author: string;
+  /** The author's initials, or an empty string. */
+  readonly initials: string;
+  /** The date as the file stores it (`xsd:dateTime`), or absent. */
+  readonly date?: string;
+  /** The text, with one line feed between paragraphs. */
+  readonly text: string;
+}
+
+/** A comment thread of a slide: its first comment, its state, its anchor, and its replies. */
+export interface AutomationCommentThreadRead extends AutomationCommentRead {
+  /** `legacy`: ECMA-376 Part 1, 19.4. `modern`: the threaded comment parts. */
+  readonly format: 'legacy' | 'modern';
+  /** Always false for the legacy format, which has no state. */
+  readonly resolved: boolean;
+  readonly anchor: AutomationCommentAnchor;
+  /** The replies, oldest first. */
+  readonly replies: readonly AutomationCommentRead[];
+}
+
 /** What an operation answered with. */
 export type AutomationValue =
   | { readonly kind: 'shapeFormat'; readonly format: ShapeFormatProperties }
@@ -584,6 +626,7 @@ export type AutomationValue =
   | { readonly kind: 'selection'; readonly selection: AutomationSelectionRead }
   | { readonly kind: 'transition'; readonly transition: AutomationTransitionRead }
   | { readonly kind: 'headerFooter'; readonly headerFooter: AutomationHeaderFooterRead }
+  | { readonly kind: 'comments'; readonly comments: readonly AutomationCommentThreadRead[] }
   /** A command that committed. The effect is the response's revision. */
   | { readonly kind: 'applied' };
 

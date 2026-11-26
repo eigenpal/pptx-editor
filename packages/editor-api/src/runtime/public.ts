@@ -29,6 +29,7 @@ export type {
   RunCallback,
 } from './runtime.ts';
 export type { CreateServerOptions } from './server.ts';
+export type { CreateBrowserOptions } from './browser.ts';
 export { TrackedObjects } from './tracked-objects.ts';
 
 export {
@@ -76,6 +77,15 @@ export {
   type SlideBackgroundPictureOrTextureFillOptions,
   type SlideBackgroundSolidFillOptions,
 } from '../model/backgrounds.ts';
+export {
+  Comment,
+  CommentCollection,
+  CommentReply,
+  CommentReplyCollection,
+  type CommentAddOptions,
+  type CommentAnchor,
+  type CommentAuthorOptions,
+} from '../model/comments.ts';
 export { CustomProperty, CustomPropertyCollection } from '../model/custom-properties.ts';
 export {
   CustomXmlPart,

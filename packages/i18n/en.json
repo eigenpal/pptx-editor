@@ -849,6 +849,7 @@
     "mixedSize": "The selected text has more than one size",
     "noCommentAuthor": "Set an author to comment",
     "commentNoStatus": "Legacy comments cannot be resolved",
+    "commentNoTextRange": "Legacy comments cannot point at text",
     "commentNotEditable": "This comment holds content that cannot be edited here",
     "noCommentTarget": "Comments can point only at elements on the slide's top level",
     "animationsReadOnly": "The effects of this slide use markup that the editor does not change",

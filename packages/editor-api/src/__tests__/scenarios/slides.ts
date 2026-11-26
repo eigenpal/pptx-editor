@@ -198,4 +198,46 @@ export const SLIDE_SCENARIOS: readonly Scenario[] = [
       };
     },
   },
+  {
+    // `Slide.comments`, an SDK extension: the threaded comment parts of a deck with no comments.
+    name: 'slides.comments',
+    area: 'slides',
+    deck: 'slide-layouts',
+    writes: true,
+    async script(context) {
+      const comments = context.presentation.slides.getItemAt(0).comments;
+      const first = comments.add('Shorten the title.', { authorName: 'Review Agent' });
+      const second = comments.add('Check this shape.', {
+        shape: context.presentation.slides.getItemAt(0).shapes.getItemAt(0),
+        authorName: 'Review Agent',
+      });
+      await context.sync();
+      first.reply('Done.', { authorName: 'Grace Hopper' });
+      first.resolved = true;
+      second.reply('Remove me.', { authorName: 'Grace Hopper' });
+      await context.sync();
+      second.replies.getItemAt(0).delete();
+      await context.sync();
+      const read = await this.readBack!(context);
+      same((read as Json[]).length, 2, 'both threads stay');
+      return read;
+    },
+    async readBack(context) {
+      const comments = context.presentation.slides.getItemAt(0).comments;
+      comments.load(
+        'items/authorName,items/authorInitials,items/content,items/resolved,items/anchor'
+      );
+      await context.sync();
+      const replies = comments.items.map((c) => c.replies.load('items/authorName,items/content'));
+      await context.sync();
+      return comments.items.map((c, i) => ({
+        author: c.authorName,
+        initials: c.authorInitials,
+        content: c.content,
+        resolved: c.resolved,
+        anchor: c.anchor.type,
+        replies: replies[i]!.items.map((r) => `${r.authorName}: ${r.content}`),
+      }));
+    },
+  },
 ];

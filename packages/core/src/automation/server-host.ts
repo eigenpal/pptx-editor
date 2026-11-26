@@ -49,6 +49,13 @@ export interface StoreAutomationOptions {
    * it cannot draw.
    */
   readonly renderImage?: (target: AutomationImageTarget) => Promise<Uint8Array>;
+  /**
+   * The author of a comment or reply that a write adds without naming one (`p:cmAuthor/@name`,
+   * ECMA-376 Part 1, 19.4.2, or a threaded comment author). A server has no signed-in user:
+   * without this option, such a write refuses (`unsupported-content`,
+   * `disabled.noCommentAuthor`) rather than sign the comment with a placeholder name.
+   */
+  readonly author?: string;
 }
 
 /**
@@ -79,6 +86,7 @@ export function storeAutomationPort(
     subscribe: (listener) => store.subscribe(() => listener()),
     measurer: () => options.measurer,
     collaborating: () => options.collaborating === true,
+    commentAuthor: () => options.author,
     ...(options.renderImage ? { renderImage: options.renderImage } : {}),
     dispose: unsubscribe,
   };

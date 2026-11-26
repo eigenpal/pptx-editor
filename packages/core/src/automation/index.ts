@@ -13,6 +13,9 @@ export type {
   AutomationBindingRead,
   AutomationCapabilities,
   AutomationChangeEvent,
+  AutomationCommentAnchor,
+  AutomationCommentRead,
+  AutomationCommentThreadRead,
   AutomationCustomPropertyRead,
   AutomationCustomXmlPartRead,
   AutomationError,
@@ -58,6 +61,8 @@ export type {
   AutomationCellAddress,
   AutomationCellBorderSide,
   AutomationCellMarginsWrite,
+  AutomationCommentExpect,
+  AutomationCommentScope,
   AutomationCustomPropertyWrite,
   AutomationFillWrite,
   AutomationFontWrite,
@@ -77,6 +82,7 @@ export type {
   AutomationHeaderFooterWrite,
 } from './operations.ts';
 export { AUTOMATION_COMMANDS } from './operations.ts';
+export { commentAuthorName, MAX_COMMENT_AUTHOR } from './commands/comment-write.ts';
 export {
   createAutomationHost,
   MAX_BATCH_OPERATIONS,

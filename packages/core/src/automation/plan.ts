@@ -8,6 +8,7 @@ import type { AutomationRef, AutomationValue } from './protocol.ts';
 import * as adjustments from './plan-adjustments.ts';
 import * as backgrounds from './plan-backgrounds.ts';
 import * as bindings from './plan-bindings.ts';
+import * as comments from './plan-comments.ts';
 import type { AutomationBindings } from './plan-bindings.ts';
 import * as find from './plan-find.ts';
 import * as headerFooter from './plan-header-footer.ts';
@@ -71,6 +72,8 @@ export interface BatchPlanContext extends TextPlanContext {
    * queued before it.
    */
   readonly selectionAfter?: { value?: ReturnType<AutomationSelectionPort['read']> };
+  /** The author of a new comment or reply that names none (`plan-comments.ts`). */
+  readonly commentAuthor?: string;
 }
 
 function selectionPort(ctx: BatchPlanContext): AutomationSelectionPort {
@@ -384,6 +387,34 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return adjustments.readAdjustments(ctx, op.shape);
     case 'setAdjustment':
       return adjustments.setAdjustment(ctx, op.shape, op.index, op.value);
+    case 'readComments':
+      return comments.readComments(ctx, op.slide);
+    case 'addComment':
+      return comments.addComment(ctx, op.slide, op.text, op.shape, op.span, op.author, op.initials);
+    case 'replyToComment':
+      return comments.replyToComment(
+        ctx,
+        op.slide,
+        op.comment,
+        op.text,
+        op.author,
+        op.initials,
+        op.expect,
+        op.scope
+      );
+    case 'setCommentText':
+      return comments.setCommentText(ctx, op.slide, op.comment, op.text, op.expect, op.scope);
+    case 'setCommentResolved':
+      return comments.setCommentResolved(
+        ctx,
+        op.slide,
+        op.comment,
+        op.resolved,
+        op.expect,
+        op.scope
+      );
+    case 'deleteComment':
+      return comments.deleteComment(ctx, op.slide, op.comment, op.expect, op.scope);
     case 'readSelection':
       return readSelection(ctx);
     case 'selectSlides': {

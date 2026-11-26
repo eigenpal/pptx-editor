@@ -286,7 +286,7 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   [
     'disabled.noCommentAuthor',
     'edit.no-comment-author',
-    'A comment needs an author. Pass author, or set the author option of the editor.',
+    'A comment needs an author. Pass authorName, or set the author option of the runtime or the editor.',
   ],
   [
     'disabled.commentNoStatus',
@@ -299,9 +299,14 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The comment holds content other than text, such as a mention. Reply instead of editing it.',
   ],
   [
+    'disabled.commentNoTextRange',
+    'edit.comment-no-text-range',
+    'Legacy comments point at a place or an element, not at text. Leave out textRange.',
+  ],
+  [
     'disabled.noCommentTarget',
     'edit.no-comment-target',
-    'A comment can point only at an element on the top level of the current slide. Pass its id, or none.',
+    'A comment can point only at an element on the top level of its slide. Pass such an element, or none.',
   ],
   // Edit errors of the engine (`errors.*`): GeneralException, or InvalidArgument for a name.
   [
@@ -327,7 +332,7 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   [
     'errors.commentChanged',
     'edit.comment-changed',
-    'The comment at this id no longer matches expect. Read the comments of the slide again.',
+    'The comment at this id changed since it was read. Load the comments of the slide again.',
   ],
   [
     'errors.commentAmbiguous',

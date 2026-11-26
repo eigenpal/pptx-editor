@@ -212,6 +212,19 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['lineUnitAfter', 'Use a number of lines from 0 to 132.'],
   ['leftIndent', 'Use a number of points from 0 to 4032.'],
   ['firstLineIndent', 'Use a number of points from -4032 to 4032.'],
+  // Comments.
+  ['comment', 'Use the id of a comment of this slide, as Comment.id gives it.'],
+  ['comment-text', 'Use comment text of 1 to 10000 characters.'],
+  ['comment-author', 'Use an author name of 1 to 255 characters.'],
+  ['comment-initials', 'Use initials of at most 8 characters.'],
+  ['comment-shape', 'Use a shape on the top level of the same slide, not a shape in a group.'],
+  [
+    'comment-span',
+    'Use a textRange inside the text of the shape that holds 1 or more characters, not only paragraph breaks.',
+  ],
+  ['comment-expect', 'Use a comment that a load of this slide returned.'],
+  ['comment-scope', 'Use a comment that a load of this slide returned.'],
+  ['resolved', BOOLEAN],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */
