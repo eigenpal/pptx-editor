@@ -1,5 +1,30 @@
 # @pptx-editor.dev/core
 
+## 0.8.0
+
+### Minor Changes
+
+- eb5a5b9: Add the SDK extension `ShapeCollection.addChart(type, data, options?)`. It adds a chart with an embedded workbook and returns the new shape. The automation `addShape` operation takes a `chart` kind. A chart edit now refuses a chart part over 16 MiB before it writes. `Chart.setData` now refuses a store rejection with `NotSupported`, not `InvalidArgument`.
+- 74e6cf7: Add `ShapeCollection.addPicture` to the editing API, an SDK extension. It adds a picture shape from PNG, JPEG, or GIF bytes of at most 50 MiB. It returns the new `Shape`. The automation operation `addShape` takes a new `picture` kind. Picture bytes over 50 MiB now refuse with `InvalidArgument` in every picture write.
+- 894ae1f: Add `Shape.chart` to the editing API, an SDK extension. `Chart` reads the type, title, categories, series, and workbook state of a chart, and `setData` replaces its data. The new automation operations `readChart` and `setChartData` use the editor's chart edit, so the caches and an embedded workbook change together.
+- face20e: Add `Slide.comments` to the editing API, an SDK extension. It reads, adds, replies to, edits, resolves, and deletes slide comments in both formats, through `Comment`, `CommentReply`, and their collections. The new `author` option of `createServer` and `createBrowser` signs new comments. The automation host adds the comment operations, `BrowserAutomationOptions`, and `commentAuthorName`.
+- c5ed475: Add `Slide.headerFooter` and `Presentation.applyHeaderFooter()` to the editing API, as SDK extensions. They show or hide the slide number, the date, and the footer on one slide or on all slides, and can skip title slides. The automation protocol adds `readHeaderFooter` and `setHeaderFooter`.
+- d06ae7b: Add `Presentation.replaceAll(searchText, replacementText, options)` and `Slide.replaceAll` to the editing API, with `SearchOptions` (`matchCase`, `matchWholeWord`). It replaces text in shapes, table cells, and notes. It keeps the font and returns the count. The automation host adds the `replaceText` operation. Find no longer matches a field through U+FFFC.
+- 477012a: Add the SDK extension `Presentation.sections`. Read each section's id, name, position, and slide ids. Add a section at a slide, rename it, move it with its slides, and delete it with or without its slides. Each sync is one undo step. The core automation protocol adds section operations and the `section` handle kind.
+- bdfeefb: Add the SDK extension `Slide.duplicate()`. It copies a slide directly after its source in the same presentation and returns the new `Slide`, which works in the same batch. The copy keeps the layout, master, and pictures, and gets its own notes, charts, and tags. The core automation protocol adds the `duplicateSlide` operation.
+- 8a1753a: Add the SDK extension `Slide.speakerNotes`. Load it to read the notes as plain text, and set it to replace them, one paragraph for each line. A write to a slide with no notes creates the notes slide from the notes master. The core automation protocol adds the `readSlideNotes` and `setSlideNotes` operations.
+- 07fefab: Add the SDK extension `TextRange.search(searchText, options?)`, in the shape of `Range.search` of the DOCX Editor API. It returns a `TextRangeCollection` of the matches inside the range, with `items`, `getCount`, `getItemAt`, `getFirst`, `getFirstOrNullObject`, and `getLast`. It uses the rules of `replaceAll`. The automation protocol adds the `findText` operation.
+- 658f45e: Add SDK extensions on `ParagraphFormat` for line spacing, space before and after, and indents. Add the `ParagraphLineSpacingRule` enum and `TableCell.paragraphFormat`. A `150%` spacing value now reads as 1.5 lines. Reads return the value in force, or `null` for a mixed range. The automation `setParagraph` and `readParagraph` operations add the matching fields.
+- 15de8f2: Add `ShapeFont.highlightColor` to the editing API, an SDK extension. It reads the text highlight as `#RRGGBB`, or `null` for no highlight and for a mixed range. A color write sets `a:highlight`, and `null` removes it. It works on text ranges, text frames, and table cells. The automation `setFont` and `readFont` operations add the `highlightColor` field.
+- 26fff35: Add `Slide.hidden` to the editing API, an SDK extension. Load it to read whether a slide is hidden, and set it to hide or show the slide. The write changes `p:sld/@show` through the new automation operation `setSlideHidden`, which the `setSlidesHidden` editor command also uses.
+- c03c16c: Add `Slide.transition` to the editing API, an SDK extension. `SlideTransition` reads and writes the effect, `durationMs`, the advance settings, `direction`, and `throughBlack`. `set()` writes several in one step, and `remove()` clears the transition. The new automation operations `readTransition` and `setTransition` use the engine's transition edit.
+- ae05398: Add the `TextFrame.getTextFit()` SDK extension. It reports whether text overflows its shape, from the layout that `getImageAsBase64()` draws, with `overflows`, `textHeight`, `availableHeight`, and `substitutedFonts`. It works on a server runtime with no canvas. The automation protocol adds the `readTextFit` operation.
+
+### Patch Changes
+
+- 94620b7: `insertSlidesFromBase64` with `UseDestinationTheme` picks a better layout when several layouts share a type. It prefers the same layout name, then the same master name, then the same layout when both names match. Thus a slide from `Slide.exportAsBase64` keeps its layout in the same presentation, when its layout and master have names.
+- Updated dependencies: @pptx-editor.dev/i18n@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes

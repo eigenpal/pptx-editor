@@ -1,5 +1,11 @@
 # @pptx-editor.dev/react
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies: @pptx-editor.dev/core@0.8.0, @pptx-editor.dev/i18n@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes
