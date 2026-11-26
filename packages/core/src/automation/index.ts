@@ -16,6 +16,8 @@ export type {
   AutomationCommentAnchor,
   AutomationCommentRead,
   AutomationCommentThreadRead,
+  AutomationChartRead,
+  AutomationChartReadOnlyReason,
   AutomationCustomPropertyRead,
   AutomationCustomXmlPartRead,
   AutomationError,
@@ -81,6 +83,7 @@ export type {
   AutomationZOrder,
   AutomationHeaderFooterWrite,
 } from './operations.ts';
+export type { AutomationChartData, AutomationChartSeries } from './operations-chart.ts';
 export { AUTOMATION_COMMANDS } from './operations.ts';
 export { commentAuthorName, MAX_COMMENT_AUTHOR } from './commands/comment-write.ts';
 export {

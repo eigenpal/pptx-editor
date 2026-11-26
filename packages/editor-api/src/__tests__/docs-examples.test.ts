@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, spyOn, test } from 'bun:test';
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
+import { chartDataDeck } from '../../../../scripts/fixtures/chart-data.ts';
 import {
   isPptxEditorError,
   PptxEditor,
@@ -828,4 +829,42 @@ test('the table cell paragraph example of tables.mdx sets the cell spacing', asy
     return [format.spaceAfter, format.leftIndent];
   });
   expect(read).toEqual([4, 6]);
+});
+
+test('the charts example replaces the values of named series', async () => {
+  // docs/site/content/editor-api/charts.mdx, "Replace chart data".
+  async function updateCharts(
+    runtime: PptxEditorRuntime,
+    values: Record<string, (number | null)[]>
+  ) {
+    return runtime.run(async (context) => {
+      const shapes = context.presentation.slides.getItemAt(0).shapes.load('items/type');
+      await context.sync();
+      const charts = shapes.items
+        .filter((shape) => shape.type === 'Chart')
+        .map((shape) => shape.chart.load('categories,series,readOnlyReason'));
+      await context.sync();
+      for (const chart of charts) {
+        if (chart.isNullObject || chart.readOnlyReason !== null) continue;
+        chart.setData({
+          categories: chart.categories,
+          series: chart.series.map((s) => ({
+            name: s.name,
+            values: Object.hasOwn(values, s.name) ? values[s.name]! : s.values,
+          })),
+        });
+      }
+      await context.sync();
+      return charts.length;
+    });
+  }
+  const runtime = await PptxEditor.createServer(buildPptx(chartDataDeck()), { substitutes: false });
+  expect(await updateCharts(runtime, { Actual: [1, 2, 3, 4] })).toBe(1);
+  const series = await runtime.run(async (context) => {
+    const chart = context.presentation.slides.getItemAt(0).shapes.getItem('3').chart.load('series');
+    await context.sync();
+    return chart.series;
+  });
+  expect(series[1]).toEqual({ name: 'Actual', values: [1, 2, 3, 4] });
+  runtime.dispose();
 });

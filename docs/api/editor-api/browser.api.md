@@ -250,6 +250,102 @@ export enum BulletType {
 }
 
 // @public
+export class Chart extends ModelObject {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, shape: Shape);
+    get categories(): string[];
+    get chartType(): ChartType | `${ChartType}` | null;
+    getShape(): Shape;
+    // @internal (undocumented)
+    protected onLoad(request: ResolvedLoadOptions): void;
+    get readOnlyReason(): ChartReadOnlyReason | `${ChartReadOnlyReason}` | null;
+    get series(): ChartSeriesData[];
+    setData(data: ChartData): void;
+    get title(): string | null;
+    get workbook(): ChartWorkbookState | `${ChartWorkbookState}`;
+}
+
+// @public
+export interface ChartData {
+    categories: string[];
+    series: ChartSeriesData[];
+}
+
+// @public
+export enum ChartReadOnlyReason {
+    // (undocumented)
+    combination = "Combination",
+    // (undocumented)
+    filtered = "Filtered",
+    // (undocumented)
+    mixedCategories = "MixedCategories",
+    // (undocumented)
+    multiLevel = "MultiLevel",
+    // (undocumented)
+    noData = "NoData",
+    // (undocumented)
+    tooLarge = "TooLarge",
+    // (undocumented)
+    unreadable = "Unreadable",
+    // (undocumented)
+    unsupportedType = "UnsupportedType"
+}
+
+// @public
+export interface ChartSeriesData {
+    name: string;
+    values: (number | null)[];
+}
+
+// @public
+export enum ChartType {
+    // (undocumented)
+    area = "Area",
+    // (undocumented)
+    areaStacked = "AreaStacked",
+    // (undocumented)
+    areaStacked100 = "AreaStacked100",
+    // (undocumented)
+    barClustered = "BarClustered",
+    // (undocumented)
+    barStacked = "BarStacked",
+    // (undocumented)
+    barStacked100 = "BarStacked100",
+    // (undocumented)
+    columnClustered = "ColumnClustered",
+    // (undocumented)
+    columnStacked = "ColumnStacked",
+    // (undocumented)
+    columnStacked100 = "ColumnStacked100",
+    // (undocumented)
+    doughnut = "Doughnut",
+    // (undocumented)
+    line = "Line",
+    // (undocumented)
+    lineMarkers = "LineMarkers",
+    // (undocumented)
+    pie = "Pie",
+    // (undocumented)
+    radar = "Radar",
+    // (undocumented)
+    xyscatter = "XYScatter",
+    // (undocumented)
+    xyscatterLines = "XYScatterLines"
+}
+
+// @public
+export enum ChartWorkbookState {
+    // (undocumented)
+    embedded = "Embedded",
+    // (undocumented)
+    external = "External",
+    // (undocumented)
+    kept = "Kept",
+    // (undocumented)
+    none = "None"
+}
+
+// @public
 export abstract class ClientObject implements RuntimeManagedObject {
     // @internal
     [DEFER_REFUSAL](error: PptxEditorError): void;
@@ -1397,6 +1493,7 @@ export class Shape extends ModelObject {
     set altTextDescription(value: string);
     get altTextTitle(): string;
     set altTextTitle(value: string);
+    get chart(): Chart;
     get creationId(): string | null;
     get customXmlParts(): CustomXmlPartCollection;
     delete(): void;

@@ -27,6 +27,7 @@ import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
 import { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
 import { Adjustments } from './adjustments.ts';
+import { Chart } from './charts.ts';
 import { ItemCollection } from './collection.ts';
 import {
   CONNECTOR,
@@ -109,6 +110,7 @@ export class Shape extends ModelObject {
   #placeholder: PlaceholderFormat | undefined;
   #parentGroup: Shape | undefined;
   #adjustments: Adjustments | undefined;
+  #chart: Chart | undefined;
 
   /** @internal */
   constructor(context: RequestContext, path: ObjectPath, nullable = false) {
@@ -270,6 +272,51 @@ export class Shape extends ModelObject {
       this.path
     ));
   }
+  /**
+   * The chart of a chart frame (`c:chart` in `a:graphicData`, ECMA-376 Part 1, §21.2.2.26), or a
+   * null object for any other shape. Check `isNullObject` after a sync. A chart of an extension
+   * namespace is no chart frame: its shape type reads `Unsupported`, and this is a null object.
+   *
+   * This property is an SDK extension. The pinned Office.js reference has no such member.
+   *
+   * @example
+   * ```ts
+   * const chart = shape.chart.load('chartType,categories,series');
+   * await context.sync();
+   * if (!chart.isNullObject) console.log(chart.chartType, chart.series.length);
+   * ```
+   */
+  get chart(): Chart {
+    return (this.#chart ??= this.#chartOf());
+  }
+
+  /** The chart object, with the read that tells a chart frame from another shape queued now. */
+  #chartOf(): Chart {
+    const path = ObjectPath.pending(`${this.path.label}.chart`);
+    const chart = new Chart(this.context, path, this);
+    // A shape that a sync found to be a null object has a null chart, as a getter answers one.
+    if (this.path.isNull) {
+      path.resolveNull();
+      return chart;
+    }
+    const label = path.label;
+    // The read only tells a null object: the chart's loads and writes name the shape itself, so
+    // they wait for no read.
+    this.enqueue(
+      'read',
+      'chart',
+      (ref) => ({ op: 'readShape', shape: ref(this.path) }),
+      (value) => {
+        const read = value.kind === 'null' ? null : hydrated(value, 'shape', label).shape;
+        if (read?.type === 'chart' && this.path.isAddressable) path.resolveTo(this.path.handle());
+        else path.resolveNull();
+      },
+      path,
+      false
+    );
+    return chart;
+  }
+
   /** The group that holds this shape. `ItemNotFound` at the sync for a shape at the top level. */
   get parentGroup(): Shape {
     return this.#parentGroupOf(false);
@@ -478,6 +525,7 @@ export class Shape extends ModelObject {
       customXmlParts: () => this.customXmlParts,
       placeholderFormat: () => this.placeholderFormat,
       group: () => this.group,
+      chart: () => this.chart,
       parentGroup: () => this.#parentGroupOf(this.loadingOrNull),
     });
     this.loadScalars(

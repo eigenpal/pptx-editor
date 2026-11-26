@@ -17,7 +17,13 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 
 /** The decks under `fixtures/` that scenarios open. */
 export type FixtureName =
-  'slide-layouts' | 'tables' | 'pictures' | 'text-runs' | 'gradients' | 'shape-effects-presets';
+  | 'slide-layouts'
+  | 'tables'
+  | 'pictures'
+  | 'text-runs'
+  | 'gradients'
+  | 'shape-effects-presets'
+  | 'chart-data';
 
 /** Each fixture a scenario may name, for runners that preload them. */
 export const FIXTURES: readonly FixtureName[] = [
@@ -27,6 +33,7 @@ export const FIXTURES: readonly FixtureName[] = [
   'text-runs',
   'gradients',
   'shape-effects-presets',
+  'chart-data',
 ];
 
 /** What a runner hands a script besides the context: decks as base64, as an add-in gets them. */

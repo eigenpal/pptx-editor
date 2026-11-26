@@ -146,6 +146,35 @@ export interface AutomationChangeEvent {
 }
 
 // @public
+export interface AutomationChartData {
+    // (undocumented)
+    readonly categories: readonly string[];
+    // (undocumented)
+    readonly series: readonly AutomationChartSeries[];
+}
+
+// @public
+export interface AutomationChartRead {
+    readonly categories: readonly string[];
+    readonly readOnlyReason: AutomationChartReadOnlyReason | null;
+    readonly series: readonly AutomationChartSeries[];
+    readonly title: string | null;
+    readonly type: ChartType | null;
+    readonly workbook: ChartWorkbookState;
+}
+
+// @public
+export type AutomationChartReadOnlyReason = 'noData' | 'combination' | 'unsupportedType' | 'filtered' | 'multiLevel' | 'mixedCategories' | 'tooLarge' | 'unreadable';
+
+// @public
+export interface AutomationChartSeries {
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly values: readonly (number | null)[];
+}
+
+// @public
 export type AutomationCommentAnchor = {
     readonly kind: 'slide';
 } | {
@@ -1005,6 +1034,14 @@ export type AutomationOperation = {
     readonly expect?: AutomationCommentExpect;
     readonly scope?: AutomationCommentScope;
 } | {
+    readonly op: 'readChart';
+    readonly shape: AutomationRef;
+    readonly orNull?: boolean;
+} | {
+    readonly op: 'setChartData';
+    readonly shape: AutomationRef;
+    readonly data: AutomationChartData;
+} | {
     readonly op: 'readSelection';
 } | {
     readonly op: 'selectSlides';
@@ -1584,6 +1621,9 @@ export type AutomationValue = {
 /** A command that committed. The effect is the response's revision. */
 | {
     readonly kind: 'applied';
+} | {
+    readonly kind: 'chart';
+    readonly chart: AutomationChartRead;
 };
 
 // @public

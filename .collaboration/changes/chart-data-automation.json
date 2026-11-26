@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation setChartData writes the chart part and its embedded workbook again whole through the existing removePart and addPart operations that the setChartData editor command uses. The readChart operation writes nothing, and its cache of workbook dry runs is keyed by part bytes in memory only. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-chart-data.test.ts",
+    "packages/core/src/automation/__tests__/host-chart.test.ts",
+    "packages/editor-api/src/__tests__/chart-data.test.ts"
+  ]
+}

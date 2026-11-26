@@ -1,4 +1,4 @@
-// A new chart (`insertChart`): a chart part (ECMA-376 Part 1, 21.2.2.27 chartSpace) with the
+// A new chart (`insertChart`): a chart part (ECMA-376 Part 1, 21.2.2.29 chartSpace) with the
 // data in its caches, an embedded workbook (a SpreadsheetML package, ECMA-376 Part 1, 18) that
 // holds the same data in the table that the chart's cell references name, and a graphic frame
 // on the slide that shows the chart (§19.3.1.21 graphicFrame). The data edit (`setChartData`)
@@ -71,8 +71,11 @@ export function sampleChartData(type: ChartType): NewChartData {
 
 const isNumber = (label: string): boolean => label.trim() !== '' && Number.isFinite(Number(label));
 
-/** Check the data of a new chart. Throws `CommandRefusal`. */
-function checkData(data: unknown, xy: boolean): NewChartData {
+/**
+ * Check the data of a chart: its labels, names, and values, with one value for each category.
+ * `xy`: the categories are X values, so each is a number. Throws `CommandRefusal`.
+ */
+export function checkChartData(data: unknown, xy: boolean): NewChartData {
   if (!data || typeof data !== 'object') throw new CommandRefusal('errors.unsupported', 'data');
   const { categories, series } = data as NewChartData;
   if (!Array.isArray(categories) || !Array.isArray(series))
@@ -266,7 +269,7 @@ export function insertChartFrame(
 ): string {
   if (!isChartType(type)) throw new CommandRefusal('errors.unsupported', 'chartType');
   const xy = axisKindOf(type) === 'xy';
-  const checked = checkData(data ?? sampleChartData(type), xy);
+  const checked = checkChartData(data ?? sampleChartData(type), xy);
   // The workbook, then the chart part, which names the workbook by its relationship.
   const chartPart = freePartName(batch, '/ppt/charts/chart', '.xml');
   const book = freePartName(batch, '/ppt/embeddings/Workbook', '.xlsx');

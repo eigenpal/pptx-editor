@@ -90,6 +90,7 @@
     "editor-api/sections",
     "editor-api/text-and-ranges",
     "editor-api/tables",
+    "editor-api/charts",
     "editor-api/pictures",
     "editor-api/comments",
     "editor-api/reference",

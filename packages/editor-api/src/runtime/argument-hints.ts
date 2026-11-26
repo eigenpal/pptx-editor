@@ -225,6 +225,11 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['comment-expect', 'Use a comment that a load of this slide returned.'],
   ['comment-scope', 'Use a comment that a load of this slide returned.'],
   ['resolved', BOOLEAN],
+  // Charts.
+  [
+    'chartData',
+    'Use { categories: string[], series: [{ name, values }] } with one number or null per category.',
+  ],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */

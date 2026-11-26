@@ -12,6 +12,7 @@ import type {
   TransitionKind,
 } from '../contracts/neutral.ts';
 import type { TransitionDirection } from './commands/transition-commands.ts';
+import type { AutomationChartData } from './operations-chart.ts';
 import type { AutomationRef } from './protocol.ts';
 
 /** How a collection item is found: by position, or by the id the object model shows. */
@@ -814,6 +815,23 @@ export type AutomationOperation =
       readonly expect?: AutomationCommentExpect;
       readonly scope?: AutomationCommentScope;
     }
+  // Charts: the chart part (`c:chartSpace`, ECMA-376 Part 1, §21.2.2.29) of a chart frame.
+  | {
+      /** The type, title, categories, series, and workbook of a chart frame. */
+      readonly op: 'readChart';
+      readonly shape: AutomationRef;
+      /** Answer null, not a refusal, for a shape that is not a chart frame. */
+      readonly orNull?: boolean;
+    }
+  | {
+      /**
+       * Replace the categories and series of a chart frame, by position: the caches (`c:cat`,
+       * `c:val`), the cell references, and an embedded workbook change together.
+       */
+      readonly op: 'setChartData';
+      readonly shape: AutomationRef;
+      readonly data: AutomationChartData;
+    }
   // Selection (browser host only)
   | { readonly op: 'readSelection' }
   | { readonly op: 'selectSlides'; readonly slides: readonly AutomationRef[] }
@@ -953,6 +971,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'setCommentText',
   'setCommentResolved',
   'deleteComment',
+  'setChartData',
 ]);
 
 /** The operations that need a reader's selection. */

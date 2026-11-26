@@ -22,6 +22,7 @@ import {
 } from './backgrounds.ts';
 import { Binding, BindingCollection } from './bindings.ts';
 import { Comment, CommentCollection, CommentReply, CommentReplyCollection } from './comments.ts';
+import { Chart } from './charts.ts';
 import { CustomProperty, CustomPropertyCollection } from './custom-properties.ts';
 import {
   CustomXmlPart,
@@ -77,6 +78,7 @@ const CLASSES: readonly (readonly [unknown, string])[] = [
   [CommentCollection, 'CommentCollection'],
   [CommentReply, 'CommentReply'],
   [CommentReplyCollection, 'CommentReplyCollection'],
+  [Chart, 'Chart'],
   [CustomProperty, 'CustomProperty'],
   [CustomPropertyCollection, 'CustomPropertyCollection'],
   [CustomXmlPart, 'CustomXmlPart'],
