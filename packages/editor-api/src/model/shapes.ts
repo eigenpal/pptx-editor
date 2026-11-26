@@ -651,6 +651,38 @@ export class ShapeCollection extends ShapeList {
     return this.groupOf([() => shapes.map((s) => pathOf(s))], 'addGroup');
   }
 
+  /**
+   * Add a picture shape (`p:pic`, ECMA-376 Part 1, §19.3.1.37) and return it. This is an SDK
+   * extension: the pinned Office.js reference has no member that adds a picture.
+   *
+   * @param base64EncodedImage - The Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB.
+   * The bytes go into a new image part of the package. Other bytes, SVG among them, refuse with
+   * `InvalidArgument` at the sync, and the call writes nothing. Send the bytes alone, with no
+   * `data:` URL prefix.
+   * @param options - The box in points. With no size, the picture keeps the aspect ratio of the
+   * image and fits 60% of the slide, centered. It is never larger than its own size. When the
+   * image states no resolution, the engine uses 96 pixels per inch. With only `width` or only
+   * `height`, the other keeps the aspect ratio. When you give a size, the engine centers each
+   * missing `left` or `top` on the slide.
+   *
+   * @remarks
+   * `Shape.type` reads `Image`. The new shape has no alt text: set `altTextDescription` in the
+   * same batch. The picture never fills an empty placeholder. The call and the writes queued
+   * with it apply as one undo step at the sync.
+   *
+   * @example
+   * ```ts
+   * const logo = slide.shapes.addPicture(logoBase64, { left: 24, top: 24, width: 120 });
+   * logo.altTextDescription = 'Company logo';
+   * await context.sync();
+   * ```
+   */
+  addPicture(base64EncodedImage: string, options?: ShapeAddOptions): Shape {
+    const target = `${this.path.label}.addPicture`;
+    const base64 = text(base64EncodedImage, target);
+    return this.#add('addPicture', { kind: 'picture', base64 }, boxOf(options, target));
+  }
+
   #add(name: string, shape: AutomationNewShape, box: AutomationBox): Shape {
     const path = ObjectPath.pending(`${this.path.label}.${name}()`);
     const created = new Shape(this.context, path);

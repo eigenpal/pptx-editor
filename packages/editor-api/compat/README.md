@@ -159,3 +159,7 @@ Automatic adoption with `--adopt` requires both checks:
 ### Section extensions
 
 `Presentation.sections`, `Section`, `SectionCollection`, and `SectionDeleteOptions` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest, because the pinned reference has no sections. They read and change the section list in the presentation's extension list (`p:extLst`, ECMA-376 Part 1, 19.2.1.12). The collection keeps the Office.js collection shape: `items`, `getCount()`, `getItem()`, `getItemAt()`, and `getItemOrNullObject()`.
+
+### Picture extension
+
+`ShapeCollection.addPicture()` is an SDK extension. The pinned Office.js PowerPoint reference has no member that adds a picture shape. Thus the compatibility manifest has no entry for it. It adds a `p:pic` element (ECMA-376 Part 1, §19.3.1.37) over a new Image part (§15.2.14). It takes PNG, JPEG, or GIF bytes of at most 50 MiB, as `ShapeFill.setImage()` does.

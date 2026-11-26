@@ -1346,6 +1346,7 @@ export class ShapeCollection extends ShapeList {
     addGroup(values: Array<string | Shape>): Shape;
     addLine(connectorType?: ConnectorType, options?: ShapeAddOptions): Shape;
     addLine(connectorType?: 'Straight' | 'Elbow' | 'Curve', options?: ShapeAddOptions): Shape;
+    addPicture(base64EncodedImage: string, options?: ShapeAddOptions): Shape;
     addTable(rowCount: number, columnCount: number, options?: TableAddOptions): Shape;
     addTextBox(text_: string, options?: ShapeAddOptions): Shape;
     // @internal (undocumented)

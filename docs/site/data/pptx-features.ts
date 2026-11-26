@@ -909,7 +909,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application.',
+      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application. `shapes.addPicture` adds PNG, JPEG, or GIF pictures.',
     docsLink: '/docs/editor-api',
   },
 

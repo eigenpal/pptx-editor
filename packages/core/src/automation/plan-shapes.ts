@@ -8,6 +8,7 @@ import {
   child,
   elements,
   imageSize,
+  imageSizeEmu,
   isValidXmlText,
   presentationInfo,
   REL,
@@ -27,6 +28,7 @@ import { fromBase64 } from './commands/base64.ts';
 import {
   addImagePart,
   deleteShapes,
+  insertImage,
   insertLine,
   insertShape,
   insertTextBox,
@@ -139,6 +141,8 @@ export function addShape(
     );
   const { w, h } = slideSize(ctx);
   const part = target.part;
+  // A picture's bytes are checked before anything is written, so bad bytes leave no part.
+  const picture = shape.kind === 'picture' ? decodeImage(shape.base64) : undefined;
   const nodeId = edit(() => {
     switch (shape.kind) {
       case 'geometric':
@@ -159,6 +163,15 @@ export function addShape(
         if (!Number.isInteger(rows) || !Number.isInteger(columns)) badArgument('rows');
         return insertTableFrame(ctx.batch, part, rows, columns, w, h);
       }
+      case 'picture': {
+        // The editor's Insert Picture edit (`insertImage`): a `p:pic` whose `p:blipFill` embeds
+        // the new Image part (`a:blip/@r:embed`, `CT_Blip`, §20.1.8.13), with
+        // `a:picLocks/@noChangeAspect` (`CT_PictureLocking`, §20.1.2.2.31) and no alt text
+        // (`p:cNvPr/@descr`, §19.3.1.12). It fits 60% of the slide, centered, and never fills a
+        // placeholder here: an automation call has no selection to choose one.
+        const p = picture!;
+        return insertImage(ctx.batch, part, p.bytes, p.mime, p.width, p.height, w, h);
+      }
       default:
         return badArgument('shape');
     }
@@ -166,7 +179,8 @@ export function addShape(
   const el = ctx.batch.element(part, nodeId);
   const handle = shapeHandle(ctx, target.owner, el);
   const at = shapeAt(ctx, handle);
-  if (box) writeBox(ctx, at, box, undefined);
+  const place = picture && box ? pictureBox(box, picture, w, h) : box;
+  if (place) writeBox(ctx, at, place, undefined);
   if (shape.kind === 'textBox' && shape.text) setText(ctx, handle, undefined, shape.text);
   if (shape.kind === 'table' && shape.values) writeCells(ctx, handle, shape.values);
   return { kind: 'handle', handle };
@@ -447,13 +461,79 @@ const MAX_BASE64 = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 * 1.1;
  * bytes must decode and carry a PNG, JPEG, or GIF header.
  */
 export function imageRelationship(ctx: PlanContext, part: string, base64: unknown): string {
+  const image = decodeImage(base64);
+  return addImagePart(ctx.batch, part, image.bytes, image.mime);
+}
+
+/** Image bytes from the caller, checked: their type from the header, and their pixel size. */
+interface DecodedImage {
+  readonly bytes: Uint8Array;
+  readonly mime: string;
+  /**
+   * The size at the resolution the header states (96 pixels per inch when it states none), in
+   * pixels at 96 per inch, as `insertImage` takes it. Replace Picture sizes the same way.
+   */
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Decode base64 image bytes from the caller, or refuse with `invalid-argument` (`base64`). The
+ * bytes must decode and carry a PNG, JPEG, or GIF header with a readable pixel size. They are
+ * untrusted: the length is checked before the decode, and nothing past the header is decoded.
+ */
+function decodeImage(base64: unknown): DecodedImage {
   // Checked before the decode allocates: base64 carries 3 bytes in 4 characters.
   if (typeof base64 !== 'string' || base64.length === 0 || base64.length > MAX_BASE64)
     badArgument('base64');
   const bytes = fromBase64(base64);
   const mime = bytes ? imageType(bytes) : undefined;
-  if (!bytes || !mime || !imageSize(bytes)) badArgument('base64');
-  return addImagePart(ctx.batch, part, bytes, mime);
+  const size = bytes && mime ? imageSize(bytes) : null;
+  if (!bytes || !mime || !size || bytes.length > MAX_IMAGE_BYTES) badArgument('base64');
+  const emu = imageSizeEmu(size);
+  return { bytes, mime, width: emu.cx / 9525, height: emu.cy / 9525 };
+}
+
+/**
+ * The box of a new picture from the caller's `box`, in points. A missing width or height keeps
+ * the aspect ratio of the image. When the caller sets a size but no position, the picture
+ * is centered on the slide (`w` × `h` EMU), as the default size is. The caller's values are
+ * checked first, so a refusal names the value the caller gave; a computed dimension out of range
+ * refuses with `picture-size`.
+ */
+function pictureBox(
+  box: AutomationBox,
+  image: DecodedImage,
+  w: number,
+  h: number
+): AutomationBox | undefined {
+  // `writeBox` checks the values again; checking here first keeps the caller's names in errors.
+  const given = (v: number | undefined, name: string, min: number) =>
+    v === undefined ? undefined : numberIn(v, name, min, MAX_POINTS);
+  const left = given(box.left, 'left', -MAX_POINTS);
+  const top = given(box.top, 'top', -MAX_POINTS);
+  let width = given(box.width, 'width', 0);
+  let height = given(box.height, 'height', 0);
+  if (width !== undefined && height === undefined) height = (width * image.height) / image.width;
+  else if (height !== undefined && width === undefined)
+    width = (height * image.width) / image.height;
+  if (width === undefined || height === undefined) {
+    // No size: the default size, at the caller's position if any.
+    const at = { ...(left === undefined ? {} : { left }), ...(top === undefined ? {} : { top }) };
+    return Object.keys(at).length ? at : undefined;
+  }
+  if (width > MAX_POINTS || height > MAX_POINTS)
+    throw new AutomationFailure(
+      'invalid-argument',
+      'the other dimension of the picture is too large',
+      'picture-size'
+    );
+  return {
+    left: left ?? (w / 12_700 - width) / 2,
+    top: top ?? (h / 12_700 - height) / 2,
+    width,
+    height,
+  };
 }
 
 /** A stretched picture fill (`a:blipFill`, ECMA-376 Part 1, 20.1.8.14) over a new media part. */
