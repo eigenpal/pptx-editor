@@ -130,6 +130,32 @@
         "package-lock.json": "71e47b7f8edcb2dceeefa5f70991fab1d6a1d72336b92837152f483764cc8528",
         "fixture.json": "afde1f3a7416748c12197fd1f92eae31954581d6e31991eae5e1392db0f7ac31"
       }
+    },
+    {
+      "version": "0.8.0",
+      "commit": "7bcfe6ad8a74833416b872344ac62cbdb3274968",
+      "format": "pptx-collaboration:1.8.1.1",
+      "directory": ".collaboration/releases/0.8.0",
+      "packages": {
+        "@pptx-editor.dev/i18n": {
+          "tarball": "https://registry.npmjs.org/@pptx-editor.dev/i18n/-/i18n-0.8.0.tgz",
+          "integrity": "sha512-8a37B6l/dCfqcIZeJ1pxdAPmtAAa7ynAULBYMZYr0PPL69tDgXVeBuCuS9BtGr0JRrpBfn8r6Hn+SiUDaRVC5Q=="
+        },
+        "@pptx-editor.dev/core": {
+          "tarball": "https://registry.npmjs.org/@pptx-editor.dev/core/-/core-0.8.0.tgz",
+          "integrity": "sha512-pgD+W0JwZnUyTiCgbO7Zag/LfRaGtmTdfoW6PUeJ4dSKBCjvJ9P1fz/mjPdaOT4In2d0eisgtp9CC1cDKou+xg=="
+        },
+        "@pptx-editor.dev/pro": {
+          "tarball": "https://registry.npmjs.org/@pptx-editor.dev/pro/-/pro-0.8.0.tgz",
+          "integrity": "sha512-GqdXQNTN0JjLJ7aw6odzqYlVdnIAXRqNq6AfUbY9LEUhm2e4g+BWJNdnUiYmYHtG551f1RsdPyy1HtCOJTMuyg=="
+        }
+      },
+      "sourceLockHash": "98a082b4e1a9792d59b4bf5fe5c0d55172e1038a35648a9e472066f9668becb3",
+      "hashes": {
+        "package.json": "5177aae720518b43496d32f3b93e62be09ed690c9ad519e36b7b395b98e16dbd",
+        "package-lock.json": "70b4c3403507809e20a25f3721e7e7effa51970b008199470deb1b35df6b1004",
+        "fixture.json": "7d11f44b0e04354da3f92c16fd49ff693bfa8be8416956f0148c225fb43c19a5"
+      }
     }
   ]
 }
