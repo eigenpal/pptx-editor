@@ -466,7 +466,7 @@ export type AutomationNewShape =
 };
 
 // @public
-export type AutomationObjectKind = 'presentation' | 'slide' | 'slideLayout' | 'slideMaster' | 'shape';
+export type AutomationObjectKind = 'presentation' | 'slide' | 'slideLayout' | 'slideMaster' | 'shape' | 'section';
 
 // @public
 export type AutomationOperation = {
@@ -903,6 +903,33 @@ export type AutomationOperation = {
     readonly op: 'setSlideNotes';
     readonly slide: AutomationRef;
     readonly text: string;
+} | {
+    readonly op: 'listSections';
+} | {
+    readonly op: 'getSection';
+    readonly key: AutomationItemKey;
+    readonly orNull?: boolean;
+} | {
+    readonly op: 'readSection';
+    readonly section: AutomationRef;
+} | {
+    readonly op: 'addSection';
+    readonly name: string;
+    readonly slide: AutomationRef;
+} | {
+    readonly op: 'renameSection';
+    readonly section: AutomationRef;
+    readonly name: string;
+} | {
+    readonly op: 'moveSection';
+    readonly section: AutomationRef;
+    readonly index: number;
+} | {
+    readonly op: 'deleteSection';
+    readonly section: AutomationRef;
+    readonly deleteSlides?: boolean;
+} | {
+    readonly op: 'deleteAllSections';
 };
 
 // @public
@@ -1018,6 +1045,14 @@ export type AutomationSaveResult = {
     readonly ok: false;
     readonly error: AutomationError;
 };
+
+// @public
+export interface AutomationSectionRead {
+    readonly id: string;
+    readonly index: number;
+    readonly name: string;
+    readonly slideIds: readonly string[];
+}
 
 // @public
 export interface AutomationSelectionPort {
@@ -1302,6 +1337,9 @@ export type AutomationValue = {
 } | {
     readonly kind: 'slide';
     readonly slide: AutomationSlideRead;
+} | {
+    readonly kind: 'section';
+    readonly section: AutomationSectionRead;
 } | {
     readonly kind: 'layout';
     readonly layout: AutomationLayoutRead;

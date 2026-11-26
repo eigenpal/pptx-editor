@@ -36,6 +36,7 @@ export type {
   AutomationRef,
   AutomationResultRef,
   AutomationSaveResult,
+  AutomationSectionRead,
   AutomationSelectionRead,
   AutomationShapeRead,
   AutomationSlideRead,

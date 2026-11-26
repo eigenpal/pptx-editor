@@ -16,7 +16,7 @@ import type { AutomationOperation } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
 export type AutomationObjectKind =
-  'presentation' | 'slide' | 'slideLayout' | 'slideMaster' | 'shape';
+  'presentation' | 'slide' | 'slideLayout' | 'slideMaster' | 'shape' | 'section';
 
 declare const AUTOMATION_HANDLE_BRAND: unique symbol;
 
@@ -438,6 +438,22 @@ export interface AutomationSlideRead {
   readonly master: AutomationHandle<'slideMaster'> | null;
 }
 
+/**
+ * A section of the presentation: a `p14:section` of the section list in the presentation's
+ * extension list (`p:extLst`, ECMA-376 Part 1, 19.2.1.12). The section elements come from the
+ * `p14` extension schema (`CT_Section`), not from ECMA-376.
+ */
+export interface AutomationSectionRead {
+  /** `p14:section/@id`, a GUID in braces (`ST_Guid`, ECMA-376 Part 1, 22.9.2.4). */
+  readonly id: string;
+  /** `p14:section/@name`. */
+  readonly name: string;
+  /** The zero-based position of the section in the section list. */
+  readonly index: number;
+  /** The `p:sldId/@id` of each slide of the section, in slide order. */
+  readonly slideIds: readonly string[];
+}
+
 /** The presentation. Lengths in points. */
 export interface AutomationPresentationRead {
   /** A stable id for the open presentation in this host. */
@@ -474,6 +490,7 @@ export type AutomationValue =
   | { readonly kind: 'base64'; readonly base64: string }
   | { readonly kind: 'presentation'; readonly presentation: AutomationPresentationRead }
   | { readonly kind: 'slide'; readonly slide: AutomationSlideRead }
+  | { readonly kind: 'section'; readonly section: AutomationSectionRead }
   | { readonly kind: 'layout'; readonly layout: AutomationLayoutRead }
   | { readonly kind: 'shape'; readonly shape: AutomationShapeRead }
   | { readonly kind: 'fill'; readonly fill: AutomationFillRead }

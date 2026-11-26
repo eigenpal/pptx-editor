@@ -288,7 +288,7 @@ export function createSectionSummaries(): (
 }
 
 /** A section name as the editor keeps it: one line, no control characters, 1 to 255 long. */
-function sectionName(raw: string): string {
+export function sectionName(raw: string): string {
   const name = cleanText(raw)
     .replace(/[\n\u000B]/g, ' ')
     .trim();

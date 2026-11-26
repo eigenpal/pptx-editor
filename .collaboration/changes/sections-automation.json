@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operations listSections, getSection, readSection, addSection, renameSection, moveSection, deleteSection, and deleteAllSections run the existing section commands that the editor's section commands use, in one store transaction per batch. They emit only existing part and tree operations. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-sections.test.ts",
+    "packages/core/src/automation/__tests__/host-sections.test.ts",
+    "packages/editor-api/src/__tests__/sections.test.ts"
+  ]
+}

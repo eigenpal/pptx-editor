@@ -29,7 +29,9 @@ export type AutomationTarget =
   | { readonly kind: 'slide'; readonly sldId: string }
   | { readonly kind: 'slideLayout'; readonly part: string }
   | { readonly kind: 'slideMaster'; readonly part: string }
-  | { readonly kind: 'shape'; readonly owner: AutomationOwner; readonly shapeId: string };
+  | { readonly kind: 'shape'; readonly owner: AutomationOwner; readonly shapeId: string }
+  /** A section by its `p14:section/@id`, which no edit of other sections changes. */
+  | { readonly kind: 'section'; readonly id: string };
 
 /**
  * 128 bits of hex from the platform CSPRNG. Fails closed: a runtime without
@@ -64,6 +66,8 @@ function targetKey(target: AutomationTarget): string {
       return `${target.kind}:${target.part}`;
     case 'shape':
       return `shape:${ownerKey(target.owner)}#${target.shapeId}`;
+    case 'section':
+      return `section:${target.id}`;
   }
 }
 

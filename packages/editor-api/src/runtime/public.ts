@@ -97,6 +97,7 @@ export {
   type InsertSlideOptions,
 } from '../model/presentation.ts';
 export type { SearchOptions } from '../model/search.ts';
+export { Section, SectionCollection, type SectionDeleteOptions } from '../model/sections.ts';
 export {
   PlaceholderFormat,
   Shape,

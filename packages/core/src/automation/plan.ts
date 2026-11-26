@@ -17,6 +17,7 @@ import * as custom from './plan-custom-properties.ts';
 import * as customXml from './plan-custom-xml.ts';
 import * as reads from './plan-reads.ts';
 import * as props from './plan-properties.ts';
+import * as sections from './plan-sections.ts';
 import * as shapes from './plan-shapes.ts';
 import * as slides from './plan-slides.ts';
 import * as tableFormat from './plan-table-format.ts';
@@ -428,6 +429,22 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return notes.readSlideNotes(ctx, op.slide);
     case 'setSlideNotes':
       return notes.setSlideNotes(ctx, op.slide, op.text);
+    case 'listSections':
+      return sections.listSections(ctx);
+    case 'getSection':
+      return sections.getSection(ctx, op.key, op.orNull);
+    case 'readSection':
+      return sections.readSection(ctx, op.section);
+    case 'addSection':
+      return sections.addSection(ctx, op.name, op.slide);
+    case 'renameSection':
+      return sections.renameSection(ctx, op.section, op.name);
+    case 'moveSection':
+      return sections.moveSection(ctx, op.section, op.index);
+    case 'deleteSection':
+      return sections.deleteSection(ctx, op.section, op.deleteSlides);
+    case 'deleteAllSections':
+      return sections.deleteAllSections(ctx);
     default:
       throw new AutomationFailure(
         'unknown-operation',
