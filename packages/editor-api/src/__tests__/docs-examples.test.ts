@@ -868,3 +868,38 @@ test('the charts example replaces the values of named series', async () => {
   expect(series[1]).toEqual({ name: 'Actual', values: [1, 2, 3, 4] });
   runtime.dispose();
 });
+
+test('the charts example adds a column chart with an embedded workbook', async () => {
+  // docs/site/content/editor-api/charts.mdx, "Add a chart".
+  async function addRevenueChart(runtime: PptxEditorRuntime) {
+    return runtime.run(async (context) => {
+      const slide = context.presentation.slides.getItemAt(0);
+      const shape = slide.shapes.addChart(
+        'ColumnClustered',
+        {
+          categories: ['Q1', 'Q2', 'Q3', 'Q4'],
+          series: [
+            { name: 'Revenue', values: [12, 15, 14, 18] },
+            { name: 'Cost', values: [8, 9, 10, 11] },
+          ],
+        },
+        { left: 60, top: 100, width: 480, height: 300 }
+      );
+      shape.load('id');
+      await context.sync();
+      return shape.id;
+    });
+  }
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  const id = await addRevenueChart(runtime);
+  const chart = await runtime.run(async (context) => {
+    const read = context.presentation.slides
+      .getItemAt(0)
+      .shapes.getItem(id)
+      .chart.load('chartType,workbook,series');
+    await context.sync();
+    return read.toJSON();
+  });
+  expect(chart).toMatchObject({ chartType: 'ColumnClustered', workbook: 'Embedded' });
+  runtime.dispose();
+});

@@ -6,6 +6,7 @@
 // the object model shows them; the host converts to EMU (12 700 per point) at this boundary.
 
 import type {
+  ChartType,
   FindOptions,
   LineEndType,
   ShapeFormatPatch,
@@ -59,7 +60,14 @@ export type AutomationNewShape =
    * A picture (`p:pic`, `CT_Picture`, ECMA-376 Part 1, §19.3.1.37) over a new Image part
    * (§15.2.14): the Base64 bytes of a PNG, JPEG, or GIF image of at most 50 MiB.
    */
-  | { readonly kind: 'picture'; readonly base64: string };
+  | { readonly kind: 'picture'; readonly base64: string }
+  /**
+   * A chart frame (`p:graphicFrame`, `CT_GraphicalObjectFrame`, ECMA-376 Part 1, §19.3.1.21)
+   * with a new chart part (`c:chartSpace`, `CT_ChartSpace`, §21.2.2.29) of `chartType` over
+   * `data`, and an embedded workbook that holds the same table (`c:externalData`,
+   * `CT_ExternalData`, §21.2.2.63).
+   */
+  | { readonly kind: 'chart'; readonly chartType: ChartType; readonly data: AutomationChartData };
 
 /** Shape properties a write sets. */
 export interface AutomationShapeWrite extends AutomationBox {

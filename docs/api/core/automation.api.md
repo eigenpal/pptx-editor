@@ -572,6 +572,17 @@ export type AutomationNewShape =
 | {
     readonly kind: 'picture';
     readonly base64: string;
+}
+/**
+* A chart frame (`p:graphicFrame`, `CT_GraphicalObjectFrame`, ECMA-376 Part 1, §19.3.1.21)
+* with a new chart part (`c:chartSpace`, `CT_ChartSpace`, §21.2.2.29) of `chartType` over
+* `data`, and an embedded workbook that holds the same table (`c:externalData`,
+* `CT_ExternalData`, §21.2.2.63).
+*/
+| {
+    readonly kind: 'chart';
+    readonly chartType: ChartType;
+    readonly data: AutomationChartData;
 };
 
 // @public

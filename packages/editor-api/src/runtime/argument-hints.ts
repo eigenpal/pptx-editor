@@ -230,6 +230,7 @@ const ROWS: readonly (readonly [string, string])[] = [
     'chartData',
     'Use { categories: string[], series: [{ name, values }] } with one number or null per category.',
   ],
+  ['chartType', 'Use a value of ChartType.'],
 ];
 
 /** The hints, in a record with no prototype, so a detail never reaches a built-in name. */

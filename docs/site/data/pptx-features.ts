@@ -672,7 +672,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Insert and edit common chart types, data, and formatting with @pptx-editor.dev/pro under the EigenPal Pro License. Unsupported chart types or features show placeholders or remain read-only. The editing API reads and replaces chart data with `shape.chart`. Linked workbooks never open automatically.',
+      'Insert and edit common chart types, data, and formatting with @pptx-editor.dev/pro under the EigenPal Pro License. Unsupported chart types or features show placeholders or remain read-only. The editing API adds charts with `shapes.addChart`, and reads and replaces chart data with `shape.chart`. Linked workbooks never open automatically.',
     docsLink: '/docs/guides/charts',
   },
   {

@@ -27,7 +27,7 @@ import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
 import { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
 import { Adjustments } from './adjustments.ts';
-import { Chart } from './charts.ts';
+import { Chart, chartDataOf, chartTypeToFile, type ChartData, type ChartType } from './charts.ts';
 import { ItemCollection } from './collection.ts';
 import {
   CONNECTOR,
@@ -681,6 +681,59 @@ export class ShapeCollection extends ShapeList {
     );
     plan.apply(shape.getTable());
     return shape;
+  }
+
+  /**
+   * Add a chart (`p:graphicFrame`, `CT_GraphicalObjectFrame`, with a new `c:chartSpace` part,
+   * `CT_ChartSpace`, ECMA-376 Part 1, §19.3.1.21 and §21.2.2.29) of `chartType` over `data`, and
+   * answer the new chart frame. The chart part caches the data, and an embedded workbook holds
+   * the same table (`c:externalData`, `CT_ExternalData`, §21.2.2.63), so `chart.setData` and a
+   * later edit of the workbook start from the same values.
+   *
+   * The chart has the editor's default look. It has no title and a legend at the bottom. Its
+   * series take the theme colors in order. A `Pie` or `Doughnut` chart colors each category
+   * (`c:varyColors`, §21.2.2.227).
+   *
+   * Positions and sizes are in points. Without a box, the chart is three fifths of the slide
+   * wide. It is centered below the top fifth of the slide. A graphic frame or picture can cover
+   * more than half of that place. Then the chart moves down and right by 5% of the slide. Each
+   * new chart at that place moves one more step, but not off the slide. A box field that
+   * `options` does not give keeps its default value. Thus, give `left` and `top` with a new
+   * `width` or `height`.
+   *
+   * `data` takes the form of `Chart.setData`. Give at least one category and one series. Give at
+   * most 4000 categories and 255 series, and one value for each category. Labels and names have
+   * at most 255 characters. The chart XML must also fit in 16 MiB. That limit depends on the
+   * length of the labels and values. The categories of an `XYScatter` or `XYScatterLines` chart
+   * are its X values, so each is a number as text. The chart keeps them as numbers, so `'1e3'`
+   * reads back as `'1000'`. Another chart type, data of another form, or a box out of range
+   * refuses with `InvalidArgument`. Then the call adds nothing.
+   *
+   * This method is an SDK extension. The pinned Office.js reference has no such member.
+   *
+   * @example
+   * ```ts
+   * const shape = slide.shapes.addChart(
+   *   'ColumnClustered',
+   *   {
+   *     categories: ['Q1', 'Q2', 'Q3', 'Q4'],
+   *     series: [{ name: 'Revenue', values: [12, 15, 14, 18] }],
+   *   },
+   *   { left: 60, top: 100, width: 480, height: 300 }
+   * );
+   * await context.sync();
+   * ```
+   */
+  addChart(
+    chartType: ChartType | `${ChartType}`,
+    data: ChartData,
+    options?: ShapeAddOptions
+  ): Shape {
+    const target = `${this.path.label}.addChart`;
+    const type = chartTypeToFile(chartType, `${target}.chartType`);
+    const checked = chartDataOf(data, `${target}.data`);
+    const box = boxOf(options, target);
+    return this.#add('addChart', { kind: 'chart', chartType: type, data: checked }, box);
   }
 
   /** Group shapes of this collection, by shape or by id. Answers the new group. */

@@ -1,0 +1,12 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation addShape with a chart kind adds the chart part, its embedded workbook, and the graphic frame through the same addPart, relationship, and insertNode operations as the insertChart editor command, with part names from the actor. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/pro/src/__tests__/yjs-add-chart.test.ts",
+    "packages/core/src/automation/__tests__/host-chart.test.ts",
+    "packages/editor-api/src/__tests__/add-chart.test.ts"
+  ]
+}

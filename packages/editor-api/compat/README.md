@@ -183,3 +183,5 @@ Automatic adoption with `--adopt` requires both checks:
 ### Chart extensions
 
 `Shape.chart`, `Chart`, `ChartData`, `ChartSeriesData`, `ChartType`, `ChartWorkbookState`, and `ChartReadOnlyReason` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest, because that reference has no chart members. `Chart.chartType` and `ChartType` use the Office.js chart type names. `Chart.setData` replaces the categories and series of a `c:chartSpace` part (ECMA-376 Part 1, §21.2.2.29) by position, and writes the caches, the cell references, and an embedded workbook together.
+
+`ShapeCollection.addChart` is an SDK extension too. It adds a chart frame with a new `c:chartSpace` part and an embedded workbook that holds the same table. Its `data` argument takes the `ChartData` form of `Chart.setData`.

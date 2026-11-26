@@ -1,10 +1,44 @@
 ---
 title: 'Charts'
-description: 'Read and replace the data of charts with the editing API.'
+description: 'Add charts, and read and replace their data, with the editing API.'
 category: 'Editing API'
 ---
 
-Use `shape.chart` to read the chart type, title, categories, and series of a chart. Call `chart.setData()` to replace its data. Both members are SDK extensions, not members of the pinned Office.js reference. They work the same in browser and server runtimes.
+Use `slide.shapes.addChart()` to add a chart. Use `shape.chart` to read the chart type, title, categories, and series of a chart. Call `chart.setData()` to replace its data. These members are SDK extensions, not members of the pinned Office.js reference. They work the same in browser and server runtimes.
+
+## Add a chart
+
+This example adds a clustered column chart to the first slide and returns the id of the new shape:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function addRevenueChart(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const slide = context.presentation.slides.getItemAt(0);
+    const shape = slide.shapes.addChart(
+      'ColumnClustered',
+      {
+        categories: ['Q1', 'Q2', 'Q3', 'Q4'],
+        series: [
+          { name: 'Revenue', values: [12, 15, 14, 18] },
+          { name: 'Cost', values: [8, 9, 10, 11] },
+        ],
+      },
+      { left: 60, top: 100, width: 480, height: 300 }
+    );
+    shape.load('id');
+    await context.sync();
+    return shape.id;
+  });
+}
+```
+
+The chart type is a `ChartType` value: `ColumnClustered`, `ColumnStacked`, `ColumnStacked100`, `BarClustered`, `BarStacked`, `BarStacked100`, `Line`, `LineMarkers`, `Area`, `AreaStacked`, `AreaStacked100`, `Pie`, `Doughnut`, `Radar`, `XYScatter`, or `XYScatterLines`. Another value refuses with `InvalidArgument`.
+
+The data has the form that `setData` takes. For `XYScatter` and `XYScatterLines`, the categories are the X values, so each is a number as text. The chart keeps them as numbers, so `'1e3'` reads back as `'1000'`.
+
+The new chart has the default look of the editor's Insert Chart command. It has no title and a legend at the bottom. Its series take the theme colors in order. A `Pie` or `Doughnut` chart gives each category its own color. Its embedded workbook holds the same table, so `chart.workbook` reads `Embedded`. The options give the position and size in points. Without them, the chart is three fifths of the slide wide. It is centered below the top fifth of the slide. A table, chart, picture, or other graphic frame can cover more than half of that place. Then the chart moves down and right by 5% of the slide, past the corner of that object. Each new chart at the same place moves one more step. The chart does not move off the slide. Each box field that you do not give keeps its default value. Thus, give `left` and `top` with a new `width` or `height`.
 
 ## Replace chart data
 
@@ -63,7 +97,7 @@ When `readOnlyReason` is not `null`, `categories` and `series` are empty. A `Com
 
 `setData` replaces the data by position. Category `i` and series `j` keep the formatting, the data point overrides, and the data labels of the ones at the same position. A series past the old count is new, and it takes the automatic color of its position. To remove a series, leave it out.
 
-Give at least one category and one series, at most 4000 categories and 255 series, and one value for each category. Labels and names have at most 255 characters. The X values of a scatter chart are numbers as text, unless the chart already names them as text.
+Give at least one category and one series, at most 4000 categories and 255 series, and one value for each category. The chart XML of the data must also fit in 16 MiB. That limit depends on the length of the labels and values. Labels and names have at most 255 characters. The X values of a scatter chart are numbers as text, unless the chart already names them as text.
 
 ## Keep the workbook in step
 

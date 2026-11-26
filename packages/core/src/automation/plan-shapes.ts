@@ -38,6 +38,9 @@ import {
   specFromXml,
 } from './commands/shape-commands.ts';
 import { insertTableFrame } from './commands/table-insert.ts';
+import { insertChartFrame } from './commands/chart-insert.ts';
+import { isChartType } from './commands/chart-type.ts';
+import { chartEdit } from './plan-charts.ts';
 import { resolveSlide } from '../cascade/index.ts';
 import type {
   AutomationBox,
@@ -157,6 +160,15 @@ export function addShape(
       case 'textBox':
         if (typeof shape.text !== 'string') badArgument('text');
         return insertTextBox(ctx.batch, part, w, h);
+      case 'chart': {
+        // The type first, then the data, as `insertChart` checks them: a refusal names the
+        // argument. The chart is centered on the slide; a box moves it below.
+        if (!isChartType(shape.chartType)) badArgument('chartType');
+        // The editor's command inserts sample data without data; this one takes data only.
+        if (typeof shape.data !== 'object' || shape.data === null) badArgument('chartData');
+        const type = shape.chartType;
+        return chartEdit(() => insertChartFrame(ctx.batch, part, type, shape.data, w, h));
+      }
       case 'table': {
         const rows = numberIn(shape.rows, 'rows', 1, 75);
         const columns = numberIn(shape.columns, 'columns', 1, 75);

@@ -399,4 +399,37 @@ export const SHAPE_SCENARIOS: readonly Scenario[] = [
       return chart.toJSON() as Json;
     },
   },
+  {
+    name: 'shapes.add-chart',
+    area: 'shapes',
+    deck: 'chart-data',
+    writes: true,
+    async script(context) {
+      const shapes = context.presentation.slides.getItemAt(1).shapes;
+      const shape = shapes.addChart(
+        'LineMarkers',
+        {
+          categories: ['Jan', 'Feb', 'Mar'],
+          series: [
+            { name: 'North', values: [3, 4, 6] },
+            { name: 'South', values: [2, null, 5] },
+          ],
+        },
+        { left: 40, top: 60, width: 400, height: 240 }
+      );
+      shape.load('type,left,top,width,height');
+      await context.sync();
+      check(shape.type === 'Chart', 'the new shape is a chart');
+      return { box: [shape.left, shape.top, shape.width, shape.height].map(pt) };
+    },
+    async readBack(context) {
+      const shapes = context.presentation.slides.getItemAt(1).shapes.load('items/type');
+      await context.sync();
+      const charts = shapes.items
+        .filter((s) => s.type === 'Chart')
+        .map((s) => s.chart.load('chartType,categories,series,workbook'));
+      await context.sync();
+      return charts.map((c) => c.toJSON()) as Json;
+    },
+  },
 ];

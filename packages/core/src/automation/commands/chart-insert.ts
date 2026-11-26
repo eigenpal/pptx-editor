@@ -16,6 +16,7 @@ import {
 } from '../../store/index.ts';
 import type { ChartType, NewChartData } from '../../contracts/neutral.ts';
 import { toBase64 } from './base64.ts';
+import { MAX_CHART_PART_BYTES } from '../../cascade/chart-part.ts';
 import {
   MAX_CHART_LABEL,
   MAX_CHART_POINTS,
@@ -106,6 +107,22 @@ export function checkChartData(data: unknown, xy: boolean): NewChartData {
   return { categories: labels, series: rows };
 }
 
+/**
+ * The fewest bytes of the caches that `newChartSpaceXml` writes for `data`. Each series caches
+ * every category (`c:cat`, `CT_AxDataSource`, §21.2.2.24, or `c:xVal`, §21.2.2.234) and its
+ * values (`c:val`, `CT_NumDataSource`, §21.2.2.224), one point each (`c:pt`, `CT_StrVal`,
+ * §21.2.2.151, or `CT_NumVal`, §21.2.2.150). A label counts as escaped, and an X value as the
+ * number text that the cache holds. The chart XML is longer than this sum.
+ */
+function newChartCacheBytes(data: NewChartData, xy: boolean): number {
+  const pt = '<c:pt idx=""><c:v></c:v></c:pt>'.length;
+  const label = (l: string): number => (xy ? String(Number(l)).length : escapeXml(l).length) + pt;
+  let bytes = data.categories.reduce((sum, l) => sum + label(l), 0) * data.series.length;
+  for (const row of data.series)
+    for (const v of row.values) if (v !== null) bytes += String(v).length + pt;
+  return bytes;
+}
+
 /** A string reference with its cache. */
 const strRef = (f: string, values: readonly string[]): string =>
   `<c:strRef><c:f>${escapeXml(f)}</c:f><c:strCache><c:ptCount val="${values.length}"/>${values
@@ -155,7 +172,8 @@ export function newChartSpaceXml(type: ChartType, data: NewChartData, bookRel: s
     `${textProps(1000)}<c:externalData r:id="${escapeXmlAttribute(bookRel)}"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`;
   if (type === 'columnClustered') return `${XML}${xml}`;
   const parsed = parseXmlPart('/ppt/charts/chart.xml', xml);
-  if (!parsed.ok) throw new CommandRefusal('errors.unsupported', 'template');
+  // The template is well formed, so only its size can pass the reader's limits.
+  if (!parsed.ok) throw new CommandRefusal('errors.chartData.tooLarge');
   const root = parsed.part.root;
   const chart = cChild(root, 'chart')!;
   const plot = cChild(cChild(chart, 'plotArea'), 'barChart')!;
@@ -270,17 +288,21 @@ export function insertChartFrame(
   if (!isChartType(type)) throw new CommandRefusal('errors.unsupported', 'chartType');
   const xy = axisKindOf(type) === 'xy';
   const checked = checkChartData(data ?? sampleChartData(type), xy);
-  // The workbook, then the chart part, which names the workbook by its relationship.
+  // Data whose caches alone pass the read limit refuses before the XML is built.
+  if (newChartCacheBytes(checked, xy) > MAX_CHART_PART_BYTES)
+    throw new CommandRefusal('errors.chartData.tooLarge');
+  // The chart part names the workbook by its relationship.
   const chartPart = freePartName(batch, '/ppt/charts/chart', '.xml');
   const book = freePartName(batch, '/ppt/embeddings/Workbook', '.xlsx');
+  const bookRel = addRelationship(batch, chartPart, REL_PACKAGE, book);
+  const chartBytes = new TextEncoder().encode(newChartSpaceXml(type, checked, bookRel));
+  // A part past the read limit would read back as no chart (`chartFrameOf`). The check comes
+  // before the workbook is built, so too much data costs no workbook.
+  if (chartBytes.length > MAX_CHART_PART_BYTES)
+    throw new CommandRefusal('errors.chartData.tooLarge');
   batch.push({ op: 'addPart', part: book, base64: toBase64(newChartWorkbook(checked, xy)) });
   ensureContentType(batch, 'xlsx', XLSX_CT, book);
-  const bookRel = addRelationship(batch, chartPart, REL_PACKAGE, book);
-  batch.push({
-    op: 'addPart',
-    part: chartPart,
-    base64: toBase64(new TextEncoder().encode(newChartSpaceXml(type, checked, bookRel))),
-  });
+  batch.push({ op: 'addPart', part: chartPart, base64: toBase64(chartBytes) });
   addOverride(batch, chartPart, CHART_CT);
   const rId = addRelationship(batch, part, REL.chart, chartPart);
   // Three fifths of the slide wide, at most 4:3 and three fifths high, or the placeholder's
