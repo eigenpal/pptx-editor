@@ -2878,7 +2878,7 @@ export class TextRange extends ModelObject {
     getSubstring(start: number, length?: number): TextRange;
     get hyperlinks(): HyperlinkScopedCollection;
     // @internal
-    static later(context: RequestContext, path: ObjectPath): {
+    static later(context: RequestContext, path: ObjectPath, nullable?: boolean): {
         range: TextRange;
         settle: (to: {
             shape: AutomationHandle;
@@ -2890,6 +2890,7 @@ export class TextRange extends ModelObject {
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
     get paragraphFormat(): ParagraphFormat;
+    search(searchText: string, options?: SearchOptions): TextRangeCollection;
     // @internal
     static selected(owner: ModelObject, name: string, nullable: boolean): TextRange;
     setHyperlink(options?: HyperlinkAddOptions): Hyperlink;
@@ -2898,6 +2899,22 @@ export class TextRange extends ModelObject {
     set start(value: number);
     get text(): string;
     set text(value: string);
+}
+
+// @public
+export class TextRangeCollection extends ModelObject {
+    // @internal
+    constructor(context: RequestContext, path: ObjectPath, shape: ObjectPath, plan: (ref: RefOf) => AutomationOperation);
+    getCount(): ClientResult<number>;
+    getFirst(): TextRange;
+    getFirstOrNullObject(): TextRange;
+    getItemAt(index: number): TextRange;
+    getLast(): TextRange;
+    get items(): TextRange[];
+    // @internal (undocumented)
+    protected get loadsItemPaths(): boolean;
+    // @internal (undocumented)
+    protected onLoad(request: ResolvedLoadOptions): void;
 }
 
 // @public

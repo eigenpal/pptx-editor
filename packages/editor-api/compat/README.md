@@ -152,6 +152,8 @@ Automatic adoption with `--adopt` requires both checks:
 
 `Presentation.replaceAll`, `Slide.replaceAll`, and `SearchOptions` are SDK extensions. They are not entries in the pinned Office.js presentation reference or the compatibility manifest. The pinned reference has no member that finds or replaces text across a presentation. `SearchOptions` uses the Office.js option names `matchCase` and `matchWholeWord`. It refuses any other option name.
 
+`TextRange.search` and `TextRangeCollection` are SDK extensions too. They follow `Range.search` and `RangeCollection` of the DOCX Editor API, with the `getCount` and `getItemAt` item access of this object model. The search uses the rules of `replaceAll` and the same `SearchOptions`.
+
 ### Text layout extensions
 
 `TextFrame.getTextFit()` and `TextFrameFit` are SDK extensions. They are not entries in the pinned Office.js PowerPoint reference or compatibility manifest. The read reports the engine's own text layout: whether the text overflows its text area, the laid-out text height, and the available height, in points.

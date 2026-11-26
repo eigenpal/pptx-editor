@@ -196,6 +196,30 @@ export function findMatches(
   return out;
 }
 
+/**
+ * The matches of `query` in one text body, as `[start, end)` offsets over its paragraphs joined
+ * by one separator character, as the automation text offsets count (`plan-text.ts`). The rules
+ * are those of `findMatches`: a match stays in one paragraph and never covers a field.
+ */
+export function matchesInBody(
+  txBody: Element,
+  slideNumber: number | undefined,
+  query: string,
+  options: FindOptions = {}
+): [number, number][] {
+  if (!query || query.length > MAX_FIND_TEXT || query.includes(FIELD_CHAR)) return [];
+  const out: [number, number][] = [];
+  let base = 0;
+  for (const p of paragraphsOf(txBody)) {
+    const text = searchText(p, slideNumber);
+    for (const [start, end] of matchesIn(text, query, options))
+      out.push([base + start, base + end]);
+    // The paragraph separator is one character.
+    base += text.length + 1;
+  }
+  return out;
+}
+
 /** A replacement as one line of text a slide can show. */
 export function cleanReplacement(text: string): string {
   if (text.length > MAX_FIND_TEXT) throw new CommandRefusal('errors.findTooLong');

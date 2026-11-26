@@ -893,6 +893,12 @@ export type AutomationOperation = {
     readonly shape: AutomationRef;
     readonly span?: AutomationTextSpan;
 } | {
+    readonly op: 'findText';
+    readonly shape: AutomationRef;
+    readonly query: string;
+    readonly options?: FindOptions;
+    readonly span?: AutomationTextSpan;
+} | {
     readonly op: 'readTags';
     readonly owner: AutomationRef;
 } | {
@@ -1536,6 +1542,9 @@ export type AutomationValue = {
 } | {
     readonly kind: 'text';
     readonly text: string;
+} | {
+    readonly kind: 'textSpans';
+    readonly spans: readonly AutomationTextSpan[];
 } | {
     readonly kind: 'number';
     readonly value: number;

@@ -20,7 +20,7 @@ import type {
 } from '../contracts/neutral.ts';
 import type { TransitionDirection } from './commands/transition-commands.ts';
 import type { AutomationChartSeries } from './operations-chart.ts';
-import type { AutomationOperation } from './operations.ts';
+import type { AutomationOperation, AutomationTextSpan } from './operations.ts';
 
 /** What kind of presentation object a handle names. */
 export type AutomationObjectKind =
@@ -593,6 +593,7 @@ export type AutomationValue =
   /** A lookup that found nothing, asked for with `orNull`. */
   | { readonly kind: 'null' }
   | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'textSpans'; readonly spans: readonly AutomationTextSpan[] }
   | { readonly kind: 'number'; readonly value: number }
   | { readonly kind: 'flag'; readonly value: boolean }
   /** `.pptx` bytes as base64: an exported slide. */

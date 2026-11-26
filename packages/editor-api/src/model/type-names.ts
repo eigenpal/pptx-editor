@@ -63,6 +63,7 @@ import {
 import { Tag, TagCollection } from './tags.ts';
 import { ThemeColorScheme } from './theme.ts';
 import { BulletFormat, ParagraphFormat, ShapeFont, TextFrame, TextRange } from './text.ts';
+import { TextRangeCollection } from './text-ranges.ts';
 import { SlideTransition } from './transitions.ts';
 
 /** Each class with its Office.js type name. */
@@ -129,6 +130,7 @@ const CLASSES: readonly (readonly [unknown, string])[] = [
   [TagCollection, 'TagCollection'],
   [TextFrame, 'TextFrame'],
   [TextRange, 'TextRange'],
+  [TextRangeCollection, 'TextRangeCollection'],
   [ThemeColorScheme, 'ThemeColorScheme'],
   [SlideTransition, 'SlideTransition'],
   [SlideHeaderFooter, 'SlideHeaderFooter'],

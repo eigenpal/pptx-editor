@@ -159,6 +159,7 @@ export {
   TextRange,
   type TextFrameFit,
 } from '../model/text.ts';
+export { TextRangeCollection } from '../model/text-ranges.ts';
 export { SlideHeaderFooter, type HeaderFooterSettings } from '../model/header-footer.ts';
 
 export { SlideTransitionDirection, SlideTransitionEffect } from '../model/transition-enums.ts';

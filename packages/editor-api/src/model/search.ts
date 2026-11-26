@@ -3,9 +3,10 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The arguments of `Presentation.replaceAll` and `Slide.replaceAll`, SDK extensions over the
-// editor's find (`core/src/automation/commands/find.ts`). Each argument is checked at the call,
-// so a refusal names it; the engine checks the operation again (`plan-find.ts`).
+// The arguments of `TextRange.search`, `Presentation.replaceAll`, and `Slide.replaceAll`, SDK
+// extensions over the editor's find (`core/src/automation/commands/find.ts`). Each argument is
+// checked at the call, so a refusal names it; the engine checks the operation again
+// (`plan-find.ts`).
 
 import type { AutomationOperation } from '@pptx-editor.dev/core/automation';
 import type { FindOptions } from '@pptx-editor.dev/core/contracts';
@@ -13,7 +14,7 @@ import { failArgument, nearest, oneOf } from '../runtime/errors.ts';
 import { text } from './model-object.ts';
 
 /**
- * How `replaceAll` compares text. Both options are off by default.
+ * How `search` and `replaceAll` compare text. Both options are off by default.
  *
  * @public
  */
@@ -27,7 +28,7 @@ export interface SearchOptions {
   matchWholeWord?: boolean;
 }
 
-/** The longest search text and replacement text that `replaceAll` takes (`MAX_FIND_TEXT`). */
+/** The longest search text and replacement text that the calls take (`MAX_FIND_TEXT`). */
 const MAX_REPLACE_TEXT = 1000;
 
 const SEARCH_OPTIONS: readonly string[] = ['matchCase', 'matchWholeWord'];
@@ -51,7 +52,7 @@ function searchOptions(
   if (typeof options !== 'object' || options === null)
     failArgument(target, 'a SearchOptions object');
   // A name this API does not have is refused, not dropped: a search that ignored it would
-  // replace matches the caller did not ask for.
+  // find or replace matches the caller did not ask for.
   for (const name of Object.keys(options))
     if (!SEARCH_OPTIONS.includes(name))
       failArgument(`${target}.${name}`, oneOf(SEARCH_OPTIONS), nearest(name, SEARCH_OPTIONS));
@@ -68,16 +69,8 @@ function searchOptions(
   };
 }
 
-/**
- * The `replaceText` operation of a `replaceAll` call, without its scope, or `InvalidArgument`
- * naming the argument under `target`.
- */
-export function replaceOperation(
-  searchText: unknown,
-  replacementText: unknown,
-  options: SearchOptions | undefined,
-  target: string
-): Extract<AutomationOperation, { op: 'replaceText' }> {
+/** The search text of a call, or `InvalidArgument` naming it under `target`. */
+function searchQuery(searchText: unknown, target: string): string {
   const query = text(searchText, `${target}.searchText`);
   // U+FFFC is how the search sees a field: a query with it could match one.
   if (
@@ -90,6 +83,34 @@ export function replaceOperation(
       `${target}.searchText`,
       `search text of 1 to ${MAX_REPLACE_TEXT} characters, with no paragraph break, no U+FFFC, and no control characters`
     );
+  return query;
+}
+
+/**
+ * The query and options of a `search` call, without its shape and span, or `InvalidArgument`
+ * naming the argument under `target`.
+ */
+export function searchArguments(
+  searchText: unknown,
+  options: SearchOptions | undefined,
+  target: string
+): { query: string; options?: FindOptions } {
+  const query = searchQuery(searchText, target);
+  const find = searchOptions(options, `${target}.options`);
+  return { query, ...(find ? { options: find } : {}) };
+}
+
+/**
+ * The `replaceText` operation of a `replaceAll` call, without its scope, or `InvalidArgument`
+ * naming the argument under `target`.
+ */
+export function replaceOperation(
+  searchText: unknown,
+  replacementText: unknown,
+  options: SearchOptions | undefined,
+  target: string
+): Extract<AutomationOperation, { op: 'replaceText' }> {
+  const query = searchQuery(searchText, target);
   const replacement = text(replacementText, `${target}.replacementText`);
   if (replacement.length > MAX_REPLACE_TEXT || !xmlText(replacement))
     failArgument(
