@@ -1586,6 +1586,7 @@ export enum ShapeAutoSize {
 export class ShapeCollection extends ShapeList {
     // @internal
     constructor(context: RequestContext, path: ObjectPath, container: ObjectPath);
+    addChart(chartType: ChartType | `${ChartType}`, data: ChartData, options?: ShapeAddOptions): Shape;
     addGeometricShape(geometricShapeType: GeometricShapeType, options?: ShapeAddOptions): Shape;
     addGeometricShape(geometricShapeType: `${GeometricShapeType}`, options?: ShapeAddOptions): Shape;
     addGroup(values: Array<string | Shape>): Shape;

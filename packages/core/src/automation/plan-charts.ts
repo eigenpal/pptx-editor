@@ -199,6 +199,9 @@ export function readChart(ctx: PlanContext, ref: AutomationRef, orNull?: boolean
   };
 }
 
+/** The details of an `errors.unsupported` refusal that name the form of the data. */
+const DATA_FORM = new Set(['data', 'series', 'values', 'source', 'kind']);
+
 /** Engine refusals that name the caller's data, not the chart. */
 const DATA_REFUSALS = new Set([
   'errors.chartData.empty',
@@ -212,15 +215,19 @@ const DATA_REFUSALS = new Set([
  * references, or workbook the edit cannot write is `unsupported-content`. The detail is the
  * engine's reason, which selects the public diagnostic.
  */
-function chartEdit<T>(run: () => T): T {
+export function chartEdit<T>(run: () => T): T {
   try {
     return run();
   } catch (e) {
     if (!(e instanceof CommandRefusal)) throw e;
-    // The form of the data: an array, a value count, a source index.
-    if (e.reason === 'errors.unsupported') badArgument('chartData');
+    // The form of the data: an array, a series, a value count, a source index.
+    if (e.reason === 'errors.unsupported' && DATA_FORM.has(e.detail ?? ''))
+      badArgument('chartData');
     const code = DATA_REFUSALS.has(e.reason) ? 'invalid-argument' : 'unsupported-content';
-    throw new AutomationFailure(code, 'the chart data was refused', e.reason);
+    // A store refusal keeps its detail; the diagnostic reads the reason before the ':'.
+    const detail =
+      e.reason === 'errors.unsupported' && e.detail ? `${e.reason}:${e.detail}` : e.reason;
+    throw new AutomationFailure(code, 'the chart data was refused', detail);
   }
 }
 

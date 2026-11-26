@@ -9,13 +9,16 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // the data members are plain values, not ranges.
 
 import type { AutomationChartData, AutomationChartRead } from '@pptx-editor.dev/core/automation';
-import { failArgument } from '../runtime/errors.ts';
+import { failArgument, nearest, oneOf } from '../runtime/errors.ts';
 import type { ResolvedLoadOptions } from '../runtime/load-options.ts';
 import { pathOf } from './model-object.ts';
 import type { ObjectPath } from '../runtime/object-path.ts';
 import type { RequestContext } from '../runtime/request-context.ts';
 import { ModelObject } from './model-object.ts';
 import type { Shape } from './shapes.ts';
+
+/** A chart type as the engine names it (`columnClustered`, `scatter`, …). */
+type ChartTypeOfFile = NonNullable<AutomationChartRead['type']>;
 
 /**
  * A chart type that the engine reads and writes: the plot element (`c:barChart`, `c:lineChart`,
@@ -110,7 +113,11 @@ export interface ChartSeriesData {
  * @public
  */
 export interface ChartData {
-  /** The category labels, or the X values of a scatter chart as text. At most 4000. */
+  /**
+   * The category labels, or the X values of a scatter chart as text. At most 4000. The chart
+   * XML of the data must also fit in 16 MiB. That limit depends on the length of the labels and
+   * values.
+   */
   categories: string[];
   /** The series in plot order. At most 255. */
   series: ChartSeriesData[];
@@ -122,7 +129,7 @@ function pairs<V extends string>(entries: readonly (readonly [string, V])[]): Re
 }
 
 /** The engine's chart type (`ChartType` of the core contract) of each Office.js value. */
-const TYPE_TO_FILE = pairs([
+const TYPE_TO_FILE = pairs<ChartTypeOfFile>([
   ['ColumnClustered', 'columnClustered'],
   ['ColumnStacked', 'columnStacked'],
   ['ColumnStacked100', 'columnPercentStacked'],
@@ -143,6 +150,14 @@ const TYPE_TO_FILE = pairs([
 const TYPE_FROM_FILE = pairs(
   Object.entries(TYPE_TO_FILE).map(([api, file]) => [file, api as `${ChartType}`] as const)
 );
+
+/** The engine's chart type of an Office.js `ChartType` value, or `InvalidArgument`. */
+export function chartTypeToFile(value: unknown, target: string): ChartTypeOfFile {
+  const names = Object.keys(TYPE_TO_FILE);
+  if (typeof value !== 'string' || !(value in TYPE_TO_FILE))
+    failArgument(target, oneOf(names), nearest(value, names));
+  return TYPE_TO_FILE[value]!;
+}
 
 const WORKBOOK: Readonly<Record<AutomationChartRead['workbook'], `${ChartWorkbookState}`>> = {
   embedded: 'Embedded',

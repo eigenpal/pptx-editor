@@ -31,7 +31,7 @@ export const CHART_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.drawingml.chart+xml';
 
 /** The most bytes of chart XML read for one chart. Past it the chart keeps its placeholder. */
-const MAX_CHART_PART_BYTES = 16 * 1024 * 1024;
+export const MAX_CHART_PART_BYTES = 16 * 1024 * 1024;
 
 /** A resolved chart part: its tree, and what its colors and fonts resolve against. */
 export interface ResolvedChartPart {

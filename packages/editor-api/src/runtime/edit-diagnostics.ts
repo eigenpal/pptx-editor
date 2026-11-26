@@ -397,7 +397,7 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   [
     'errors.chartData.tooLarge',
     'edit.chart-data-range',
-    'A chart edits up to 255 series and 4000 categories. Pass less data.',
+    'A chart edits up to 255 series and 4000 categories, in at most 16 MiB of chart XML. Pass less data.',
   ],
   [
     'errors.chartData.empty',

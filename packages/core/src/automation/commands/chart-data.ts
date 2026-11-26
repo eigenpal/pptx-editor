@@ -19,15 +19,13 @@ import {
   type PptxPackage,
 } from '../../store/index.ts';
 import { contentElements } from '../../cascade/alternate-content.ts';
+import { MAX_CHART_PART_BYTES } from '../../cascade/chart-part.ts';
 import type { ChartData, ChartDataRead, ChartWorkbookState } from '../../contracts/neutral.ts';
 import { toBase64 } from './base64.ts';
 import { readChartModel, type ChartModel } from './chart-data-model.ts';
 import { planChartEdit, rewriteChartSpace } from './chart-data-write.ts';
 import { chartWorkbook, updatedWorkbook } from './chart-workbook.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
-
-/** The most bytes of chart XML an edit reads, as the cascade reads (`chart-part.ts`). */
-const MAX_CHART_PART_BYTES = 16 * 1024 * 1024;
 
 /** The chart part behind a chart frame. */
 export interface ChartFrame {
@@ -210,7 +208,10 @@ export function writeChartPart(batch: OpBatch, part: string, chartSpace: Element
   } catch {
     throw new CommandRefusal('errors.chartData.invalidText');
   }
+  const bytes = new TextEncoder().encode(xml);
+  // A part past the read limit would read back as no chart: refuse the data that makes it.
+  if (bytes.length > MAX_CHART_PART_BYTES) throw new CommandRefusal('errors.chartData.tooLarge');
   // As bytes, as the reader keeps a chart part: a collaboration peer and a reopened copy then
   // hold the same part, with its attributes in the order written.
-  replacePart(batch, part, { base64: toBase64(new TextEncoder().encode(xml)) });
+  replacePart(batch, part, { base64: toBase64(bytes) });
 }

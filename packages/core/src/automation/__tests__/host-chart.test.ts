@@ -99,4 +99,38 @@ describe('automation host: charts', () => {
       value: { kind: 'chart', chart: { categories: ['A', 'B'], series: [data.series[0]] } },
     });
   });
+
+  test('addShape adds a chart frame, and refuses a type or data it does not take', () => {
+    const { store, host } = setup();
+    const data = { categories: ['A', 'B'], series: [{ name: 'S', values: [1, 2] }] };
+    const add = (shape: unknown) =>
+      host.execute({
+        operations: [
+          { op: 'getSlide', key: { index: 0 } },
+          { op: 'addShape', container: { result: 0 }, shape } as AutomationOperation,
+          { op: 'readChart', shape: { result: 1 } },
+        ],
+      });
+    const response = add({ kind: 'chart', chartType: 'doughnut', data });
+    expect(response.results[2]).toMatchObject({
+      status: 'ok',
+      value: {
+        kind: 'chart',
+        chart: { type: 'doughnut', categories: ['A', 'B'], workbook: 'embedded' },
+      },
+    });
+    const before = store.revision;
+    const cases: [unknown, string, string][] = [
+      [{ kind: 'chart', chartType: 'bubble', data }, 'invalid-argument', 'chartType'],
+      [{ kind: 'chart', chartType: 'pie' }, 'invalid-argument', 'chartData'],
+      [
+        { kind: 'chart', chartType: 'scatter', data },
+        'invalid-argument',
+        'errors.chartData.notNumber',
+      ],
+    ];
+    for (const [shape, code, detail] of cases)
+      expect(add(shape).results[1]).toMatchObject({ status: 'error', error: { code, detail } });
+    expect(store.revision).toBe(before);
+  });
 });
