@@ -164,6 +164,30 @@ export interface AutomationParagraphWrite {
   readonly bulletStyle?: string;
   /** 1-based list level, 1 to 9. */
   readonly indentLevel?: number;
+  /**
+   * Line spacing in points (`a:lnSpc`, CT_TextSpacing, ECMA-376 Part 1, 21.1.2.2.5), 0.01 to
+   * 1584. Each paragraph keeps its rule. An exact spacing (`a:spcPts`) takes the points. A
+   * multiple (`a:spcPct`) takes the points over 12, so 12 points is one line.
+   */
+  readonly lineSpacing?: number;
+  /**
+   * The line spacing kind: `multiple` (`a:spcPct`) or `exactly` (`a:spcPts`). Each paragraph
+   * keeps the points of its spacing, so `exactly` on a 1.5-line paragraph gives 18 points.
+   * Applied before `lineSpacing` when both are given.
+   */
+  readonly lineSpacingRule?: 'multiple' | 'exactly';
+  /** Space before in points (`a:spcBef/a:spcPts`, ECMA-376 Part 1, 21.1.2.2.10), 0 to 1584. */
+  readonly spaceBefore?: number;
+  /** Space after in points (`a:spcAft/a:spcPts`, ECMA-376 Part 1, 21.1.2.2.9), 0 to 1584. */
+  readonly spaceAfter?: number;
+  /** Space before in lines (`a:spcBef/a:spcPct`), 0 to 132. Not with `spaceBefore`. */
+  readonly lineUnitBefore?: number;
+  /** Space after in lines (`a:spcAft/a:spcPct`), 0 to 132. Not with `spaceAfter`. */
+  readonly lineUnitAfter?: number;
+  /** The left margin in points (`a:pPr/@marL`, ST_TextMargin), 0 to 4032. */
+  readonly leftIndent?: number;
+  /** The first line indent in points (`a:pPr/@indent`, ST_TextIndent), -4032 to 4032. */
+  readonly firstLineIndent?: number;
 }
 
 /** Document properties a write sets. */

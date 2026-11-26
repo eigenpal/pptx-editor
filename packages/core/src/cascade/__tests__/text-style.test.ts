@@ -24,6 +24,19 @@ function body(pPr: string, bodyPr = '<a:bodyPr/>') {
 }
 
 describe('text cascade bounds', () => {
+  test('a percent string in a:spcPct reads as its percent (ECMA-376 Part 1, 20.1.10.77)', () => {
+    const at = (val: string) =>
+      body(`<a:pPr><a:lnSpc><a:spcPct val="${val}"/></a:lnSpc></a:pPr>`).paragraphs[0]!.lineSpacing;
+    expect(at('150%')).toEqual({ pct: 1.5 });
+    expect(at('150000')).toEqual({ pct: 1.5 });
+    expect(at('150.5%')).toEqual({ pct: 1.505 });
+    expect(at('-50%')).toEqual({ pct: 0 });
+    // A value that is not a number keeps single spacing.
+    expect(at('abc')).toEqual({ pct: 1 });
+    const before = body('<a:pPr><a:spcBef><a:spcPct val="50%"/></a:spcBef></a:pPr>');
+    expect(before.paragraphs[0]!.spaceBefore).toEqual({ pct: 0.5 });
+  });
+
   test('line spacing in percent reads within ST_TextSpacingPercentOrPercentString', () => {
     const huge = body('<a:pPr><a:lnSpc><a:spcPct val="999999999999999"/></a:lnSpc></a:pPr>');
     expect(huge.paragraphs[0]!.lineSpacing).toEqual({ pct: 132 });

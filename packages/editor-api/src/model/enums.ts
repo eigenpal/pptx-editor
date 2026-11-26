@@ -466,6 +466,19 @@ export enum DocumentPropertyType {
   string = 'String',
 }
 
+/**
+ * How `ParagraphFormat.lineSpacing` is measured. SDK extension: the pinned Office.js reference
+ * has no line spacing member on `ParagraphFormat`. `Multiple` is `a:spcPct` and `Exactly` is
+ * `a:spcPts` in `a:lnSpc` (CT_TextSpacing, ECMA-376 Part 1, 21.1.2.2.5). DrawingML has no
+ * minimum line height, so there is no `AtLeast` value.
+ *
+ * @public
+ */
+export enum ParagraphLineSpacingRule {
+  multiple = 'Multiple',
+  exactly = 'Exactly',
+}
+
 /** A two-way table between Office.js values and ECMA-376 values. */
 export interface EnumMap<O extends string> {
   /** The ECMA-376 value of an Office.js value, or `InvalidArgument` naming `target`. */
@@ -889,3 +902,9 @@ export function tableStyleOf(name: string): `${TableStyle}` | null {
 }
 
 const TABLE_STYLES: ReadonlySet<string> = new Set(Object.values(TableStyle));
+
+/** The line spacing kinds of the automation protocol: `a:spcPct` and `a:spcPts`. */
+export const LINE_SPACING_RULE = enumMap<`${ParagraphLineSpacingRule}`>([
+  ['Multiple', 'multiple'],
+  ['Exactly', 'exactly'],
+]);

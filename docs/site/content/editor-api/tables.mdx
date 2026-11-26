@@ -50,6 +50,15 @@ For bulk formatting, queue every cell change before one final `context.sync()`. 
 
 Find the table shape by its identifier, then call `shape.getTable()`. Use `table.rows` and `table.columns` for structural changes. Use `getCellOrNullObject(row, column)` when a target might not exist.
 
+Use `cell.paragraphFormat` to set the line spacing, the space before and after, and the indents of the cell's text. It is an SDK extension. See [Text and ranges](/docs/editor-api/text-and-ranges#set-line-spacing-paragraph-spacing-and-indents).
+
+```ts
+// cell is a TableCell from getCellOrNullObject, checked in this run.
+cell.paragraphFormat.spaceAfter = 4;
+cell.paragraphFormat.leftIndent = 6;
+await context.sync();
+```
+
 A cell resize that cuts through another merged cell is refused with diagnostic `edit.merge-overlap`. Split or resize the other cell first. Table styles must exist in the presentation, except `MediumStyle2Accent1` and `NoStyleNoGrid`.
 
 ## See also

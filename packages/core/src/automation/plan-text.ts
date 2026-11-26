@@ -60,6 +60,7 @@ import type {
   AutomationValue,
 } from './protocol.ts';
 import { resolvedShape } from './plan-reads.ts';
+import { applySpacing, ownSpacing, spacingRead, spacingWrite } from './plan-paragraph-spacing.ts';
 import {
   AutomationFailure,
   badArgument,
@@ -819,6 +820,7 @@ export function readParagraph(
           chosen.map((p) => (p!.bullet?.type === 'autonum' ? p!.bullet.scheme : null))
         ),
         indentLevel: shared(chosen.map((p) => p!.level + 1)),
+        ...spacingRead(chosen as ResolvedParagraph[]),
       }
     : {
         alignment: shared(files.map((p) => attr(child(p, 'a:pPr'), 'algn') ?? 'l')),
@@ -826,6 +828,8 @@ export function readParagraph(
         bulletType: null,
         bulletStyle: null,
         indentLevel: shared(files.map((p) => (intAttr(child(p, 'a:pPr'), 'lvl') ?? 0) + 1)),
+        // With no cascade (a layout or a master shape), only the paragraphs' own values read.
+        ...spacingRead(files.map(ownSpacing)),
       };
   return { kind: 'paragraph', paragraph };
 }
@@ -841,15 +845,19 @@ export function setParagraph(
   cell?: AutomationCellAddress
 ): AutomationValue {
   if (typeof format !== 'object' || format === null) badArgument('paragraph');
+  const spacing = spacingWrite(format);
   const t = textTarget(ctx, ref, false, cell);
   const range = rangeOf(t, span);
   const { part } = t.at;
   const slide = ownerSlideIndex(ctx.batch.pkg, t.at.owner);
+  // The line spacing in force, before this write: a write keeps each paragraph's rule.
+  const before = spacing.lineSpacing ? resolvedParagraphsOf(ctx, t) : undefined;
   edit(() => {
     const ids = paragraphsForFormatting(ctx.batch, part, t.txBody.id, range);
     const all = paragraphsOf(ctx.batch.element(part, t.txBody.id)).map((p) => p.id);
     for (const pId of ids) {
       const pPrId = ensureParagraphProps(ctx.batch, part, pId);
+      applySpacing(ctx.batch, part, pId, pPrId, spacing, before);
       const set = (name: string, value: string | null): void =>
         ctx.batch.push({
           op: 'setAttribute',

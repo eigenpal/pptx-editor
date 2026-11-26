@@ -175,6 +175,16 @@ export class TableCell extends ModelObject {
       this.#cell
     ));
   }
+  /**
+   * The paragraph formatting of all the cell's text, as on a text range. It has the line
+   * spacing, the space before and after, the indents, the alignment, and the bullets.
+   *
+   * SDK extension: the pinned Office.js reference has no `paragraphFormat` member on
+   * `TableCell`. Its `horizontalAlignment` and `indentLevel` are the cell's own members.
+   */
+  get paragraphFormat(): ParagraphFormat {
+    return this.#paragraphs();
+  }
   /** The borders of the cell (`a:tcPr` lines). */
   get borders(): Borders {
     return (this.#borders ??= new Borders(
@@ -334,6 +344,7 @@ export class TableCell extends ModelObject {
         fill: () => this.fill,
         borders: () => this.borders,
         margins: () => this.margins,
+        paragraphFormat: () => this.paragraphFormat,
       }
     );
     const cell = this.#cell;

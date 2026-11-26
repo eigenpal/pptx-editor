@@ -174,6 +174,45 @@ These targets refuse the read with `NotSupported`:
 
 A text frame from `getTextFrameOrNullObject()` that is a null object skips the read, and the result stays not loaded. `getTextFit()` is an SDK extension. The pinned Office.js reference has no such member.
 
+## Set line spacing, paragraph spacing, and indents
+
+`paragraphFormat` reads and sets the line spacing, the space before and after the paragraphs, and the indents. These members are SDK extensions, not members of the pinned Office.js reference.
+
+```ts
+// shape is a Shape with a text frame, loaded in this run.
+const format = shape.textFrame.textRange.paragraphFormat;
+format.lineSpacingRule = 'Multiple';
+format.lineSpacing = 18; // 1.5 lines: under Multiple, 12 points is one line.
+format.spaceBefore = 6;
+format.spaceAfter = 0;
+format.leftIndent = 18;
+format.firstLineIndent = -18; // A hanging indent.
+format.load('lineSpacing,lineSpacingRule,spaceBefore');
+await context.sync();
+console.log(format.lineSpacing, format.lineSpacingRule, format.spaceBefore); // 18 'Multiple' 6
+```
+
+| Member | Value |
+| --- | --- |
+| `lineSpacing` | The line spacing in points. A write takes 0.01 to 1584. Under `Exactly`, it is the line height. Under `Multiple`, it is a nominal value: 12 points is one line, so `18` is 1.5 lines. |
+| `lineSpacingRule` | `Multiple` or `Exactly`. |
+| `spaceBefore`, `spaceAfter` | The space before or after the paragraphs in points, from 0 to 1584. |
+| `lineUnitBefore`, `lineUnitAfter` | The space before or after the paragraphs in lines of their text, from 0 to 132. |
+| `leftIndent` | The left indent in points, from 0 to 4032. It adds to the left margin of the text frame. |
+| `firstLineIndent` | The indent of the first line from `leftIndent` in points, from -4032 to 4032. A negative value is a hanging indent. |
+
+A read returns the value in force. This includes a value from the list style, the layout, or the master. A read returns `null` when the paragraphs of the range have different values. Paragraphs with the same points and different rules read those points, and `lineSpacingRule` reads `null`. Paragraph formatting applies to the paragraphs that the range touches.
+
+A presentation stores a line spacing as a multiple or as exact points. A multiple scales with the size of the text. Thus, under `Multiple`, `lineSpacing` is not the height of a line. To find the height of the text, use `textFrame.getTextFit()`.
+
+A `lineSpacing` write keeps the rule of each paragraph. A `lineSpacingRule` write keeps the nominal points, so `Exactly` on a 1.5-line paragraph gives exactly 18 points. Thus, the two writes give the same result in either order. A rule write on a paragraph that already has that rule adds no formatting. A rule write never gives a line spacing below 0.01 points. The rule has no `Single`, `OnePointFive`, `Double`, or `AtLeast` value. For single spacing, set `Multiple` and 12 points.
+
+A presentation also stores a space before or after a paragraph in points or in lines. `spaceBefore` reads `null` when the space is in lines, and `lineUnitBefore` reads `null` when the space is in points. A space of 0 reads 0 in both. A write in one unit replaces a value in the other unit, so the last write wins. The same is true for `spaceAfter` and `lineUnitAfter`. The space before the first paragraph of a text frame takes no room in the layout. The space after the last paragraph also takes no room. The `spcFirstLastPara` setting of the text frame changes this.
+
+A value out of range refuses the sync with `InvalidArgument`, and the sync writes nothing. A write cannot remove a value to inherit again. A write re-fits the text of a shape with an autofit setting. Thus, `textFrame.getTextFit()` in the same sync reports the new layout. For a table cell, use `cell.paragraphFormat`, which is an SDK extension too.
+
+A shape can be on a slide layout or a slide master. There, a read returns only the values that the paragraphs set themselves. A value that the paragraphs do not set reads `null`. Also, a `lineSpacing` or `lineSpacingRule` write treats a paragraph with no line spacing of its own as single spacing.
+
 ## Check text targets
 
 Pictures, connectors, tables, and groups do not expose an editable text frame through this API. A direct text read on those shapes fails with `NotSupported` and diagnostic `edit.no-text-frame`. Use [Tables](/docs/editor-api/tables) for table cell text.

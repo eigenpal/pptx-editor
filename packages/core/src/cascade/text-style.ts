@@ -120,14 +120,25 @@ function lastChild(chain: readonly Element[], names: readonly string[]): Element
 }
 
 function spacing(el: Element | undefined, fallback: Spacing): Spacing {
+  return textSpacing(el) ?? fallback;
+}
+
+/**
+ * The spacing a `CT_TextSpacing` element holds (`a:lnSpc`, ECMA-376 Part 1, 21.1.2.2.5;
+ * `a:spcBef`, 21.1.2.2.10; `a:spcAft`, 21.1.2.2.9), or undefined when it holds none.
+ * `a:spcPct` (21.1.2.2.11) takes either form of its value. ST_TextSpacingPercentOrPercentString
+ * (20.1.10.77) is a percent string (`150%`), as in the example of 21.1.2.2.5. A transitional
+ * document can also give thousandths of a percent (`150000`): ST_TextSpacingPercent (ECMA-376
+ * Part 4, 17.2.2.11) is an additional member of that union (Part 4, 17.2.2.6). @internal
+ */
+export function textSpacing(el: Element | undefined): Spacing | undefined {
   const pctEl = child(el, 'a:spcPct');
-  // ST_TextSpacingPercentOrPercentString: 0 to 13200000 (132000 %). A file value outside it
-  // would make line positions too large to compute.
-  if (pctEl)
-    return { pct: Math.max(0, Math.min(intAttr(pctEl, 'val') ?? 100_000, 13_200_000)) / 100_000 };
+  // At most 13200000 thousandths of a percent (132 lines), as ST_TextSpacingPercent allows. A
+  // file value outside it would make line positions too large to compute.
+  if (pctEl) return { pct: Math.max(0, Math.min(percentAttr(attr(pctEl, 'val')) ?? 1, 132)) };
   const pts = child(el, 'a:spcPts');
   if (pts) return { pts: Math.max(0, Math.min(intAttr(pts, 'val') ?? 0, 158_400)) };
-  return fallback;
+  return undefined;
 }
 
 const clampEmu = (v: number | undefined, d: number): number =>

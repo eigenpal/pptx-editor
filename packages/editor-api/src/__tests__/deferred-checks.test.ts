@@ -34,6 +34,14 @@ const EXTENSIONS: ReadonlySet<string> = new Set([
   'speakerNotes',
   'addPicture',
   'applyHeaderFooter',
+  'lineSpacing',
+  'lineSpacingRule',
+  'spaceBefore',
+  'spaceAfter',
+  'lineUnitBefore',
+  'lineUnitAfter',
+  'leftIndent',
+  'firstLineIndent',
 ]);
 
 /** The members of `proto` and the classes above it that check their arguments at the sync. */

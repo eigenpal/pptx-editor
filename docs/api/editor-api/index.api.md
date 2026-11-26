@@ -962,12 +962,28 @@ export class ParagraphFormat extends ModelObject {
     // @internal
     constructor(context: RequestContext, path: ObjectPath, shape: ObjectPath, span: () => Span, cell?: AutomationCellAddress);
     get bulletFormat(): BulletFormat;
+    get firstLineIndent(): number | null;
+    set firstLineIndent(value: number);
     get horizontalAlignment(): ParagraphHorizontalAlignment | `${ParagraphHorizontalAlignment}` | null;
     set horizontalAlignment(value: ParagraphHorizontalAlignment | `${ParagraphHorizontalAlignment}` | null);
     get indentLevel(): number;
     set indentLevel(value: number);
+    get leftIndent(): number | null;
+    set leftIndent(value: number);
+    get lineSpacing(): number | null;
+    set lineSpacing(value: number);
+    get lineSpacingRule(): ParagraphLineSpacingRule | `${ParagraphLineSpacingRule}` | null;
+    set lineSpacingRule(value: ParagraphLineSpacingRule | `${ParagraphLineSpacingRule}`);
+    get lineUnitAfter(): number | null;
+    set lineUnitAfter(value: number);
+    get lineUnitBefore(): number | null;
+    set lineUnitBefore(value: number);
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
+    get spaceAfter(): number | null;
+    set spaceAfter(value: number);
+    get spaceBefore(): number | null;
+    set spaceBefore(value: number);
 }
 
 // @public (undocumented)
@@ -986,6 +1002,14 @@ export enum ParagraphHorizontalAlignment {
     right = "Right",
     // (undocumented)
     thaiDistributed = "ThaiDistributed"
+}
+
+// @public
+export enum ParagraphLineSpacingRule {
+    // (undocumented)
+    exactly = "Exactly",
+    // (undocumented)
+    multiple = "Multiple"
 }
 
 // @public
@@ -2248,6 +2272,7 @@ export class TableCell extends ModelObject {
     get margins(): Margins;
     // @internal (undocumented)
     protected onLoad(request: ResolvedLoadOptions): void;
+    get paragraphFormat(): ParagraphFormat;
     resize(rowCount: number, columnCount: number): void;
     get rowCount(): number;
     get rowIndex(): number;

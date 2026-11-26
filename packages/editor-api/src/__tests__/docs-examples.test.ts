@@ -780,3 +780,52 @@ test('the slide transition example fades every slide', async () => {
     runtime.dispose();
   }
 });
+
+test('the paragraph spacing example of text-and-ranges.mdx sets and reads the values', async () => {
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  const read = await runtime.run(async (context) => {
+    const shape = context.presentation.slides.getItemAt(0).shapes.getItem('2');
+    // As written in the docs.
+    const format = shape.textFrame.textRange.paragraphFormat;
+    format.lineSpacingRule = 'Multiple';
+    format.lineSpacing = 18; // 1.5 lines: under Multiple, 12 points is one line.
+    format.spaceBefore = 6;
+    format.spaceAfter = 0;
+    format.leftIndent = 18;
+    format.firstLineIndent = -18; // A hanging indent.
+    format.load('lineSpacing,lineSpacingRule,spaceBefore');
+    await context.sync();
+    return [format.lineSpacing, format.lineSpacingRule, format.spaceBefore];
+  });
+  expect(read).toEqual([18, 'Multiple', 6]);
+  const again = await reopen(runtime);
+  const saved = await again.run(async (context) => {
+    const format = context.presentation.slides
+      .getItemAt(0)
+      .shapes.getItem('2')
+      .textFrame.textRange.paragraphFormat.load('spaceAfter,leftIndent,firstLineIndent');
+    await context.sync();
+    return [format.spaceAfter, format.leftIndent, format.firstLineIndent];
+  });
+  expect(saved).toEqual([0, 18, -18]);
+});
+
+test('the table cell paragraph example of tables.mdx sets the cell spacing', async () => {
+  const runtime = await PptxEditor.createServer(deck(), { substitutes: false });
+  const read = await runtime.run(async (context) => {
+    const table = context.presentation.slides
+      .getItemAt(1)
+      .shapes.addTable(2, 2, { left: 20, top: 20 })
+      .getTable();
+    await context.sync();
+    const cell = table.getCellOrNullObject(0, 0);
+    // As written in the docs.
+    cell.paragraphFormat.spaceAfter = 4;
+    cell.paragraphFormat.leftIndent = 6;
+    await context.sync();
+    const format = cell.paragraphFormat.load('spaceAfter,leftIndent');
+    await context.sync();
+    return [format.spaceAfter, format.leftIndent];
+  });
+  expect(read).toEqual([4, 6]);
+});

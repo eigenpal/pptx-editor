@@ -287,6 +287,27 @@ export interface AutomationParagraphRead {
   readonly bulletStyle: string | null;
   /** 1-based list level (`a:pPr/@lvl` + 1). */
   readonly indentLevel: number | null;
+  // The spacing and indent fields read through the cascade on a slide. On a slide layout or a
+  // slide master, they read the paragraphs' own values only, and null for a value they do not set.
+  /**
+   * The effective line spacing in points: exact points for `exactly`, and the multiple times 12
+   * for `multiple`. Null for a mixed range.
+   */
+  readonly lineSpacing?: number | null;
+  /** `multiple` (`a:spcPct`) or `exactly` (`a:spcPts`). Null for a mixed range. */
+  readonly lineSpacingRule?: 'multiple' | 'exactly' | null;
+  /** The effective space before in points. Null for a mixed range or a space in lines. */
+  readonly spaceBefore?: number | null;
+  /** The effective space after in points. Null for a mixed range or a space in lines. */
+  readonly spaceAfter?: number | null;
+  /** The effective space before in lines. Null for a mixed range or a space in points. */
+  readonly lineUnitBefore?: number | null;
+  /** The effective space after in lines. Null for a mixed range or a space in points. */
+  readonly lineUnitAfter?: number | null;
+  /** The effective left margin (`marL`) in points. Null for a mixed range. */
+  readonly leftIndent?: number | null;
+  /** The effective first line indent (`indent`) in points. Null for a mixed range. */
+  readonly firstLineIndent?: number | null;
 }
 
 /** One key and value of a tag list (`p:tagLst`). */
