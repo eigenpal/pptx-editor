@@ -1617,13 +1617,13 @@ export const MAX_ADVANCE_MS = 3600000;
 export const MAX_BATCH_OPERATIONS = 10000;
 
 // @public
+export const MAX_COMMENT_AUTHOR = 255;
+
+// @public
 export const MAX_TRANSITION_MS = 59000;
 
 // @public
 export const MIN_TRANSITION_MS = 10;
-
-// @public
-export const MAX_COMMENT_AUTHOR = 255;
 
 // @public
 export interface ServerAutomationOptions extends StoreAutomationOptions {
