@@ -938,6 +938,13 @@ export type AutomationOperation = {
     readonly deleteSlides?: boolean;
 } | {
     readonly op: 'deleteAllSections';
+} | {
+    readonly op: 'readTransition';
+    readonly slide: AutomationRef;
+} | {
+    readonly op: 'setTransition';
+    readonly slide: AutomationRef;
+    readonly transition: AutomationTransitionWrite;
 };
 
 // @public
@@ -1309,6 +1316,24 @@ export interface AutomationTextSpan {
 }
 
 // @public
+export interface AutomationTransitionRead extends SlideTransitionState {
+    readonly direction: TransitionDirection | null;
+    readonly element: string | null;
+    readonly throughBlack: boolean;
+}
+
+// @public
+export interface AutomationTransitionWrite {
+    readonly advanceAfterMs?: number | null;
+    readonly advanceOnClick?: boolean;
+    readonly direction?: TransitionDirection;
+    readonly durationMs?: number;
+    readonly kind?: TransitionKind | 'none';
+    readonly remove?: true;
+    readonly throughBlack?: boolean;
+}
+
+// @public
 export type AutomationUnsubscribe = () => void;
 
 // @public
@@ -1411,6 +1436,9 @@ export type AutomationValue = {
 } | {
     readonly kind: 'selection';
     readonly selection: AutomationSelectionRead;
+} | {
+    readonly kind: 'transition';
+    readonly transition: AutomationTransitionRead;
 }
 /** A command that committed. The effect is the response's revision. */
 | {
@@ -1439,7 +1467,16 @@ export function createStoreAutomationHost(store: PptxDocumentStore, options?: St
 export type LineEndType = 'none' | 'triangle' | 'arrow' | 'stealth' | 'oval' | 'diamond';
 
 // @public
+export const MAX_ADVANCE_MS = 3600000;
+
+// @public
 export const MAX_BATCH_OPERATIONS = 10000;
+
+// @public
+export const MAX_TRANSITION_MS = 59000;
+
+// @public
+export const MIN_TRANSITION_MS = 10;
 
 // @public
 export interface ServerAutomationOptions extends StoreAutomationOptions {
@@ -1490,6 +1527,9 @@ export interface StoreAutomationOptions {
 
 // @public
 export function storeAutomationPort(store: PptxDocumentStore, options?: StoreAutomationOptions): AutomationDocumentPort;
+
+// @public
+export type TransitionDirection = 'l' | 'u' | 'r' | 'd' | 'horzIn' | 'horzOut' | 'vertIn' | 'vertOut';
 
 // (No @packageDocumentation comment for this package)
 

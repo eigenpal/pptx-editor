@@ -132,6 +132,55 @@ A write makes one paragraph for each line. `\n`, `\r\n`, `\r`, and `\v` each end
 
 The write applies at the next `context.sync()`, and a browser runtime records each synchronization as one undo step. Browser and server runtimes behave the same. The API refuses a value that is not a string, longer than 1,000,000 characters, or with a character that XML cannot hold. The refusal has the code `InvalidArgument`, and nothing in that synchronization applies. When the presentation has no notes master, a write that must create a notes slide refuses with `NotSupported`. The diagnostic is `edit.no-notes-master`. A notes slide with no body placeholder refuses a write with `NotSupported` and the diagnostic `edit.no-notes-placeholder`. `Presentation.replaceAll` and `Slide.replaceAll` also search the speaker notes. `slide.speakerNotes` is an SDK extension, not a member of the pinned Office.js reference.
 
+## Set slide transitions
+
+Use `slide.transition` to read or change the transition of a slide. The transition is the effect that shows the slide, its duration, and its advance settings. Call `transition.set()` to write several settings in one step. To apply one transition to every slide, load the slides and loop over them in one synchronization:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function fadeEverySlide(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const slides = context.presentation.slides.load('items');
+    await context.sync();
+    for (const slide of slides.items) {
+      slide.transition.set({ effect: 'Fade', durationMs: 700, advanceAfterMs: null });
+    }
+    await context.sync();
+    slides.load('items/transition/effect');
+    await context.sync();
+    return slides.items.map((slide) => slide.transition.effect);
+  });
+}
+```
+
+The writes of one `context.sync()` are one transaction. A browser runtime records them as one undo step. Browser and server runtimes behave the same. To remove the transition of a slide, call `slide.transition.remove()`.
+
+`SlideTransition` has these properties:
+
+| Property | Values | Saved as |
+| --- | --- | --- |
+| `effect` | `None`, `Fade`, `Push`, `Wipe`, `Split`, or `Cut`. Other standard effects, such as `Dissolve`, and `Other` are read only. | The effect element of `p:transition` |
+| `durationMs` | 10 to 59,000 milliseconds | `p14:dur`, and the nearest speed `spd` |
+| `advanceOnClick` | `true` or `false` | `advClick` |
+| `advanceAfterMs` | 0 to 3,600,000 milliseconds, or `null` for no automatic advance | `advTm` |
+| `direction` | `Left`, `Up`, `Right`, or `Down` for `Push` and `Wipe`. `HorizontalIn`, `HorizontalOut`, `VerticalIn`, or `VerticalOut` for `Split`. `null` for other effects. | `dir`, and `orient` for `Split` |
+| `throughBlack` | `true` or `false`, for `Fade` and `Cut` | `thruBlk` |
+
+A slide with no transition reads `None`, 750 ms, advance on click, and no advance time. A standard effect reads by its element name. An effect from an extension namespace reads `Other`. A write of the timing or the direction keeps the effect and the `mc:AlternateContent` branches that hold it. A write of a new effect replaces the transition markup. It keeps the duration, the advance settings, the transition sound (`p:sndAc`), and the extensions. A new `Push` goes up, and a new `Split` is `VerticalOut`, unless the same `set()` call sets `direction`.
+
+On a slide with an effect, `effect: 'None'` removes the effect, the sound, and the extensions. It keeps the advance settings. `remove()` removes the whole `p:transition`, also on a slide that holds only a sound. A write that does not set `effect` never removes markup. After `None`, set the effect and the duration in one `set()` call. A slide with no `p:transition` reads 750 ms. A slide that keeps an empty `p:transition` reads its speed, 500 ms by default.
+
+These writes refuse with `NotSupported`, and nothing in that synchronization is written:
+
+- A duration on a slide with no effect (`edit.transition-no-effect`). Set the effect and the duration in the same `set()` call.
+- A `direction` or `throughBlack` value for an effect that does not take it (`edit.transition-option-not-supported`).
+- A duration other than 500, 750, or 1000 ms on an extension effect that has no duration branch (`edit.transition-speed-only`).
+
+A read-only effect, an unknown name, or a value out of range refuses with `InvalidArgument`, and nothing is written. Setting the current value writes nothing.
+
+`slide.transition`, `SlideTransition`, `SlideTransitionEffect`, and `SlideTransitionDirection` are SDK extensions, not members of the pinned Office.js reference. Layouts and masters do not have this property.
+
 ## Edit line width, dashes, and endpoints
 
 Use `shape.lineFormat` to read or change line properties in either runtime. This example formats the first shape, which must be a supported line or connector:

@@ -25,6 +25,7 @@ import * as tables from './plan-tables.ts';
 import * as text from './plan-text.ts';
 import * as textFit from './plan-text-fit.ts';
 import * as theme from './plan-theme.ts';
+import * as transitions from './plan-transition.ts';
 import { AUTOMATION_COMMANDS } from './operations.ts';
 import {
   AutomationFailure,
@@ -445,6 +446,10 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return sections.deleteSection(ctx, op.section, op.deleteSlides);
     case 'deleteAllSections':
       return sections.deleteAllSections(ctx);
+    case 'readTransition':
+      return transitions.readTransition(ctx, op.slide);
+    case 'setTransition':
+      return transitions.setTransition(ctx, op.slide, op.transition);
     default:
       throw new AutomationFailure(
         'unknown-operation',

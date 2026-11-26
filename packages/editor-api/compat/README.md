@@ -163,3 +163,7 @@ Automatic adoption with `--adopt` requires both checks:
 ### Picture extension
 
 `ShapeCollection.addPicture()` is an SDK extension. The pinned Office.js PowerPoint reference has no member that adds a picture shape. Thus the compatibility manifest has no entry for it. It adds a `p:pic` element (ECMA-376 Part 1, §19.3.1.37) over a new Image part (§15.2.14). It takes PNG, JPEG, or GIF bytes of at most 50 MiB, as `ShapeFill.setImage()` does.
+
+### Slide transition extension
+
+`Slide.transition`, `SlideTransition`, `SlideTransitionOptions`, `SlideTransitionEffect`, and `SlideTransitionDirection` are SDK extensions. The pinned Office.js reference has no transition member, so the compatibility manifest has no entry for them. They read and write `p:transition` (`CT_SlideTransition`, ECMA-376 Part 1, §19.3.1.50). The effect names are the ECMA-376 effect element names in PascalCase. `Other` reads an effect from an extension namespace, and a timing write keeps it.

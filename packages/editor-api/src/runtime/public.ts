@@ -149,6 +149,9 @@ export {
   type TextFrameFit,
 } from '../model/text.ts';
 
+export { SlideTransitionDirection, SlideTransitionEffect } from '../model/transition-enums.ts';
+export { SlideTransition, type SlideTransitionOptions } from '../model/transitions.ts';
+
 export type {
   LineEndType,
   ShapeFormatPatch,

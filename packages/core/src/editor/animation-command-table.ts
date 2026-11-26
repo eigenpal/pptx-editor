@@ -59,7 +59,9 @@ export function compileAnimationCommand(
       const part = slides[i]?.partName;
       if (!part) throw new CommandRefusal('errors.malformed');
       try {
-        setTransition(batch, part, command);
+        // Only the fields of the command: the edit's other options belong to the editing API.
+        const { kind, durationMs, advanceOnClick, advanceAfterMs } = command;
+        setTransition(batch, part, { kind, durationMs, advanceOnClick, advanceAfterMs });
         changed += 1;
       } catch (e) {
         // A slide that has the transition already is skipped; the others change.

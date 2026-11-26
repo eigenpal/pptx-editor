@@ -29,6 +29,7 @@ import { ShapeCollection } from './shapes.ts';
 import { CustomXmlPartCollection } from './custom-xml.ts';
 import { TagCollection } from './tags.ts';
 import { ThemeColorScheme } from './theme.ts';
+import { SlideTransition } from './transitions.ts';
 
 /**
  * Options for `SlideCollection.add`.
@@ -56,6 +57,7 @@ export class Slide extends ModelObject {
   #master: SlideMaster | undefined;
   #background: SlideBackground | undefined;
   #theme: ThemeColorScheme | undefined;
+  #transition: SlideTransition | undefined;
 
   /** @internal */
   constructor(context: RequestContext, path: ObjectPath, nullable = false) {
@@ -184,6 +186,29 @@ export class Slide extends ModelObject {
     return (this.#background ??= new SlideBackground(
       this.context,
       ObjectPath.derived(`${this.path.label}.background`, this.path),
+      this.path
+    ));
+  }
+
+  /**
+   * The transition of the slide: the effect that shows it, how long the effect plays, and when
+   * the slide show moves on (`p:transition`, ECMA-376 Part 1, §19.3.1.50). Load its properties,
+   * or write them, as on any other object.
+   *
+   * This property is an SDK extension. The pinned Office.js reference has no such member.
+   *
+   * @example
+   * ```ts
+   * const transition = context.presentation.slides.getItemAt(0).transition.load('effect');
+   * await context.sync();
+   * if (transition.effect === 'None') transition.set({ effect: 'Fade', durationMs: 700 });
+   * await context.sync();
+   * ```
+   */
+  get transition(): SlideTransition {
+    return (this.#transition ??= new SlideTransition(
+      this.context,
+      ObjectPath.derived(`${this.path.label}.transition`, this.path),
       this.path
     ));
   }
@@ -369,6 +394,7 @@ export class Slide extends ModelObject {
       background: () => this.background,
       themeColorScheme: () => this.themeColorScheme,
       customXmlParts: () => this.customXmlParts,
+      transition: () => this.transition,
     });
     this.loadScalars(
       names.filter((name) => name !== 'speakerNotes'),

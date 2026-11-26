@@ -23,6 +23,7 @@ import {
   type Element,
   type PptxPackage,
 } from '../packages/core/src/store/index.ts';
+import type { AutomationTransitionWrite } from '../packages/core/src/automation/index.ts';
 import {
   createBrowserAutomationHost,
   createPptxEditor,
@@ -283,6 +284,23 @@ async function edited(bytes: Uint8Array): Promise<PptxPackage | null> {
     editor.exec({ type: 'removeAnimation', effectId: effects[3].id });
   }
   editor.exec({ type: 'setTransition', kind: 'split', durationMs: 1250, advanceAfterMs: 4000 });
+  // The editing API's transition writes (`Slide.transition`): a direction on every copy, and a
+  // transition with no effect that keeps only an advance time.
+  const api = createBrowserAutomationHost(editor);
+  const transition = (index: number, write: AutomationTransitionWrite): void => {
+    const response = api.execute({
+      operations: [
+        { op: 'getPresentation' },
+        { op: 'getSlide', key: { index } },
+        { op: 'setTransition', slide: { result: 1 }, transition: write },
+      ],
+    });
+    if (!response.ok) throw new Error(`transition write refused: ${JSON.stringify(response)}`);
+  };
+  transition(0, { kind: 'split', durationMs: 1250, direction: 'horzIn' });
+  const count = editor.snapshot().slides.length;
+  if (count > 1) transition(1, { kind: 'fade', durationMs: 600, throughBlack: true });
+  if (count > 2) transition(2, { kind: 'none', advanceAfterMs: 2000 });
   editor.exec({ type: 'nudge', dx: 9525, dy: 9525 });
   editor.exec({ type: 'duplicateSlide', index: 0 });
   editor.exec({ type: 'setNotes', index: 0, text: 'Edited notes' });

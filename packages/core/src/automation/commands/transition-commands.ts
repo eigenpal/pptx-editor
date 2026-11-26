@@ -10,10 +10,13 @@
 // A change of the advance settings or the duration writes into every copy of the transition,
 // so a kind that the editor does not write (and its extension markup) stays. A plain
 // `p:transition` holds only a speed: a duration that is no speed wraps it in a new
-// `mc:AlternateContent` whose `p14` choice holds the duration. A change of the
-// kind replaces the whole transition markup with a new `mc:AlternateContent`, and `none`
-// removes it. The new markup goes where `CT_Slide` puts the transition: after `p:clrMapOvr`
-// and before `p:timing` and `p:extLst`.
+// `mc:AlternateContent` whose `p14` choice holds the duration. A change of the kind replaces
+// the whole transition markup with a new `mc:AlternateContent` and keeps its sound (`p:sndAc`,
+// §19.5.69) and extensions. A change to `none` keeps only the advance settings. `clear`
+// removes the transition, and so does `none` with the default advance settings on a transition
+// that holds nothing. The new markup goes where `CT_Slide` puts the transition: after
+// `p:clrMapOvr` and before `p:timing` and `p:extLst`. A direction (`push`, `wipe`, `split`) or
+// `thruBlk` (`fade`, `cut`) goes into the effect element of every copy that holds that effect.
 
 import type { SlideTransitionState, TransitionKind } from '../../contracts/neutral.ts';
 import { attr, elements, NS, specOf, xmlPartOf, type Element } from '../../store/index.ts';
@@ -25,9 +28,11 @@ const isP = (el: Element | undefined, local: string): boolean =>
   !!el && el.ns === NS.p && el.local === local;
 const isAlternate = (el: Element): boolean => el.ns === NS.mc && el.local === 'AlternateContent';
 
-/** The shortest and longest transition, and the longest advance time, in ms. */
+/** The shortest transition duration that `setTransition` writes, in ms. */
 export const MIN_TRANSITION_MS = 10;
+/** The longest transition duration that `setTransition` writes, in ms. */
 export const MAX_TRANSITION_MS = 59_000;
+/** The longest advance time (`advTm`) that `setTransition` writes, in ms. */
 export const MAX_ADVANCE_MS = 3_600_000;
 
 // The tables are `Map`s: their keys come from the file and from commands, and an object would
@@ -120,12 +125,143 @@ export function readTransition(root: Element | undefined): SlideTransitionState 
   };
 }
 
+/**
+ * The direction of an effect: `dir` of `p:push` and `p:wipe` (`CT_SideDirectionTransition`,
+ * `ST_TransitionSideDirectionType`, ECMA-376 Part 1, §19.7.53: `l`, `u`, `r`, `d`, default `l`),
+ * or `orient` (`ST_Direction`, §19.7.2, default `horz`) with `dir`
+ * (`ST_TransitionInOutDirectionType`, §19.7.52, default `out`) of `p:split`
+ * (`CT_SplitTransition`).
+ */
+export type TransitionDirection =
+  'l' | 'u' | 'r' | 'd' | 'horzIn' | 'horzOut' | 'vertIn' | 'vertOut';
+
+/** The effect element and its options, as the first copy of the transition holds them. */
+export interface TransitionVariant {
+  /**
+   * The local name of the effect element when it is one of the `CT_SlideTransition` choices
+   * (§19.3.1.50) in the PresentationML namespace, else null (no effect, or an extension effect).
+   */
+  readonly element: string | null;
+  /** The direction of `push`, `wipe`, and `split`; null for any other effect. */
+  readonly direction: TransitionDirection | null;
+  /** `thruBlk` of `fade` and `cut` (`CT_OptionalBlackTransition`, default false). */
+  readonly throughBlack: boolean;
+}
+
+/** The effect elements of `CT_SlideTransition` (§19.3.1.50), in schema order. */
+const ELEMENTS: ReadonlySet<string> = new Set([
+  'blinds',
+  'checker',
+  'circle',
+  'dissolve',
+  'comb',
+  'cover',
+  'cut',
+  'diamond',
+  'fade',
+  'newsflash',
+  'plus',
+  'pull',
+  'push',
+  'random',
+  'randomBar',
+  'split',
+  'strips',
+  'wedge',
+  'wheel',
+  'wipe',
+  'zoom',
+]);
+const SIDES: ReadonlySet<string> = new Set(['l', 'u', 'r', 'd']);
+const SPLITS: ReadonlySet<string> = new Set(['horzIn', 'horzOut', 'vertIn', 'vertOut']);
+
+/** The effect element of one copy, or undefined. */
+function effectOf(el: Element): Element | undefined {
+  return elements(el).find((c) => !(isP(c, 'sndAc') || isP(c, 'extLst')));
+}
+
+const isTrue = (v: string | undefined): boolean => v === '1' || v === 'true';
+
+/** The effect element and its options of a slide root. */
+export function readTransitionVariant(root: Element | undefined): TransitionVariant {
+  const first = transitionOf(root).copies[0];
+  const effect = first && effectOf(first.el);
+  if (!effect || effect.ns !== NS.p || !ELEMENTS.has(effect.local))
+    return { element: null, direction: null, throughBlack: false };
+  const local = effect.local;
+  let direction: TransitionDirection | null = null;
+  if (local === 'push' || local === 'wipe') {
+    const dir = attr(effect, 'dir') ?? 'l';
+    direction = SIDES.has(dir) ? (dir as TransitionDirection) : null;
+  } else if (local === 'split') {
+    const inward = (attr(effect, 'dir') ?? 'out') === 'in';
+    const value = `${attr(effect, 'orient') ?? 'horz'}${inward ? 'In' : 'Out'}`;
+    direction = SPLITS.has(value) ? (value as TransitionDirection) : null;
+  }
+  const throughBlack = (local === 'fade' || local === 'cut') && isTrue(attr(effect, 'thruBlk'));
+  return { element: local, direction, throughBlack };
+}
+
 /** What `setTransition` changes; absent fields keep their values. */
 export interface TransitionChange {
   readonly kind?: TransitionKind | 'none';
   readonly durationMs?: number;
   readonly advanceOnClick?: boolean;
   readonly advanceAfterMs?: number | null;
+  /** For `push` and `wipe`, a side; for `split`, an orientation and a direction. */
+  readonly direction?: TransitionDirection;
+  /** For `fade` and `cut`. */
+  readonly throughBlack?: boolean;
+  /** Remove the whole transition, with its sound and extensions. The other fields are ignored. */
+  readonly clear?: boolean;
+}
+
+/** Whether `kind` takes `direction` and `throughBlack` as `change` names them. */
+export function variantFits(kind: SlideTransitionState['kind'], change: TransitionChange): boolean {
+  const { direction, throughBlack } = change;
+  if (direction !== undefined) {
+    if (kind === 'push' || kind === 'wipe') {
+      if (!SIDES.has(direction)) return false;
+    } else if (kind !== 'split' || !SPLITS.has(direction)) return false;
+  }
+  return throughBlack === undefined || kind === 'fade' || kind === 'cut';
+}
+
+/**
+ * Write `direction` and `throughBlack` into the effect element of every copy that holds the
+ * effect `kind`. An attribute at its schema default is removed, so the markup stays minimal.
+ */
+function applyVariant(batch: OpBatch, part: string, kind: string, change: TransitionChange): void {
+  if (change.direction === undefined && change.throughBlack === undefined) return;
+  const root = xmlPartOf(batch.pkg, part)?.root;
+  for (const copy of transitionOf(root).copies) {
+    const effect = effectOf(copy.el);
+    if (!effect || !isP(effect, kind)) continue;
+    const at = (local: string, value: string | null, fallback: string): void => {
+      const current = attr(effect, local) ?? fallback;
+      if (current === (value ?? fallback)) return;
+      batch.push({ op: 'setAttribute', part, node: effect.id, name: { ns: '', local }, value });
+    };
+    const { direction, throughBlack } = change;
+    if (direction !== undefined && SIDES.has(direction))
+      at('dir', direction === 'l' ? null : direction, 'l');
+    if (direction !== undefined && SPLITS.has(direction)) {
+      const orient = direction.startsWith('horz') ? 'horz' : 'vert';
+      at('orient', orient === 'horz' ? null : orient, 'horz');
+      at('dir', direction.endsWith('In') ? 'in' : null, 'out');
+    }
+    if (throughBlack !== undefined) {
+      const current = isTrue(attr(effect, 'thruBlk'));
+      if (current !== throughBlack)
+        batch.push({
+          op: 'setAttribute',
+          part,
+          node: effect.id,
+          name: { ns: '', local: 'thruBlk' },
+          value: throughBlack ? '1' : null,
+        });
+    }
+  }
 }
 
 const speedOf = (ms: number): string => (ms <= 500 ? 'fast' : ms <= 750 ? 'med' : 'slow');
@@ -171,6 +307,12 @@ function setAttr(
 export function setTransition(batch: OpBatch, part: string, change: TransitionChange): void {
   const root = xmlPartOf(batch.pkg, part)?.root;
   if (!root) throw new CommandRefusal('errors.malformed');
+  if (change.clear === true) {
+    const { holders } = transitionOf(root);
+    if (holders.length === 0) throw new CommandRefusal('disabled.noAnimationChange');
+    for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
+    return;
+  }
   if (change.kind !== undefined && change.kind !== 'none' && !KINDS.has(change.kind))
     throw new CommandRefusal('errors.unsupported', 'kind');
   const current = readTransition(root);
@@ -189,6 +331,7 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
           : checkMs(change.advanceAfterMs, 0, MAX_ADVANCE_MS),
   };
   if (typeof next.advanceOnClick !== 'boolean') throw new CommandRefusal('errors.unsupported');
+  if (!variantFits(next.kind, change)) throw new CommandRefusal('errors.unsupported', 'variant');
   const { holders, copies } = transitionOf(root);
   const before = batch.ops.length;
   const sameKind = next.kind === current.kind && copies.length > 0;
@@ -199,7 +342,19 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     holders.length === 1 &&
     isP(holders[0], 'transition') &&
     SPEEDS.get(speedOf(next.durationMs)) !== next.durationMs;
-  if (sameKind && !plainKeepsDuration) {
+  // An explicit `none` on a transition that holds nothing (no effect, no sound, no extensions)
+  // with the default advance settings removes it, as `clear` does. A
+  // write that does not name the kind never removes markup, and a slide with no effect keeps
+  // its sound.
+  const clears =
+    copies.length > 0 &&
+    change.kind === 'none' &&
+    copies.every((c) => elements(c.el).length === 0) &&
+    next.advanceOnClick &&
+    next.advanceAfterMs === null;
+  if (clears) {
+    for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
+  } else if (sameKind && !plainKeepsDuration) {
     // The same kind: write the settings into every copy, and keep the rest of the markup.
     for (const copy of copies) {
       setAttr(
@@ -228,6 +383,13 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     // copy of it with the duration.
     wrapPlain(batch, part, root, copies[0].el, next);
   } else {
+    // A new effect keeps the sound (`p:sndAc`, §19.5.69) and the extensions (`p:extLst`) of the
+    // transition, in the order of `CT_SlideTransition`.
+    const keptOf = (local: string): Element | undefined =>
+      next.kind === 'none'
+        ? undefined
+        : copies.map((c) => elements(c.el).find((x) => isP(x, local))).find(Boolean);
+    const kept = [keptOf('sndAc'), keptOf('extLst')].filter((x): x is Element => !!x);
     for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
     const xml = newTransitionXml(next);
     if (xml) {
@@ -245,8 +407,19 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
         index: at < 0 ? kids.length : at,
         spec: specFromXml(xml),
       });
+      for (const copy of kept.length ? transitionOf(xmlPartOf(batch.pkg, part)?.root).copies : [])
+        kept.forEach((el, i) =>
+          batch.push({
+            op: 'insertNode',
+            part,
+            parent: copy.el.id,
+            index: copy.el.children.length + i,
+            spec: specOf(el),
+          })
+        );
     }
   }
+  applyVariant(batch, part, next.kind, change);
   if (batch.ops.length === before) throw new CommandRefusal('disabled.noAnimationChange');
 }
 

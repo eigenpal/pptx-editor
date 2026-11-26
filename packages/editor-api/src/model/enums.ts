@@ -474,7 +474,7 @@ export interface EnumMap<O extends string> {
   fromFile(value: string | null | undefined): O | null;
 }
 
-function enumMap<O extends string>(
+export function enumMap<O extends string>(
   pairs: readonly (readonly [O, string])[],
   options: {
     readonly writeOnly?: readonly (readonly [O, string])[];

@@ -5,7 +5,13 @@
 // store ops through the edits in `commands/`. Lengths are in points and angles in degrees, as
 // the object model shows them; the host converts to EMU (12 700 per point) at this boundary.
 
-import type { FindOptions, LineEndType, ShapeFormatPatch } from '../contracts/neutral.ts';
+import type {
+  FindOptions,
+  LineEndType,
+  ShapeFormatPatch,
+  TransitionKind,
+} from '../contracts/neutral.ts';
+import type { TransitionDirection } from './commands/transition-commands.ts';
 import type { AutomationRef } from './protocol.ts';
 
 /** How a collection item is found: by position, or by the id the object model shows. */
@@ -219,6 +225,30 @@ export interface AutomationTableStyleWrite {
 
 /** `ShapeZOrder` moves. */
 export type AutomationZOrder = 'bringForward' | 'bringToFront' | 'sendBackward' | 'sendToBack';
+
+/**
+ * The slide transition settings a write sets (`p:transition`, `CT_SlideTransition`, ECMA-376
+ * Part 1, §19.3.1.50). Absent fields keep their values.
+ */
+export interface AutomationTransitionWrite {
+  /**
+   * The effect element to write. On a transition with an effect, `none` removes the effect, the
+   * sound, and the extensions, and keeps the advance settings. A slide with only a sound keeps it.
+   */
+  readonly kind?: TransitionKind | 'none';
+  /** 10 to 59,000 ms: `p14:dur`, and the nearest `spd` (`ST_TransitionSpeed`, §19.7.54). */
+  readonly durationMs?: number;
+  /** `advClick`. */
+  readonly advanceOnClick?: boolean;
+  /** `advTm`: 0 to 3,600,000 ms, or null to remove it. */
+  readonly advanceAfterMs?: number | null;
+  /** The side of `push` and `wipe`, or the orientation and direction of `split`. */
+  readonly direction?: TransitionDirection;
+  /** `thruBlk` of `fade` and `cut` (`CT_OptionalBlackTransition`). */
+  readonly throughBlack?: boolean;
+  /** `true` alone removes the whole `p:transition`, with its sound and extensions. */
+  readonly remove?: true;
+}
 
 /** Every operation a host understands. */
 export type AutomationOperation =
@@ -714,6 +744,13 @@ export type AutomationOperation =
   | {
       /** Remove every section. The slides stay. */
       readonly op: 'deleteAllSections';
+    }
+  // The transition of a slide (`p:transition`, ECMA-376 Part 1, §19.3.1.50).
+  | { readonly op: 'readTransition'; readonly slide: AutomationRef }
+  | {
+      readonly op: 'setTransition';
+      readonly slide: AutomationRef;
+      readonly transition: AutomationTransitionWrite;
     };
 
 /** The operations that write. Every other operation only reads. */
@@ -777,6 +814,7 @@ export const AUTOMATION_COMMANDS: ReadonlySet<AutomationOperation['op']> = new S
   'moveSection',
   'deleteSection',
   'deleteAllSections',
+  'setTransition',
 ]);
 
 /** The operations that need a reader's selection. */
