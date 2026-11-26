@@ -218,7 +218,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'none',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'Searches slide text, table cells, and speaker notes.',
+    notes:
+      'Searches slide text, table cells, and speaker notes. The editing API replaces text with `presentation.replaceAll` and `slide.replaceAll`.',
   },
   {
     id: 'text.clipboard',
@@ -283,7 +284,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Choose no autofit, shrink text on overflow, or resize the shape to fit. Autofit recalculates after edits, with approximate results for rotated text, multiple columns, and nonrectangular shapes. Titles shrink to 90% at most, then overflow.',
+      'Choose no autofit, shrink text on overflow, or resize the shape to fit. Autofit recalculates after edits, with approximate results for rotated text, multiple columns, and nonrectangular shapes. Titles shrink to 90% at most, then overflow. The editing API reports overflow with `textFrame.getTextFit()`.',
   },
   {
     id: 'paragraphs.text-direction-columns',
@@ -909,7 +910,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application. `shapes.addPicture` adds PNG, JPEG, or GIF pictures.',
+      'Automate presentation edits on servers or in live editors with @pptx-editor.dev/editor-api under the EigenPal Pro License. The API implements a selected Office.js subset with batched operations. Server image rendering requires a rasterizer supplied by your application. `shapes.addPicture` adds PNG, JPEG, or GIF pictures. SDK extensions add slide duplication, sections, speaker notes, comments, charts, transitions, headers and footers, highlight, and paragraph spacing.',
     docsLink: '/docs/editor-api',
   },
 

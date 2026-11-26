@@ -10,7 +10,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // - each `new CommandRefusal('<reason>', ...)`: an edit refusal (`disabled.*`, `errors.*`), which
 //   the host passes on as its detail;
 // - each `new AutomationFailure('<code>', <message>, '<detail>')` and `automationError(...)` with a
-//   literal detail;
+//   literal detail, or a template detail with a literal `<reason>:` head;
 // - each `badArgument('<name>')`, an argument refusal named by its field.
 //
 // Run `node packages/editor-api/scripts/refusal-reasons.mjs` to print the list as JSON.
@@ -56,6 +56,18 @@ function argumentsAt(source, open) {
 function literal(arg) {
   const m = /^(['"])((?:[^'"\\]|\\.)*)\1$/.exec(arg ?? '');
   return m ? m[2] : undefined;
+}
+
+/**
+ * The fixed reason of a failure detail. That is a plain literal, or the literal head of a
+ * template such as `` `chart-read-only:${why}` ``. `diagnosticOf` reads a detail up to its
+ * first ':', so the head selects the diagnostic and the test can check it.
+ */
+function detailReason(arg) {
+  const plain = literal(arg);
+  if (plain !== undefined) return plain;
+  const m = /^`([a-z][a-z-]*):\$\{[^`]*`$/.exec(arg ?? '');
+  return m ? m[1] : undefined;
 }
 
 /** The files the hosts reach through relative imports. */
@@ -107,7 +119,9 @@ export function refusalReasons() {
         const values =
           kind === 'refusal' && literal(args[at]) === undefined
             ? [...(args[at] ?? '').matchAll(/'((?:disabled|errors)\.[A-Za-z]+)'/g)].map((x) => x[1])
-            : [literal(args[at])].filter((v) => v !== undefined);
+            : [kind === 'failure' ? detailReason(args[at]) : literal(args[at])].filter(
+                (v) => v !== undefined
+              );
         if (values.length === 0)
           dynamic.push(`${relative(CORE, file)}:${source.slice(0, m.index).split('\n').length}`);
         for (const value of values)
