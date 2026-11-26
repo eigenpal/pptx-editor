@@ -29,6 +29,7 @@ const EXTENSIONS: ReadonlySet<string> = new Set([
   'duplicate',
   'hidden',
   'replaceAll',
+  'search',
   'highlightColor',
   'getTextFit',
   'speakerNotes',

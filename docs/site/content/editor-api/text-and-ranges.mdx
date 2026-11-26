@@ -1,6 +1,6 @@
 ---
 title: 'Text and ranges'
-description: 'Read, replace, and format text with TextFrame and TextRange.'
+description: 'Read, find, replace, and format text with TextFrame and TextRange.'
 category: 'Editing API'
 ---
 
@@ -8,36 +8,48 @@ Use `shape.textFrame.textRange` for a shape’s full text. Use `getSubstring(sta
 
 The example accepts a runtime from [Runtime and lifecycle](/docs/editor-api/runtime). The target shape must have a text frame.
 
-## Replace one occurrence
+## Find text in a range
 
-Load the text, find the target, and synchronize the replacement:
+Use `TextRange.search` to find each match inside a range. It returns a `TextRangeCollection`. Each match is a `TextRange` that you can read, write, and format:
 
 ```ts
 import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
 
-export async function replaceText(
+export async function boldEach(
   runtime: PptxEditorRuntime,
   slideId: string,
   shapeId: string,
-  search: string,
-  replacement: string
+  search: string
 ) {
-  if (!search) throw new Error('Search text must not be empty');
   return runtime.run(async (context) => {
     const slide = context.presentation.slides.getItem(slideId);
     const range = slide.shapes.getItem(shapeId).textFrame.textRange;
-    range.load('text');
+    const matches = range.search(search, { matchWholeWord: true });
+    matches.load('items');
     await context.sync();
-    const start = range.text.indexOf(search);
-    if (start === -1) return false;
-    range.getSubstring(start, search.length).text = replacement;
+    for (const match of matches.items) match.font.bold = true;
     await context.sync();
-    return true;
+    return matches.items.length;
   });
 }
 ```
 
-Offsets use UTF-16 code units, as JavaScript string indexes do. Do not split a surrogate pair. Paragraph breaks read as `\r`; line breaks read as `\v`. If another writer changes the presentation after the read, the write can fail with `StaleDocument`. Read the text again and reconsider the replacement before retrying.
+The collection has `items`, `getCount()`, `getItemAt(index)`, `getFirst()`, `getFirstOrNullObject()`, and `getLast()`. Load the text or the font of a match on the match itself, for example `matches.getFirst().load('text')`. `getFirst`, `getLast`, and `getItemAt` refuse with `ItemNotFound` at the sync when there is no such match.
+
+Each match keeps the offsets that the search found. A text write that changes the length of a match moves the text after it, so the later matches no longer cover their text. To write several matches, go from the last match to the first, or use [`replaceAll`](#replace-text-across-the-presentation). A format change, such as `font.bold`, keeps the length and is safe in any order.
+
+The search reads the text of the range at the sync, so a write earlier in the same batch counts. A match lies wholly inside the range. The matching rules and the refusals are those of [`replaceAll`](#replace-text-across-the-presentation): `SearchOptions` takes `matchCase` and `matchWholeWord`, a match stays in one paragraph, and a field or an equation is never part of a match. To replace one match, set its `text`:
+
+```ts
+const range = context.presentation.slides.getItem(slideId).shapes.getItem(shapeId)
+  .textFrame.textRange;
+range.search('{{client}}', { matchCase: true }).getFirst().text = 'Northwind';
+await context.sync();
+```
+
+Offsets use UTF-16 code units, as JavaScript string indexes do. Do not split a surrogate pair. Paragraph breaks read as `\r`; line breaks read as `\v`. If another writer changes the presentation between a read and a write, the write can fail with `StaleDocument`. Read the text again and reconsider the change before retrying.
+
+`TextRange.search` and `TextRangeCollection` are SDK extensions, in the shape of `Range.search` of the DOCX Editor API. The pinned Office.js reference has no such members.
 
 ## Replace text across the presentation
 

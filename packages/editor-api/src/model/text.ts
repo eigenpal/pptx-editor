@@ -45,6 +45,8 @@ import {
   type TextVerticalAlignment,
 } from './enums.ts';
 import { Hyperlink, HyperlinkScopedCollection, type HyperlinkAddOptions } from './hyperlinks.ts';
+import { searchArguments, type SearchOptions } from './search.ts';
+import { TextRangeCollection } from './text-ranges.ts';
 import { finite, flag, ModelObject, text, type RefOf } from './model-object.ts';
 import { Shape } from './shapes.ts';
 
@@ -297,14 +299,16 @@ export class TextRange extends ModelObject {
   }
 
   /**
-   * @internal A nullable range over a pending path whose shape and span a later read gives:
-   * the text range of a hyperlink that a lookup finds. `settle` resolves it, or marks it null.
+   * @internal A range over a pending path whose shape and span a later read gives: the text
+   * range of a hyperlink that a lookup finds, or a match of a search. `settle` resolves it, or
+   * marks it null. Nullable unless `nullable` is false.
    */
   static later(
     context: RequestContext,
-    path: ObjectPath
+    path: ObjectPath,
+    nullable = true
   ): { range: TextRange; settle: (to: { shape: AutomationHandle; span: Span } | null) => void } {
-    const range = new TextRange(context, path, path, undefined, true);
+    const range = new TextRange(context, path, path, undefined, nullable);
     return {
       range,
       settle(to) {
@@ -375,6 +379,45 @@ export class TextRange extends ModelObject {
       this.#shape,
       () => this.#span
     ));
+  }
+
+  /**
+   * The matches of `searchText` inside this range, in text order. An SDK extension, as
+   * `Range.search` of the DOCX Editor API: Office.js has no such member.
+   *
+   * Each match is a `TextRange` wholly inside this range, at fixed offsets. A text write that
+   * changes the length of a match moves the text after it, so write matches from the last to
+   * the first, or use `replaceAll`. The text is read at the sync, so an earlier write counts. The matching rules and the `InvalidArgument` refusals of
+   * the search text and options are those of `Presentation.replaceAll`: a match stays in one
+   * paragraph, never covers a field or an equation, and matches do not overlap.
+   *
+   * @example
+   * ```ts
+   * await runtime.run(async (context) => {
+   *   const shape = context.presentation.slides.getItemAt(0).shapes.getItemAt(0);
+   *   const matches = shape.textFrame.textRange.search('FY25', { matchWholeWord: true });
+   *   matches.load('items');
+   *   await context.sync();
+   *   for (const match of matches.items) match.font.bold = true;
+   *   await context.sync();
+   * });
+   * ```
+   */
+  search(searchText: string, options?: SearchOptions): TextRangeCollection {
+    const label = this.at('search');
+    const args = searchArguments(searchText, options, label);
+    const shape = this.#shape;
+    return new TextRangeCollection(
+      this.context,
+      ObjectPath.derived(`${this.path.label}.search()`, this.path),
+      shape,
+      (ref) => {
+        // `ref` first: for a range a read finds, it waits for that read, which gives the span.
+        const handle = ref(shape);
+        const span = this.#span;
+        return { op: 'findText', shape: handle, ...args, ...(span ? { span } : {}) };
+      }
+    );
   }
 
   /** The text frame that holds the range. */

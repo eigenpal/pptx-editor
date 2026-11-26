@@ -631,6 +631,14 @@ export type AutomationOperation =
       readonly shape: AutomationRef;
       readonly span?: AutomationTextSpan;
     }
+  | {
+      /** The matches of `query` inside the span, as `textSpans` in whole-text offsets. */
+      readonly op: 'findText';
+      readonly shape: AutomationRef;
+      readonly query: string;
+      readonly options?: FindOptions;
+      readonly span?: AutomationTextSpan;
+    }
   // Tags. The owner is the presentation, a slide, or a shape.
   | { readonly op: 'readTags'; readonly owner: AutomationRef }
   | {

@@ -1,0 +1,11 @@
+{
+  "impact": "no-impact",
+  "fields": [],
+  "before": "pptx-collaboration:1.8.1.1",
+  "after": "pptx-collaboration:1.8.1.1",
+  "reason": "The automation operation findText reads the matches of a query in one shape's text and answers their spans. It writes nothing. A write to a match goes through the existing text operations. Shared schemas, room metadata, repair rules, and canonical interpretation remain unchanged.",
+  "tests": [
+    "packages/core/src/automation/__tests__/host-find-text.test.ts",
+    "packages/editor-api/src/__tests__/text-range-search.test.ts"
+  ]
+}

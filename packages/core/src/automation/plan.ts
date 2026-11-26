@@ -216,6 +216,8 @@ export function planOperation(ctx: BatchPlanContext, op: AutomationOperation): A
       return slides.listHyperlinks(ctx, op.slide);
     case 'listTextHyperlinks':
       return slides.listTextHyperlinks(ctx, op.shape, op.span);
+    case 'findText':
+      return find.findText(ctx, op.shape, op.query, op.options, op.span);
     case 'listBindings':
       return bindings.listBindings(ctx, op.owner);
     case 'addBinding':
