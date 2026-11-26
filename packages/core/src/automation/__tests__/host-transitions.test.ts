@@ -158,9 +158,7 @@ describe('automation host: slide transitions', () => {
     const slide = firstSlide(host);
     ok(host, [{ op: 'setTransition', slide, transition: { kind: 'push', durationMs: 900 } }]);
     const pushed = saved(host);
-    expect(
-      pushed.match(new RegExp(`<p:push dir="u"/>${SOUND}${EXT.replace(/[{}]/g, '\\$&')}`, 'g'))
-    ).toHaveLength(2);
+    expect(pushed.split(`<p:push dir="u"/>${SOUND}${EXT}`).length - 1).toBe(2);
     ok(host, [{ op: 'setTransition', slide, transition: { kind: 'none' } }]);
     expect(saved(host)).toContain('<p:transition advTm="3000"/>');
     ok(host, [{ op: 'setTransition', slide, transition: { kind: 'none', advanceAfterMs: null } }]);
