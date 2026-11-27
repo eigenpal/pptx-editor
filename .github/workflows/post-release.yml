@@ -4,7 +4,8 @@ name: Post-release updates
 # When a Release run publishes, comment "Released in vX.Y.Z" on every shipped PR and every
 # issue it closed. When PPTX_ROADMAP_PROJECT_NUMBER is set, stamp that project's "Shipped in" field.
 # Send pptx-editor.dev an `upstream-release` dispatch, so the site moves to the new version
-# and regenerates its docs the same day. DOCX Editor commit adf0e178.
+# and regenerates its docs the same day. Wait for that sync: the site announces a merged
+# sync itself, and this workflow reports a sync that did not finish. DOCX Editor commit adf0e178.
 
 on:
   workflow_run:
@@ -320,8 +321,12 @@ jobs:
     needs: source
     if: needs.source.outputs.published == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    # The site sync waits for its own pull-request checks before it merges.
+    timeout-minutes: 60
     permissions: {}
+    outputs:
+      result: ${{ steps.wait.outputs.result }}
+      url: ${{ steps.wait.outputs.url }}
     steps:
       - name: Mint release-pal App token
         id: pal-token
@@ -337,11 +342,14 @@ jobs:
       # API reference, and merges only after its checks pass. Its daily
       # schedule stays as the fallback when this dispatch fails.
       - name: Dispatch upstream-release
+        id: dispatch
         env:
           GH_TOKEN: ${{ steps.pal-token.outputs.token }}
           VERSION: ${{ needs.source.outputs.version }}
           SITE: ${{ github.repository_owner }}/pptx-editor.dev
         run: |
+          # One minute of margin for clock skew between the runner and GitHub.
+          echo "since=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           body=$(jq -n --arg version "$VERSION" \
             '{event_type: "upstream-release", client_payload: {version: $version}}')
           # Retry a short API error before the run fails and reports to Slack.
@@ -356,9 +364,81 @@ jobs:
           echo "::error::Could not dispatch to $SITE. Its daily schedule syncs $VERSION instead."
           exit 1
 
+      # A sent dispatch is not a finished update. Wait for the site's sync run, so the
+      # Slack report below says whether the site reached the new version. The site names
+      # dispatch runs `upstream-release <version>`.
+      - name: Wait for the site sync
+        id: wait
+        env:
+          GH_TOKEN: ${{ steps.pal-token.outputs.token }}
+          VERSION: ${{ needs.source.outputs.version }}
+          SITE: ${{ github.repository_owner }}/pptx-editor.dev
+          SINCE: ${{ steps.dispatch.outputs.since }}
+        run: |
+          title="upstream-release $VERSION"
+          run_id=""
+          for _ in $(seq 1 40); do
+            # A failed read counts as "not found yet"; the loop retries it.
+            runs=$(gh api "repos/$SITE/actions/runs?event=repository_dispatch&created=%3E%3D$SINCE&per_page=50" 2>/dev/null) || runs='{}'
+            # shellcheck disable=SC2016 # $t is a jq variable.
+            run_id=$(jq -r --arg t "$title" '[.workflow_runs[]? | select(.display_title == $t)] | sort_by(.created_at) | .[0].id // ""' <<<"$runs" 2>/dev/null || true)
+            [ -n "$run_id" ] && break
+            sleep 15
+          done
+          if [ -z "$run_id" ]; then
+            echo "result=missing" >> "$GITHUB_OUTPUT"
+            echo "::error::No '$title' run started in $SITE within 10 minutes."
+            exit 1
+          fi
+          url="https://github.com/$SITE/actions/runs/$run_id"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Waiting for $url"
+          while :; do
+            # A failed read counts as "still running"; the job timeout bounds the wait.
+            state=$(gh api "repos/$SITE/actions/runs/$run_id" --jq '"\(.status) \(.conclusion // "")"' 2>/dev/null) || state="unknown "
+            [ "${state%% *}" = completed ] && break
+            sleep 30
+          done
+          result="${state#* }"
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          echo "$SITE sync for $VERSION: $result ($url)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$result" != success ]; then
+            echo "::error::The $SITE sync finished with $result: $url"
+            exit 1
+          fi
+
+  # pptx-editor.dev announces a merged sync itself (SLACK_DEPLOY_WEBHOOK_URL). This job
+  # reports the cases where the site update did not finish: no run, a failed run, a
+  # cancelled run, or a failed dispatch.
+  site-report:
+    name: Report a failed site update
+    needs: [source, site]
+    if: always() && needs.source.outputs.published == 'true' && (needs.site.result == 'failure' || needs.site.result == 'cancelled')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Notify Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          VERSION: ${{ needs.source.outputs.version }}
+          RESULT: ${{ needs.site.outputs.result || needs.site.result }}
+          SITE_RUN_URL: ${{ needs.site.outputs.url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL is not set, so the site update is not announced."
+            exit 0
+          fi
+          link="${SITE_RUN_URL:-$RUN_URL}"
+          text=":x: pptx-editor.dev update to v$VERSION finished with $RESULT. The packages are already on npm; do not republish. · <$link|site run> · <$RUN_URL|post-release run>"
+          jq -n --arg text "$text" '{text: $text}' \
+            | curl -sSf --connect-timeout 10 --max-time 30 -X POST -H 'Content-Type: application/json' -d @- "$SLACK_WEBHOOK_URL" >/dev/null
+
   report:
     name: Report a failure
-    needs: [source, announcements, site, collaboration-baseline]
+    # A failed site update is reported by site-report, with its site run.
+    needs: [source, announcements, collaboration-baseline]
     if: failure()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
