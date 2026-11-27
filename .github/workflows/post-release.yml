@@ -4,8 +4,8 @@ name: Post-release updates
 # When a Release run publishes, comment "Released in vX.Y.Z" on every shipped PR and every
 # issue it closed. When PPTX_ROADMAP_PROJECT_NUMBER is set, stamp that project's "Shipped in" field.
 # Send pptx-editor.dev an `upstream-release` dispatch, so the site moves to the new version
-# and regenerates its docs the same day. Wait for that sync and announce its result in
-# Slack, success or failure. DOCX Editor commit adf0e178.
+# and regenerates its docs the same day. Wait for that sync: the site announces a merged
+# sync itself, and this workflow reports a sync that did not finish. DOCX Editor commit adf0e178.
 
 on:
   workflow_run:
@@ -378,9 +378,10 @@ jobs:
           title="upstream-release $VERSION"
           run_id=""
           for _ in $(seq 1 40); do
+            # A failed read counts as "not found yet"; the loop retries it.
+            runs=$(gh api "repos/$SITE/actions/runs?event=repository_dispatch&created=%3E%3D$SINCE&per_page=50" 2>/dev/null) || runs='{}'
             # shellcheck disable=SC2016 # $t is a jq variable.
-            run_id=$( (gh api "repos/$SITE/actions/runs?event=repository_dispatch&created=%3E%3D$SINCE&per_page=50" || echo '{}') \
-              | jq -r --arg t "$title" '[.workflow_runs[]? | select(.display_title == $t)] | sort_by(.created_at) | .[0].id // ""')
+            run_id=$(jq -r --arg t "$title" '[.workflow_runs[]? | select(.display_title == $t)] | sort_by(.created_at) | .[0].id // ""' <<<"$runs" 2>/dev/null || true)
             [ -n "$run_id" ] && break
             sleep 15
           done
@@ -393,7 +394,8 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Waiting for $url"
           while :; do
-            state=$(gh api "repos/$SITE/actions/runs/$run_id" --jq '"\(.status) \(.conclusion // "")"' || echo "unknown ")
+            # A failed read counts as "still running"; the job timeout bounds the wait.
+            state=$(gh api "repos/$SITE/actions/runs/$run_id" --jq '"\(.status) \(.conclusion // "")"' 2>/dev/null) || state="unknown "
             [ "${state%% *}" = completed ] && break
             sleep 30
           done
@@ -405,11 +407,13 @@ jobs:
             exit 1
           fi
 
-  # A site update is announced after it finishes, the same way as for docx-editor.dev.
+  # pptx-editor.dev announces a merged sync itself (SLACK_DEPLOY_WEBHOOK_URL). This job
+  # reports the cases where the site update did not finish: no run, a failed run, a
+  # cancelled run, or a failed dispatch.
   site-report:
-    name: Report the site update
+    name: Report a failed site update
     needs: [source, site]
-    if: always() && needs.source.outputs.published == 'true' && needs.site.result != 'skipped'
+    if: always() && needs.source.outputs.published == 'true' && (needs.site.result == 'failure' || needs.site.result == 'cancelled')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -427,17 +431,14 @@ jobs:
             exit 0
           fi
           link="${SITE_RUN_URL:-$RUN_URL}"
-          if [ "$RESULT" = success ]; then
-            text=":books: pptx-editor.dev updated to v$VERSION: docs regenerated and merged to main · <https://www.pptx-editor.dev/docs/latest|docs> · <$link|site run>"
-          else
-            text=":x: pptx-editor.dev update to v$VERSION finished with $RESULT · <$link|site run> · <$RUN_URL|post-release run>"
-          fi
+          text=":x: pptx-editor.dev update to v$VERSION finished with $RESULT. The packages are already on npm; do not republish. · <$link|site run> · <$RUN_URL|post-release run>"
           jq -n --arg text "$text" '{text: $text}' \
             | curl -sSf --connect-timeout 10 --max-time 30 -X POST -H 'Content-Type: application/json' -d @- "$SLACK_WEBHOOK_URL" >/dev/null
 
   report:
     name: Report a failure
-    needs: [source, announcements, site, collaboration-baseline]
+    # A failed site update is reported by site-report, with its site run.
+    needs: [source, announcements, collaboration-baseline]
     if: failure()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
